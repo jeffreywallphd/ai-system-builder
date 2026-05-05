@@ -5,6 +5,7 @@ export interface ComfyUiImageGenerationWorkflowMapperOptions {
   defaultWidth?: number;
   defaultHeight?: number;
   defaultSteps?: number;
+  latentReferenceImageName?: string;
   defaultSampler?: string;
   defaultScheduler?: string;
 }
@@ -25,12 +26,16 @@ export function mapImageGenerationRequestToComfyUiPrompt(
   const width = request.width ?? options.defaultWidth ?? 1024;
   const height = request.height ?? options.defaultHeight ?? 1024;
   const steps = request.steps ?? options.defaultSteps ?? 30;
-  const sampler = request.sampler ?? options.defaultSampler ?? "euler";
-  const scheduler = request.scheduler ?? options.defaultScheduler ?? "normal";
+  const cfg = request.cfg ?? 8;
+  const denoise = request.denoise ?? 1;
+  const sampler = request.sampler ?? options.defaultSampler ?? "dpmpp_2m";
+  const scheduler = request.scheduler ?? options.defaultScheduler ?? "karras";
   const seed = request.seed ?? (Math.floor(Math.random() * Number.MAX_SAFE_INTEGER) + 1);
+  const latentSource = request.latentSource?.kind === "artifact" && options.latentReferenceImageName
+    ? ["10", 0]
+    : ["4", 0];
 
-  return {
-    prompt: {
+  const prompt: ComfyUiPromptPayload["prompt"] = {
       "1": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: checkpoint } },
       "2": { class_type: "CLIPTextEncode", inputs: { text: request.prompt, clip: ["1", 1] } },
       "3": { class_type: "CLIPTextEncode", inputs: { text: request.negativePrompt ?? "", clip: ["1", 1] } },
@@ -40,18 +45,25 @@ export function mapImageGenerationRequestToComfyUiPrompt(
         inputs: {
           seed,
           steps,
-          cfg: 8,
+          cfg,
           sampler_name: sampler,
           scheduler,
-          denoise: 1,
+          denoise,
           model: ["1", 0],
           positive: ["2", 0],
           negative: ["3", 0],
-          latent_image: ["4", 0],
+          latent_image: latentSource,
         },
       },
       "6": { class_type: "VAEDecode", inputs: { samples: ["5", 0], vae: ["1", 2] } },
       "7": { class_type: "SaveImage", inputs: { filename_prefix: "ai-system-builder", images: ["6", 0] } },
-    },
   };
+
+  if (request.latentSource?.kind === "artifact" && options.latentReferenceImageName) {
+    prompt["8"] = { class_type: "LoadImage", inputs: { image: options.latentReferenceImageName } };
+    prompt["9"] = { class_type: "ResizeAndPadImage", inputs: { image: ["8", 0], target_width: width, target_height: height, padding_color: "black", interpolation: "area" } };
+    prompt["10"] = { class_type: "VAEEncode", inputs: { pixels: ["9", 0], vae: ["1", 2] } };
+  }
+
+  return { prompt };
 }

@@ -1,6 +1,7 @@
 import type { ArtifactRepoStoragePort } from "../../../application/ports/storage";
 import { execFile as nodeExecFile } from "node:child_process";
 import { existsSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
@@ -10,6 +11,7 @@ import { createComfyUiHttpClient, createComfyUiImageGenerationRuntimeAdapter, cr
 import { createComfyUiRuntimeInstaller } from "../../../adapters/runtime/installer/comfyui/createComfyUiRuntimeInstaller";
 import { createPythonRuntimeAdapterFoundation, ensurePythonRuntimeWorkerDependencies } from "../../../adapters/runtime/python";
 import { createGitRuntimeInstallerAdapter } from "../../../adapters/runtime/installer/git/createGitRuntimeInstallerAdapter";
+import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
 import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
 import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/model/huggingface";
 import { createLocalImageAssetRegistryAdapter } from "../../../adapters/persistence/image";
@@ -30,6 +32,7 @@ import {
   StoreArtifactUploadUseCase,
   VerifyImportedArtifactSourceBackingUseCase,
   VerifyPublishedArtifactBackingUseCase,
+  DeleteRegisteredArtifactUseCase,
   BrowseModelsUseCase,
   GetModelDetailsUseCase,
   ListModelsUseCase,
@@ -37,6 +40,10 @@ import {
   DownloadModelUseCase,
   UpdateModelRecordUseCase,
   DeleteModelRecordUseCase,
+  ListSettingsDefinitionsUseCase,
+  ReadSettingsUseCase,
+  UpdateSettingUseCase,
+  ClearSettingUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import {
@@ -71,6 +78,7 @@ import {
   type ComfyUiPythonEnvironmentMode,
 } from "../../../adapters/runtime/comfyui/comfyUiPythonEnvironment";
 import type { ComfyUiRuntimeDeviceMode } from "../../../adapters/runtime/comfyui/createComfyUiRuntimeSupervisor";
+import { RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY } from "../../../contracts/settings";
 
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
 const execFile = promisify(nodeExecFile);
@@ -153,6 +161,10 @@ export interface ComposeServerHostOptions {
   logSink?: StructuredLogSink;
   now?: () => string;
   artifactRepo?: ComposeServerHostArtifactRepoOptions;
+  restartServer?: () => void | Promise<void>;
+  settings?: {
+    localSettingsFilePath?: string;
+  };
 }
 
 export interface RegisterServerApiOptions {
@@ -161,7 +173,7 @@ export interface RegisterServerApiOptions {
   runtimeRootDirectory?: string;
 }
 
-export type ServerComfyUiInstallRootSource = "COMFYUI_INSTALL_ROOT" | "SERVER_RUNTIME_ROOT" | "default-server-runtime-root";
+export type ServerComfyUiInstallRootSource = "SERVER_RUNTIME_ROOT" | "default-server-runtime-root";
 export type ServerComfyUiLaunchPythonExecutableSource = "ambient" | "managed-venv" | "skip-python-setup";
 export type ServerPythonRuntimeMode = "worker-sidecar";
 export type ServerPythonRuntimeRootSource = "SERVER_RUNTIME_ROOT" | "default-server-runtime-root";
@@ -173,9 +185,46 @@ function normalizeComfyUiRuntimeDeviceMode(value: string | undefined): ComfyUiRu
   return undefined;
 }
 
+function normalizeServerImageGenerationRuntimeMode(value: string | undefined): ComfyUiRuntimeDeviceMode | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === "nvidia") return "cuda";
+  if (normalized === "amd" || normalized === "intel") return "directml";
+  return normalizeComfyUiRuntimeDeviceMode(normalized);
+}
+
 function parseBooleanEnvFlag(value: string | undefined): boolean {
   const normalized = value?.trim().toLowerCase();
   return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
+function extensionForImageReference(mediaType: string | undefined, artifactId: string): string {
+  const media = mediaType?.trim().toLowerCase();
+  if (media === "image/jpeg" || media === "image/jpg") return ".jpg";
+  if (media === "image/webp") return ".webp";
+  if (media === "image/png") return ".png";
+  const match = artifactId.match(/\.(png|jpe?g|webp)$/i);
+  return match ? `.${match[1].toLowerCase().replace("jpeg", "jpg")}` : ".png";
+}
+
+function parseServerComfyUiPort(env: NodeJS.ProcessEnv): number {
+  const raw = env.SERVER_COMFYUI_PORT?.trim();
+  if (!raw) return 8189;
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("SERVER_COMFYUI_PORT must be an integer between 1 and 65535.");
+  }
+  return port;
+}
+
+function classifyPythonRuntimeSupervisorLogLevel(eventType: string, source?: unknown): "info" | "warn" | "error" {
+  if (eventType === "process-error" || eventType === "startup-timeout") {
+    return "error";
+  }
+  if (eventType === "process-exit" || source === "stderr") {
+    return "warn";
+  }
+  return "info";
 }
 
 export function resolveServerComfyUiPythonEnvironmentMode(env: NodeJS.ProcessEnv = process.env): {
@@ -215,8 +264,13 @@ export function resolveServerComfyUiLaunchPythonExecutable(input: {
   };
 }
 
-export function resolveServerComfyUiRuntimeDeviceMode(env: NodeJS.ProcessEnv = process.env): ComfyUiRuntimeDeviceMode {
-  return normalizeComfyUiRuntimeDeviceMode(env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR) ?? "cpu";
+export function resolveServerComfyUiRuntimeDeviceMode(
+  env: NodeJS.ProcessEnv = process.env,
+  requestedRuntimeMode?: string,
+): ComfyUiRuntimeDeviceMode {
+  return normalizeComfyUiRuntimeDeviceMode(env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR)
+    ?? normalizeServerImageGenerationRuntimeMode(requestedRuntimeMode)
+    ?? "cpu";
 }
 
 export function resolveServerRuntimeRootDirectory(input: {
@@ -239,10 +293,6 @@ export function resolveServerComfyUiInstallRoot(input: {
   runtimeRootDirectory: string;
 }): { installRoot: string; source: ServerComfyUiInstallRootSource } {
   const env = input.env ?? process.env;
-  const configured = env.COMFYUI_INSTALL_ROOT?.trim();
-  if (configured) {
-    return { installRoot: resolve(configured), source: "COMFYUI_INSTALL_ROOT" };
-  }
   const runtime = resolveServerRuntimeRootDirectory({ env, runtimeRootDirectory: input.runtimeRootDirectory });
   return {
     installRoot: joinHostPath(runtime.runtimeRootDirectory, "runtime-installs", "comfyui"),
@@ -313,6 +363,15 @@ export function composeServerHost(
     registerApi(registerOptions) {
       const env = options.env ?? process.env;
       const defaultRuntimeRootDirectory = joinHostPath(dirname(registerOptions.storageRootDirectory), "server-runtime");
+      const applicationSettings = createLocalApplicationSettingsAdapter({
+        filePath: options.settings?.localSettingsFilePath ?? joinHostPath(registerOptions.storageRootDirectory, "config", "application-settings.json"),
+        now: options.now,
+      });
+      const applicationSecrets = createInMemorySecretsAdapter();
+      const readRuntimeSettingString = async (key: string): Promise<string | undefined> => {
+        const value = (await applicationSettings.readValues({ keys: [key] }))[0]?.value;
+        return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+      };
       const serverRuntimeResolution = resolveServerRuntimeRootDirectory({
         env,
         runtimeRootDirectory: registerOptions.runtimeRootDirectory ?? defaultRuntimeRootDirectory,
@@ -512,23 +571,34 @@ export function composeServerHost(
         artifactStorage: storage,
         now: options.now,
       });
+      const deleteRegisteredArtifact = new DeleteRegisteredArtifactUseCase({
+        artifactCatalogRead: artifactCatalog,
+        artifactCatalogDelete: artifactCatalog,
+        storage,
+        artifactBindingStorage: artifactBindings,
+      });
 
       const resolvedRuntimeDeviceMode = runtimeDeviceMode;
       void loggingPort.log({ level: "info", message: "Resolved ComfyUI runtime device mode.", timestamp: new Date().toISOString(), verbosity: "normal", event: "runtime.comfyui.configuration", component: "server-host", subsystem: "runtime", data: { runtimeDeviceMode: resolvedRuntimeDeviceMode } });
 
       const comfyUiInstallRoot = runtimeResolution.installRoot;
-      const comfyUiBaseUrl = env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
+      const comfyUiHost = "127.0.0.1";
+      const comfyUiPort = parseServerComfyUiPort(env);
+      const comfyUiBaseUrl = `http://${comfyUiHost}:${comfyUiPort}`;
       const installCommandTimeoutMs = parseNumberEnv(env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS, "COMFYUI_INSTALL_COMMAND_TIMEOUT_MS");
       const execFileWithTimeout = async (file: string, args: readonly string[] = []) => execFile(file, [...args], {
         ...(installCommandTimeoutMs ? { timeout: installCommandTimeoutMs } : {}),
         windowsHide: true,
       }) as Promise<{ stdout: string; stderr: string }>;
       const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort, execFile: execFileWithTimeout });
-      const comfyUiInstaller = createComfyUiRuntimeInstaller({
+      let comfyUiSupervisor: ReturnType<typeof createComfyUiRuntimeSupervisor> | undefined;
+      let activeRuntimeDeviceMode: ComfyUiRuntimeDeviceMode | undefined;
+      const createComfyUiInstallerForMode = async (mode: ComfyUiRuntimeDeviceMode) => createComfyUiRuntimeInstaller({
         gitInstaller: gitRuntimeInstaller,
         pythonCommand: basePythonCommand,
         execFile: execFileWithTimeout,
-        runtimeDeviceMode: resolvedRuntimeDeviceMode,
+        runtimeDeviceMode: mode,
+        cudaTorchWheelIndexUrl: await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY),
         skipPythonSetup,
         skipPythonValidation,
         pythonEnvironmentMode,
@@ -538,20 +608,95 @@ export function composeServerHost(
         directMlPackageName: env.COMFYUI_DIRECTML_PACKAGE,
         logging: loggingPort,
       });
-      const comfyUiSupervisor = createComfyUiRuntimeSupervisor({
-        workingDirectory: comfyUiInstallRoot,
-        pythonExecutable: launchPythonResolution.launchPythonExecutable,
-        installer: comfyUiInstaller,
-        installRoot: comfyUiInstallRoot,
-        runtimeDeviceMode: resolvedRuntimeDeviceMode,
-        autoInstall: true,
-        installSourceRef: env.COMFYUI_INSTALL_REF,
-        
-        logging: loggingPort,
-      });
+      const startComfyUiWithRuntimeDeviceMode = async (request: { runtimeDeviceMode?: ComfyUiRuntimeDeviceMode }) => {
+        const cudaTorchWheelIndexUrl = await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY);
+        const envOverride = normalizeComfyUiRuntimeDeviceMode(env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR);
+        const requestedMode = normalizeServerImageGenerationRuntimeMode(request.runtimeDeviceMode);
+        const resolvedRequestMode = envOverride
+          ?? (requestedMode === undefined || requestedMode === "auto"
+            ? (cudaTorchWheelIndexUrl ? "cuda" : "cpu")
+            : resolveServerComfyUiRuntimeDeviceMode(env, request.runtimeDeviceMode));
+        const modeChanged = activeRuntimeDeviceMode !== undefined && activeRuntimeDeviceMode !== resolvedRequestMode;
+        if (modeChanged && comfyUiSupervisor) {
+          await comfyUiSupervisor.stop();
+          comfyUiSupervisor = undefined;
+        }
+        if (!comfyUiSupervisor) {
+          comfyUiSupervisor = createComfyUiRuntimeSupervisor({
+            workingDirectory: comfyUiInstallRoot,
+            pythonExecutable: launchPythonResolution.launchPythonExecutable,
+            installer: await createComfyUiInstallerForMode(resolvedRequestMode),
+            installRoot: comfyUiInstallRoot,
+            host: comfyUiHost,
+            port: comfyUiPort,
+            runtimeDeviceMode: resolvedRequestMode,
+            autoInstall: true,
+            installSourceRef: env.COMFYUI_INSTALL_REF,
+            logging: loggingPort,
+          });
+          activeRuntimeDeviceMode = resolvedRequestMode;
+        }
+        await loggingPort.log({
+          level: "info",
+          message: "Resolved server ComfyUI runtime mode before start.",
+          timestamp: new Date().toISOString(),
+          verbosity: "normal",
+          event: "runtime.comfyui.mode.resolution",
+          component: "server-host",
+          subsystem: "runtime",
+          data: {
+            requestedRuntimeDeviceMode: request.runtimeDeviceMode,
+            cudaTorchWheelIndexConfigured: Boolean(cudaTorchWheelIndexUrl),
+            envOverrideWon: Boolean(envOverride),
+            runtimeDeviceMode: resolvedRequestMode,
+            processReuse: modeChanged ? "restarted_mode_changed" : "reused_or_started",
+          },
+        });
+        await comfyUiSupervisor.start();
+      };
+      const comfyUiSupervisorPort = {
+        async start() {
+          await startComfyUiWithRuntimeDeviceMode({});
+        },
+        async startWithRuntimeDeviceMode(request: { runtimeDeviceMode?: ComfyUiRuntimeDeviceMode }) {
+          await startComfyUiWithRuntimeDeviceMode(request);
+        },
+        getRecentRuntimeOutput() {
+          return comfyUiSupervisor?.getRecentRuntimeOutput() ?? [];
+        },
+        getRuntimeDeviceMode() {
+          return activeRuntimeDeviceMode ?? runtimeDeviceMode;
+        },
+      };
+      const comfyUiClient = createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl });
+      const imageGenerationRuntimeControl = {
+        async unloadModel() {
+          if (!comfyUiSupervisor?.isRunning()) {
+            return { unloaded: true, message: "No running ComfyUI runtime process has a loaded model." };
+          }
+          await comfyUiClient.unloadModels();
+          return { unloaded: true, message: "ComfyUI model memory was released." };
+        },
+      };
       const runtimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
-        client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }),
-        supervisor: comfyUiSupervisor,
+        client: comfyUiClient,
+        supervisor: comfyUiSupervisorPort,
+        prepareLatentReferenceImage: async ({ artifactId }) => {
+          const result = await storage.retrieveArtifact({ key: artifactId });
+          if (!result.ok) {
+            throw new Error(`Unable to read latent reference image artifact '${artifactId}': ${result.error.message}`);
+          }
+          const content = result.value.content instanceof Uint8Array
+            ? result.value.content
+            : new Uint8Array(result.value.content as ArrayBufferLike);
+          const mediaType = result.value.descriptor.mediaType;
+          const extension = extensionForImageReference(mediaType, artifactId);
+          const imageName = `ai-system-builder-latent-${Date.now()}-${Math.random().toString(36).slice(2)}${extension}`;
+          const inputDirectory = joinHostPath(comfyUiInstallRoot, "input");
+          await mkdir(inputDirectory, { recursive: true });
+          await writeFile(joinHostPath(inputDirectory, imageName), content);
+          return { imageName };
+        },
         mapperOptions: { defaultCheckpoint: env.COMFYUI_DEFAULT_CHECKPOINT },
       });
       
@@ -575,7 +720,8 @@ export function composeServerHost(
         PYTHON_RUNTIME_PORT: pythonRuntimeEndpoint.port || "43111",
         HF_HOME: hfHome,
         TRANSFORMERS_CACHE: transformersCache,
-        HF_HUB_DISABLE_XET: env.HF_HUB_DISABLE_XET ?? "1",
+        ...(env.HF_HUB_DISABLE_XET ? { HF_HUB_DISABLE_XET: env.HF_HUB_DISABLE_XET } : {}),
+        HF_XET_CACHE: env.HF_XET_CACHE?.trim() || joinHostPath(pythonRuntimeRoot, "xet"),
         HF_HUB_DISABLE_SYMLINKS_WARNING: env.HF_HUB_DISABLE_SYMLINKS_WARNING ?? "1",
       };
       const pythonRuntimeFoundation = createPythonRuntimeAdapterFoundation({
@@ -588,14 +734,64 @@ export function composeServerHost(
           prepareRuntimeEnvironment(context) {
             ensurePythonRuntimeWorkerDependencies({ command: context.command, cwd: context.cwd, env: context.env });
           },
+          onEvent(event) {
+            const source = event.data?.source;
+            const detail = event.detail?.trim();
+            const message = event.type === "stdio"
+              ? `Python runtime ${source === "stderr" ? "stderr" : "stdout"}: ${detail ?? ""}`
+              : detail ?? `Python runtime event: ${event.type}`;
+            void loggingPort.log({
+              timestamp: new Date().toISOString(),
+              level: classifyPythonRuntimeSupervisorLogLevel(event.type, source),
+              verbosity: "normal",
+              event: "runtime.python.server.activity",
+              message,
+              component: "python-runtime-supervisor",
+              subsystem: "runtime",
+              data: {
+                eventType: event.type,
+                supervisorStatus: event.status,
+                ...event.data,
+              },
+            });
+          },
         },
       });
       const downloadModelUseCase = new DownloadModelUseCase({
         modelRegistry,
         modelDownloader: {
           ensureModelDownloaded: async (request) => {
+            const startedAt = Date.now();
+            modelManagementLogger.info("runtime.python.model_download.requested", {
+              provider: request.provider,
+              modelId: request.modelId,
+            });
             await pythonRuntimeFoundation.supervisor.start();
-            return pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request);
+            modelManagementLogger.info("runtime.python.model_download.runtime_ready", {
+              provider: request.provider,
+              modelId: request.modelId,
+              elapsedMs: Date.now() - startedAt,
+            });
+            try {
+              const result = await pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request);
+              modelManagementLogger.info("runtime.python.model_download.succeeded", {
+                provider: result.provider,
+                modelId: result.modelId,
+                downloaded: result.downloaded,
+                fromCache: result.fromCache,
+                hasLocalPath: typeof result.localPath === "string" && result.localPath.length > 0,
+                elapsedMs: Date.now() - startedAt,
+              });
+              return result;
+            } catch (error) {
+              modelManagementLogger.warn("runtime.python.model_download.failed", {
+                provider: request.provider,
+                modelId: request.modelId,
+                message: error instanceof Error ? error.message : String(error),
+                elapsedMs: Date.now() - startedAt,
+              });
+              throw error;
+            }
           },
         },
       });
@@ -608,9 +804,24 @@ export function composeServerHost(
       const generateImageUseCase = new GenerateImageUseCase({
         runtimeTaskRegistry,
         modelCheckpointResolver: createRuntimePreparedModelCheckpointResolver({
-          runtime: comfyUiSupervisor,
+          runtime: comfyUiSupervisorPort,
           modelCheckpointResolver: localModelCheckpointResolver,
         }),
+      });
+      const listSettingsDefinitionsUseCase = new ListSettingsDefinitionsUseCase({
+        settings: applicationSettings,
+      });
+      const readSettingsUseCase = new ReadSettingsUseCase({
+        settings: applicationSettings,
+        secrets: applicationSecrets,
+      });
+      const updateSettingUseCase = new UpdateSettingUseCase({
+        settings: applicationSettings,
+        secrets: applicationSecrets,
+      });
+      const clearSettingUseCase = new ClearSettingUseCase({
+        settings: applicationSettings,
+        secrets: applicationSecrets,
       });
 
       const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({
@@ -642,6 +853,7 @@ export function composeServerHost(
         readArtifactDetailUseCase: readArtifactDetail,
         readArtifactContentUseCase: readArtifactContent,
         artifactMediaViewRetrieval,
+        deleteRegisteredArtifactUseCase: deleteRegisteredArtifact,
         hasArtifactInRepoUseCase: hasArtifactInRepo,
         browseHuggingFaceNamespaceDatasetsUseCase: browseHuggingFaceNamespaceDatasets,
         browseHuggingFaceDatasetParquetFilesUseCase: browseHuggingFaceDatasetParquetFiles,
@@ -660,7 +872,13 @@ export function composeServerHost(
         deleteModelRecordUseCase,
         generateImageUseCase,
         imageGenerationFinalizationOrchestrator,
+        imageGenerationRuntimeControl,
+        listSettingsDefinitionsUseCase,
+        readSettingsUseCase,
+        updateSettingUseCase,
+        clearSettingUseCase,
         modelManagementLogger,
+        restartServer: options.restartServer,
       });
     },
   };

@@ -1,7 +1,7 @@
 import type { ChangeEvent } from "react";
-import type { ImageGenerationFormValues, ImageGenerationModelLoadStatus, ImageGenerationModelOption } from "../hooks/useImageGenerationFeature";
+import type { ImageGenerationArtifactOption, ImageGenerationFormValues, ImageGenerationModelLoadStatus, ImageGenerationModelOption } from "../hooks/useImageGenerationFeature";
 
-export function ImageGenerationForm({ form, setForm, validationError, isStartDisabled, onSubmit, availableModels, modelLoadStatus, modelLoadMessage }: { form: ImageGenerationFormValues; setForm: (v: ImageGenerationFormValues) => void; validationError?: string; isStartDisabled: boolean; onSubmit: () => void; availableModels: ImageGenerationModelOption[]; modelLoadStatus: ImageGenerationModelLoadStatus; modelLoadMessage?: string; }) {
+export function ImageGenerationForm({ form, setForm, validationError, isStartDisabled, onSubmit, availableModels, availableImageArtifacts = [], artifactLoadMessage, modelLoadStatus, modelLoadMessage }: { form: ImageGenerationFormValues; setForm: (v: ImageGenerationFormValues) => void; validationError?: string; isStartDisabled: boolean; onSubmit: () => void; availableModels: ImageGenerationModelOption[]; availableImageArtifacts?: ImageGenerationArtifactOption[]; artifactLoadMessage?: string; modelLoadStatus: ImageGenerationModelLoadStatus; modelLoadMessage?: string; }) {
   const bindText = (key: keyof ImageGenerationFormValues) => ({ value: form[key], onChange: (e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: e.target.value }) });
   return (
     <section className="ui-panel ui-stack ui-stack--sm">
@@ -12,6 +12,8 @@ export function ImageGenerationForm({ form, setForm, validationError, isStartDis
       <label className="ui-stack ui-stack--sm"><span>Width</span><input className="ui-input" type="number" {...bindText("width")} /></label>
       <label className="ui-stack ui-stack--sm"><span>Height</span><input className="ui-input" type="number" {...bindText("height")} /></label>
       <label className="ui-stack ui-stack--sm"><span>Steps</span><input className="ui-input" type="number" {...bindText("steps")} /></label>
+      <label className="ui-stack ui-stack--sm"><span>CFG</span><input className="ui-input" type="number" {...bindText("cfg")} /></label>
+      <label className="ui-stack ui-stack--sm"><span>Denoise</span><input className="ui-input" type="number" min="0" max="1" step="0.01" {...bindText("denoise")} /></label>
       <label className="ui-stack ui-stack--sm"><span>Sampler</span><input className="ui-input" {...bindText("sampler")} /></label>
       <label className="ui-stack ui-stack--sm"><span>Scheduler</span><input className="ui-input" {...bindText("scheduler")} /></label>
       <label className="ui-stack ui-stack--sm">
@@ -22,6 +24,14 @@ export function ImageGenerationForm({ form, setForm, validationError, isStartDis
         </select>
       </label>
       {modelLoadMessage ? <p role={modelLoadStatus === "error" ? "alert" : "status"} className={modelLoadStatus === "error" ? "ui-feedback ui-feedback--error" : undefined}>{modelLoadMessage}</p> : null}
+      <label className="ui-stack ui-stack--sm">
+        <span>Latent Source</span>
+        <select className="ui-input" value={form.latentSourceArtifactId} onChange={(event) => setForm({ ...form, latentSourceArtifactId: event.target.value })}>
+          <option value="">Empty latent image</option>
+          {availableImageArtifacts.map((artifact) => <option key={artifact.value} value={artifact.value}>{artifact.label}</option>)}
+        </select>
+      </label>
+      {artifactLoadMessage ? <p role="alert" className="ui-feedback ui-feedback--error">{artifactLoadMessage}</p> : null}
       <label className="ui-stack ui-stack--sm"><span>Number of Images</span><input className="ui-input" type="number" {...bindText("numImages")} /></label>
       {validationError ? <p className="ui-feedback ui-feedback--error">{validationError}</p> : null}
       <button type="button" className="ui-button" onClick={onSubmit} disabled={isStartDisabled}>Start Generation</button>

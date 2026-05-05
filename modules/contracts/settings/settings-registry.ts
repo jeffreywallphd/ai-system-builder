@@ -27,6 +27,7 @@ const QA_TASK_MODEL_DEFAULT: ModelDefaultConfig = {
 };
 
 export const IMAGE_GENERATION_GPU_TYPE_SETTING_KEY = "runtime.imageGeneration.gpuType" as const;
+export const RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY = "runtime.torch.cudaWheelIndexUrl" as const;
 
 export const INITIAL_APPLICATION_SETTING_DEFINITIONS: ApplicationSettingDefinition[] = [
   {
@@ -75,6 +76,16 @@ export const INITIAL_APPLICATION_SETTING_DEFINITIONS: ApplicationSettingDefiniti
     valueKind: "select",
     options: [{ value: "auto" }, { value: "nvidia" }, { value: "amd" }, { value: "intel" }, { value: "cpu" }],
     defaultValue: "auto",
+    scope: "application",
+  },
+  {
+    key: RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY,
+    category: "runtime",
+    label: "Torch CUDA wheel index URL",
+    description: "PyTorch wheel index URL for this computer's CUDA setup.",
+    instructions: "Visit https://pytorch.org/get-started/locally/ to find the right CUDA wheel index URL. When set, CUDA is used as the default image generation startup mode unless another runtime mode is selected.",
+    placeholder: "https://download.pytorch.org/whl/cu130",
+    valueKind: "string",
     scope: "application",
   },
   {

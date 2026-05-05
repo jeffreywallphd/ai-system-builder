@@ -18,6 +18,9 @@ export class DownloadModelUseCase {
     const download = await this.dependencies.modelDownloader.ensureModelDownloaded({
       provider: "transformers",
       modelId: normalizedRequest.modelId,
+      inferenceMode: normalizedRequest.inferenceMode,
+      taskTags: normalizedRequest.taskTags,
+      artifactForm: normalizedRequest.artifactForm,
     });
 
     if (!download.localPath) {

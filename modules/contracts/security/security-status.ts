@@ -9,4 +9,7 @@ export interface SecurityStatus {
   pairingEnabled: boolean;
   pairedDeviceCount?: number;
   currentPrincipal?: AuthPrincipal;
+  devSecurityToggleEnabled?: boolean;
+  devSecurityEnforcementMode?: "disabled-dev" | "lan-token-enforced";
+  requiresRestartToChangeTransportSecurity?: boolean;
 }

@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
+import { EventEmitter } from "node:events";
 import path from "node:path";
 
-import { describe, expect, it } from "../../../../modules/testing/node-test";
+import { describe, expect, it, testDouble } from "../../../../modules/testing/node-test";
 
 describe("server dev runner", () => {
   it("keeps the server workspace dev script on the repository dev runner", () => {
@@ -24,5 +25,90 @@ describe("server dev runner", () => {
     expect(source).not.toContain("node:child_process");
     expect(source).not.toContain("tsx watch");
     expect(source).not.toContain("esbuild");
+  });
+
+  it("keeps Hugging Face model browsing fetch types compatible with server TypeScript", () => {
+    const source = readFileSync(
+      path.resolve("modules/adapters/model/huggingface/createHuggingFaceModelBrowseDetailsAdapter.ts"),
+      "utf8",
+    );
+
+    expect(source).toContain("type HuggingFaceFetchInput = Parameters<typeof fetch>[0];");
+    expect(source).not.toContain("RequestInfo");
+  });
+
+  it("awaits the compiled async server factory before creating the listener", async () => {
+    const { startCompiledServer } = await import("../../../../dev-tools/scripts/server/dev-server.mjs");
+    const env = { PORT: "43110" };
+    const createdServer = {
+      app: {},
+      config: {
+        port: 43110,
+        storageRootDirectory: "storage-root",
+        runtimeRootDirectory: "runtime-root",
+      },
+      loggingPort: {
+        log: testDouble.fn(),
+      },
+    };
+    const listener = Object.assign(new EventEmitter(), {
+      listen: testDouble.fn((port: number, callback: () => void) => {
+        callback();
+        return listener;
+      }),
+      close: testDouble.fn((callback: (error?: Error) => void) => {
+        callback();
+      }),
+    });
+    const createServer = testDouble.fn(async (options: { env: typeof env; restartServer?: () => void }) => {
+      expect(options.env).toBe(env);
+      expect(options.restartServer).toBeUndefined();
+      return createdServer;
+    });
+    const createServerListener = testDouble.fn((actualCreatedServer: typeof createdServer) => {
+      expect(actualCreatedServer).toBe(createdServer);
+      return listener;
+    });
+    const requireFromRoot = Object.assign(
+      testDouble.fn(() => ({
+        createServer,
+        createServerListener,
+      })),
+      {
+        cache: {
+          [path.resolve("dist/apps/server/src/createServer.js")]: {},
+        },
+      },
+    );
+    const stderr = { write: testDouble.fn() };
+
+    const startedListener = await startCompiledServer({
+      paths: {
+        distRootDirectory: path.resolve("dist"),
+        serverCreateServerPath: path.resolve("apps/server/src/createServer.ts"),
+      },
+      env,
+      stderr,
+      requireFromRoot,
+    });
+
+    expect(startedListener).toBe(listener);
+    expect(createServer).toHaveBeenCalledOnce();
+    expect(createServerListener).toHaveBeenCalledWith(createdServer);
+    expect(listener.listen).toHaveBeenCalledWith(43110, expect.any(Function));
+    expect(createdServer.loggingPort.log).toHaveBeenCalledWith({
+      timestamp: expect.any(String),
+      level: "info",
+      verbosity: "normal",
+      event: "server.http.listening",
+      host: "server",
+      component: "server-host",
+      message: "Server HTTP listener started.",
+      data: {
+        port: 43110,
+        storageRootDirectory: "storage-root",
+        runtimeRootDirectory: "runtime-root",
+      },
+    });
   });
 });

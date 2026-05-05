@@ -50,6 +50,8 @@ export interface ApplicationSettingDefinition {
   category: ApplicationSettingCategory;
   label: string;
   description?: string;
+  placeholder?: string;
+  instructions?: string;
   valueKind: ApplicationSettingValueKind;
   sensitive?: boolean;
   defaultValue?: ApplicationSettingPrimitiveValue;

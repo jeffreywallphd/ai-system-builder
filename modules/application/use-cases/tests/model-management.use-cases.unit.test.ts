@@ -122,7 +122,13 @@ describe("model management use cases", () => {
       metadata: { likes: 10 },
     });
 
-    expect(ensureModelDownloaded).toHaveBeenCalledWith({ provider: "transformers", modelId: "org/demo-model" });
+    expect(ensureModelDownloaded).toHaveBeenCalledWith({
+      provider: "transformers",
+      modelId: "org/demo-model",
+      inferenceMode: "causal",
+      taskTags: ["text-generation"],
+      artifactForm: undefined,
+    });
     const registerCall = registerDownloadedModel.mock.calls[0]?.[0];
     expect(registerCall?.displayName).toBe("Demo Model");
     expect(registerCall?.source).toBe("huggingface");

@@ -36,6 +36,24 @@ describe("registerModelManagementApiRoutes",()=>{
     expect(infoCalls.some((call:any[]) => call[0]==='api.model.request.succeeded' && call[1]?.operation==='model.browse' && call[1]?.resultCount===2 && call[1]?.requestId==='r1' && call[1]?.correlationId==='c1')).toBe(true);
   });
 
+  it("logs download result details from the nested download payload", async()=>{
+    const handlers=new Map<string,any>(); const app:ModelManagementExpressRoutePort={post:testDouble.fn((p,h)=>handlers.set(p,h))};
+    const logger={info:testDouble.fn(),warn:testDouble.fn()};
+    registerModelManagementApiRoutes({
+      app,logger,
+      browseModelsUseCase:{execute:testDouble.fn(async()=>({models:[]}))},
+      getModelDetailsUseCase:{execute:testDouble.fn(async()=>({}))},
+      listModelsUseCase:{execute:testDouble.fn(async()=>({models:[]}))},
+      saveModelReferenceUseCase:{execute:testDouble.fn(async()=>({}))},
+      downloadModelUseCase:{execute:testDouble.fn(async()=>({model:{modelRecordId:"downloaded-stable-diffusion"},download:{provider:"transformers",modelId:"stabilityai/stable-diffusion-xl-base-1.0",downloaded:true,fromCache:false,localPath:"/models/sdxl"}}))},
+      updateModelRecordUseCase:{execute:testDouble.fn(async()=>({}))},
+      deleteModelRecordUseCase:{execute:testDouble.fn(async()=>({}))},
+    });
+    await handlers.get('/api/model/download')({body:{provider:'huggingface',modelId:'stabilityai/stable-diffusion-xl-base-1.0'},headers:{}},response().res);
+    const infoCalls = logger.info.mock.calls;
+    expect(infoCalls.some((call:any[]) => call[0]==='api.model.request.succeeded' && call[1]?.operation==='model.download' && call[1]?.modelId==='stabilityai/stable-diffusion-xl-base-1.0' && call[1]?.modelRecordId==='downloaded-stable-diffusion' && call[1]?.downloaded===true && call[1]?.fromCache===false && typeof call[1]?.elapsedMs==="number")).toBe(true);
+  });
+
   it("logs browse failure with mapped code", async()=>{
     const handlers=new Map<string,any>(); const app:ModelManagementExpressRoutePort={post:testDouble.fn((p,h)=>handlers.set(p,h))};
     const logger={info:testDouble.fn(),warn:testDouble.fn()};

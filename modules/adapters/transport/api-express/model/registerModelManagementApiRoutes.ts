@@ -76,11 +76,13 @@ function summarizeResult(operation: string, value: unknown): Record<string, unkn
     return { resultCount: Array.isArray(value.models) ? value.models.length : undefined };
   }
   if (operation === "model.download") {
+    const download = isObjectRecord(value.download) ? value.download : {};
+    const model = isObjectRecord(value.model) ? value.model : {};
     return {
-      modelId: typeof value.modelId === "string" ? value.modelId : undefined,
-      modelRecordId: typeof value.modelRecordId === "string" ? value.modelRecordId : undefined,
-      downloaded: typeof value.downloaded === "boolean" ? value.downloaded : undefined,
-      fromCache: typeof value.fromCache === "boolean" ? value.fromCache : undefined,
+      modelId: typeof download.modelId === "string" ? download.modelId : undefined,
+      modelRecordId: typeof model.modelRecordId === "string" ? model.modelRecordId : undefined,
+      downloaded: typeof download.downloaded === "boolean" ? download.downloaded : undefined,
+      fromCache: typeof download.fromCache === "boolean" ? download.fromCache : undefined,
     };
   }
   return {
@@ -91,13 +93,14 @@ function summarizeResult(operation: string, value: unknown): Record<string, unkn
 
 function registerRoute(app: ModelManagementExpressRoutePort, logger: ModelRouteLogger | undefined, path: string, operation: `${Lowercase<string>}.${Lowercase<string>}`, execute: (body: unknown) => Promise<unknown>) {
   app.post(path, async (request, response) => {
+    const startedAt = Date.now();
     const context = contextFrom(request);
     const requestSummary = summarizeBody(request.body);
     logger?.info("api.model.request.received", { operation, ...requestSummary, ...context });
     try {
       const value = await execute(request.body);
       const apiResponse = createApiSuccessResponse(operation, value, context);
-      logger?.info("api.model.request.succeeded", { operation, ...summarizeResult(operation, value), ...context });
+      logger?.info("api.model.request.succeeded", { operation, ...summarizeResult(operation, value), elapsedMs: Date.now() - startedAt, ...context });
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
       const code = mapFailureCode(error);
@@ -105,7 +108,7 @@ function registerRoute(app: ModelManagementExpressRoutePort, logger: ModelRouteL
       const details = typeof error === "object" && error !== null && "details" in error && isObjectRecord((error as { details?: unknown }).details)
         ? (error as { details: Record<string, unknown> }).details
         : undefined;
-      logger?.warn("api.model.request.failed", { operation, code, message, details, ...requestSummary, ...context });
+      logger?.warn("api.model.request.failed", { operation, code, message, details, elapsedMs: Date.now() - startedAt, ...requestSummary, ...context });
       const apiResponse = createApiFailureResponse(createApiError(operation, code, message, context), context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     }

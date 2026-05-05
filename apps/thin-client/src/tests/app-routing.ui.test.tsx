@@ -87,5 +87,11 @@ describe("thin-client routing and page composition", () => {
     expect(container.textContent).toContain("Browse models");
     expect(window.location.pathname).toBe("/models");
 
+    const securityButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Security");
+    expect(securityButton).toBeDefined();
+    await act(async () => { securityButton?.dispatchEvent(new Event("click", { bubbles: true })); });
+    expect(container.textContent).toContain("Security");
+    expect(window.location.pathname).toBe("/security");
+
   });
 });

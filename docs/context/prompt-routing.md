@@ -82,6 +82,17 @@ Escalation: if a task changes host-owned runtime behavior or per-feature executi
 
 ## Security routing and escalation
 
-For security tasks, include `index.pack.md`, `architecture.pack.md` (if present), `security.pack.md`, `server-host.pack.md`, `desktop-host.pack.md`, `persistence-storage.pack.md`, `runtime.pack.md`, and feature packs (for example `image-generation.pack.md`) when feature-level enforcement is in scope.
+For security tasks, keep context minimum-sufficient:
 
-If a task changes authn/authz, credential handling, transport encryption, storage security, audit behavior, or runtime security policy, read ADR-0015 directly.
+- Always include `index.pack.md` + `security.pack.md`.
+- Include `server-host.pack.md` when server route/middleware/mode behavior is in scope.
+- Include `desktop-host.pack.md` and/or `desktop-implementation.pack.md` when desktop/thin-client flows are in scope.
+- For thin-client pairing, secure fetch, token storage, or 401/403 UX tasks, include:
+  - `security.pack.md`
+  - `server-host.pack.md`
+  - thin-client/desktop implementation pack(s) as applicable
+  - affected feature pack(s) (for example `image-generation.pack.md`, artifact browser/storage-related packs, model-related packs when present)
+- Include `persistence-storage.pack.md` for token-store/security-store or artifact-authorization boundary changes.
+- Include `runtime.pack.md` only when runtime security/process concerns are directly in scope.
+
+If a task changes route policy, security status semantics, token handling, or security API error behavior, read ADR-0015 directly.

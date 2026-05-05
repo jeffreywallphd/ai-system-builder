@@ -77,13 +77,70 @@ export function ImageGenerationFeature({
           ) : null}
         </div>
 
+        <div className="ui-stack ui-stack--xs">
+          <label htmlFor="image-generation-runtime-mode">Runtime mode</label>
+          <select
+            className="ui-input"
+            id="image-generation-runtime-mode"
+            value={feature.runtimeMode}
+            onChange={(event) => feature.setRuntimeMode((event.target as HTMLSelectElement).value as typeof feature.runtimeMode)}
+          >
+            <option value="auto">Auto</option>
+            <option value="cpu">CPU</option>
+            <option value="cuda">CUDA</option>
+            <option value="directml">DirectML</option>
+          </select>
+        </div>
+
+        <div className="ui-stack ui-stack--xs">
+          <label htmlFor="image-generation-latent-source">Latent source</label>
+          <div>
+            <select
+              className="ui-input"
+              id="image-generation-latent-source"
+              value={feature.form.latentSourceArtifactId}
+              onChange={(event) => setFormValue("latentSourceArtifactId", (event.target as HTMLSelectElement).value)}
+            >
+              <option value="">Empty latent image</option>
+              {feature.imageArtifacts.map((artifact) => (
+                <option key={artifact.storageKey} value={artifact.storageKey}>
+                  {artifact.originalName ?? artifact.storageKey}
+                </option>
+              ))}
+            </select>{" "}
+            <button type="button" className="ui-button" onClick={() => void feature.refreshImageArtifacts()} disabled={feature.imageArtifactsLoading}>
+              Refresh Images
+            </button>
+          </div>
+          {feature.imageArtifactsError ? <p role="alert">{feature.imageArtifactsError}</p> : null}
+        </div>
+
+        <div className="ui-stack ui-stack--xs">
+          <label htmlFor="image-generation-prompt">Prompt</label>
+          <textarea
+            className="ui-input ui-textarea"
+            id="image-generation-prompt"
+            value={feature.form.prompt}
+            onInput={(event) => setFormValue("prompt", (event.target as HTMLTextAreaElement).value)}
+          />
+        </div>
+
+        <div className="ui-stack ui-stack--xs">
+          <label htmlFor="image-generation-negativePrompt">Negative Prompt (optional)</label>
+          <textarea
+            className="ui-input ui-textarea"
+            id="image-generation-negativePrompt"
+            value={feature.form.negativePrompt}
+            onInput={(event) => setFormValue("negativePrompt", (event.target as HTMLTextAreaElement).value)}
+          />
+        </div>
+
         {[
-          ["prompt", "Prompt", "text"],
-          ["negativePrompt", "Negative Prompt (optional)", "text"],
           ["seed", "Seed (optional)", "number"],
           ["width", "Width", "number"],
           ["height", "Height", "number"],
           ["steps", "Steps", "number"],
+          ["cfg", "CFG", "number"],
           ["sampler", "Sampler", "text"],
           ["scheduler", "Scheduler", "text"],
           ["numImages", "Number of Images", "number"],
@@ -103,6 +160,21 @@ export function ImageGenerationFeature({
             </div>
           );
         })}
+
+        <div className="ui-stack ui-stack--xs">
+          <label htmlFor="image-generation-denoise">Denoise</label>
+          <input
+            className="ui-input"
+            id="image-generation-denoise"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={feature.form.denoise}
+            onInput={(event) => setFormValue("denoise", (event.target as HTMLInputElement).value)}
+          />
+          <output htmlFor="image-generation-denoise">{feature.form.denoise}</output>
+        </div>
 
         <details>
           <summary>Advanced: Manual model/checkpoint override (optional)</summary>
@@ -133,7 +205,13 @@ export function ImageGenerationFeature({
         <button className="ui-button" type="button" onClick={() => onNavigateToArtifacts?.()}>
           Open Artifacts
         </button>
+        <button className="ui-button" type="button" onClick={() => void feature.unloadModel()} disabled={feature.isUnloadModelDisabled}>
+          {feature.unloadModelState.status === "loading" ? "Unloading model..." : "Unload model"}
+        </button>
       </div>
+      {feature.unloadModelState.message ? (
+        <p role={feature.unloadModelState.status === "error" ? "alert" : "status"}>{feature.unloadModelState.message}</p>
+      ) : null}
 
       <h3>Status</h3>
       <p>

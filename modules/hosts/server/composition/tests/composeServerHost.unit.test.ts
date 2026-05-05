@@ -154,7 +154,7 @@ describe("composeServerHost", () => {
       runtimeRootDirectory: "/tmp/server-runtime",
     });
 
-    expect(app.post).toHaveBeenCalledTimes(25);
+    expect(app.post).toHaveBeenCalledTimes(26);
     expect(app.get).toHaveBeenCalledTimes(3);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
@@ -162,6 +162,7 @@ describe("composeServerHost", () => {
       "/api/artifact/browse",
       "/api/artifact/read",
       "/api/artifact/content/read",
+      "/api/artifact/delete",
       "/api/config/huggingface-token",
       "/api/artifact-repo/has",
       "/api/huggingface/namespace/datasets",
@@ -219,12 +220,31 @@ describe("composeServerHost", () => {
     process.env.COMFYUI_RUNTIME_DEVICE_MODE = previous;
   });
 
+  it("resolves request-selected server image-generation runtime modes when no env override is set", () => {
+    expect(resolveServerComfyUiRuntimeDeviceMode({} as NodeJS.ProcessEnv, "cuda")).toBe("cuda");
+    expect(resolveServerComfyUiRuntimeDeviceMode({} as NodeJS.ProcessEnv, "directml")).toBe("directml");
+    expect(resolveServerComfyUiRuntimeDeviceMode({} as NodeJS.ProcessEnv, "cpu")).toBe("cpu");
+    expect(resolveServerComfyUiRuntimeDeviceMode({} as NodeJS.ProcessEnv, "nvidia")).toBe("cuda");
+    expect(resolveServerComfyUiRuntimeDeviceMode({ COMFYUI_RUNTIME_DEVICE_MODE: "cpu" } as NodeJS.ProcessEnv, "cuda")).toBe("cpu");
+  });
+
 
   it("wires server model download through python runtime instead of unavailable stub", () => {
     const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
     const source = readFileSync(canonicalSourcePath, "utf8");
     expect(source).toContain("pythonRuntimeFoundation.runtimePort.ensureModelDownloaded");
+    expect(source).toContain("runtime.python.model_download.requested");
+    expect(source).toContain("runtime.python.model_download.succeeded");
+    expect(source).toContain("runtime.python.model_download.failed");
     expect(source).not.toContain("Model download runtime is unavailable on server host.");
+  });
+
+  it("wires server Python runtime supervisor activity into structured logs", () => {
+    const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(canonicalSourcePath, "utf8");
+    expect(source).toContain("onEvent(event)");
+    expect(source).toContain("runtime.python.server.activity");
+    expect(source).toContain("classifyPythonRuntimeSupervisorLogLevel");
   });
 
   it("resolves the server Python runtime worker directory from the repository root when launched from app workspace", () => {
@@ -291,13 +311,13 @@ describe("server runtime/comfy root resolution", () => {
     expect(source).toBe("SERVER_RUNTIME_ROOT");
   });
 
-  it("COMFYUI_INSTALL_ROOT overrides exact install root", () => {
+  it("ignores COMFYUI_INSTALL_ROOT and keeps server ComfyUI under server runtime root", () => {
     const { installRoot, source } = resolveServerComfyUiInstallRoot({
       env: { SERVER_RUNTIME_ROOT: "/tmp/runtime-root", COMFYUI_INSTALL_ROOT: " /tmp/custom-comfy " } as NodeJS.ProcessEnv,
       runtimeRootDirectory: "/app/server-runtime",
     });
-    expect(installRoot).toBe(resolve("/tmp/custom-comfy"));
-    expect(source).toBe("COMFYUI_INSTALL_ROOT");
+    expect(installRoot).toBe(resolve("/tmp/runtime-root", "runtime-installs", "comfyui"));
+    expect(source).toBe("SERVER_RUNTIME_ROOT");
   });
 });
 
@@ -409,5 +429,14 @@ describe("server ComfyUI python/runtime resolution", () => {
     const source = readFileSync(sourcePath, "utf8");
     expect(source).not.toContain("hosts/desktop");
     expect(source).not.toContain("transport/ipc-electron");
+  });
+
+  it("keeps Hugging Face Xet enabled by default while assigning a server-owned Xet cache", () => {
+    const sourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
+    const source = readFileSync(sourcePath, "utf8");
+
+    expect(source).toContain("HF_XET_CACHE");
+    expect(source).toContain("joinHostPath(pythonRuntimeRoot, \"xet\")");
+    expect(source).not.toContain("HF_HUB_DISABLE_XET: env.HF_HUB_DISABLE_XET ?? \"1\"");
   });
 });

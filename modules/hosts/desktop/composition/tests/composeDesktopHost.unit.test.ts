@@ -123,6 +123,14 @@ describe("composeDesktopHost", () => {
     expect(resolveComfyUiRuntimeDeviceMode({ gpuType: "cpu" })).toBe("cpu");
   });
 
+  it("uses CUDA by default when a torch CUDA wheel index is configured", () => {
+    expect(resolveComfyUiRuntimeDeviceMode({
+      hasNvidiaGpu: false,
+      gpuType: "auto",
+      cudaTorchWheelIndexUrl: "https://download.pytorch.org/whl/cu130",
+    })).toBe("cuda");
+  });
+
   it("resolves CUDA only when Nvidia is explicitly detected or configured", () => {
     expect(resolveComfyUiRuntimeDeviceMode({ hasNvidiaGpu: true })).toBe("cuda");
     expect(resolveComfyUiRuntimeDeviceMode({ hasNvidiaGpu: false })).toBe("cpu");
@@ -375,6 +383,7 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start()");
     expect(source).toContain("requiredCapabilities: PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES");
     expect(source).toContain("HF_HUB_DISABLE_XET");
+    expect(source).not.toContain("HF_HUB_DISABLE_XET: process.env.HF_HUB_DISABLE_XET ?? \"1\"");
     expect(source).toContain("PrepareTrainingDatasetFromArtifactsUseCase");
     expect(source).toContain("prepareTrainingDatasetFromArtifactsUseCase");
   });

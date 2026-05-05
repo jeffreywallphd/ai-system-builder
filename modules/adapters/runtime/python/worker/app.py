@@ -111,6 +111,13 @@ def _build_task_status_result(record: dict[str, Any]) -> PythonRuntimeTaskStatus
 
 
 def _run_task(request: StartPythonRuntimeTaskRequest) -> Any:
+    if request.taskType == "ensure-model-download":
+        payload = EnsureModelDownloadRequest.model_validate(request.payload)
+        def on_model_download_progress(progress: dict[str, Any]) -> None:
+            _update_task(request.requestId, progress=progress)
+
+        return _ensure_model_download_data(payload, on_progress=on_model_download_progress)
+
     if request.taskType == "train-model":
         payload = TrainModelTaskRequest.model_validate(request.payload)
         def on_training_progress(progress: dict[str, Any]) -> None:
@@ -180,6 +187,28 @@ def _run_task(request: StartPythonRuntimeTaskRequest) -> Any:
         ).model_dump(mode="json")
 
     raise RuntimeError(f"Task type '{request.taskType}' is not implemented yet.")
+
+
+def _ensure_model_download_data(
+    request: EnsureModelDownloadRequest,
+    on_progress: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
+    availability = ensure_generation_model_downloaded(
+        LocalModelConfig(provider=request.provider, modelId=request.modelId),
+        on_progress=on_progress,
+        download_context={
+            "inferenceMode": request.inferenceMode,
+            "taskTags": request.taskTags,
+            "artifactForm": request.artifactForm,
+        },
+    )
+    return EnsureModelDownloadResult(
+        provider=request.provider,
+        modelId=request.modelId,
+        downloaded=availability.downloaded,
+        fromCache=availability.from_cache,
+        localPath=availability.local_path,
+    ).model_dump(mode="json")
 
 
 def _start_async_task(request: StartPythonRuntimeTaskRequest) -> StartPythonRuntimeTaskResult:
@@ -264,11 +293,51 @@ def cancel_task(request_id: str) -> CancelPythonRuntimeTaskResult:
 
 @app.post("/models/ensure-downloaded", response_model=EnsureModelDownloadResult)
 def ensure_model_download(request: EnsureModelDownloadRequest) -> EnsureModelDownloadResult | JSONResponse:
+    started_at = time.monotonic()
+    print(
+        json.dumps(
+            {
+                "event": "runtime.model_download.started",
+                "provider": request.provider,
+                "modelId": request.modelId,
+            },
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
     try:
-        availability = ensure_generation_model_downloaded(LocalModelConfig(provider=request.provider, modelId=request.modelId))
+        result = _ensure_model_download_data(request)
     except Exception as error:
+        print(
+            json.dumps(
+                {
+                    "event": "runtime.model_download.failed",
+                    "provider": request.provider,
+                    "modelId": request.modelId,
+                    "elapsedMs": round((time.monotonic() - started_at) * 1000),
+                    "message": str(error),
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
         return JSONResponse(status_code=502, content={"error": PythonRuntimeError(code="model_download_failed", errorCode="generation_model_not_available", stage="generation", message=str(error), details={"provider": request.provider, "modelId": request.modelId}, retryable=True).model_dump(mode="json")})
-    return EnsureModelDownloadResult(provider=request.provider, modelId=request.modelId, downloaded=availability.downloaded, fromCache=availability.from_cache, localPath=availability.local_path)
+    print(
+        json.dumps(
+            {
+                "event": "runtime.model_download.succeeded",
+                "provider": request.provider,
+                "modelId": request.modelId,
+                "downloaded": result.get("downloaded") is True,
+                "fromCache": result.get("fromCache") is True,
+                "hasLocalPath": bool(result.get("localPath")),
+                "elapsedMs": round((time.monotonic() - started_at) * 1000),
+            },
+            ensure_ascii=False,
+        ),
+        flush=True,
+    )
+    return EnsureModelDownloadResult.model_validate(result)
 
 
 @app.get("/models/status", response_model=ModelStatusResult)

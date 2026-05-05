@@ -29,7 +29,7 @@ describe("useImageGenerationFeature", () => {
     await act(async () => { (c.querySelector("#selectB") as HTMLButtonElement).click(); });
     expect(modelClient.listModels).toHaveBeenCalledTimes(1);
     await act(async () => { (c.querySelector("#prompt") as HTMLInputElement).value = "cat"; (c.querySelector("#prompt") as HTMLInputElement).dispatchEvent(new Event("input", { bubbles: true })); (c.querySelector("#start") as HTMLButtonElement).click(); });
-    expect(client.startImageGeneration).toHaveBeenCalledWith(expect.objectContaining({ model: "b" }));
+    expect(client.startImageGeneration).toHaveBeenCalledWith(expect.objectContaining({ model: "b", engineHints: { runtimeDeviceMode: "auto" } }));
   });
 
   it("manual model fallback applies only when no selected record", async () => {
@@ -111,9 +111,22 @@ describe("useImageGenerationFeature", () => {
     const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [] }) };
     const c = document.createElement("div"); const root = createRoot(c);
     await act(async()=>{root.render(<Harness client={client} modelClient={modelClient} />);});
+    await act(async()=>{(c.querySelector("#prompt") as HTMLInputElement).value = ""; (c.querySelector("#prompt") as HTMLInputElement).dispatchEvent(new Event("input", { bubbles: true }));});
     expect((c.querySelector("#validation") as HTMLElement).textContent).toBe("");
     await act(async()=>{(c.querySelector("#start") as HTMLButtonElement).click();});
     expect((c.querySelector("#validation") as HTMLElement).textContent).toContain("Prompt is required");
+  });
+
+  it("initializes server generation defaults", async () => {
+    const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn() };
+    const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [] }) };
+    function H() {
+      const f = useImageGenerationFeature(client, undefined, modelClient);
+      return <div><span id="defaults">{[f.form.prompt, f.form.negativePrompt, f.form.width, f.form.height, f.form.sampler, f.form.scheduler].join("|")}</span></div>;
+    }
+    const c = document.createElement("div"); const root = createRoot(c);
+    await act(async () => { root.render(<H />); });
+    expect((c.querySelector("#defaults") as HTMLElement).textContent).toBe("raw photo quality image; 35mm camera quality image; a dog in the park|anime; cartoon; melty; blurry|1024|1024|dpmpp_2m|karras");
   });
 
   it('loads model inventory without invalid list source metadata', async () => {

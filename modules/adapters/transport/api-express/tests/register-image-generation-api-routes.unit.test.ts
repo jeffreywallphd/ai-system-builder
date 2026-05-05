@@ -16,6 +16,7 @@ describe("registerImageGenerationApiRoutes", () => {
       expect(status).toHaveBeenCalledWith(400);
       expect(json).toHaveBeenCalledWith(expect.objectContaining({ ok: false, error: expect.objectContaining({ code: "validation" }) }));
     }
+    expect(handlers.has("/api/image-generation/unload-model")).toBe(true);
   });
 
   it("maps domain failure codes to HTTP status codes", async () => {
@@ -41,5 +42,25 @@ describe("registerImageGenerationApiRoutes", () => {
     await handlers.get('/api/image-generation/finalize')({ body: { requestId: 'r1' }, headers: {} }, res);
     expect(status).toHaveBeenCalledWith(200);
     expect(json).toHaveBeenCalledWith(expect.objectContaining({ ok: true, value: { finalized: false, reason: 'image generation finalization is unavailable' } }));
+  });
+
+  it("maps unload-model route to runtime control port", async () => {
+    const handlers = new Map<string, any>();
+    const app: ExpressRoutePort = { post: testDouble.fn((p,h)=>handlers.set(p,h)) };
+    const imageGenerationRuntimeControl = {
+      unloadModel: testDouble.fn(async () => ({ unloaded: true, message: "released" })),
+    };
+    registerImageGenerationApiRoutes({
+      app,
+      generateImageUseCase: { startImageGeneration: testDouble.fn(), readImageGeneration: testDouble.fn(), cancelImageGeneration: testDouble.fn() } as any,
+      imageGenerationRuntimeControl,
+    });
+
+    const { res, status, json } = response();
+    await handlers.get("/api/image-generation/unload-model")({ body: {}, headers: {} }, res);
+
+    expect(imageGenerationRuntimeControl.unloadModel).toHaveBeenCalledTimes(1);
+    expect(status).toHaveBeenCalledWith(200);
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ ok: true, value: { unloaded: true, message: "released" } }));
   });
 });

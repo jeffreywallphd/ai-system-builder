@@ -43,11 +43,68 @@ function writeDiagnostic(diagnostic, stream) {
 
 function clearDistRequireCache(distRootDirectory, requireFunction) {
   const normalizedDistRoot = path.resolve(distRootDirectory);
-  for (const modulePath of Object.keys(requireFunction.cache)) {
+  for (const modulePath of Object.keys(requireFunction.cache ?? {})) {
     if (path.resolve(modulePath).startsWith(normalizedDistRoot)) {
       delete requireFunction.cache[modulePath];
     }
   }
+}
+
+function assertCompiledServerModule(compiledServerModule, modulePath) {
+  if (typeof compiledServerModule?.createServer !== "function") {
+    throw new TypeError(`Compiled server module does not export createServer: ${modulePath}`);
+  }
+
+  if (typeof compiledServerModule?.createServerListener !== "function") {
+    throw new TypeError(`Compiled server module does not export createServerListener: ${modulePath}`);
+  }
+}
+
+export async function startCompiledServer(options) {
+  const { paths, env, stderr, requireFromRoot } = options;
+
+  if (!existsSync(paths.serverCreateServerPath)) {
+    stderr.write(`[server-dev] Waiting for compiled server module: ${paths.serverCreateServerPath}\n`);
+    return undefined;
+  }
+
+  clearDistRequireCache(paths.distRootDirectory, requireFromRoot);
+  const compiledServerModule = requireFromRoot(paths.serverCreateServerPath);
+  assertCompiledServerModule(compiledServerModule, paths.serverCreateServerPath);
+
+  const createdServer = await compiledServerModule.createServer({
+    env,
+    restartServer: options.restartServer,
+  });
+  const listener = compiledServerModule.createServerListener(createdServer);
+
+  await new Promise((resolve, reject) => {
+    const handleListenError = (error) => {
+      reject(error);
+    };
+
+    listener.once("error", handleListenError);
+    listener.listen(createdServer.config.port, () => {
+      listener.off("error", handleListenError);
+      void createdServer.loggingPort.log({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        verbosity: "normal",
+        event: "server.http.listening",
+        host: "server",
+        component: "server-host",
+        message: "Server HTTP listener started.",
+        data: {
+          port: createdServer.config.port,
+          storageRootDirectory: createdServer.config.storageRootDirectory,
+          runtimeRootDirectory: createdServer.config.runtimeRootDirectory,
+        },
+      });
+      resolve();
+    });
+  });
+
+  return listener;
 }
 
 export function startServerDevRunner(options = {}) {
@@ -81,34 +138,6 @@ export function startServerDevRunner(options = {}) {
     });
   };
 
-  const startCompiledServer = async () => {
-    if (!existsSync(paths.serverCreateServerPath)) {
-      stderr.write(`[server-dev] Waiting for compiled server module: ${paths.serverCreateServerPath}\n`);
-      return;
-    }
-
-    clearDistRequireCache(paths.distRootDirectory, requireFromRoot);
-    const { createServer } = requireFromRoot(paths.serverCreateServerPath);
-    const { app, config, loggingPort } = createServer({ env });
-
-    activeHttpServer = app.listen(config.port, () => {
-      void loggingPort.log({
-        timestamp: new Date().toISOString(),
-        level: "info",
-        verbosity: "normal",
-        event: "server.http.listening",
-        host: "server",
-        component: "server-host",
-        message: "Server HTTP listener started.",
-        data: {
-          port: config.port,
-          storageRootDirectory: config.storageRootDirectory,
-          runtimeRootDirectory: config.runtimeRootDirectory,
-        },
-      });
-    });
-  };
-
   const restartCompiledServer = () => {
     restartQueue = restartQueue
       .then(async () => {
@@ -117,7 +146,13 @@ export function startServerDevRunner(options = {}) {
         }
 
         await closeActiveServer();
-        await startCompiledServer();
+        activeHttpServer = await startCompiledServer({
+          paths,
+          env,
+          stderr,
+          requireFromRoot,
+          restartServer: restartCompiledServer,
+        });
       })
       .catch((error) => {
         const message = error instanceof Error ? error.stack ?? error.message : String(error);
@@ -175,7 +210,7 @@ export function startServerDevRunner(options = {}) {
   };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const runner = startServerDevRunner();
   process.once("SIGINT", runner.stop);
   process.once("SIGTERM", runner.stop);

@@ -1,9 +1,17 @@
 import { existsSync, readFileSync } from "node:fs";
+import http from "node:http";
+import https from "node:https";
 import path from "node:path";
 
 import express from "express";
 
 import { composeServerHost } from "../../../modules/hosts/server";
+import {
+  applySecurityHeaders,
+  createHttpsServerOptions,
+  registerSecurityRoutes,
+} from "../../../modules/adapters/transport/api-express/security";
+import { composeServerSecurity } from "../../../modules/hosts/server/security/composeServerSecurity";
 import type { LoggingPort } from "../../../modules/application/ports/logging";
 import type { StructuredLogSink } from "../../../modules/adapters/observability/logging";
 
@@ -16,12 +24,20 @@ export interface ServerRuntimeConfig {
   port: number;
   storageRootDirectory: string;
   runtimeRootDirectory: string;
+  security: Awaited<ReturnType<typeof composeServerSecurity>>["config"];
+}
+
+export interface ResolvedServerRuntimePaths {
+  port: number;
+  storageRootDirectory: string;
+  runtimeRootDirectory: string;
 }
 
 export interface CreateServerOptions {
   env?: NodeJS.ProcessEnv;
   logSink?: StructuredLogSink;
   now?: () => string;
+  restartServer?: () => void | Promise<void>;
 }
 
 export interface CreatedServer {
@@ -29,6 +45,8 @@ export interface CreatedServer {
   config: ServerRuntimeConfig;
   loggingPort: LoggingPort;
 }
+
+export type ServerListener = http.Server | https.Server;
 
 interface ServerRootResolutionOptions {
   cwd?: string;
@@ -118,10 +136,10 @@ export function resolveServerRuntimeRootDirectory(
     : resolveDefaultServerRuntimeRootDirectory({ cwd: options.cwd, env });
 }
 
-export function resolveServerRuntimeConfig(
+export function resolveServerRuntimePaths(
   env: NodeJS.ProcessEnv = process.env,
   options: { cwd?: string } = {},
-): ServerRuntimeConfig {
+): ResolvedServerRuntimePaths {
   const storageRootFromEnv = env.SERVER_STORAGE_ROOT?.trim();
   const rootResolutionOptions = { cwd: options.cwd, env };
 
@@ -130,15 +148,21 @@ export function resolveServerRuntimeConfig(
       ? path.resolve(storageRootFromEnv)
       : resolveDefaultServerStorageRootDirectory(rootResolutionOptions);
 
-  return {
-    port: normalizePort(env.PORT),
-    storageRootDirectory,
-    runtimeRootDirectory: resolveServerRuntimeRootDirectory(env, options),
-  };
+  const runtimeRootDirectory = resolveServerRuntimeRootDirectory(env, options);
+  return { port: normalizePort(env.PORT), storageRootDirectory, runtimeRootDirectory };
 }
 
-export function createServer(options: CreateServerOptions = {}): CreatedServer {
-  const config = resolveServerRuntimeConfig(options.env);
+export function resolveServerRuntimeConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  options: { cwd?: string } = {},
+): ResolvedServerRuntimePaths {
+  return resolveServerRuntimePaths(env, options);
+}
+
+export async function createServer(options: CreateServerOptions = {}): Promise<CreatedServer> {
+  const runtimePaths = resolveServerRuntimePaths(options.env);
+  const security = await composeServerSecurity(options.env ?? process.env, runtimePaths.storageRootDirectory);
+  const config: ServerRuntimeConfig = { ...runtimePaths, security: security.config };
   const serverHost = composeServerHost({
     env: options.env,
     logging: {
@@ -147,6 +171,7 @@ export function createServer(options: CreateServerOptions = {}): CreatedServer {
     },
     logSink: options.logSink,
     now: options.now,
+    restartServer: options.restartServer,
     artifactRepo: {
       huggingFaceAccessToken: options.env?.HF_TOKEN ?? options.env?.HUGGING_FACE_TOKEN,
       huggingFaceTokenConfigFilePath: path.join(config.storageRootDirectory, "config", "hugging-face-token.json"),
@@ -155,6 +180,16 @@ export function createServer(options: CreateServerOptions = {}): CreatedServer {
 
   const app = express();
   app.use(express.json({ limit: "5mb" }));
+  applySecurityHeaders(app);
+  app.use(security.middleware);
+  registerSecurityRoutes(app, {
+    getStatus: async (authContext) => ({ ...(await security.services.getStatusService.execute({ config: { mode: security.config.mode, httpsRequired: security.config.httpsRequired, authRequired: security.config.authRequired, allowLocalhostWithoutAuth: security.config.allowLocalhostWithoutAuth }, httpsEnabled: security.config.httpsEnabled, pairingEnabled: security.config.pairingEnabled, now: new Date(), currentAuthContext: authContext, devSecurityToggleEnabled: security.config.devSecurityToggleEnabled, devSecurityEnforcementMode: security.devSecurityEnforcement.isEnabled() ? security.devSecurityEnforcement.getMode() : undefined, requiresRestartToChangeTransportSecurity: true })), tls: security.config.tlsStatus }),
+    completePairing: (body) => security.services.completePairing.execute(body),
+    revokeToken: (body) => security.credentials.revokeDevice({ deviceId: body.deviceId, revokedAt: new Date() }),
+    getDevMode: security.devSecurityEnforcement.isEnabled() ? () => security.devSecurityEnforcement.getMode() : undefined,
+    setDevMode: security.devSecurityEnforcement.isEnabled() ? (mode) => security.devSecurityEnforcement.setMode(mode) : undefined,
+    getLocalCaPem: security.config.tlsStatus?.mode === "auto-local-ca" ? security.config.tlsMaterial?.getLocalCaPublicCertificatePem : undefined,
+  });
 
   serverHost.registerApi({
     app,
@@ -167,4 +202,12 @@ export function createServer(options: CreateServerOptions = {}): CreatedServer {
     config,
     loggingPort: serverHost.loggingPort,
   };
+}
+
+export function createServerListener(createdServer: CreatedServer): ServerListener {
+  if (createdServer.config.security.httpsEnabled) {
+    return https.createServer(createHttpsServerOptions(createdServer.config.security.tlsMaterial), createdServer.app);
+  }
+
+  return http.createServer(createdServer.app);
 }

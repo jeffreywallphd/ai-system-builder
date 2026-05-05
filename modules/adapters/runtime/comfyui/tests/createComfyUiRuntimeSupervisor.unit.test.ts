@@ -226,6 +226,36 @@ describe("createComfyUiRuntimeSupervisor", () => {
     expect(health).toMatchObject({ status: "stopped" });
   });
 
+  it("waits for process exit when stopping before mode restart", async () => {
+    const mockChild = createMockChildProcess();
+    const spawnImplementation = testDouble.fn(() => mockChild as any);
+    const fetchImplementation = testDouble.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ devices: [] }),
+    });
+    const supervisor = createComfyUiRuntimeSupervisor({
+      workingDirectory: "/tmp/comfyui",
+      spawnImplementation: spawnImplementation as never,
+      fetchImplementation: fetchImplementation as never,
+      healthCheckIntervalMs: 1,
+      startupTimeoutMs: 200,
+    });
+
+    await supervisor.start();
+    const stopped = supervisor.stop();
+    let settled = false;
+    void stopped.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    mockChild.emit("exit", null, "SIGTERM");
+    await stopped;
+    expect(settled).toBe(true);
+    expect(supervisor.isRunning()).toBe(false);
+  });
+
   it("fails startup without timeout cleanup when the process exits before health checks complete", async () => {
     const mockChild = createMockChildProcess();
     const spawnImplementation = testDouble.fn(() => mockChild as any);

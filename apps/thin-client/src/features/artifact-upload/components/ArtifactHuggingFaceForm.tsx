@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import type {
   ArtifactBrowserApiClient,
@@ -19,11 +19,6 @@ interface ViewState {
 
 export function ArtifactHuggingFaceForm({ client, onRegistered }: ArtifactHuggingFaceFormProps) {
   const artifactClient = useArtifactBrowserClient(client);
-  const [tokenInput, setTokenInput] = useState("");
-  const [tokenState, setTokenState] = useState<ViewState>({ status: "idle" });
-  const [huggingFaceTokenStatus, setHuggingFaceTokenStatus] = useState<{ configured: boolean; maskedToken?: string }>({
-    configured: false,
-  });
   const [registerState, setRegisterState] = useState<ViewState>({ status: "idle" });
   const [registerNamespace, setRegisterNamespace] = useState("");
   const [registerRepository, setRegisterRepository] = useState("");
@@ -34,36 +29,6 @@ export function ArtifactHuggingFaceForm({ client, onRegistered }: ArtifactHuggin
   const [datasets, setDatasets] = useState<ThinClientHuggingFaceNamespaceDataset[]>([]);
   const [filesByRepository, setFilesByRepository] = useState<Record<string, { files: ThinClientHuggingFaceDatasetParquetFile[]; state: ViewState }>>({});
   const [expandedDataset, setExpandedDataset] = useState<string | undefined>();
-
-  useEffect(() => {
-    void artifactClient.getHuggingFaceTokenStatus().then(setHuggingFaceTokenStatus).catch(() => {
-      setHuggingFaceTokenStatus({ configured: false });
-    });
-  }, [artifactClient]);
-
-  async function saveHuggingFaceToken(): Promise<void> {
-    setTokenState({ status: "loading", message: "Saving Hugging Face token..." });
-    try {
-      const status = await artifactClient.setHuggingFaceToken({ token: tokenInput });
-      setHuggingFaceTokenStatus(status);
-      setTokenInput("");
-      setTokenState({ status: "success", message: "Hugging Face token saved." });
-    } catch (error) {
-      setTokenState({ status: "error", message: error instanceof Error ? error.message : "Failed to save Hugging Face token." });
-    }
-  }
-
-  async function clearHuggingFaceToken(): Promise<void> {
-    setTokenState({ status: "loading", message: "Removing Hugging Face token..." });
-    try {
-      const status = await artifactClient.clearHuggingFaceToken();
-      setHuggingFaceTokenStatus(status);
-      setTokenInput("");
-      setTokenState({ status: "success", message: "Hugging Face token removed." });
-    } catch (error) {
-      setTokenState({ status: "error", message: error instanceof Error ? error.message : "Failed to remove Hugging Face token." });
-    }
-  }
 
   async function registerHuggingFaceNamespace(): Promise<void> {
     setRegisterState({ status: "loading", message: "Loading namespace datasets..." });
@@ -150,22 +115,6 @@ export function ArtifactHuggingFaceForm({ client, onRegistered }: ArtifactHuggin
 
   return (
     <section className="ui-stack ui-stack--sm">
-      <p>Hugging Face token</p>
-      <p role="status">
-        Status: {huggingFaceTokenStatus.configured ? `configured (${huggingFaceTokenStatus.maskedToken ?? "...."})` : "not configured"}
-      </p>
-      <label className="ui-stack ui-stack--sm">
-        <span>Access token</span>
-        <input className="ui-input" type="password" value={tokenInput} onChange={(event) => setTokenInput(event.target.value)} placeholder="hf_..." />
-      </label>
-      <button className="ui-button artifact-ingestion-mobile-button" type="button" onClick={() => void saveHuggingFaceToken()} disabled={tokenState.status === "loading" || tokenInput.trim().length === 0}>
-        {tokenState.status === "loading" ? "Saving..." : "Save token"}
-      </button>
-      <button className="ui-button artifact-ingestion-mobile-button" type="button" onClick={() => void clearHuggingFaceToken()} disabled={tokenState.status === "loading" || !huggingFaceTokenStatus.configured}>
-        Clear token
-      </button>
-      {tokenState.message ? <p role={tokenState.status === "error" ? "alert" : "status"}>{tokenState.message}</p> : null}
-
       <button className="ui-button artifact-ingestion-mobile-button" type="button" onClick={() => setShowRegisterForm((current) => !current)} disabled={registerState.status === "loading"}>Register from Hugging Face</button>
       {showRegisterForm ? (
         <section className="ui-stack ui-stack--sm">

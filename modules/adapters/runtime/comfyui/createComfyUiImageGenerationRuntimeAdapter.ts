@@ -4,15 +4,39 @@ import type { ImageGenerationRequest } from "../../../contracts/image-generation
 import { TaskType, type RuntimeTaskListRequest, type RuntimeTaskListResult, type RuntimeTaskRecord, type RuntimeTaskStatus, type StartRuntimeTaskRequest, type StartRuntimeTaskResult } from "../../../contracts/runtime";
 import type { RuntimeTaskRegistryPort } from "../../../application/ports/runtime/runtime-task-registry.port";
 import type { ComfyUiHttpClient } from "./createComfyUiHttpClient";
-import type { ComfyUiRuntimeSupervisor } from "./createComfyUiRuntimeSupervisor";
+import type { ComfyUiRuntimeDeviceMode, ComfyUiRuntimeSupervisor } from "./createComfyUiRuntimeSupervisor";
 import { mapImageGenerationRequestToComfyUiPrompt, type ComfyUiImageGenerationWorkflowMapperOptions } from "./comfyUiImageGenerationWorkflowMapper";
 
-interface Deps { client: Pick<ComfyUiHttpClient, "submitPrompt" | "getQueue" | "getHistory">; supervisor: Pick<ComfyUiRuntimeSupervisor, "start" | "getRecentRuntimeOutput" | "getRuntimeDeviceMode">; mapperOptions: ComfyUiImageGenerationWorkflowMapperOptions; now?: () => string; }
+interface Deps {
+  client: Pick<ComfyUiHttpClient, "submitPrompt" | "getQueue" | "getHistory">;
+  supervisor: Pick<ComfyUiRuntimeSupervisor, "start" | "getRecentRuntimeOutput" | "getRuntimeDeviceMode"> & {
+    startWithRuntimeDeviceMode?: (request: { runtimeDeviceMode?: ComfyUiRuntimeDeviceMode }) => Promise<void>;
+  };
+  prepareLatentReferenceImage?: (request: {
+    artifactId: string;
+    imageRequest: ImageGenerationRequest;
+  }) => Promise<{ imageName: string }>;
+  mapperOptions: ComfyUiImageGenerationWorkflowMapperOptions;
+  now?: () => string;
+}
 
 const GENERIC_NO_OUTPUT_MESSAGE = "ComfyUI history entry did not contain image outputs.";
 
 function toRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+}
+
+function normalizeRequestedRuntimeDeviceMode(value: unknown): ComfyUiRuntimeDeviceMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "auto" || normalized === "cpu" || normalized === "directml" || normalized === "cuda"
+    ? normalized
+    : undefined;
+}
+
+function resolveRequestedRuntimeDeviceMode(request: ImageGenerationRequest): ComfyUiRuntimeDeviceMode | undefined {
+  const hints = toRecord(request.engineHints);
+  return normalizeRequestedRuntimeDeviceMode(hints?.runtimeDeviceMode);
 }
 
 function toShortTraceback(traceback: unknown): string | undefined {
@@ -84,13 +108,40 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
         throw new Error(`ComfyUI runtime adapter only supports ${TaskType.IMAGE_GENERATION} tasks.`);
       }
       const imageRequest = request.payload as ImageGenerationRequest;
-      await deps.supervisor.start();
-      const payload = mapImageGenerationRequestToComfyUiPrompt(imageRequest, deps.mapperOptions);
+      const requestedRuntimeDeviceMode = resolveRequestedRuntimeDeviceMode(imageRequest);
+      if (deps.supervisor.startWithRuntimeDeviceMode) {
+        await deps.supervisor.startWithRuntimeDeviceMode({ runtimeDeviceMode: requestedRuntimeDeviceMode });
+      } else {
+        await deps.supervisor.start();
+      }
+      const latentReference = imageRequest.latentSource?.kind === "artifact"
+        ? await deps.prepareLatentReferenceImage?.({
+            artifactId: imageRequest.latentSource.artifactId,
+            imageRequest,
+          })
+        : undefined;
+      if (imageRequest.latentSource?.kind === "artifact" && !latentReference?.imageName) {
+        throw new Error("Image generation latent artifact reference could not be prepared for ComfyUI.");
+      }
+      const payload = mapImageGenerationRequestToComfyUiPrompt(imageRequest, {
+        ...deps.mapperOptions,
+        latentReferenceImageName: latentReference?.imageName,
+      });
       const submitted = await deps.client.submitPrompt(payload);
       const requestId = request.requestId ?? randomUUID();
       const submittedAt = now();
       byRequest.set(requestId, { promptId: submitted.prompt_id, request: imageRequest, submittedAt });
-      return { requestId, status: submitted.number === undefined ? "running" : "queued", metadata: { engine: "comfyui", comfyUiPromptId: submitted.prompt_id, submittedAt } } as StartRuntimeTaskResult;
+      return {
+        requestId,
+        status: submitted.number === undefined ? "running" : "queued",
+        metadata: {
+          engine: "comfyui",
+          comfyUiPromptId: submitted.prompt_id,
+          submittedAt,
+          requestedRuntimeDeviceMode,
+          runtimeDeviceMode: deps.supervisor.getRuntimeDeviceMode?.(),
+        },
+      } as StartRuntimeTaskResult;
     },
 
     async getTaskStatus(requestId) {
