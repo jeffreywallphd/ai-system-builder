@@ -21,6 +21,8 @@ export const API_ROUTE_POLICIES: ReadonlyMap<string, ApiRoutePolicy> = new Map<s
   ["POST /api/image-generation/cancel", { public: false, scopes: ["image-generation:write"] }],
   ["POST /api/image-generation/finalize", { public: false, scopes: ["image-generation:write"] }],
   ["POST /api/image-generation/unload-model", { public: false, scopes: ["image-generation:write"] }],
+  ["POST /api/image-generation/runtime-resources", { public: false, scopes: ["image-generation:read"] }],
+  ["GET /api/image-generation/output-preview", { public: false, scopes: ["image-generation:read"] }],
 
   ["GET /api/config/huggingface-token", { public: false, scopes: ["artifact:read"] }],
   ["POST /api/config/huggingface-token", { public: false, scopes: ["artifact:write"] }],

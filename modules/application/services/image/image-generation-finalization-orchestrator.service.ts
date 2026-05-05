@@ -11,7 +11,7 @@ export class ImageGenerationFinalizationOrchestratorService {
     },
   ) {}
 
-  public async finalizeIfCompleted(requestId: string): Promise<{ finalized: boolean; assets?: Array<{ assetId: string; artifactId: string; storageKey: string; mediaType: string; source: "generated" }>; reason?: string }> {
+  public async finalizeIfCompleted(requestId: string, options?: { preferredFileName?: string }): Promise<{ finalized: boolean; assets?: Array<{ assetId: string; artifactId: string; storageKey: string; mediaType: string; source: "generated" }>; reason?: string }> {
     const finalizedAssets = this.finalizedRequests.get(requestId);
     if (finalizedAssets) return { finalized: true, assets: finalizedAssets };
 
@@ -27,7 +27,7 @@ export class ImageGenerationFinalizationOrchestratorService {
       return { finalized: true, assets };
     }
 
-    const result = await this.dependencies.finalizeImageGenerationService.finalizeCompletedTask(task);
+    const result = await this.dependencies.finalizeImageGenerationService.finalizeCompletedTask(task, options);
     this.finalizedRequests.set(requestId, result.assets);
     return { finalized: true, assets: result.assets };
   }

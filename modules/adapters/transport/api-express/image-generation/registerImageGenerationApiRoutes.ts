@@ -46,6 +46,12 @@ function mapRequestIdBody(body: unknown): string {
   if (!requestId) throw new Error("requestId is required.");
   return requestId;
 }
+function mapFinalizeBody(body: unknown): { requestId: string; preferredFileName?: string } {
+  if (!isObjectRecord(body)) throw new Error("Request body must be an object.");
+  const requestId = mapRequestIdBody(body);
+  const preferredFileName = typeof body.preferredFileName === "string" ? body.preferredFileName.trim() : "";
+  return { requestId, preferredFileName: preferredFileName.length > 0 ? preferredFileName : undefined };
+}
 
 function failure(operation: ImageGenerationOperation, code: "internal" | "validation" | "not-found" | "unavailable", message: string, context: { requestId?: string; correlationId?: string }) {
   return createApiFailureResponse(createApiError(operation, code, message, context), context);
@@ -116,14 +122,14 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
   dependencies.app.post("/api/image-generation/finalize", async (request, response) => {
     const context = contextFrom(request);
     try {
-      const requestId = mapRequestIdBody(request.body);
+      const finalizeRequest = mapFinalizeBody(request.body);
       if (!dependencies.imageGenerationFinalizationOrchestrator) {
         const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_FINALIZE_OPERATION, { finalized: false, reason: "image generation finalization is unavailable" }, context);
         response.status(statusCode(apiResponse)).json(apiResponse);
         return;
       }
 
-      const value = await dependencies.imageGenerationFinalizationOrchestrator.finalizeIfCompleted(requestId);
+      const value = await dependencies.imageGenerationFinalizationOrchestrator.finalizeIfCompleted(finalizeRequest.requestId, { preferredFileName: finalizeRequest.preferredFileName });
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_FINALIZE_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
@@ -181,4 +187,3 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
     }
   });
 }
-

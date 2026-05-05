@@ -16,7 +16,7 @@ describe("createFilesystemGeneratedImagePersistenceAdapter", () => {
     const artifactStorageBinding = { upsertArtifactStorageBinding: testDouble.fn(async () => ({ ok: true as const, value: { binding: {} } })) };
     const adapter = createFilesystemGeneratedImagePersistenceAdapter({ comfyUiOutputRoot: out, artifactStorageRoot: store, artifactCatalogAppend, artifactStorageBinding });
     const result = await adapter.persistGeneratedImage({ output: { type: "image", engine: "comfyui", fileName: "x.png" }, requestId: "req-1" });
-    expect(result.storageKey).toBe(`generated/images/${result.artifactId.replaceAll("/", "_")}.png`);
+    expect(result.storageKey).toBe("generated/images/x.png");
     await expect(stat(path.join(store, result.storageKey))).resolves.toEqual(expect.objectContaining({ isFile: expect.any(Function) }));
     await expect(stat(path.join(out, "x.png"))).rejects.toThrow();
     expect(artifactCatalogAppend.appendArtifactCatalogRecord).toHaveBeenCalledWith(expect.objectContaining({ record: expect.objectContaining({ sourceKind: "generated", artifactFamily: "image" }) }));
@@ -55,5 +55,22 @@ describe("createFilesystemGeneratedImagePersistenceAdapter", () => {
     });
     await expect(stat(path.join(store, result.storageKey))).resolves.toEqual(expect.objectContaining({ isFile: expect.any(Function) }));
     expect(await readFile(path.join(store, result.storageKey))).toEqual(pngBody);
+  });
+
+  it("uses preferred user file names and appends numeric suffixes for collisions", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "img-user-name-"));
+    const out = path.join(root, "comfy");
+    const store = path.join(root, "store");
+    await mkdir(out, { recursive: true });
+    await writeFile(path.join(out, "x.png"), "abc");
+    await mkdir(path.join(store, "generated/images"), { recursive: true });
+    await writeFile(path.join(store, "generated/images/my-image.png"), "existing");
+    const adapter = createFilesystemGeneratedImagePersistenceAdapter({ comfyUiOutputRoot: out, artifactStorageRoot: store });
+    const result = await adapter.persistGeneratedImage({
+      output: { type: "image", engine: "comfyui", fileName: "x.png", contentBase64: Buffer.from("abc").toString("base64") },
+      requestId: "req-1",
+      preferredFileName: "my image.png",
+    });
+    expect(result.storageKey).toBe("generated/images/my-image-2.png");
   });
 });
