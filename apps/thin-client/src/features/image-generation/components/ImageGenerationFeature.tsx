@@ -217,6 +217,11 @@ export function ImageGenerationFeature({
       <p>
         <strong>{feature.status}</strong>
       </p>
+      <ul>
+        <li>Memory: <strong>{feature.runtimeResources.memoryUsagePercent.toFixed(1)}%</strong></li>
+        <li>CPU: <strong>{feature.runtimeResources.cpuUsagePercent.toFixed(1)}%</strong></li>
+        <li>GPU: <strong>{feature.runtimeResources.gpuUsagePercent.toFixed(1)}%</strong></li>
+      </ul>
       {feature.requestId ? <p>Request ID: {feature.requestId}</p> : null}
       {feature.error ? <p role="alert">{feature.error}</p> : null}
       {feature.status === "succeeded" ? <button className="ui-button" type="button" onClick={() => { const name = window.prompt("Name this image generation"); if (name) void feature.saveGeneration(name); }}>Save Generation</button> : null}

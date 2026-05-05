@@ -35,12 +35,12 @@ async function parseJsonResponseSafe(response: Response): Promise<unknown | unde
 }
 
 function mapPayload<T>(endpoint: string, response: Response, payload: unknown | undefined, mapper: (payload: unknown) => T): T {
-  if (payload === undefined) {
-    throw new Error(`ComfyUI request failed for ${endpoint} with status ${response.status} and invalid JSON response body.`);
-  }
-
   if (!response.ok) {
     throw new Error(`ComfyUI request failed for ${endpoint} with status ${response.status}.`);
+  }
+
+  if (payload === undefined) {
+    throw new Error(`ComfyUI request failed for ${endpoint} with status ${response.status} and invalid JSON response body.`);
   }
 
   try {
@@ -94,6 +94,9 @@ export function createComfyUiHttpClient(options: CreateComfyUiHttpClientOptions)
         body: JSON.stringify({ unload_models: true, free_memory: true }),
       });
       const payload = await parseJsonResponseSafe(response);
+      if (response.ok && payload === undefined) {
+        return { unloadedModels: true, freedMemory: true };
+      }
       return mapPayload("/free", response, payload, mapComfyUiFreeMemoryResponse);
     },
   };

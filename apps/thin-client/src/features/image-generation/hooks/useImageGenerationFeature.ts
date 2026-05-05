@@ -12,6 +12,7 @@ import { createApiModelManagementClient, type ModelManagementApiClient } from ".
 import { createApiImageGenerationClient, type FinalizedImageAsset, type ImageGenerationApiClient } from "../api/apiImageGenerationClient";
 
 const POLL_INTERVAL_MS = 1200;
+const RESOURCE_POLL_INTERVAL_MS = 5000;
 const DEFAULT_PROMPT = "raw photo quality image; 35mm camera quality image; a dog in the park";
 const DEFAULT_NEGATIVE_PROMPT = "anime; cartoon; melty; blurry";
 type UiStatus = "idle" | "starting" | "queued" | "running" | "succeeded" | "finalizing" | "finalized" | "failed" | "cancelled";
@@ -66,6 +67,7 @@ export function useImageGenerationFeature(
   const [results, setResults] = useState<FinalizedImageAsset[]>(persistedState?.results ?? []);
   const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false);
   const [unloadModelState, setUnloadModelState] = useState<{ status: "idle" | "loading" | "success" | "error"; message?: string }>({ status: "idle" });
+  const [runtimeResources, setRuntimeResources] = useState<{ memoryUsagePercent: number; cpuUsagePercent: number; gpuUsagePercent: number }>({ memoryUsagePercent: 0, cpuUsagePercent: 0, gpuUsagePercent: 0 });
 
   const mountedRef = useRef(true);
   const activeRequestRef = useRef<string | undefined>(undefined);
@@ -119,6 +121,23 @@ export function useImageGenerationFeature(
   }, [artifactClient]);
 
   useEffect(() => { void refreshImageArtifacts(); }, [refreshImageArtifacts]);
+  useEffect(() => {
+    let cancelled = false;
+    let timer: number | undefined;
+    const pollResources = async () => {
+      try {
+        const snapshot = await client.readRuntimeResources();
+        if (!cancelled) setRuntimeResources(snapshot);
+      } finally {
+        if (!cancelled) timer = window.setTimeout(() => { void pollResources(); }, RESOURCE_POLL_INTERVAL_MS);
+      }
+    };
+    void pollResources();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [client]);
 
   const validationError = useMemo(() => {
     if (!form.prompt.trim()) return "Prompt is required.";
@@ -277,5 +296,5 @@ export function useImageGenerationFeature(
   const referenceOnlyImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => !isImageGenerationModelReady(m)), [imageGenerationModels]);
   const imageGenerationModelOptions = useMemo(() => imageGenerationModels.map(toImageGenerationModelDropdownOption).filter((option): option is NonNullable<typeof option> => Boolean(option)), [imageGenerationModels]);
 
-  return { form, setForm, runtimeMode, setRuntimeMode, status, error, requestId, results, start, saveGeneration, cancel, unloadModel, unloadModelState, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), isUnloadModelDisabled: ACTIVE_STATUSES.includes(status) || unloadModelState.status === "loading", createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions, imageArtifacts, imageArtifactsLoading, imageArtifactsError, refreshImageArtifacts };
+  return { form, setForm, runtimeMode, setRuntimeMode, status, error, requestId, results, start, saveGeneration, cancel, unloadModel, unloadModelState, runtimeResources, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), isUnloadModelDisabled: ACTIVE_STATUSES.includes(status) || unloadModelState.status === "loading", createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions, imageArtifacts, imageArtifactsLoading, imageArtifactsError, refreshImageArtifacts };
 }

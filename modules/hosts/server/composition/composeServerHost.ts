@@ -3,6 +3,7 @@ import { execFile as nodeExecFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { cpus, freemem, totalmem } from "node:os";
 import { promisify } from "node:util";
 import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
 import { FinalizeImageGenerationService } from "../../../application/services/image/finalize-image-generation.service";
@@ -676,6 +677,15 @@ export function composeServerHost(
           }
           await comfyUiClient.unloadModels();
           return { unloaded: true, message: "ComfyUI model memory was released." };
+        },
+        async readRuntimeResources() {
+          const cpuSamples = cpus();
+          const totalIdle = cpuSamples.reduce((sum, cpu) => sum + cpu.times.idle, 0);
+          const totalTick = cpuSamples.reduce((sum, cpu) => sum + Object.values(cpu.times).reduce((a, b) => a + b, 0), 0);
+          const cpuUsagePercent = totalTick > 0 ? Math.max(0, Math.min(100, (1 - totalIdle / totalTick) * 100)) : 0;
+          const totalMemory = totalmem();
+          const memoryUsagePercent = totalMemory > 0 ? Math.max(0, Math.min(100, ((totalMemory - freemem()) / totalMemory) * 100)) : 0;
+          return { memoryUsagePercent, cpuUsagePercent, gpuUsagePercent: 0 };
         },
       };
       const runtimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
