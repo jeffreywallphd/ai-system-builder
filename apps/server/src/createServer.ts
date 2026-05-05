@@ -37,6 +37,7 @@ export interface CreateServerOptions {
   env?: NodeJS.ProcessEnv;
   logSink?: StructuredLogSink;
   now?: () => string;
+  restartServer?: () => void | Promise<void>;
 }
 
 export interface CreatedServer {
@@ -170,6 +171,7 @@ export async function createServer(options: CreateServerOptions = {}): Promise<C
     },
     logSink: options.logSink,
     now: options.now,
+    restartServer: options.restartServer,
     artifactRepo: {
       huggingFaceAccessToken: options.env?.HF_TOKEN ?? options.env?.HUGGING_FACE_TOKEN,
       huggingFaceTokenConfigFilePath: path.join(config.storageRootDirectory, "config", "hugging-face-token.json"),

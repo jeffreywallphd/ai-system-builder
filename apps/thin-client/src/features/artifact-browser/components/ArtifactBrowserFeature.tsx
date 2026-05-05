@@ -49,17 +49,15 @@ function PublishedBackingPanel(
 export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) {
   const {
     items,
-    huggingFaceTokenStatus,
-    tokenInput,
-    tokenState,
     selectedStorageKey,
     pendingDeleteStorageKey,
     deleteConfirmationInput,
     detail,
     content,
     imageViewUrl,
+    canSelectPreviousImage,
+    canSelectNextImage,
     publishState,
-    publishForm,
     registerState,
     localizeState,
     sourceVerifyState,
@@ -69,6 +67,8 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     viewState,
     selectArtifact,
     refreshArtifacts,
+    selectPreviousImage,
+    selectNextImage,
     requestDeleteRegisteredArtifact,
     confirmPendingDelete,
     cancelPendingDelete,
@@ -84,32 +84,22 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     localizeArtifactFromRepo,
     recheckPublishedBacking,
     recheckSourceBacking,
-    publishArtifactToHuggingFace,
-    setRepository,
-    setPathInRepo,
-    setRevision,
-    setMediaType,
-    togglePublishForm,
     setRegisterRepository,
     setRegisterNamespace,
     setRegisterPathInRepo,
     setRegisterRevision,
     setRegisterMediaType,
     toggleRegisterForm,
-    setTokenInput,
-    saveHuggingFaceToken,
-    clearHuggingFaceToken,
   } = useArtifactBrowserFeature(client);
 
   const backingState = deriveArtifactBackingState(detail, content);
-  const publishRepository = publishForm.repository.trim();
-  const publishPathPrefix = publishForm.pathInRepo.trim().replace(/^\/+|\/+$/g, "");
-  const publishFileName = detail?.originalName?.trim() || detail?.locator.storageKey.split("/").pop() || "artifact";
-  const publishPath = publishPathPrefix ? `${publishPathPrefix}/${publishFileName}` : publishFileName;
 
   return (
     <section className="ui-panel ui-stack ui-stack--sm">
-      <header className="ui-grid ui-grid--two"><h2>Data Artifact Browser</h2><button className="ui-button" type="button" onClick={() => void refreshArtifacts()}>Refresh</button></header>
+      <header className="ui-grid ui-grid--two">
+        <h2>Data Artifact Browser</h2>
+        <button className="ui-button" type="button" onClick={() => void refreshArtifacts()}>Refresh</button>
+      </header>
       {viewState.message ? <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p> : null}
       {pendingDeleteStorageKey ? (
         <div className="ui-modal-overlay" role="presentation">
@@ -140,25 +130,6 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
           </section>
         </div>
       ) : null}
-      <section className="ui-stack ui-stack--sm">
-        <h3>Hugging Face token</h3>
-        <p role="status">
-          Status: {huggingFaceTokenStatus.configured ? `configured (${huggingFaceTokenStatus.maskedToken ?? "••••"})` : "not configured"}
-        </p>
-        <label className="ui-stack ui-stack--sm">
-          <span>Access token</span>
-          <input className="ui-input" type="password" value={tokenInput} onChange={(event) => setTokenInput(event.target.value)} placeholder="hf_..." />
-        </label>
-        <div className="ui-grid ui-grid--two">
-          <button className="ui-button" type="button" onClick={() => void saveHuggingFaceToken()} disabled={tokenState.status === "loading" || tokenInput.trim().length === 0}>
-            {tokenState.status === "loading" ? "Saving..." : "Save token"}
-          </button>
-          <button className="ui-button" type="button" onClick={() => void clearHuggingFaceToken()} disabled={tokenState.status === "loading" || !huggingFaceTokenStatus.configured}>
-            Clear token
-          </button>
-        </div>
-        {tokenState.message ? <p role={tokenState.status === "error" ? "alert" : "status"}>{tokenState.message}</p> : null}
-      </section>
 
       <button className="ui-button" type="button" onClick={toggleRegisterForm} disabled={registerState.status === "loading"}>Register from Hugging Face</button>
       {registerForm.showRegisterForm ? (
@@ -192,7 +163,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
                           Close
                         </button>
                       </div>
-                      {getHuggingFaceDatasetFilesState(dataset.repository).status === "loading" ? <p role="status">Loading dataset files…</p> : null}
+                      {getHuggingFaceDatasetFilesState(dataset.repository).status === "loading" ? <p role="status">Loading dataset files...</p> : null}
                       {getHuggingFaceDatasetFilesState(dataset.repository).status === "error" ? (
                         <p role="alert">{getHuggingFaceDatasetFilesState(dataset.repository).message ?? "Failed to load dataset files."}</p>
                       ) : null}
@@ -246,7 +217,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
               {item.originalName ?? item.storageKey}
             </button>
             {item.metadata?.backingState ? (
-              <small>{deriveArtifactListStatusLabels(item.metadata.backingState).join(" · ")}</small>
+              <small>{deriveArtifactListStatusLabels(item.metadata.backingState).join(" - ")}</small>
             ) : null}
           </li>
         ))}
@@ -299,45 +270,6 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
           {backingState.isRemoteOnly ? (
             <p role="status">Remote-only artifact. Local preview is unavailable until localization.</p>
           ) : null}
-          {backingState.hasLocalObjectAvailable ? (
-            <section className="ui-stack ui-stack--sm">
-              <button className="ui-button" type="button" onClick={togglePublishForm} disabled={publishState.status === "loading"}>
-                Publish to Hugging Face
-              </button>
-              {publishForm.showPublishForm ? (
-                <div className="ui-stack ui-stack--sm">
-                  <p role="note">Private or gated Hugging Face repositories may require a host/server token.</p>
-                  <label className="ui-stack ui-stack--sm">
-                    <span>Dataset repository</span>
-                    <input className="ui-input" value={publishForm.repository} onChange={(event) => setRepository(event.target.value)} placeholder="owner/repository" required />
-                  </label>
-                  <label className="ui-stack ui-stack--sm">
-                    <span>Path prefix (optional)</span>
-                    <input className="ui-input" value={publishForm.pathInRepo} onChange={(event) => setPathInRepo(event.target.value)} />
-                    <small className="ui-text-muted">Publishes artifact to: {publishPath}</small>
-                  </label>
-                  <label className="ui-stack ui-stack--sm"><span>Revision (optional)</span><input className="ui-input" value={publishForm.revision} onChange={(event) => setRevision(event.target.value)} /></label>
-                  <label className="ui-stack ui-stack--sm"><span>Media type (optional)</span><input className="ui-input" value={publishForm.mediaType} onChange={(event) => setMediaType(event.target.value)} /></label>
-                  <button
-                    className="ui-button"
-                    type="button"
-                    disabled={publishState.status === "loading" || publishRepository.length === 0}
-                    onClick={() => void publishArtifactToHuggingFace({
-                      repository: publishRepository,
-                      path: publishPath,
-                      revision: publishForm.revision,
-                      mediaType: publishForm.mediaType,
-                    })}
-                  >
-                    {publishState.status === "loading" ? "Publishing..." : "Publish"}
-                  </button>
-                </div>
-              ) : null}
-              {publishState.message ? <p role={publishState.status === "error" ? "alert" : "status"}>{publishState.message}</p> : null}
-            </section>
-          ) : (
-            <p role="status">Publish is available after local bytes are present.</p>
-          )}
         </section>
       ) : null}
 
@@ -389,9 +321,17 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
       ) : null}
 
       {imageViewUrl && content?.availability === "available" ? (
-        <figure className="ui-stack ui-stack--sm">
+        <figure id="artifact-browser-image-preview" className="ui-stack ui-stack--sm">
           <img src={imageViewUrl} alt={detail?.locator.storageKey ?? "Selected artifact"} />
           <figcaption>Image preview for {detail?.locator.storageKey}</figcaption>
+          <div className="ui-grid ui-grid--two">
+            <button className="ui-button" type="button" onClick={() => void selectPreviousImage()} disabled={!canSelectPreviousImage}>
+              Previous
+            </button>
+            <button className="ui-button" type="button" onClick={() => void selectNextImage()} disabled={!canSelectNextImage}>
+              Next
+            </button>
+          </div>
         </figure>
       ) : null}
 
@@ -402,7 +342,6 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
           onRecheck={() => void recheckPublishedBacking()}
         />
       ) : null}
-
     </section>
   );
 }

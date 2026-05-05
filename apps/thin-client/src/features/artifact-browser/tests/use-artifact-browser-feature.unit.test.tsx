@@ -26,7 +26,7 @@ describe("ArtifactBrowserFeature", () => {
     mountedContainer = undefined;
   });
 
-  it("exposes publish controls while showing published backing details", async () => {
+  it("hides token and publish controls while showing published backing details", async () => {
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([
         {
@@ -113,7 +113,8 @@ describe("ArtifactBrowserFeature", () => {
       artifactButton.click();
     });
 
-    expect(container.textContent).toContain("Publish to Hugging Face");
+    expect(container.textContent).not.toContain("Hugging Face token");
+    expect(container.textContent).not.toContain("Publish to Hugging Face");
     expect(container.textContent).toContain("Published Backing");
     expect(container.textContent).toContain("openai/demo");
     expect(container.textContent).toContain("Not yet verified");
@@ -182,7 +183,7 @@ describe("ArtifactBrowserFeature", () => {
     expect(container.textContent).toContain("Deleted uploads/cat.png.");
   });
 
-  it("saves and clears Hugging Face token from token settings", async () => {
+  it("does not render Hugging Face token settings", async () => {
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([]),
       readArtifactDetail: vi.fn(),
@@ -207,6 +208,10 @@ describe("ArtifactBrowserFeature", () => {
       root.render(<ArtifactBrowserFeature client={client} />);
     });
 
+    expect(container.textContent).not.toContain("Hugging Face token");
+    expect(container.querySelector("input[type='password']")).toBe(null);
+    return;
+
     const tokenInput = container.querySelector("input[type='password']") as HTMLInputElement;
     setInputValue(tokenInput, "hf_9999");
     const saveButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Save token") as HTMLButtonElement;
@@ -223,7 +228,7 @@ describe("ArtifactBrowserFeature", () => {
     expect(client.clearHuggingFaceToken).toHaveBeenCalled();
   });
 
-  it("publishes a selected local artifact from the artifact detail panel", async () => {
+  it("does not render thin-client artifact publish controls", async () => {
     const client = {
       browseArtifacts: vi.fn().mockResolvedValue([
         {
@@ -268,6 +273,9 @@ describe("ArtifactBrowserFeature", () => {
     });
 
     expect(container.textContent).toContain("Delete artifact");
+    expect(container.textContent).not.toContain("Publish to Hugging Face");
+    return;
+
     const publishToggle = Array.from(container.querySelectorAll("button"))
       .find((button) => button.textContent === "Publish to Hugging Face") as HTMLButtonElement;
     await act(async () => {
@@ -288,6 +296,66 @@ describe("ArtifactBrowserFeature", () => {
       revision: "main",
       mediaType: "",
     });
+  });
+
+  it("traverses selected image previews with previous and next controls", async () => {
+    const client = {
+      browseArtifacts: vi.fn().mockResolvedValue([
+        { storageKey: "uploads/cat-1.png", artifactFamily: "image" as const, mediaType: "image/png" },
+        { storageKey: "uploads/cat-2.png", artifactFamily: "image" as const, mediaType: "image/png" },
+      ]),
+      readArtifactDetail: vi.fn(async ({ storageKey }: { storageKey: string }) => ({
+        locator: { storageKey },
+        artifactFamily: "image" as const,
+        mediaType: "image/png",
+      })),
+      readArtifactContent: vi.fn(async ({ storageKey }: { storageKey: string }) => ({
+        locator: { storageKey },
+        mediaType: "image/png",
+        availability: "available" as const,
+        retrieval: "deferred" as const,
+      })),
+      createArtifactMediaViewUrl: vi.fn(({ storageKey }: { storageKey: string }) => `/api/artifact/media/view?storageKey=${encodeURIComponent(storageKey)}`),
+      deleteRegisteredArtifact: vi.fn(),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn(),
+      clearHuggingFaceToken: vi.fn(),
+      publishArtifactToHuggingFace: vi.fn(),
+      verifyPublishedArtifactBacking: vi.fn(),
+      registerArtifactFromRepo: vi.fn(),
+      localizeArtifactFromRepo: vi.fn(),
+    };
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ArtifactBrowserFeature client={client} />);
+    });
+
+    const firstArtifactButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("uploads/cat-1.png")) as HTMLButtonElement;
+    await act(async () => {
+      firstArtifactButton.click();
+    });
+
+    expect(container.textContent).toContain("Image preview for uploads/cat-1.png");
+    const nextButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Next") as HTMLButtonElement;
+    await act(async () => {
+      nextButton.click();
+    });
+    expect(container.textContent).toContain("Image preview for uploads/cat-2.png");
+
+    const previousButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Previous") as HTMLButtonElement;
+    await act(async () => {
+      previousButton.click();
+    });
+    expect(container.textContent).toContain("Image preview for uploads/cat-1.png");
   });
 
   it("re-checks published backing existence from the artifact detail panel", async () => {
@@ -419,8 +487,8 @@ describe("ArtifactBrowserFeature", () => {
     });
 
     const inputs = Array.from(container.querySelectorAll("input"));
-    setInputValue(inputs[2] as HTMLInputElement, "openai/demo");
-    setInputValue(inputs[3] as HTMLInputElement, "images/cat.png");
+    setInputValue(inputs[1] as HTMLInputElement, "openai/demo");
+    setInputValue(inputs[2] as HTMLInputElement, "images/cat.png");
 
     const registerButton = Array.from(container.querySelectorAll("button"))
       .find((button) => button.textContent === "Register") as HTMLButtonElement;
@@ -498,7 +566,7 @@ describe("ArtifactBrowserFeature", () => {
       registerToggle.click();
     });
 
-    const namespaceInput = Array.from(container.querySelectorAll("input"))[1] as HTMLInputElement;
+    const namespaceInput = Array.from(container.querySelectorAll("input"))[0] as HTMLInputElement;
     setInputValue(namespaceInput, "openai");
     const registerNamespaceButton = Array.from(container.querySelectorAll("button"))
       .find((button) => button.textContent === "Register namespace") as HTMLButtonElement;
@@ -577,7 +645,7 @@ describe("ArtifactBrowserFeature", () => {
       registerToggle.click();
     });
 
-    const namespaceInput = Array.from(container.querySelectorAll("input"))[1] as HTMLInputElement;
+    const namespaceInput = Array.from(container.querySelectorAll("input"))[0] as HTMLInputElement;
     setInputValue(namespaceInput, "openai");
     const registerNamespaceButton = Array.from(container.querySelectorAll("button"))
       .find((button) => button.textContent === "Register namespace") as HTMLButtonElement;

@@ -18,6 +18,7 @@ export interface ApplicationSettingsApiClient {
   readSettings: (input?: { category?: string; keys?: ApplicationSettingKey[] }) => Promise<{ values: ApplicationSettingValue[] }>;
   updateSetting: (input: { key: ApplicationSettingKey; value: ApplicationSettingPrimitiveValue }) => Promise<{ value: ApplicationSettingValue }>;
   clearSetting: (input: { key: ApplicationSettingKey }) => Promise<{ value: ApplicationSettingValue }>;
+  restartServer: () => Promise<{ restartRequested: boolean }>;
 }
 
 const createApiUrl = (baseUrl: string, suffix: string): string => `${baseUrl.trim().replace(/\/+$/, "") || "/api"}${suffix}`;
@@ -62,6 +63,11 @@ function expectValue(value: unknown): { value: ApplicationSettingValue } {
   return value as unknown as { value: ApplicationSettingValue };
 }
 
+function expectRestart(value: unknown): { restartRequested: boolean } {
+  if (!isRecord(value) || value.restartRequested !== true) throw new Error("Server restart response is malformed.");
+  return value as { restartRequested: boolean };
+}
+
 export function createApiApplicationSettingsClient(options: { apiBaseUrl?: string } = {}): ApplicationSettingsApiClient {
   const apiBaseUrl = options.apiBaseUrl ?? "/api";
   return {
@@ -80,6 +86,10 @@ export function createApiApplicationSettingsClient(options: { apiBaseUrl?: strin
     async clearSetting(input) {
       const { envelope, status, endpoint } = await postJson(apiBaseUrl, "/application-settings/clear", input);
       return ensureSuccess(envelope, status, endpoint, expectValue);
+    },
+    async restartServer() {
+      const { envelope, status, endpoint } = await postJson(apiBaseUrl, "/server/restart", {});
+      return ensureSuccess(envelope, status, endpoint, expectRestart);
     },
   };
 }

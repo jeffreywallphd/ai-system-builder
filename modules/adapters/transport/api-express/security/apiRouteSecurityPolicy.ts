@@ -29,6 +29,7 @@ export const API_ROUTE_POLICIES: ReadonlyMap<string, ApiRoutePolicy> = new Map<s
   ["POST /api/application-settings/read", { public: false, scopes: ["artifact:read"] }],
   ["POST /api/application-settings/update", { public: false, scopes: ["artifact:write"] }],
   ["POST /api/application-settings/clear", { public: false, scopes: ["artifact:write"] }],
+  ["POST /api/server/restart", { public: false, scopes: ["settings:write"] }],
   ["POST /api/artifact-repo/has", { public: false, scopes: ["artifact:read"] }],
   ["POST /api/huggingface/namespace/datasets", { public: false, scopes: ["artifact:read"] }],
   ["POST /api/huggingface/dataset/parquet-files", { public: false, scopes: ["artifact:read"] }],

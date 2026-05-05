@@ -18,6 +18,7 @@ export function SettingsPage() {
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [restarting, setRestarting] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -77,6 +78,20 @@ export function SettingsPage() {
     }
   };
 
+  const restartServer = async () => {
+    setRestarting(true);
+    setStatusMessage(undefined);
+    setErrorMessage(undefined);
+    try {
+      await client.restartServer();
+      setStatusMessage("Server restart requested.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to restart server.");
+    } finally {
+      setRestarting(false);
+    }
+  };
+
   return (
     <section className="ui-panel ui-stack ui-stack--md settings-page">
       <header className="ui-stack ui-stack--sm">
@@ -86,6 +101,15 @@ export function SettingsPage() {
       {statusMessage ? <p className="ui-status">{statusMessage}</p> : null}
       {errorMessage ? <p className="ui-status ui-status--error" role="alert">{errorMessage}</p> : null}
       <div className="ui-stack ui-stack--md">
+        <section className="settings-field ui-stack ui-stack--sm">
+          <header className="ui-stack ui-stack--sm">
+            <h3>Server</h3>
+            <p className="ui-text-muted">Restart the server process after changing settings that are applied at startup.</p>
+          </header>
+          <button className="ui-button" type="button" disabled={restarting} onClick={() => void restartServer()}>
+            {restarting ? "Restarting..." : "Restart server"}
+          </button>
+        </section>
         {definitions.map((definition) => {
           const configured = valuesByKey.get(definition.key)?.configured;
           return (
