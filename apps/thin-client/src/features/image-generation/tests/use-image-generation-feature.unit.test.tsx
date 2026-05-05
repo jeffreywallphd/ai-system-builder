@@ -138,6 +138,18 @@ describe("useImageGenerationFeature", () => {
     expect((c.querySelector('#selected') as HTMLElement).textContent).toBe('img');
   });
 
+
+  it("does not auto-finalize on success and assigns random seed when omitted", async () => {
+    const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn().mockResolvedValue({ requestId: "r1" }), readImageGeneration: vi.fn().mockResolvedValue({ requestId: "r1", status: "succeeded" }), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn() };
+    const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [] }) };
+    function H() { const f = useImageGenerationFeature(client, undefined, modelClient); return <div><button id="start" onClick={()=>void f.start()}>s</button><button id="prompt" onClick={()=>f.setForm((x)=>({...x,prompt:"cat",seed:""}))}>p</button></div>; }
+    const c = document.createElement("div"); const root = createRoot(c);
+    await act(async()=>{root.render(<H/>);});
+    await act(async()=>{(c.querySelector("#prompt") as HTMLButtonElement).click(); (c.querySelector("#start") as HTMLButtonElement).click(); await flush();});
+    expect(client.finalizeImageGenerationIfCompleted).not.toHaveBeenCalled();
+    expect(client.startImageGeneration).toHaveBeenCalledWith(expect.objectContaining({ seed: expect.any(Number) }));
+  });
+
   it("strict mode still loads model inventory", async () => {
     const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn() };
     const listModels = vi.fn().mockResolvedValue({ models: [model("img", "downloaded", "text-to-image")] });

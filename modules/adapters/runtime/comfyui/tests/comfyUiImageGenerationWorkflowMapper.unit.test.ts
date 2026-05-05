@@ -44,6 +44,8 @@ describe("comfyUiImageGenerationWorkflowMapper", () => {
     const explicit = mapImageGenerationRequestToComfyUiPrompt({ prompt: "seeded", seed: 42 }, { defaultCheckpoint: "sdxl.safetensors" });
     const implicit = mapImageGenerationRequestToComfyUiPrompt({ prompt: "random" }, { defaultCheckpoint: "sdxl.safetensors" });
     expect(explicit.prompt["5"].inputs.seed).toBe(42);
+    expect(explicit.prompt["5"].inputs.control_after_generate).toBe("fixed");
     expect(implicit.prompt["5"].inputs.seed).not.toBe(0);
+    expect(implicit.prompt["5"].inputs.control_after_generate).toBe("randomize");
   });
 });

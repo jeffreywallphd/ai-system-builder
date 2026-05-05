@@ -22,7 +22,7 @@ export function ImageGenerationFeature({
   return (
     <section className="ui-panel ui-stack ui-stack--sm" aria-label="Image Generation">
       <h2>Image Generation</h2>
-      <p className="ui-text-muted">Generate images from a prompt. Final images are saved to Artifacts.</p>
+      <p className="ui-text-muted">Generate images from a prompt. Save the generation to register it in Artifacts.</p>
 
       <section className="ui-stack ui-stack--sm">
         <div className="ui-stack ui-stack--xs">
@@ -219,6 +219,7 @@ export function ImageGenerationFeature({
       </p>
       {feature.requestId ? <p>Request ID: {feature.requestId}</p> : null}
       {feature.error ? <p role="alert">{feature.error}</p> : null}
+      {feature.status === "succeeded" ? <button className="ui-button" type="button" onClick={() => { const name = window.prompt("Name this image generation"); if (name) void feature.saveGeneration(name); }}>Save Generation</button> : null}
 
       <h3>Generated Images</h3>
       <div className="ui-stack ui-stack--sm">
