@@ -27,10 +27,10 @@ describe("useImageGenerationFeature", () => {
     const client = makeClient(); client.startImageGeneration.mockResolvedValue({ ok: true, value: { requestId: "r1" } }); client.readImageGeneration.mockResolvedValue({ ok: true, value: { status: "cancelled", requestId: "r1", taskType: "image-generation", concurrencyClass: "image-generation" } });
     let hook!: ReturnType<typeof useImageGenerationFeature>; const c = document.createElement("div"); const root = createRoot(c);
     await act(async () => root.render(<Harness client={client} onReady={(h) => { hook = h; }} />));
-    await act(async () => { hook.setForm({ prompt:"cat", negativePrompt:"", seed:"", width:"1024", height:"1024", steps:"30", cfg:"8", denoise:"1", sampler:"", scheduler:"", model:"", numImages:"1", latentSourceArtifactId:"" }); });
+    await act(async () => { hook.setForm({ prompt:"cat", negativePrompt:"", seed:"", width:"1024", height:"1024", steps:"30", cfg:"8", denoise:"1", sampler:"", scheduler:"", model:"", numImages:"1", latentSourceArtifactId:"", outputFileName:"" }); });
     await act(async () => { await hook.start(); });
     expect(client.startImageGeneration.mock.calls[0][0].seed).toBeUndefined();
-    await act(async () => { hook.setForm({ prompt:"cat", negativePrompt:"", seed:"42", width:"1024", height:"1024", steps:"30", cfg:"8", denoise:"1", sampler:"", scheduler:"", model:"", numImages:"1", latentSourceArtifactId:"" }); });
+    await act(async () => { hook.setForm({ prompt:"cat", negativePrompt:"", seed:"42", width:"1024", height:"1024", steps:"30", cfg:"8", denoise:"1", sampler:"", scheduler:"", model:"", numImages:"1", latentSourceArtifactId:"", outputFileName:"" }); });
     await act(async () => { await hook.start(); });
     expect(client.startImageGeneration.mock.calls[1][0].seed).toBe(42);
     await act(async () => root.unmount());

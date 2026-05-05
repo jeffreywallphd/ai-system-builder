@@ -3,6 +3,7 @@ import type { ImageGenerationOutput } from "../../../contracts/image-generation"
 export interface PersistGeneratedImageInput {
   output: ImageGenerationOutput;
   requestId: string;
+  preferredFileName?: string;
 }
 
 import type { StorageObjectChecksum } from "../../../contracts/storage";

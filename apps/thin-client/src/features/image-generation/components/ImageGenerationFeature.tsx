@@ -144,6 +144,7 @@ export function ImageGenerationFeature({
           ["sampler", "Sampler", "text"],
           ["scheduler", "Scheduler", "text"],
           ["numImages", "Number of Images", "number"],
+          ["outputFileName", "Output File Name (optional)", "text"],
         ].map(([key, label, type]) => {
           const formKey = key as keyof typeof feature.form;
           const id = `image-generation-${String(key)}`;

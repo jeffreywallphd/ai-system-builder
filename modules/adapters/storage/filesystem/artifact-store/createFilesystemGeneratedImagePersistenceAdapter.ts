@@ -21,10 +21,10 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
   const artifactIdFactory = new SystemArtifactIdFactory();
 
   return {
-    async persistGeneratedImage({ output }) {
+    async persistGeneratedImage({ output, preferredFileName }) {
       const artifactId = artifactIdFactory.createArtifactId().toString();
-      const safeArtifactFilePart = artifactId.replaceAll("/", "_");
-      const storageKey = `generated/images/${safeArtifactFilePart}.png`;
+      const desiredFileName = sanitizeFileName(preferredFileName) ?? sanitizeFileName(output.fileName) ?? "generated-image.png";
+      const storageKey = `generated/images/${artifactId.replaceAll("/", "_")}-${desiredFileName}`;
       const destinationPath = path.join(storageRoot, storageKey);
       await mkdir(path.dirname(destinationPath), { recursive: true });
 
@@ -63,4 +63,14 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
       return { artifactId, storageKey, mediaType: "image/png", sizeBytes: destinationStats.size, checksum, originalFileName: output.fileName };
     },
   };
+}
+
+function sanitizeFileName(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const normalized = value.trim().replaceAll("\\", "/").split("/").pop()?.trim();
+  if (!normalized) return undefined;
+  const stripped = normalized.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  if (!stripped) return undefined;
+  if (/\.[a-zA-Z0-9]+$/.test(stripped)) return stripped;
+  return `${stripped}.png`;
 }

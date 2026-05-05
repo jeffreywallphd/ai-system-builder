@@ -18,7 +18,7 @@ const DEFAULT_NEGATIVE_PROMPT = "anime; cartoon; melty; blurry";
 type UiStatus = "idle" | "starting" | "queued" | "running" | "succeeded" | "finalizing" | "finalized" | "failed" | "cancelled";
 const ACTIVE_STATUSES: UiStatus[] = ["starting", "queued", "running", "finalizing"];
 
-export interface ImageGenerationFormState { prompt: string; negativePrompt: string; seed: string; width: string; height: string; steps: string; cfg: string; denoise: string; sampler: string; scheduler: string; model: string; numImages: string; latentSourceArtifactId: string }
+export interface ImageGenerationFormState { prompt: string; negativePrompt: string; seed: string; width: string; height: string; steps: string; cfg: string; denoise: string; sampler: string; scheduler: string; model: string; numImages: string; latentSourceArtifactId: string; outputFileName: string }
 export type ImageGenerationRuntimeMode = "auto" | "cpu" | "cuda" | "directml";
 const defaultImageGenerationClient = createApiImageGenerationClient();
 const defaultModelManagementClient = createApiModelManagementClient();
@@ -52,7 +52,7 @@ export function useImageGenerationFeature(
   modelClient: ModelManagementApiClient = defaultModelManagementClient,
   artifactClient: ArtifactBrowserApiClient = defaultArtifactBrowserClient,
 ) {
-  const [form, setForm] = useState<ImageGenerationFormState>(persistedState?.form ?? { prompt: DEFAULT_PROMPT, negativePrompt: DEFAULT_NEGATIVE_PROMPT, seed: "", width: "1024", height: "1024", steps: "20", cfg: "8", denoise: "1", sampler: "dpmpp_2m", scheduler: "karras", model: "", numImages: "1", latentSourceArtifactId: "" });
+  const [form, setForm] = useState<ImageGenerationFormState>(persistedState?.form ?? { prompt: DEFAULT_PROMPT, negativePrompt: DEFAULT_NEGATIVE_PROMPT, seed: "", width: "1024", height: "1024", steps: "20", cfg: "8", denoise: "1", sampler: "dpmpp_2m", scheduler: "karras", model: "", numImages: "1", latentSourceArtifactId: "", outputFileName: "" });
   const [runtimeMode, setRuntimeMode] = useState<ImageGenerationRuntimeMode>(persistedState?.runtimeMode ?? "auto");
   const [modelInventory, setModelInventory] = useState<ModelInventoryRecord[]>([]);
   const [modelInventoryLoading, setModelInventoryLoading] = useState(false);
@@ -195,7 +195,7 @@ export function useImageGenerationFeature(
       if (form.negativePrompt.trim()) payload.negativePrompt = form.negativePrompt.trim();
       if (form.latentSourceArtifactId.trim()) payload.latentSource = { kind: "artifact", artifactId: form.latentSourceArtifactId.trim() };
       else payload.latentSource = { kind: "empty" };
-      payload.engineHints = { ...(payload.engineHints ?? {}), runtimeDeviceMode: runtimeMode };
+      payload.engineHints = { ...(payload.engineHints ?? {}), runtimeDeviceMode: runtimeMode, ...(form.outputFileName.trim() ? { outputFileName: form.outputFileName.trim() } : {}) };
 
       const started = await client.startImageGeneration(payload);
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;

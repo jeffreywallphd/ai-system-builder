@@ -39,6 +39,15 @@ describe("api image generation client", () => {
     const c = createApiImageGenerationClient();
     await expect(c.startImageGeneration({ prompt: "cat" })).rejects.toThrow("bad");
   });
+
+  it("coerces runtime resource percentages when API returns numeric strings", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValue({ status: 200, json: vi.fn().mockResolvedValue({ ok: true, value: { memoryUsagePercent: "55.5", cpuUsagePercent: "12", gpuUsagePercent: "7" } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const c = createApiImageGenerationClient();
+    const resources = await c.readRuntimeResources();
+    expect(resources).toEqual({ memoryUsagePercent: 55.5, cpuUsagePercent: 12, gpuUsagePercent: 7 });
+  });
 });
 
 
