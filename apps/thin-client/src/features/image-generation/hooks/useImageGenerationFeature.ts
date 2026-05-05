@@ -12,6 +12,8 @@ import { createApiModelManagementClient, type ModelManagementApiClient } from ".
 import { createApiImageGenerationClient, type FinalizedImageAsset, type ImageGenerationApiClient } from "../api/apiImageGenerationClient";
 
 const POLL_INTERVAL_MS = 1200;
+const DEFAULT_PROMPT = "raw photo quality image; 35mm camera quality image; a dog in the park";
+const DEFAULT_NEGATIVE_PROMPT = "anime; cartoon; melty; blurry";
 type UiStatus = "idle" | "starting" | "queued" | "running" | "succeeded" | "finalizing" | "finalized" | "failed" | "cancelled";
 const ACTIVE_STATUSES: UiStatus[] = ["starting", "queued", "running", "finalizing"];
 
@@ -45,7 +47,7 @@ export function useImageGenerationFeature(
   modelClient: ModelManagementApiClient = defaultModelManagementClient,
   artifactClient: ArtifactBrowserApiClient = defaultArtifactBrowserClient,
 ) {
-  const [form, setForm] = useState<ImageGenerationFormState>({ prompt: "", negativePrompt: "", seed: "", width: "512", height: "512", steps: "20", cfg: "8", denoise: "1", sampler: "euler", scheduler: "normal", model: "", numImages: "1", latentSourceArtifactId: "" });
+  const [form, setForm] = useState<ImageGenerationFormState>({ prompt: DEFAULT_PROMPT, negativePrompt: DEFAULT_NEGATIVE_PROMPT, seed: "", width: "1024", height: "1024", steps: "20", cfg: "8", denoise: "1", sampler: "dpmpp_2m", scheduler: "karras", model: "", numImages: "1", latentSourceArtifactId: "" });
   const [runtimeMode, setRuntimeMode] = useState<ImageGenerationRuntimeMode>("auto");
   const [modelInventory, setModelInventory] = useState<ModelInventoryRecord[]>([]);
   const [modelInventoryLoading, setModelInventoryLoading] = useState(false);
@@ -164,7 +166,7 @@ export function useImageGenerationFeature(
       const payload: ImageGenerationRequest = {
         prompt: form.prompt.trim(), width: parsePositiveInt(form.width)!, height: parsePositiveInt(form.height)!, steps: parsePositiveInt(form.steps)!, numImages: parsePositiveInt(form.numImages)!,
         cfg: Number(form.cfg), denoise: Number(form.denoise),
-        sampler: form.sampler.trim() || "euler", scheduler: form.scheduler.trim() || "normal",
+        sampler: form.sampler.trim() || "dpmpp_2m", scheduler: form.scheduler.trim() || "karras",
       };
       const seed = parseSeed(form.seed); if (seed !== undefined) payload.seed = seed;
       if (selectedModelRecordId.trim()) payload.model = selectedModelRecordId.trim();

@@ -19,13 +19,19 @@ describe("comfyUiImageGenerationWorkflowMapper", () => {
     expect(payload.prompt["5"].inputs.denoise).toBe(0.72);
   });
 
+  it("uses dpmpp_2m and karras as sampler defaults", () => {
+    const payload = mapImageGenerationRequestToComfyUiPrompt({ prompt: "test" }, { defaultCheckpoint: "sdxl.safetensors" });
+    expect(payload.prompt["5"].inputs.sampler_name).toBe("dpmpp_2m");
+    expect(payload.prompt["5"].inputs.scheduler).toBe("karras");
+  });
+
   it("routes artifact latent references through ResizeAndPadImage at requested dimensions", () => {
     const payload = mapImageGenerationRequestToComfyUiPrompt(
       { prompt: "test", width: 640, height: 384, latentSource: { kind: "artifact", artifactId: "uploads/cat.png" } },
       { defaultCheckpoint: "sdxl.safetensors", latentReferenceImageName: "cat.png" },
     );
     expect(payload.prompt["8"]).toEqual({ class_type: "LoadImage", inputs: { image: "cat.png" } });
-    expect(payload.prompt["9"]).toEqual({ class_type: "ResizeAndPadImage", inputs: { image: ["8", 0], target_width: 640, target_height: 384 } });
+    expect(payload.prompt["9"]).toEqual({ class_type: "ResizeAndPadImage", inputs: { image: ["8", 0], target_width: 640, target_height: 384, padding_color: "black", interpolation: "area" } });
     expect(payload.prompt["10"]).toEqual({ class_type: "VAEEncode", inputs: { pixels: ["9", 0], vae: ["1", 2] } });
     expect(payload.prompt["5"].inputs.latent_image).toEqual(["10", 0]);
   });
