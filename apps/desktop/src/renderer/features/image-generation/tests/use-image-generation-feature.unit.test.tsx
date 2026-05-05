@@ -247,4 +247,16 @@ describe("useImageGenerationFeature", () => {
     await act(async () => root.unmount());
   });
 
+
+
+  it("includes faceId payload when enabled with up to three references", async () => {
+    const client = makeClient();
+    client.startImageGeneration.mockResolvedValue({ ok: true, value: { requestId: "r-face" } });
+    client.readImageGeneration.mockResolvedValue({ ok: true, value: { status: "cancelled", requestId: "r-face", taskType: "image-generation", concurrencyClass: "image-generation" } });
+    let hook!: ReturnType<typeof useImageGenerationFeature>; const c = document.createElement("div"); const root = createRoot(c);
+    await act(async () => { root.render(<Harness client={client} artifactClient={{ browseArtifacts: async () => [], createArtifactMediaViewUrl: async () => "" } as any} onReady={(h) => (hook = h)} />); });
+    await act(async () => { hook.setForm({ ...hook.form, prompt: "face", faceIdEnabled: true, faceIdArtifactId1: "a1", faceIdArtifactId2: "a2", faceIdArtifactId3: "a3" }); });
+    await act(async () => { await hook.start(); });
+    expect(client.startImageGeneration.mock.calls[0][0].faceId).toMatchObject({ enabled: true, references: [{ artifactId: "a1" }, { artifactId: "a2" }, { artifactId: "a3" }] });
+  });
 });

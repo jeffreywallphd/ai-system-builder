@@ -2,6 +2,19 @@ export type ImageGenerationLatentSource =
   | { kind: "empty" }
   | { kind: "artifact"; artifactId: string };
 
+export interface ImageGenerationFaceReference {
+  artifactId: string;
+  weight?: number;
+}
+
+export interface ImageGenerationFaceIdConfig {
+  enabled: boolean;
+  references: ImageGenerationFaceReference[];
+  identityStrength?: number;
+  structureStrength?: number;
+  noise?: number;
+}
+
 export interface ImageGenerationRequest {
   prompt: string;
   negativePrompt?: string;
@@ -16,5 +29,6 @@ export interface ImageGenerationRequest {
   model?: string;
   numImages?: number;
   latentSource?: ImageGenerationLatentSource;
+  faceId?: ImageGenerationFaceIdConfig;
   engineHints?: Record<string, unknown>;
 }
