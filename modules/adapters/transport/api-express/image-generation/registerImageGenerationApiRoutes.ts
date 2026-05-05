@@ -14,7 +14,7 @@ type ImageGenerationOperation = typeof API_IMAGE_GENERATION_START_OPERATION | ty
 
 interface ExpressRequestLike { body?: unknown; headers?: Record<string, string | string[] | undefined>; }
 interface ExpressResponseLike { status: (code: number) => ExpressResponseLike; json: (body: unknown) => void; }
-export interface ExpressRoutePort { post: (path: string, handler: (request: ExpressRequestLike, response: ExpressResponseLike) => Promise<void>) => void; }
+export interface ExpressRoutePort { post: (path: string, handler: (request: ExpressRequestLike, response: ExpressResponseLike) => Promise<void>) => void; get?: (path: string, handler: (request: any, response: any) => Promise<void>) => void; }
 
 export interface RegisterImageGenerationApiRoutesDependencies {
   app: ExpressRoutePort;
@@ -23,6 +23,7 @@ export interface RegisterImageGenerationApiRoutesDependencies {
   imageGenerationRuntimeControl?: {
     unloadModel: () => Promise<{ unloaded: boolean; message?: string }>;
     readRuntimeResources?: () => Promise<{ memoryUsagePercent: number; cpuUsagePercent: number; gpuUsagePercent: number }>;
+    readOutputPreview?: (input: { fileName: string; subfolder?: string }) => Promise<{ mediaType: string; contentBase64: string }>;
   };
 }
 
@@ -146,6 +147,23 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
     }
   });
 
+
+  dependencies.app.get?.("/api/image-generation/output-preview", async (request: any, response: any) => {
+    try {
+      const fileName = typeof request?.query?.fileName === "string" ? request.query.fileName.trim() : "";
+      const subfolder = typeof request?.query?.subfolder === "string" ? request.query.subfolder.trim() : undefined;
+      if (!fileName || !dependencies.imageGenerationRuntimeControl?.readOutputPreview) {
+        response.status(404).end();
+        return;
+      }
+      const preview = await dependencies.imageGenerationRuntimeControl.readOutputPreview({ fileName, subfolder });
+      response.setHeader("content-type", preview.mediaType);
+      response.status(200).send(Buffer.from(preview.contentBase64, "base64"));
+    } catch {
+      response.status(404).end();
+    }
+  });
+
   dependencies.app.post("/api/image-generation/runtime-resources", async (request, response) => {
     const context = contextFrom(request);
     try {
@@ -159,3 +177,5 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
     }
   });
 }
+
+

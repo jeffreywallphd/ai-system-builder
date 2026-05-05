@@ -1,8 +1,8 @@
 import type { ArtifactRepoStoragePort } from "../../../application/ports/storage";
 import { execFile as nodeExecFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { cpus, freemem, totalmem } from "node:os";
 import { promisify } from "node:util";
 import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
@@ -670,6 +670,7 @@ export function composeServerHost(
         },
       };
       const comfyUiClient = createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl });
+      let previousCpuSample: { idle: number; total: number } | undefined;
       const imageGenerationRuntimeControl = {
         async unloadModel() {
           if (!comfyUiSupervisor?.isRunning()) {
@@ -682,10 +683,23 @@ export function composeServerHost(
           const cpuSamples = cpus();
           const totalIdle = cpuSamples.reduce((sum, cpu) => sum + cpu.times.idle, 0);
           const totalTick = cpuSamples.reduce((sum, cpu) => sum + Object.values(cpu.times).reduce((a, b) => a + b, 0), 0);
-          const cpuUsagePercent = totalTick > 0 ? Math.max(0, Math.min(100, (1 - totalIdle / totalTick) * 100)) : 0;
+          const deltaIdle = previousCpuSample ? totalIdle - previousCpuSample.idle : 0;
+          const deltaTotal = previousCpuSample ? totalTick - previousCpuSample.total : 0;
+          previousCpuSample = { idle: totalIdle, total: totalTick };
+          const cpuUsagePercent = deltaTotal > 0 ? Math.max(0, Math.min(100, (1 - deltaIdle / deltaTotal) * 100)) : 0;
           const totalMemory = totalmem();
           const memoryUsagePercent = totalMemory > 0 ? Math.max(0, Math.min(100, ((totalMemory - freemem()) / totalMemory) * 100)) : 0;
           return { memoryUsagePercent, cpuUsagePercent, gpuUsagePercent: 0 };
+        },
+        async readOutputPreview({ fileName, subfolder }: { fileName: string; subfolder?: string }) {
+          const outputRoot = joinHostPath(comfyUiInstallRoot, "output");
+          const resolved = resolve(outputRoot, subfolder ?? "", fileName);
+          const rel = relative(outputRoot, resolved);
+          if (!fileName || rel.startsWith("..") || isAbsolute(rel)) throw new Error("Invalid output preview path.");
+          const content = await readFile(resolved);
+          const lower = fileName.toLowerCase();
+          const mediaType = lower.endsWith(".jpg") || lower.endsWith(".jpeg") ? "image/jpeg" : lower.endsWith(".webp") ? "image/webp" : "image/png";
+          return { mediaType, contentBase64: content.toString("base64") };
         },
       };
       const runtimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({

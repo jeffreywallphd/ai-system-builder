@@ -228,6 +228,12 @@ export function ImageGenerationFeature({
 
       <h3>Generated Images</h3>
       <div className="ui-stack ui-stack--sm">
+        {feature.runtimeOutputPreviews.map((preview) => (
+          <article key={`runtime-${preview.url}`} className="ui-stack ui-stack--xs">
+            <img src={preview.url} alt={`Generated runtime image ${preview.fileName}`} />
+            <p>{preview.fileName}</p>
+          </article>
+        ))}
         {feature.results.map((asset) => (
           <article key={asset.assetId} className="ui-stack ui-stack--xs">
             <img src={feature.createPreviewUrl(asset.storageKey)} alt={`Generated image ${asset.assetId}`} />

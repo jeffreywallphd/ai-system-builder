@@ -65,6 +65,7 @@ export function useImageGenerationFeature(
   const [requestId, setRequestId] = useState<string | undefined>(persistedState?.requestId);
   const [error, setError] = useState<string | undefined>(persistedState?.error);
   const [results, setResults] = useState<FinalizedImageAsset[]>(persistedState?.results ?? []);
+  const [runtimeOutputPreviews, setRuntimeOutputPreviews] = useState<Array<{ url: string; fileName: string }>>([]);
   const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false);
   const [unloadModelState, setUnloadModelState] = useState<{ status: "idle" | "loading" | "success" | "error"; message?: string }>({ status: "idle" });
   const [runtimeResources, setRuntimeResources] = useState<{ memoryUsagePercent: number; cpuUsagePercent: number; gpuUsagePercent: number }>({ memoryUsagePercent: 0, cpuUsagePercent: 0, gpuUsagePercent: 0 });
@@ -182,7 +183,7 @@ export function useImageGenerationFeature(
     activeRequestRef.current = undefined;
 
     try {
-      setError(undefined); setResults([]); setRequestId(undefined); setStatus("starting");
+      setError(undefined); setResults([]); setRuntimeOutputPreviews([]); setRequestId(undefined); setStatus("starting");
       const payload: ImageGenerationRequest = {
         prompt: form.prompt.trim(), width: parsePositiveInt(form.width)!, height: parsePositiveInt(form.height)!, steps: parsePositiveInt(form.steps)!, numImages: parsePositiveInt(form.numImages)!,
         cfg: Number(form.cfg), denoise: Number(form.denoise),
@@ -203,6 +204,11 @@ export function useImageGenerationFeature(
       const finalTask = await pollUntilTerminal(started.requestId, runId);
       if (!finalTask || !mountedRef.current || pollRunIdRef.current !== runId) return;
       if (finalTask.status !== "succeeded") return;
+      const outputs = Array.isArray((finalTask as any)?.data?.outputs) ? (finalTask as any).data.outputs : [];
+      const previews = outputs
+        .filter((o: any) => o && typeof o.fileName === "string" && o.fileName.trim())
+        .map((o: any) => ({ url: client.createRuntimeOutputPreviewUrl(o.fileName, typeof o.subfolder === "string" ? o.subfolder : undefined), fileName: o.fileName }));
+      setRuntimeOutputPreviews(previews);
       setStatus("succeeded");
     } catch (cause) {
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;
@@ -296,5 +302,5 @@ export function useImageGenerationFeature(
   const referenceOnlyImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => !isImageGenerationModelReady(m)), [imageGenerationModels]);
   const imageGenerationModelOptions = useMemo(() => imageGenerationModels.map(toImageGenerationModelDropdownOption).filter((option): option is NonNullable<typeof option> => Boolean(option)), [imageGenerationModels]);
 
-  return { form, setForm, runtimeMode, setRuntimeMode, status, error, requestId, results, start, saveGeneration, cancel, unloadModel, unloadModelState, runtimeResources, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), isUnloadModelDisabled: ACTIVE_STATUSES.includes(status) || unloadModelState.status === "loading", createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions, imageArtifacts, imageArtifactsLoading, imageArtifactsError, refreshImageArtifacts };
+  return { form, setForm, runtimeMode, setRuntimeMode, status, error, requestId, results, runtimeOutputPreviews, start, saveGeneration, cancel, unloadModel, unloadModelState, runtimeResources, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), isUnloadModelDisabled: ACTIVE_STATUSES.includes(status) || unloadModelState.status === "loading", createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions, imageArtifacts, imageArtifactsLoading, imageArtifactsError, refreshImageArtifacts };
 }
