@@ -1,6 +1,7 @@
 import type { ArtifactRepoStoragePort } from "../../../application/ports/storage";
 import { execFile as nodeExecFile } from "node:child_process";
 import { existsSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
@@ -162,7 +163,7 @@ export interface RegisterServerApiOptions {
   runtimeRootDirectory?: string;
 }
 
-export type ServerComfyUiInstallRootSource = "COMFYUI_INSTALL_ROOT" | "SERVER_RUNTIME_ROOT" | "default-server-runtime-root";
+export type ServerComfyUiInstallRootSource = "SERVER_RUNTIME_ROOT" | "default-server-runtime-root";
 export type ServerComfyUiLaunchPythonExecutableSource = "ambient" | "managed-venv" | "skip-python-setup";
 export type ServerPythonRuntimeMode = "worker-sidecar";
 export type ServerPythonRuntimeRootSource = "SERVER_RUNTIME_ROOT" | "default-server-runtime-root";
@@ -185,6 +186,25 @@ function normalizeServerImageGenerationRuntimeMode(value: string | undefined): C
 function parseBooleanEnvFlag(value: string | undefined): boolean {
   const normalized = value?.trim().toLowerCase();
   return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
+function extensionForImageReference(mediaType: string | undefined, artifactId: string): string {
+  const media = mediaType?.trim().toLowerCase();
+  if (media === "image/jpeg" || media === "image/jpg") return ".jpg";
+  if (media === "image/webp") return ".webp";
+  if (media === "image/png") return ".png";
+  const match = artifactId.match(/\.(png|jpe?g|webp)$/i);
+  return match ? `.${match[1].toLowerCase().replace("jpeg", "jpg")}` : ".png";
+}
+
+function parseServerComfyUiPort(env: NodeJS.ProcessEnv): number {
+  const raw = env.SERVER_COMFYUI_PORT?.trim();
+  if (!raw) return 8189;
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("SERVER_COMFYUI_PORT must be an integer between 1 and 65535.");
+  }
+  return port;
 }
 
 function classifyPythonRuntimeSupervisorLogLevel(eventType: string, source?: unknown): "info" | "warn" | "error" {
@@ -263,10 +283,6 @@ export function resolveServerComfyUiInstallRoot(input: {
   runtimeRootDirectory: string;
 }): { installRoot: string; source: ServerComfyUiInstallRootSource } {
   const env = input.env ?? process.env;
-  const configured = env.COMFYUI_INSTALL_ROOT?.trim();
-  if (configured) {
-    return { installRoot: resolve(configured), source: "COMFYUI_INSTALL_ROOT" };
-  }
   const runtime = resolveServerRuntimeRootDirectory({ env, runtimeRootDirectory: input.runtimeRootDirectory });
   return {
     installRoot: joinHostPath(runtime.runtimeRootDirectory, "runtime-installs", "comfyui"),
@@ -547,7 +563,9 @@ export function composeServerHost(
       void loggingPort.log({ level: "info", message: "Resolved ComfyUI runtime device mode.", timestamp: new Date().toISOString(), verbosity: "normal", event: "runtime.comfyui.configuration", component: "server-host", subsystem: "runtime", data: { runtimeDeviceMode: resolvedRuntimeDeviceMode } });
 
       const comfyUiInstallRoot = runtimeResolution.installRoot;
-      const comfyUiBaseUrl = env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
+      const comfyUiHost = "127.0.0.1";
+      const comfyUiPort = parseServerComfyUiPort(env);
+      const comfyUiBaseUrl = `http://${comfyUiHost}:${comfyUiPort}`;
       const installCommandTimeoutMs = parseNumberEnv(env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS, "COMFYUI_INSTALL_COMMAND_TIMEOUT_MS");
       const execFileWithTimeout = async (file: string, args: readonly string[] = []) => execFile(file, [...args], {
         ...(installCommandTimeoutMs ? { timeout: installCommandTimeoutMs } : {}),
@@ -583,6 +601,8 @@ export function composeServerHost(
             pythonExecutable: launchPythonResolution.launchPythonExecutable,
             installer: createComfyUiInstallerForMode(resolvedRequestMode),
             installRoot: comfyUiInstallRoot,
+            host: comfyUiHost,
+            port: comfyUiPort,
             runtimeDeviceMode: resolvedRequestMode,
             autoInstall: true,
             installSourceRef: env.COMFYUI_INSTALL_REF,
@@ -634,6 +654,22 @@ export function composeServerHost(
       const runtimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
         client: comfyUiClient,
         supervisor: comfyUiSupervisorPort,
+        prepareLatentReferenceImage: async ({ artifactId }) => {
+          const result = await storage.retrieveArtifact({ key: artifactId });
+          if (!result.ok) {
+            throw new Error(`Unable to read latent reference image artifact '${artifactId}': ${result.error.message}`);
+          }
+          const content = result.value.content instanceof Uint8Array
+            ? result.value.content
+            : new Uint8Array(result.value.content as ArrayBufferLike);
+          const mediaType = result.value.descriptor.mediaType;
+          const extension = extensionForImageReference(mediaType, artifactId);
+          const imageName = `ai-system-builder-latent-${Date.now()}-${Math.random().toString(36).slice(2)}${extension}`;
+          const inputDirectory = joinHostPath(comfyUiInstallRoot, "input");
+          await mkdir(inputDirectory, { recursive: true });
+          await writeFile(joinHostPath(inputDirectory, imageName), content);
+          return { imageName };
+        },
         mapperOptions: { defaultCheckpoint: env.COMFYUI_DEFAULT_CHECKPOINT },
       });
       

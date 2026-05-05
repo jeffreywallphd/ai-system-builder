@@ -1,5 +1,6 @@
 import { cpus, totalmem, freemem } from "node:os";
 import { execFile as nodeExecFile, spawnSync } from "node:child_process";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { LoggingPort } from "../../../application/ports/logging";
@@ -47,6 +48,7 @@ import { createLogger, type StructuredLogSink } from "../../../adapters/observab
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
 import { DefaultModelDefaultResolver } from "../../../application/services/settings";
 import type { ApplicationSecretsPort, ApplicationSettingsPort, ModelDefaultResolverPort } from "../../../application/ports/settings";
+import type { ArtifactObjectStoragePort } from "../../../application/ports/storage";
 import { createWebsiteHtmlAcquisitionPort } from "../../../adapters/ingestion";
 import {
   createArtifactRepoStorageAdapter,
@@ -270,6 +272,15 @@ const PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT = 60_000;
 const COMFYUI_INSTALL_COMMAND_TIMEOUT_MS_DEFAULT = 30 * 60 * 1000;
 const DATASET_PREPARATION_TASK_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 const DATASET_PREPARATION_INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000;
+
+function extensionForImageReference(mediaType: string | undefined, artifactId: string): string {
+  const media = mediaType?.trim().toLowerCase();
+  if (media === "image/jpeg" || media === "image/jpg") return ".jpg";
+  if (media === "image/webp") return ".webp";
+  if (media === "image/png") return ".png";
+  const match = artifactId.match(/\.(png|jpe?g|webp)$/i);
+  return match ? `.${match[1].toLowerCase().replace("jpeg", "jpg")}` : ".png";
+}
 
 export function resolveComfyUiInstallRoot(env: NodeJS.ProcessEnv = process.env, runtimeRootDirectory?: string): string {
   const configured = env.COMFYUI_INSTALL_ROOT?.trim();
@@ -795,9 +806,28 @@ export function composeDesktopHost(
           return activeRuntimeDeviceMode ?? "cpu";
         },
       };
+      let latentReferenceStorage: Pick<ArtifactObjectStoragePort, "retrieveArtifact"> | undefined;
       const comfyUiRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
         client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }),
         supervisor: comfyUiSupervisorPort,
+        prepareLatentReferenceImage: async ({ artifactId }) => {
+          if (!latentReferenceStorage) {
+            throw new Error("Artifact storage is unavailable for latent reference image preparation.");
+          }
+          const result = await latentReferenceStorage.retrieveArtifact({ key: artifactId });
+          if (!result.ok) {
+            throw new Error(`Unable to read latent reference image artifact '${artifactId}': ${result.error.message}`);
+          }
+          const content = result.value.content instanceof Uint8Array
+            ? result.value.content
+            : new Uint8Array(result.value.content as ArrayBufferLike);
+          const extension = extensionForImageReference(result.value.descriptor.mediaType, artifactId);
+          const imageName = `ai-system-builder-latent-${Date.now()}-${Math.random().toString(36).slice(2)}${extension}`;
+          const inputDirectory = join(comfyUiInstallRoot, "input");
+          await mkdir(inputDirectory, { recursive: true });
+          await writeFile(join(inputDirectory, imageName), content);
+          return { imageName };
+        },
         mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT },
       });
       const runtimeTaskRegistry = createRuntimeTaskRegistryRouter({ python: pythonRuntimeTaskRegistry, image: comfyUiRuntimeTaskRegistry });
@@ -827,6 +857,7 @@ export function composeDesktopHost(
         now: options.now,
         artifactCatalogAppend: artifactCatalog,
       });
+      latentReferenceStorage = storage;
       const artifactBrowserRead = createFilesystemArtifactBrowserReadAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
         artifactCatalogRead: artifactCatalog,

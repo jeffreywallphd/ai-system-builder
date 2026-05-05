@@ -12,6 +12,10 @@ interface Deps {
   supervisor: Pick<ComfyUiRuntimeSupervisor, "start" | "getRecentRuntimeOutput" | "getRuntimeDeviceMode"> & {
     startWithRuntimeDeviceMode?: (request: { runtimeDeviceMode?: ComfyUiRuntimeDeviceMode }) => Promise<void>;
   };
+  prepareLatentReferenceImage?: (request: {
+    artifactId: string;
+    imageRequest: ImageGenerationRequest;
+  }) => Promise<{ imageName: string }>;
   mapperOptions: ComfyUiImageGenerationWorkflowMapperOptions;
   now?: () => string;
 }
@@ -110,7 +114,19 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
       } else {
         await deps.supervisor.start();
       }
-      const payload = mapImageGenerationRequestToComfyUiPrompt(imageRequest, deps.mapperOptions);
+      const latentReference = imageRequest.latentSource?.kind === "artifact"
+        ? await deps.prepareLatentReferenceImage?.({
+            artifactId: imageRequest.latentSource.artifactId,
+            imageRequest,
+          })
+        : undefined;
+      if (imageRequest.latentSource?.kind === "artifact" && !latentReference?.imageName) {
+        throw new Error("Image generation latent artifact reference could not be prepared for ComfyUI.");
+      }
+      const payload = mapImageGenerationRequestToComfyUiPrompt(imageRequest, {
+        ...deps.mapperOptions,
+        latentReferenceImageName: latentReference?.imageName,
+      });
       const submitted = await deps.client.submitPrompt(payload);
       const requestId = request.requestId ?? randomUUID();
       const submittedAt = now();
