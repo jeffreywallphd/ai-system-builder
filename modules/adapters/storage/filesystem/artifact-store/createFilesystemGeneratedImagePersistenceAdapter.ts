@@ -30,7 +30,10 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
       await mkdir(path.dirname(destinationPath), { recursive: true });
 
       if (output.contentBase64 && output.contentBase64.trim()) {
+        await options.logging?.log({ timestamp: new Date().toISOString(), level: "info", verbosity: "normal", component: "storage.filesystem", event: "generated_image_preview_memory_cached", message: `Persisting generated image from in-memory output for ${output.fileName}.` });
         await writeFile(destinationPath, Buffer.from(output.contentBase64, "base64"));
+        const sourcePath = path.resolve(outputRoot, output.subfolder ?? "", output.fileName);
+        await rm(sourcePath, { force: true }).catch(() => undefined);
       } else {
         const sourcePath = path.resolve(outputRoot, output.subfolder ?? "", output.fileName);
         const relativeOutput = path.relative(outputRoot, sourcePath);
@@ -45,6 +48,7 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
           await rm(sourcePath);
         }
         await stat(sourcePath).then(() => { throw new Error("Generated image source still exists after finalization."); }, () => undefined);
+        await options.logging?.log({ timestamp: new Date().toISOString(), level: "info", verbosity: "normal", component: "storage.filesystem", event: "generated_image_output_deleted", message: `Deleted ComfyUI output after persistence for ${output.fileName}.` });
       }
 
       const [destinationStats, destinationBytes] = await Promise.all([stat(destinationPath), readFile(destinationPath)]);
@@ -60,6 +64,7 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
         const bindingResult = await options.artifactStorageBinding.upsertArtifactStorageBinding({ binding: { artifactId, role: "primary", backing: { kind: "artifact-object", provider: "filesystem", locator: storageKey, verification: { exists: true, verifiedAt: createdAt } }, createdAt } });
         if (!bindingResult.ok) throw new Error(`Failed to persist generated image primary binding: ${bindingResult.error.message}`);
       }
+      await options.logging?.log({ timestamp: new Date().toISOString(), level: "info", verbosity: "normal", component: "storage.filesystem", event: "generated_image_persist_succeeded", message: `Persisted generated image ${output.fileName} as ${storageKey} (${artifactId}).` });
 
       return { artifactId, storageKey, mediaType: "image/png", sizeBytes: destinationStats.size, checksum, originalFileName: output.fileName };
     },

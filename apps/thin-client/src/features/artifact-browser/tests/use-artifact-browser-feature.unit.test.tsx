@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -181,6 +182,40 @@ describe("ArtifactBrowserFeature", () => {
 
     expect(client.deleteRegisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/cat.png" });
     expect(container.textContent).toContain("Deleted uploads/cat.png.");
+  });
+
+  it("deletes selected artifacts in bulk after Delete All confirmation", async () => {
+    const client = {
+      browseArtifacts: vi.fn().mockResolvedValue([
+        { storageKey: "uploads/a.png", artifactFamily: "image" as const },
+        { storageKey: "uploads/b.png", artifactFamily: "image" as const },
+      ]),
+      readArtifactDetail: vi.fn(),
+      readArtifactContent: vi.fn(),
+      createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
+      deleteRegisteredArtifact: vi.fn().mockResolvedValue({}),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn().mockResolvedValue({ configured: true, maskedToken: "••••1234" }),
+      clearHuggingFaceToken: vi.fn().mockResolvedValue({ configured: false }),
+      publishArtifactToHuggingFace: vi.fn(),
+      verifyPublishedArtifactBacking: vi.fn(),
+      registerArtifactFromRepo: vi.fn(),
+      localizeArtifactFromRepo: vi.fn(),
+    };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+    await act(async () => { root.render(<ArtifactBrowserFeature client={client} />); });
+    const checkboxes = Array.from(container.querySelectorAll("input[type='checkbox']")) as HTMLInputElement[];
+    await act(async () => { checkboxes[0]?.click(); checkboxes[1]?.click(); });
+    const deleteAllInput = Array.from(container.querySelectorAll("input")).find((input) => input.getAttribute("placeholder") === "Delete All") as HTMLInputElement;
+    setInputValue(deleteAllInput, "Delete All");
+    const deleteSelected = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Delete Selected")) as HTMLButtonElement;
+    await act(async () => { deleteSelected.click(); });
+    expect(client.deleteRegisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/a.png" });
+    expect(client.deleteRegisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/b.png" });
   });
 
   it("does not render Hugging Face token settings", async () => {
@@ -836,4 +871,3 @@ describe("ArtifactBrowserFeature", () => {
     expect(container.textContent).toContain("Localize artifact");
   });
 });
-

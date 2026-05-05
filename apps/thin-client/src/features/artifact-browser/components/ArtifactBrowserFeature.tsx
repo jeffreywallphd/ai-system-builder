@@ -52,6 +52,8 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     selectedStorageKey,
     pendingDeleteStorageKey,
     deleteConfirmationInput,
+    selectedArtifactKeys,
+    bulkDeleteConfirmationInput,
     detail,
     content,
     imageViewUrl,
@@ -73,6 +75,10 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     confirmPendingDelete,
     cancelPendingDelete,
     setDeleteConfirmationInput,
+    toggleSelectedArtifactKey,
+    clearSelectedArtifactKeys,
+    setBulkDeleteConfirmationInput,
+    deleteSelectedArtifacts,
     registerArtifactFromHuggingFace,
     registerHuggingFaceNamespace,
     browseHuggingFaceDatasetParquetFiles,
@@ -206,8 +212,21 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
       ) : null}
 
       <ul className="ui-stack ui-stack--sm">
+        <li className="ui-grid ui-grid--two">
+          <label className="ui-stack ui-stack--sm">
+            <span>Bulk delete confirmation</span>
+            <input className="ui-input" value={bulkDeleteConfirmationInput} onChange={(event) => setBulkDeleteConfirmationInput(event.target.value)} placeholder="Delete All" />
+          </label>
+          <div className="ui-stack ui-stack--sm">
+            <button className="ui-button ui-button--destructive" type="button" onClick={() => void deleteSelectedArtifacts()} disabled={selectedArtifactKeys.length === 0 || bulkDeleteConfirmationInput !== "Delete All"}>
+              Delete Selected ({selectedArtifactKeys.length})
+            </button>
+            <button className="ui-button" type="button" onClick={clearSelectedArtifactKeys} disabled={selectedArtifactKeys.length === 0}>Clear selection</button>
+          </div>
+        </li>
         {items.map((item) => (
-          <li key={item.originalName ?? item.storageKey}>
+          <li key={item.storageKey}>
+            <input type="checkbox" checked={selectedArtifactKeys.includes(item.storageKey)} onChange={() => toggleSelectedArtifactKey(item.storageKey)} />
             <button
               className="ui-button"
               type="button"
