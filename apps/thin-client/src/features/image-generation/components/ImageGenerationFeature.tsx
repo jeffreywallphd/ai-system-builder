@@ -114,6 +114,21 @@ export function ImageGenerationFeature({
           </div>
           {feature.imageArtifactsError ? <p role="alert">{feature.imageArtifactsError}</p> : null}
         </div>
+        <label className="ui-stack ui-stack--xs">
+          <span>Enable FaceID (optional)</span>
+          <input type="checkbox" checked={feature.form.faceIdEnabled} onChange={(event) => feature.setForm((current) => ({ ...current, faceIdEnabled: event.target.checked }))} />
+        </label>
+        {feature.form.faceIdEnabled ? (
+          <div className="ui-stack ui-stack--xs">
+            <p className="ui-text-muted">FaceID supports 1-3 image artifacts. You can reuse the same artifact in multiple slots.</p>
+            <label className="ui-stack ui-stack--xs"><span>Face reference image 1</span><select className="ui-input" value={feature.form.faceIdArtifactId1} onChange={(event) => setFormValue("faceIdArtifactId1", (event.target as HTMLSelectElement).value)}><option value="">Select image artifact</option>{feature.imageArtifacts.map((artifact) => <option key={`face1-${artifact.storageKey}`} value={artifact.storageKey}>{artifact.originalName ?? artifact.storageKey}</option>)}</select></label>
+            <label className="ui-stack ui-stack--xs"><span>Face reference image 2 (optional)</span><select className="ui-input" value={feature.form.faceIdArtifactId2} onChange={(event) => setFormValue("faceIdArtifactId2", (event.target as HTMLSelectElement).value)}><option value="">Select image artifact</option>{feature.imageArtifacts.map((artifact) => <option key={`face2-${artifact.storageKey}`} value={artifact.storageKey}>{artifact.originalName ?? artifact.storageKey}</option>)}</select></label>
+            <label className="ui-stack ui-stack--xs"><span>Face reference image 3 (optional)</span><select className="ui-input" value={feature.form.faceIdArtifactId3} onChange={(event) => setFormValue("faceIdArtifactId3", (event.target as HTMLSelectElement).value)}><option value="">Select image artifact</option>{feature.imageArtifacts.map((artifact) => <option key={`face3-${artifact.storageKey}`} value={artifact.storageKey}>{artifact.originalName ?? artifact.storageKey}</option>)}</select></label>
+            <label className="ui-stack ui-stack--xs"><span>Face identity strength</span><input className="ui-input" type="number" step="0.01" value={feature.form.faceIdIdentityStrength} onInput={(event) => setFormValue("faceIdIdentityStrength", (event.target as HTMLInputElement).value)} /></label>
+            <label className="ui-stack ui-stack--xs"><span>Face structure strength</span><input className="ui-input" type="number" step="0.01" value={feature.form.faceIdStructureStrength} onInput={(event) => setFormValue("faceIdStructureStrength", (event.target as HTMLInputElement).value)} /></label>
+            <label className="ui-stack ui-stack--xs"><span>Face noise</span><input className="ui-input" type="number" step="0.01" value={feature.form.faceIdNoise} onInput={(event) => setFormValue("faceIdNoise", (event.target as HTMLInputElement).value)} /></label>
+          </div>
+        ) : null}
 
         <div className="ui-stack ui-stack--xs">
           <label htmlFor="image-generation-prompt">Prompt</label>

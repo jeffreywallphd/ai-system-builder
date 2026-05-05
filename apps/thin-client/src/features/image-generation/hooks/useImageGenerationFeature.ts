@@ -18,7 +18,7 @@ const DEFAULT_NEGATIVE_PROMPT = "anime; cartoon; melty; blurry";
 type UiStatus = "idle" | "starting" | "queued" | "running" | "succeeded" | "finalizing" | "finalized" | "failed" | "cancelled";
 const ACTIVE_STATUSES: UiStatus[] = ["starting", "queued", "running", "finalizing"];
 
-export interface ImageGenerationFormState { prompt: string; negativePrompt: string; seed: string; width: string; height: string; steps: string; cfg: string; denoise: string; sampler: string; scheduler: string; model: string; numImages: string; latentSourceArtifactId: string; outputFileName: string }
+export interface ImageGenerationFormState { prompt: string; negativePrompt: string; seed: string; width: string; height: string; steps: string; cfg: string; denoise: string; sampler: string; scheduler: string; model: string; numImages: string; latentSourceArtifactId: string; outputFileName: string; faceIdEnabled: boolean; faceIdArtifactId1: string; faceIdArtifactId2: string; faceIdArtifactId3: string; faceIdIdentityStrength: string; faceIdStructureStrength: string; faceIdNoise: string; }
 export type ImageGenerationRuntimeMode = "auto" | "cpu" | "cuda" | "directml";
 const defaultImageGenerationClient = createApiImageGenerationClient();
 const defaultModelManagementClient = createApiModelManagementClient();
@@ -73,7 +73,7 @@ export function useImageGenerationFeature(
   modelClient: ModelManagementApiClient = defaultModelManagementClient,
   artifactClient: ArtifactBrowserApiClient = defaultArtifactBrowserClient,
 ) {
-  const [form, setForm] = useState<ImageGenerationFormState>(persistedState?.form ?? { prompt: DEFAULT_PROMPT, negativePrompt: DEFAULT_NEGATIVE_PROMPT, seed: "", width: "1024", height: "1024", steps: "20", cfg: "8", denoise: "1", sampler: "dpmpp_2m", scheduler: "karras", model: "", numImages: "1", latentSourceArtifactId: "", outputFileName: "" });
+  const [form, setForm] = useState<ImageGenerationFormState>(persistedState?.form ?? { prompt: DEFAULT_PROMPT, negativePrompt: DEFAULT_NEGATIVE_PROMPT, seed: "", width: "1024", height: "1024", steps: "20", cfg: "8", denoise: "1", sampler: "dpmpp_2m", scheduler: "karras", model: "", numImages: "1", latentSourceArtifactId: "", outputFileName: "", faceIdEnabled: false, faceIdArtifactId1: "", faceIdArtifactId2: "", faceIdArtifactId3: "", faceIdIdentityStrength: "0.85", faceIdStructureStrength: "0.75", faceIdNoise: "0.35" });
   const [runtimeMode, setRuntimeMode] = useState<ImageGenerationRuntimeMode>(persistedState?.runtimeMode ?? "auto");
   const [modelInventory, setModelInventory] = useState<ModelInventoryRecord[]>([]);
   const [modelInventoryLoading, setModelInventoryLoading] = useState(false);
@@ -167,6 +167,9 @@ export function useImageGenerationFeature(
     if (form.seed.trim() && parseSeed(form.seed) === undefined) return "Seed must be a finite integer when provided.";
     const cfg = Number(form.cfg); if (!Number.isFinite(cfg) || cfg <= 0) return "CFG must be a positive number.";
     const denoise = Number(form.denoise); if (!Number.isFinite(denoise) || denoise < 0 || denoise > 1) return "Denoise must be between 0 and 1.";
+    if (form.faceIdEnabled) {
+      if (!form.faceIdArtifactId1.trim()) return "FaceID requires at least one face reference image.";
+    }
     return undefined;
   }, [form]);
 
@@ -217,6 +220,23 @@ export function useImageGenerationFeature(
       if (form.latentSourceArtifactId.trim()) payload.latentSource = { kind: "artifact", artifactId: form.latentSourceArtifactId.trim() };
       else payload.latentSource = { kind: "empty" };
       payload.engineHints = { ...(payload.engineHints ?? {}), runtimeDeviceMode: runtimeMode, ...(form.outputFileName.trim() ? { outputFileName: form.outputFileName.trim() } : {}) };
+      if (form.faceIdEnabled) {
+        const references = [form.faceIdArtifactId1, form.faceIdArtifactId2, form.faceIdArtifactId3]
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0)
+          .slice(0, 3)
+          .map((artifactId) => ({ artifactId }));
+        if (references.length > 0) {
+          payload.faceId = {
+            enabled: true,
+            references,
+            identityStrength: Number(form.faceIdIdentityStrength),
+            structureStrength: Number(form.faceIdStructureStrength),
+            noise: Number(form.faceIdNoise),
+          };
+          console.info("[thin-client][image-generation] FaceID enabled for request.", { referenceCount: references.length, hasLatentSource: payload.latentSource?.kind === "artifact" });
+        }
+      }
 
       const started = await client.startImageGeneration(payload);
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;

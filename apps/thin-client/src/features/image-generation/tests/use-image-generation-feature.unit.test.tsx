@@ -159,6 +159,16 @@ describe("useImageGenerationFeature", () => {
     expect((c.querySelector('#selected') as HTMLElement).textContent).toBe('img');
   });
 
+  it("includes faceId payload when enabled with up to three references", async () => {
+    const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn().mockResolvedValue({ requestId: "r1" }), readImageGeneration: vi.fn().mockResolvedValue({ requestId: "r1", status: "failed" }), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn(), readRuntimeResources: vi.fn().mockResolvedValue({ memoryUsagePercent: 1, cpuUsagePercent: 2, gpuUsagePercent: 3 }) };
+    const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [] }) };
+    function H() { const f = useImageGenerationFeature(client, undefined, modelClient); return <div><button id="setup" onClick={() => f.setForm((x) => ({ ...x, prompt: "face", faceIdEnabled: true, faceIdArtifactId1: "a1", faceIdArtifactId2: "a1", faceIdArtifactId3: "a2" }))}>set</button><button id="start" onClick={() => void f.start()}>s</button></div>; }
+    const c = document.createElement("div"); const root = createRoot(c);
+    await act(async()=>{root.render(<H />);});
+    await act(async()=>{(c.querySelector("#setup") as HTMLButtonElement).click(); (c.querySelector("#start") as HTMLButtonElement).click();});
+    expect(client.startImageGeneration).toHaveBeenCalledWith(expect.objectContaining({ faceId: { enabled: true, references: [{ artifactId: "a1" }, { artifactId: "a1" }, { artifactId: "a2" }], identityStrength: 0.85, structureStrength: 0.75, noise: 0.35 } }));
+  });
+
   it("prefers in-memory output bytes for runtime previews before save", async () => {
     const client = {
       createArtifactMediaViewUrl: vi.fn(),
