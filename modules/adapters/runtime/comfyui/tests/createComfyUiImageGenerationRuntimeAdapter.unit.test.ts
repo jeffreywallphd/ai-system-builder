@@ -40,6 +40,32 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
     expect(result.metadata).toMatchObject({ requestedRuntimeDeviceMode: "cuda", runtimeDeviceMode: "cuda" });
   });
 
+  it("prepares FaceID artifact references before submitting the ComfyUI prompt", async () => {
+    const supervisor = { ...baseSupervisor, start: testDouble.fn(async () => {}) };
+    const client = { submitPrompt: testDouble.fn(async () => ({ prompt_id: "p1", number: 1 })), getQueue: testDouble.fn(), getHistory: testDouble.fn() };
+    const prepareFaceReferenceImage = testDouble.fn(async () => ({ imageName: "prepared-face.png" }));
+    const adapter = createComfyUiImageGenerationRuntimeAdapter({
+      supervisor,
+      client,
+      prepareFaceReferenceImage,
+      mapperOptions: { defaultCheckpoint: "sdxl" },
+    });
+
+    await adapter.startTask({
+      taskType: TaskType.IMAGE_GENERATION,
+      payload: { prompt: "portrait", faceId: { enabled: true, references: [{ artifactId: "uploads/face.png" }] } },
+      requestId: "r-face",
+    });
+
+    expect(prepareFaceReferenceImage.mock.calls[0]?.[0]).toMatchObject({
+      artifactId: "uploads/face.png",
+      imageRequest: { prompt: "portrait" },
+    });
+    const submittedPrompt = client.submitPrompt.mock.calls[0]?.[0]?.prompt;
+    expect(submittedPrompt["17"]).toEqual({ class_type: "LoadImage", inputs: { image: "prepared-face.png" } });
+    expect(Object.values(submittedPrompt).map((node: any) => node.class_type)).not.toContain("InstantIDModelLoader");
+  });
+
   it("read maps running state", async () => {
     const adapter = createComfyUiImageGenerationRuntimeAdapter({
       supervisor: baseSupervisor,

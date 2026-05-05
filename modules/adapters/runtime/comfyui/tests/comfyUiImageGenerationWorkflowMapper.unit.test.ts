@@ -49,13 +49,15 @@ describe("comfyUiImageGenerationWorkflowMapper", () => {
     expect(implicit.prompt["5"].inputs.control_after_generate).toBe("randomize");
   });
 
-  it("maps faceId conditioning workflow when references are provided", () => {
+  it("maps faceId references to a built-in image-to-image workflow when prepared references are provided", () => {
     const payload = mapImageGenerationRequestToComfyUiPrompt(
       { prompt: "portrait", faceId: { enabled: true, references: [{ artifactId: "face-a.png" }], identityStrength: 0.9, structureStrength: 0.6, noise: 0.2 } },
-      { defaultCheckpoint: "sdxl.safetensors" },
+      { defaultCheckpoint: "sdxl.safetensors", faceReferenceImageNames: ["prepared-face.png"] },
     );
-    expect(payload.prompt["11"]).toEqual({ class_type: "LoadImage", inputs: { image: "face-a.png" } });
-    expect(payload.prompt["15"].class_type).toBe("IPAdapterFaceID");
-    expect(payload.prompt["5"].inputs.positive).toEqual(["16", 0]);
+    expect(payload.prompt["17"]).toEqual({ class_type: "LoadImage", inputs: { image: "prepared-face.png" } });
+    expect(payload.prompt["18"]).toEqual({ class_type: "VAEEncode", inputs: { pixels: ["17", 0], vae: ["1", 2] } });
+    expect(payload.prompt["5"].inputs.positive).toEqual(["2", 0]);
+    expect(payload.prompt["5"].inputs.latent_image).toEqual(["18", 0]);
+    expect(Object.values(payload.prompt).map((node) => node.class_type)).not.toContain("InstantIDModelLoader");
   });
 });

@@ -16,6 +16,10 @@ interface Deps {
     artifactId: string;
     imageRequest: ImageGenerationRequest;
   }) => Promise<{ imageName: string }>;
+  prepareFaceReferenceImage?: (request: {
+    artifactId: string;
+    imageRequest: ImageGenerationRequest;
+  }) => Promise<{ imageName: string }>;
   mapperOptions: ComfyUiImageGenerationWorkflowMapperOptions;
   now?: () => string;
 }
@@ -123,9 +127,26 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
       if (imageRequest.latentSource?.kind === "artifact" && !latentReference?.imageName) {
         throw new Error("Image generation latent artifact reference could not be prepared for ComfyUI.");
       }
+      const faceReferenceImageNames = imageRequest.faceId?.enabled
+        ? (await Promise.all(
+            (imageRequest.faceId.references ?? []).slice(0, 3).map(async (reference) => {
+              const artifactId = reference.artifactId.trim();
+              if (!artifactId) return undefined;
+              const prepared = await (deps.prepareFaceReferenceImage ?? deps.prepareLatentReferenceImage)?.({
+                artifactId,
+                imageRequest,
+              });
+              return prepared?.imageName;
+            }),
+          )).filter((imageName): imageName is string => Boolean(imageName))
+        : [];
+      if (imageRequest.faceId?.enabled && (imageRequest.faceId.references ?? []).length > 0 && faceReferenceImageNames.length === 0) {
+        throw new Error("Image generation face reference artifact could not be prepared for ComfyUI.");
+      }
       const payload = mapImageGenerationRequestToComfyUiPrompt(imageRequest, {
         ...deps.mapperOptions,
         latentReferenceImageName: latentReference?.imageName,
+        faceReferenceImageNames,
       });
       const submitted = await deps.client.submitPrompt(payload);
       const requestId = request.requestId ?? randomUUID();

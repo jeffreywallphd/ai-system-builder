@@ -16,13 +16,8 @@ Current composition includes:
 - Desktop renderer artifact-repo operations (`register`, `localize`, `publish`, `verify`) use this host path via preload/IPC and therefore depend on desktop host token configuration for private/gated repositories.
 - Public Hugging Face repos may work without a token; private/gated repos surface explicit auth-required (`unavailable`) errors.
 
-## FaceID runtime prerequisites (Image Generation)
+## FaceID behavior (Image Generation)
 
 FaceID is optional in the image generation feature. When enabled in the desktop UI, users can select 1-3 uploaded image artifacts as face references and pass FaceID tuning parameters (identity/structure/noise) with the generation request payload.
 
-ComfyUI runtime requirement:
-- Install `ComfyUI_InstantID` custom node in `ComfyUI/custom_nodes/ComfyUI_InstantID`.
-- Place InstantID model files under `ComfyUI/models/instantid`.
-- Place InsightFace antelopev2 files under `ComfyUI/models/insightface/models/antelopev2`.
-
-If automatic plugin/model installation is unavailable in the running environment, the desktop image-generation form shows inline guidance with these paths.
+The managed ComfyUI workflow prepares selected image artifacts into the runtime input directory and uses the first FaceID reference as an image-to-image latent source when no explicit latent reference is selected. This keeps facial retention usable without requiring custom InstantID/InsightFace nodes in the local runtime install.

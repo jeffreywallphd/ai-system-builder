@@ -70,15 +70,39 @@ describe("registerImageGenerationApiRoutes", () => {
     const readTask = { requestId: "r1", taskType: "image-generation", status: "succeeded", concurrencyClass: "image-generation", data: { outputs: [{ fileName: "a.png", subfolder: "output" }] } };
     const imageGenerationRuntimeControl = {
       unloadModel: testDouble.fn(async () => ({ unloaded: true })),
-      cacheTaskOutputsInMemory: testDouble.fn(async () => undefined),
+      cacheTaskOutputsInMemory: testDouble.fn(async ({ taskRecord }: { taskRecord: any }) => {
+        taskRecord.data.outputs[0] = { ...taskRecord.data.outputs[0], contentBase64: "aW1n", mediaType: "image/png" };
+      }),
     };
     registerImageGenerationApiRoutes({
       app,
       generateImageUseCase: { startImageGeneration: testDouble.fn(), readImageGeneration: testDouble.fn(async () => readTask), cancelImageGeneration: testDouble.fn() } as any,
       imageGenerationRuntimeControl,
     });
-    const { res } = response();
+    const { res, json } = response();
     await handlers.get("/api/image-generation/read")({ body: { requestId: "r1" }, headers: {} }, res);
     expect(imageGenerationRuntimeControl.cacheTaskOutputsInMemory).toHaveBeenCalledWith({ taskRecord: readTask });
+    expect(json.mock.calls[0]?.[0]?.value?.data?.outputs?.[0]).toMatchObject({
+      contentBase64: "aW1n",
+      mediaType: "image/png",
+    });
+  });
+
+  it("returns succeeded read records even when output preview caching fails", async () => {
+    const handlers = new Map<string, any>();
+    const app: ExpressRoutePort = { post: testDouble.fn((p, h) => handlers.set(p, h)) };
+    const readTask = { requestId: "r1", taskType: "image-generation", status: "succeeded", concurrencyClass: "image-generation", data: { outputs: [{ fileName: "a.png" }] } };
+    registerImageGenerationApiRoutes({
+      app,
+      generateImageUseCase: { startImageGeneration: testDouble.fn(), readImageGeneration: testDouble.fn(async () => readTask), cancelImageGeneration: testDouble.fn() } as any,
+      imageGenerationRuntimeControl: {
+        unloadModel: testDouble.fn(async () => ({ unloaded: true })),
+        cacheTaskOutputsInMemory: testDouble.fn(async () => { throw new Error("cache miss"); }),
+      },
+    });
+    const { res, status, json } = response();
+    await handlers.get("/api/image-generation/read")({ body: { requestId: "r1" }, headers: {} }, res);
+    expect(status).toHaveBeenCalledWith(200);
+    expect(json.mock.calls[0]?.[0]).toMatchObject({ ok: true, value: readTask });
   });
 });

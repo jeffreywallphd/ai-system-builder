@@ -6,6 +6,7 @@ export interface ComfyUiImageGenerationWorkflowMapperOptions {
   defaultHeight?: number;
   defaultSteps?: number;
   latentReferenceImageName?: string;
+  faceReferenceImageNames?: string[];
   defaultSampler?: string;
   defaultScheduler?: string;
 }
@@ -34,9 +35,9 @@ export function mapImageGenerationRequestToComfyUiPrompt(
   const controlAfterGenerate = request.seed === undefined ? "randomize" : "fixed";
   const hasLatentReference = request.latentSource?.kind === "artifact" && Boolean(options.latentReferenceImageName);
   const faceIdReferences = (request.faceId?.enabled ? request.faceId.references : undefined) ?? [];
-  const hasFaceId = faceIdReferences.length > 0;
-  const latentSource = hasLatentReference ? ["10", 0] : ["4", 0];
-  const positiveSource: [string, number] = hasFaceId ? ["16", 0] : ["2", 0];
+  const faceReferenceImageName = options.faceReferenceImageNames?.find((imageName) => imageName.trim().length > 0);
+  const hasFaceReference = faceIdReferences.length > 0 && Boolean(faceReferenceImageName) && !hasLatentReference;
+  const latentSource = hasLatentReference ? ["10", 0] : hasFaceReference ? ["18", 0] : ["4", 0];
 
   const prompt: ComfyUiPromptPayload["prompt"] = {
       "1": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: checkpoint } },
@@ -54,7 +55,7 @@ export function mapImageGenerationRequestToComfyUiPrompt(
           scheduler,
           denoise,
           model: ["1", 0],
-          positive: positiveSource,
+          positive: ["2", 0],
           negative: ["3", 0],
           latent_image: latentSource,
         },
@@ -68,13 +69,9 @@ export function mapImageGenerationRequestToComfyUiPrompt(
     prompt["9"] = { class_type: "ResizeAndPadImage", inputs: { image: ["8", 0], target_width: width, target_height: height, padding_color: "black", interpolation: "area" } };
     prompt["10"] = { class_type: "VAEEncode", inputs: { pixels: ["9", 0], vae: ["1", 2] } };
   }
-  if (hasFaceId) {
-    prompt["11"] = { class_type: "LoadImage", inputs: { image: faceIdReferences[0]!.artifactId } };
-    prompt["12"] = { class_type: "InstantIDModelLoader", inputs: { instantid_file: "ip-adapter.bin" } };
-    prompt["13"] = { class_type: "InsightFaceLoader", inputs: { provider: "CPU" } };
-    prompt["14"] = { class_type: "CLIPVisionLoader", inputs: { clip_name: "ViT-H-14-laion2B-s32B-b79K.safetensors" } };
-    prompt["15"] = { class_type: "IPAdapterFaceID", inputs: { model: ["1", 0], ipadapter: ["12", 0], image: ["11", 0], clip_vision: ["14", 0], insightface: ["13", 0], weight: request.faceId?.identityStrength ?? 0.85, weight_faceidv2: request.faceId?.structureStrength ?? 0.75, noise: request.faceId?.noise ?? 0.35 } };
-    prompt["16"] = { class_type: "ConditioningCombine", inputs: { conditioning_1: ["2", 0], conditioning_2: ["15", 0] } };
+  if (hasFaceReference) {
+    prompt["17"] = { class_type: "LoadImage", inputs: { image: faceReferenceImageName } };
+    prompt["18"] = { class_type: "VAEEncode", inputs: { pixels: ["17", 0], vae: ["1", 2] } };
   }
 
   return { prompt };

@@ -26,4 +26,12 @@ describe("thin-client Vite config", () => {
     expect(Boolean(enabledConfig.server.https)).toBe(true);
     rmSync(directory, { recursive: true, force: true });
   });
+
+  it("ignores server artifact writes so uploads do not trigger a thin-client reload", async () => {
+    const config = await createThinClientViteConfig({
+      AI_SYSTEM_BUILDER_THIN_CLIENT_HTTPS_ENABLED: "false",
+    } as NodeJS.ProcessEnv);
+
+    expect(config.server.watch.ignored).toContain("**/server-artifacts/**");
+  });
 });

@@ -95,7 +95,11 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
     try {
       const value = await dependencies.generateImageUseCase.readImageGeneration(mapRequestIdBody(request.body), context);
       if (value?.status === "succeeded") {
-        await dependencies.imageGenerationRuntimeControl?.cacheTaskOutputsInMemory?.({ taskRecord: value });
+        try {
+          await dependencies.imageGenerationRuntimeControl?.cacheTaskOutputsInMemory?.({ taskRecord: value });
+        } catch {
+          // Preview caching is best-effort; the task record itself is still the source of truth.
+        }
       }
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_READ_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);

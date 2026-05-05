@@ -36,4 +36,6 @@ Current artifact-repo provider registration is Hugging Face only.
   - latent reference + prompts,
   - FaceID + prompts,
   - latent reference + FaceID + prompts.
-- FaceID requests require ComfyUI InstantID/InsightFace assets to exist in the executing host runtime install (plugin + model folders) before execution.
+- FaceID requests are prepared as host-owned artifact image references before ComfyUI execution.
+- The default server workflow avoids custom InstantID/InsightFace nodes so the feature remains usable with the managed ComfyUI install.
+- When no explicit latent reference is provided, the first FaceID reference is used as the image-to-image latent source for facial retention.
