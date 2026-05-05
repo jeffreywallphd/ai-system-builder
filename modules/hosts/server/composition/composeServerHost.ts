@@ -1,7 +1,7 @@
 import type { ArtifactRepoStoragePort } from "../../../application/ports/storage";
 import { execFile as nodeExecFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { cpus, freemem, totalmem } from "node:os";
 import { promisify } from "node:util";
@@ -671,6 +671,8 @@ export function composeServerHost(
       };
       const comfyUiClient = createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl });
       let previousCpuSample: { idle: number; total: number } | undefined;
+      const runtimeOutputMemory = new Map<string, { mediaType: string; contentBase64: string }>();
+      const previewKey = (fileName: string, subfolder?: string) => `${subfolder ?? ""}::${fileName}`;
       const imageGenerationRuntimeControl = {
         async unloadModel() {
           if (!comfyUiSupervisor?.isRunning()) {
@@ -689,9 +691,38 @@ export function composeServerHost(
           const cpuUsagePercent = deltaTotal > 0 ? Math.max(0, Math.min(100, (1 - deltaIdle / deltaTotal) * 100)) : 0;
           const totalMemory = totalmem();
           const memoryUsagePercent = totalMemory > 0 ? Math.max(0, Math.min(100, ((totalMemory - freemem()) / totalMemory) * 100)) : 0;
-          return { memoryUsagePercent, cpuUsagePercent, gpuUsagePercent: 0 };
+          const gpuUsagePercent = 0;
+          return { memoryUsagePercent, cpuUsagePercent, gpuUsagePercent };
+        },
+        async cacheTaskOutputsInMemory({ taskRecord }: { taskRecord: unknown }) {
+          const outputs = Array.isArray((taskRecord as { data?: { outputs?: unknown[] } })?.data?.outputs)
+            ? (taskRecord as { data: { outputs: Array<{ fileName?: string; subfolder?: string }> } }).data.outputs
+            : [];
+          const outputRoot = joinHostPath(comfyUiInstallRoot, "output");
+          for (const output of outputs) {
+            const fileName = typeof output?.fileName === "string" ? output.fileName.trim() : "";
+            const subfolder = typeof output?.subfolder === "string" ? output.subfolder : undefined;
+            if (!fileName) continue;
+            const key = previewKey(fileName, subfolder);
+            if (runtimeOutputMemory.has(key)) continue;
+            const resolved = resolve(outputRoot, subfolder ?? "", fileName);
+            const rel = relative(outputRoot, resolved);
+            if (rel.startsWith("..") || isAbsolute(rel)) continue;
+            const content = await readFile(resolved);
+            const lower = fileName.toLowerCase();
+            const mediaType = lower.endsWith(".jpg") || lower.endsWith(".jpeg") ? "image/jpeg" : lower.endsWith(".webp") ? "image/webp" : "image/png";
+            const contentBase64 = content.toString("base64");
+            runtimeOutputMemory.set(key, { mediaType, contentBase64 });
+            const outputRecord = output as Record<string, unknown>;
+            outputRecord.contentBase64 = contentBase64;
+            outputRecord.mediaType = mediaType;
+            await rm(resolved, { force: true });
+          }
         },
         async readOutputPreview({ fileName, subfolder }: { fileName: string; subfolder?: string }) {
+          const key = previewKey(fileName, subfolder);
+          const inMemory = runtimeOutputMemory.get(key);
+          if (inMemory) return inMemory;
           const outputRoot = joinHostPath(comfyUiInstallRoot, "output");
           const resolved = resolve(outputRoot, subfolder ?? "", fileName);
           const rel = relative(outputRoot, resolved);

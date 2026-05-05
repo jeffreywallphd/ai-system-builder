@@ -63,4 +63,22 @@ describe("registerImageGenerationApiRoutes", () => {
     expect(status).toHaveBeenCalledWith(200);
     expect(json).toHaveBeenCalledWith(expect.objectContaining({ ok: true, value: { unloaded: true, message: "released" } }));
   });
+
+  it("caches succeeded task outputs in memory via runtime control", async () => {
+    const handlers = new Map<string, any>();
+    const app: ExpressRoutePort = { post: testDouble.fn((p, h) => handlers.set(p, h)) };
+    const readTask = { requestId: "r1", taskType: "image-generation", status: "succeeded", concurrencyClass: "image-generation", data: { outputs: [{ fileName: "a.png", subfolder: "output" }] } };
+    const imageGenerationRuntimeControl = {
+      unloadModel: testDouble.fn(async () => ({ unloaded: true })),
+      cacheTaskOutputsInMemory: testDouble.fn(async () => undefined),
+    };
+    registerImageGenerationApiRoutes({
+      app,
+      generateImageUseCase: { startImageGeneration: testDouble.fn(), readImageGeneration: testDouble.fn(async () => readTask), cancelImageGeneration: testDouble.fn() } as any,
+      imageGenerationRuntimeControl,
+    });
+    const { res } = response();
+    await handlers.get("/api/image-generation/read")({ body: { requestId: "r1" }, headers: {} }, res);
+    expect(imageGenerationRuntimeControl.cacheTaskOutputsInMemory).toHaveBeenCalledWith({ taskRecord: readTask });
+  });
 });

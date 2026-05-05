@@ -51,6 +51,16 @@ export class FinalizeImageGenerationService {
     if (typeof value !== "object" || value === null) throw new Error("Image generation output must be an object.");
     const r = value as Record<string, unknown>;
     if (r.type !== "image" || typeof r.engine !== "string" || typeof r.fileName !== "string") throw new Error("Image generation output contract violation.");
-    return { type: "image", engine: r.engine, fileName: r.fileName, subfolder: typeof r.subfolder === "string" ? r.subfolder : undefined, promptId: typeof r.promptId === "string" ? r.promptId : undefined, width: typeof r.width === "number" ? r.width : undefined, height: typeof r.height === "number" ? r.height : undefined };
+    return {
+      type: "image",
+      engine: r.engine,
+      fileName: r.fileName,
+      subfolder: typeof r.subfolder === "string" ? r.subfolder : undefined,
+      contentBase64: typeof r.contentBase64 === "string" ? r.contentBase64 : undefined,
+      mediaType: typeof r.mediaType === "string" ? r.mediaType : undefined,
+      promptId: typeof r.promptId === "string" ? r.promptId : undefined,
+      width: typeof r.width === "number" ? r.width : undefined,
+      height: typeof r.height === "number" ? r.height : undefined,
+    };
   }
 }
