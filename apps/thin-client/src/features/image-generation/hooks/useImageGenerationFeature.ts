@@ -46,7 +46,7 @@ export function useImageGenerationFeature(
   artifactClient: ArtifactBrowserApiClient = defaultArtifactBrowserClient,
 ) {
   const [form, setForm] = useState<ImageGenerationFormState>({ prompt: "", negativePrompt: "", seed: "", width: "512", height: "512", steps: "20", cfg: "8", denoise: "1", sampler: "euler", scheduler: "normal", model: "", numImages: "1", latentSourceArtifactId: "" });
-  const [runtimeMode, setRuntimeMode] = useState<ImageGenerationRuntimeMode>("cpu");
+  const [runtimeMode, setRuntimeMode] = useState<ImageGenerationRuntimeMode>("auto");
   const [modelInventory, setModelInventory] = useState<ModelInventoryRecord[]>([]);
   const [modelInventoryLoading, setModelInventoryLoading] = useState(false);
   const [modelInventoryError, setModelInventoryError] = useState<string | undefined>(undefined);

@@ -29,7 +29,7 @@ describe("useImageGenerationFeature", () => {
     await act(async () => { (c.querySelector("#selectB") as HTMLButtonElement).click(); });
     expect(modelClient.listModels).toHaveBeenCalledTimes(1);
     await act(async () => { (c.querySelector("#prompt") as HTMLInputElement).value = "cat"; (c.querySelector("#prompt") as HTMLInputElement).dispatchEvent(new Event("input", { bubbles: true })); (c.querySelector("#start") as HTMLButtonElement).click(); });
-    expect(client.startImageGeneration).toHaveBeenCalledWith(expect.objectContaining({ model: "b", engineHints: { runtimeDeviceMode: "cpu" } }));
+    expect(client.startImageGeneration).toHaveBeenCalledWith(expect.objectContaining({ model: "b", engineHints: { runtimeDeviceMode: "auto" } }));
   });
 
   it("manual model fallback applies only when no selected record", async () => {

@@ -29,6 +29,7 @@ export interface CreateComfyUiRuntimeInstallerOptions {
   skipPythonValidation?: boolean;
   pythonEnvironmentMode?: ComfyUiPythonEnvironmentMode;
   runtimeDeviceMode?: ComfyUiRuntimeDeviceMode;
+  cudaTorchWheelIndexUrl?: string;
   directMlPackageName?: string;
   directMlTorchVersion?: string;
   directMlTorchAudioVersion?: string;
@@ -73,11 +74,13 @@ interface ComfyUiFinalizationMetadata {
   directMlPackageName: string;
   pythonDependenciesInstalledAt?: string;
   directMlDependenciesInstalledAt?: string;
+  cudaTorchDependenciesInstalledAt?: string;
+  cudaTorchWheelIndexUrl?: string;
   pythonEnvironmentCreatedAt?: string;
   validationCheckedAt?: string;
   finalizedAt: string;
 }
-export const COMFYUI_FINALIZATION_SCHEMA_VERSION = 2;
+export const COMFYUI_FINALIZATION_SCHEMA_VERSION = 3;
 export const DEFAULT_DIRECTML_TORCH_VERSION = "2.3.1";
 export const DEFAULT_DIRECTML_TORCHAUDIO_VERSION = "2.3.1";
 export const DEFAULT_DIRECTML_TORCHVISION_VERSION = "0.18.1";
@@ -129,6 +132,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
   const pythonCommand = options.pythonCommand ?? "python";
   const requirementsFileName = options.requirementsFileName ?? "requirements.txt";
   const directMlPackageName = options.directMlPackageName ?? "torch-directml";
+  const cudaTorchWheelIndexUrl = options.cudaTorchWheelIndexUrl?.trim();
   const directMlTorchVersion = options.directMlTorchVersion ?? DEFAULT_DIRECTML_TORCH_VERSION;
   const pythonEnvironmentMode = options.pythonEnvironmentMode ?? "managed-venv";
   const stat = options.stat ?? nodeStat;
@@ -224,7 +228,8 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       && metadata.skipPythonSetup === input.skipPythonSetup
       && metadata.skipPythonValidation === input.skipPythonValidation
       && metadata.requirementsFileName === requirementsFileName
-      && metadata.directMlPackageName === directMlPackageName;
+      && metadata.directMlPackageName === directMlPackageName
+      && metadata.cudaTorchWheelIndexUrl === cudaTorchWheelIndexUrl;
   }
 
   async function runCommandStage(input: {
@@ -483,6 +488,53 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     }
   }
 
+  async function ensureCudaTorchDependencies(dependencyPythonCommand: string): Promise<{ installedAt?: string; error?: RuntimeInstallResult["error"] }> {
+    if (options.runtimeDeviceMode !== "cuda" || !cudaTorchWheelIndexUrl) {
+      return {};
+    }
+
+    const stageStartedAt = Date.now();
+    log("info", "Checking ComfyUI CUDA torch dependency stage.", { cudaTorchWheelIndexUrl });
+
+    if (!options.execFile) {
+      log("error", "ComfyUI CUDA torch dependency install failed because no command runner is configured.", {
+        cudaTorchWheelIndexUrl,
+        durationMs: elapsed(stageStartedAt),
+      });
+      return { error: makeError("cuda-torch-dependency-install-failed", "Failed to install CUDA torch dependencies", { message: "no execFile configured" }) };
+    }
+
+    try {
+      await runCommandStage({
+        stage: "cuda-torch-dependency",
+        file: dependencyPythonCommand,
+        args: ["-m", "pip", "install", "--upgrade", "torch", "torchvision", "--index-url", cudaTorchWheelIndexUrl],
+      });
+      log("info", "ComfyUI CUDA torch dependency install completed.", {
+        cudaTorchWheelIndexUrl,
+        durationMs: elapsed(stageStartedAt),
+      });
+      return { installedAt: now() };
+    } catch (error) {
+      const err = error as { stdout?: string; stderr?: string; message?: string };
+      log("error", "ComfyUI CUDA torch dependency install failed.", {
+        cudaTorchWheelIndexUrl,
+        durationMs: elapsed(stageStartedAt),
+        message: err?.message,
+        stdout: err?.stdout,
+        stderr: err?.stderr,
+      });
+      return {
+        error: makeError("cuda-torch-dependency-install-failed", "Failed to install CUDA torch dependencies", {
+          stdout: err?.stdout,
+          stderr: err?.stderr,
+          message: err?.message,
+          cudaTorchWheelIndexUrl,
+        }),
+      };
+    }
+  }
+
   async function checkPythonRuntimeDependencies(dependencyPythonCommand: string, directMlReconciliation?: {
     finalTorchVersion?: string;
     resolvedTorchaudioVersion?: string;
@@ -639,6 +691,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
 
     let pythonDependenciesInstalledAt: string | undefined;
     let directMlDependenciesInstalledAt: string | undefined;
+    let cudaTorchDependenciesInstalledAt: string | undefined;
     let directMlReconciliation: { finalTorchVersion?: string; resolvedTorchaudioVersion?: string; resolvedTorchvisionVersion?: string } | undefined;
     if (!skipPythonSetup) {
       const pythonSetup = await ensurePythonDependencies(normalizedRequest.installRoot, pythonEnvironment.pythonCommand);
@@ -653,6 +706,18 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
         return { ...installResult, status: "failed", warnings, error: pythonSetup.error };
       }
       pythonDependenciesInstalledAt = pythonSetup.installedAt;
+
+      const cudaTorchSetup = await ensureCudaTorchDependencies(pythonEnvironment.pythonCommand);
+      if (cudaTorchSetup.error) {
+        log("error", "ComfyUI install finalization failed during CUDA torch dependency stage.", {
+          installRoot: normalizedRequest.installRoot,
+          targetId: normalizedRequest.targetId,
+          durationMs: elapsed(finalizeStartedAt),
+          error: cudaTorchSetup.error,
+        });
+        return { ...installResult, status: "failed", warnings, error: cudaTorchSetup.error };
+      }
+      cudaTorchDependenciesInstalledAt = cudaTorchSetup.installedAt;
 
       const directMlSetup = await ensureDirectMlDependencies(pythonEnvironment.pythonCommand);
       if (directMlSetup.error) {
@@ -713,6 +778,8 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       directMlPackageName,
       pythonDependenciesInstalledAt,
       directMlDependenciesInstalledAt,
+      cudaTorchDependenciesInstalledAt,
+      cudaTorchWheelIndexUrl,
       pythonEnvironmentCreatedAt: pythonEnvironment.createdAt,
       validationCheckedAt: validation.checkedAt,
       finalizedAt: now(),

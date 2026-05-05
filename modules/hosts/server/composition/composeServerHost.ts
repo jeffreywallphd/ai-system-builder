@@ -11,6 +11,7 @@ import { createComfyUiHttpClient, createComfyUiImageGenerationRuntimeAdapter, cr
 import { createComfyUiRuntimeInstaller } from "../../../adapters/runtime/installer/comfyui/createComfyUiRuntimeInstaller";
 import { createPythonRuntimeAdapterFoundation, ensurePythonRuntimeWorkerDependencies } from "../../../adapters/runtime/python";
 import { createGitRuntimeInstallerAdapter } from "../../../adapters/runtime/installer/git/createGitRuntimeInstallerAdapter";
+import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
 import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
 import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/model/huggingface";
 import { createLocalImageAssetRegistryAdapter } from "../../../adapters/persistence/image";
@@ -39,6 +40,10 @@ import {
   DownloadModelUseCase,
   UpdateModelRecordUseCase,
   DeleteModelRecordUseCase,
+  ListSettingsDefinitionsUseCase,
+  ReadSettingsUseCase,
+  UpdateSettingUseCase,
+  ClearSettingUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import {
@@ -73,6 +78,7 @@ import {
   type ComfyUiPythonEnvironmentMode,
 } from "../../../adapters/runtime/comfyui/comfyUiPythonEnvironment";
 import type { ComfyUiRuntimeDeviceMode } from "../../../adapters/runtime/comfyui/createComfyUiRuntimeSupervisor";
+import { RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY } from "../../../contracts/settings";
 
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
 const execFile = promisify(nodeExecFile);
@@ -155,6 +161,9 @@ export interface ComposeServerHostOptions {
   logSink?: StructuredLogSink;
   now?: () => string;
   artifactRepo?: ComposeServerHostArtifactRepoOptions;
+  settings?: {
+    localSettingsFilePath?: string;
+  };
 }
 
 export interface RegisterServerApiOptions {
@@ -353,6 +362,15 @@ export function composeServerHost(
     registerApi(registerOptions) {
       const env = options.env ?? process.env;
       const defaultRuntimeRootDirectory = joinHostPath(dirname(registerOptions.storageRootDirectory), "server-runtime");
+      const applicationSettings = createLocalApplicationSettingsAdapter({
+        filePath: options.settings?.localSettingsFilePath ?? joinHostPath(registerOptions.storageRootDirectory, "config", "application-settings.json"),
+        now: options.now,
+      });
+      const applicationSecrets = createInMemorySecretsAdapter();
+      const readRuntimeSettingString = async (key: string): Promise<string | undefined> => {
+        const value = (await applicationSettings.readValues({ keys: [key] }))[0]?.value;
+        return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+      };
       const serverRuntimeResolution = resolveServerRuntimeRootDirectory({
         env,
         runtimeRootDirectory: registerOptions.runtimeRootDirectory ?? defaultRuntimeRootDirectory,
@@ -574,11 +592,12 @@ export function composeServerHost(
       const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort, execFile: execFileWithTimeout });
       let comfyUiSupervisor: ReturnType<typeof createComfyUiRuntimeSupervisor> | undefined;
       let activeRuntimeDeviceMode: ComfyUiRuntimeDeviceMode | undefined;
-      const createComfyUiInstallerForMode = (mode: ComfyUiRuntimeDeviceMode) => createComfyUiRuntimeInstaller({
+      const createComfyUiInstallerForMode = async (mode: ComfyUiRuntimeDeviceMode) => createComfyUiRuntimeInstaller({
         gitInstaller: gitRuntimeInstaller,
         pythonCommand: basePythonCommand,
         execFile: execFileWithTimeout,
         runtimeDeviceMode: mode,
+        cudaTorchWheelIndexUrl: await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY),
         skipPythonSetup,
         skipPythonValidation,
         pythonEnvironmentMode,
@@ -589,7 +608,13 @@ export function composeServerHost(
         logging: loggingPort,
       });
       const startComfyUiWithRuntimeDeviceMode = async (request: { runtimeDeviceMode?: ComfyUiRuntimeDeviceMode }) => {
-        const resolvedRequestMode = resolveServerComfyUiRuntimeDeviceMode(env, request.runtimeDeviceMode);
+        const cudaTorchWheelIndexUrl = await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY);
+        const envOverride = normalizeComfyUiRuntimeDeviceMode(env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR);
+        const requestedMode = normalizeServerImageGenerationRuntimeMode(request.runtimeDeviceMode);
+        const resolvedRequestMode = envOverride
+          ?? (requestedMode === undefined || requestedMode === "auto"
+            ? (cudaTorchWheelIndexUrl ? "cuda" : "cpu")
+            : resolveServerComfyUiRuntimeDeviceMode(env, request.runtimeDeviceMode));
         const modeChanged = activeRuntimeDeviceMode !== undefined && activeRuntimeDeviceMode !== resolvedRequestMode;
         if (modeChanged && comfyUiSupervisor) {
           await comfyUiSupervisor.stop();
@@ -599,7 +624,7 @@ export function composeServerHost(
           comfyUiSupervisor = createComfyUiRuntimeSupervisor({
             workingDirectory: comfyUiInstallRoot,
             pythonExecutable: launchPythonResolution.launchPythonExecutable,
-            installer: createComfyUiInstallerForMode(resolvedRequestMode),
+            installer: await createComfyUiInstallerForMode(resolvedRequestMode),
             installRoot: comfyUiInstallRoot,
             host: comfyUiHost,
             port: comfyUiPort,
@@ -620,7 +645,8 @@ export function composeServerHost(
           subsystem: "runtime",
           data: {
             requestedRuntimeDeviceMode: request.runtimeDeviceMode,
-            envOverrideWon: Boolean(normalizeComfyUiRuntimeDeviceMode(env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR)),
+            cudaTorchWheelIndexConfigured: Boolean(cudaTorchWheelIndexUrl),
+            envOverrideWon: Boolean(envOverride),
             runtimeDeviceMode: resolvedRequestMode,
             processReuse: modeChanged ? "restarted_mode_changed" : "reused_or_started",
           },
@@ -781,6 +807,21 @@ export function composeServerHost(
           modelCheckpointResolver: localModelCheckpointResolver,
         }),
       });
+      const listSettingsDefinitionsUseCase = new ListSettingsDefinitionsUseCase({
+        settings: applicationSettings,
+      });
+      const readSettingsUseCase = new ReadSettingsUseCase({
+        settings: applicationSettings,
+        secrets: applicationSecrets,
+      });
+      const updateSettingUseCase = new UpdateSettingUseCase({
+        settings: applicationSettings,
+        secrets: applicationSecrets,
+      });
+      const clearSettingUseCase = new ClearSettingUseCase({
+        settings: applicationSettings,
+        secrets: applicationSecrets,
+      });
 
       const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({
         runtimeTaskRegistry,
@@ -831,6 +872,10 @@ export function composeServerHost(
         generateImageUseCase,
         imageGenerationFinalizationOrchestrator,
         imageGenerationRuntimeControl,
+        listSettingsDefinitionsUseCase,
+        readSettingsUseCase,
+        updateSettingUseCase,
+        clearSettingUseCase,
         modelManagementLogger,
       });
     },

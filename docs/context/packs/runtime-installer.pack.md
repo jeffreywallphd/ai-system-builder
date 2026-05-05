@@ -66,7 +66,8 @@ Include this pack when prompts involve:
 - ComfyUI installer is a thin adapter that composes the generic Git runtime installer.
 - Python dependency installation is best-effort and non-destructive.
 - ComfyUI Python dependencies are installed into a managed `.venv` by default to avoid ambient user-site package contamination.
-- GPU/Torch installation is not implemented yet.
+- CUDA torch installation can use the configured `runtime.torch.cudaWheelIndexUrl` setting to install `torch` and `torchvision` from the user-selected PyTorch CUDA wheel index.
+- When the CUDA wheel index setting is configured and no explicit runtime override wins, ComfyUI startup defaults to CUDA rather than CPU.
 - DirectML mode installs the DirectML dependency through the same managed Python environment.
 - DirectML mode installs `torch-directml` first, then probes the final installed `torch` base version and reconciles `torchaudio`/`torchvision` to match.
 - DirectML reconciliation is required for Intel/AMD GPU paths and does not assume NVIDIA/CUDA availability.

@@ -123,6 +123,14 @@ describe("composeDesktopHost", () => {
     expect(resolveComfyUiRuntimeDeviceMode({ gpuType: "cpu" })).toBe("cpu");
   });
 
+  it("uses CUDA by default when a torch CUDA wheel index is configured", () => {
+    expect(resolveComfyUiRuntimeDeviceMode({
+      hasNvidiaGpu: false,
+      gpuType: "auto",
+      cudaTorchWheelIndexUrl: "https://download.pytorch.org/whl/cu130",
+    })).toBe("cuda");
+  });
+
   it("resolves CUDA only when Nvidia is explicitly detected or configured", () => {
     expect(resolveComfyUiRuntimeDeviceMode({ hasNvidiaGpu: true })).toBe("cuda");
     expect(resolveComfyUiRuntimeDeviceMode({ hasNvidiaGpu: false })).toBe("cpu");

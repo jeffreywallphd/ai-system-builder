@@ -324,7 +324,36 @@ describe("createComfyUiRuntimeInstaller", () => {
     const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never, readFile: readFile as never, writeFile: writeFile as never, runtimeDeviceMode: "directml" });
     await installer.ensureInstalled(baseRequest);
     expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-c", "import torchaudio"]);
-    expect(JSON.parse(finalizationMetadata).schemaVersion).toBe(2);
+    expect(JSON.parse(finalizationMetadata).schemaVersion).toBe(3);
+  });
+
+  it("installs torch and torchvision from the configured CUDA wheel index", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(),
+    };
+    const execFile = testDouble.fn(async () => ({ stdout: "", stderr: "" }));
+    const stat = testDouble.fn(async () => ({}));
+    const installer = createComfyUiRuntimeInstaller({
+      gitInstaller,
+      execFile,
+      stat: stat as never,
+      runtimeDeviceMode: "cuda",
+      cudaTorchWheelIndexUrl: "https://download.pytorch.org/whl/cu130",
+    });
+
+    await installer.ensureInstalled(baseRequest);
+
+    expect(execFile).toHaveBeenCalledWith(managedPythonPath, [
+      "-m",
+      "pip",
+      "install",
+      "--upgrade",
+      "torch",
+      "torchvision",
+      "--index-url",
+      "https://download.pytorch.org/whl/cu130",
+    ]);
   });
 
   it("directml installs torch-directml before companion reconciliation by default", async () => {
