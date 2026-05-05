@@ -12,13 +12,15 @@ import {
 } from "./artifact-repo/registerArtifactRepoApiRoutes";
 import { registerImageGenerationApiRoutes, type RegisterImageGenerationApiRoutesDependencies } from "./image-generation/registerImageGenerationApiRoutes";
 import { registerModelManagementApiRoutes, type RegisterModelManagementApiRoutesDependencies } from "./model/registerModelManagementApiRoutes";
+import { registerApplicationSettingsApiRoutes, type RegisterApplicationSettingsApiRoutesDependencies } from "./settings/registerApplicationSettingsApiRoutes";
 
 export interface RegisterExpressApiDependencies {
   app: RegisterArtifactUploadApiRouteDependencies["app"]
     & RegisterArtifactBrowserApiRoutesDependencies["app"]
     & RegisterArtifactRepoApiRoutesDependencies["app"]
     & RegisterImageGenerationApiRoutesDependencies["app"]
-    & RegisterModelManagementApiRoutesDependencies["app"];
+    & RegisterModelManagementApiRoutesDependencies["app"]
+    & RegisterApplicationSettingsApiRoutesDependencies["app"];
   getHuggingFaceTokenStatus: RegisterArtifactRepoApiRoutesDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];
@@ -50,6 +52,10 @@ export interface RegisterExpressApiDependencies {
   validateModelUseCase?: RegisterModelManagementApiRoutesDependencies["validateModelUseCase"];
   publishModelUseCase?: RegisterModelManagementApiRoutesDependencies["publishModelUseCase"]
   modelManagementLogger?: RegisterModelManagementApiRoutesDependencies["logger"];
+  listSettingsDefinitionsUseCase?: RegisterApplicationSettingsApiRoutesDependencies["listSettingsDefinitionsUseCase"];
+  readSettingsUseCase?: RegisterApplicationSettingsApiRoutesDependencies["readSettingsUseCase"];
+  updateSettingUseCase?: RegisterApplicationSettingsApiRoutesDependencies["updateSettingUseCase"];
+  clearSettingUseCase?: RegisterApplicationSettingsApiRoutesDependencies["clearSettingUseCase"];
 }
 
 export function registerExpressApi(
@@ -105,4 +111,19 @@ export function registerExpressApi(
     imageGenerationFinalizationOrchestrator: dependencies.imageGenerationFinalizationOrchestrator,
     imageGenerationRuntimeControl: dependencies.imageGenerationRuntimeControl,
   });
+
+  if (
+    dependencies.listSettingsDefinitionsUseCase
+    && dependencies.readSettingsUseCase
+    && dependencies.updateSettingUseCase
+    && dependencies.clearSettingUseCase
+  ) {
+    registerApplicationSettingsApiRoutes({
+      app: dependencies.app,
+      listSettingsDefinitionsUseCase: dependencies.listSettingsDefinitionsUseCase,
+      readSettingsUseCase: dependencies.readSettingsUseCase,
+      updateSettingUseCase: dependencies.updateSettingUseCase,
+      clearSettingUseCase: dependencies.clearSettingUseCase,
+    });
+  }
 }

@@ -98,8 +98,12 @@ import { createLoggingConfig, type LoggingConfig } from "../../../contracts/conf
 import { PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES } from "../../../contracts/runtime";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 import type { PowerSuspensionBlockerPort } from "../../../application/ports/desktop";
+import type { RuntimeInstallerPort } from "../../../application/ports/runtime-installer";
 import type { DesktopPythonRuntimeLogEntry, DesktopPythonRuntimeStatusPayload } from "../../../contracts/ipc";
-import { IMAGE_GENERATION_GPU_TYPE_SETTING_KEY } from "../../../contracts/settings";
+import {
+  IMAGE_GENERATION_GPU_TYPE_SETTING_KEY,
+  RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY,
+} from "../../../contracts/settings";
 
 const HUGGING_FACE_TOKEN_SETTING_KEY = "huggingface.token" as const;
 const execFile = promisify(nodeExecFile);
@@ -348,6 +352,7 @@ export function resolveComfyUiRuntimeDeviceMode(input: {
   platform?: NodeJS.Platform;
   hasNvidiaGpu?: boolean;
   gpuType?: string | undefined;
+  cudaTorchWheelIndexUrl?: string | undefined;
 } = {}): ComfyUiRuntimeDeviceMode {
   const configured = readComfyUiEnvOverride(input.env);
   if (configured) {
@@ -363,6 +368,9 @@ export function resolveComfyUiRuntimeDeviceMode(input: {
   }
   if (configuredGpuType === "cpu") {
     return "cpu";
+  }
+  if ((!configuredGpuType || configuredGpuType === "auto") && input.cudaTorchWheelIndexUrl?.trim()) {
+    return "cuda";
   }
 
   if (input.hasNvidiaGpu === true) {
@@ -628,6 +636,10 @@ export function composeDesktopHost(
   const modelDefaultResolver = new DefaultModelDefaultResolver({
     settings: applicationSettings,
   });
+  const readRuntimeSettingString = async (key: string): Promise<string | undefined> => {
+    const value = (await applicationSettings.readValues({ keys: [key] }))[0]?.value;
+    return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+  };
 
   const powerSuspensionBlocker = createElectronPowerSuspensionBlocker();
   const taskPowerLifecycle = new TaskPowerLifecycleService(powerSuspensionBlocker);
@@ -719,15 +731,17 @@ export function composeDesktopHost(
           ? configuredComfyUiInstallCommandTimeoutMs
           : COMFYUI_INSTALL_COMMAND_TIMEOUT_MS_DEFAULT;
       const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort });
-      const comfyUiInstaller = createComfyUiRuntimeInstaller({
+      const createConfiguredComfyUiInstaller = async (runtimeDeviceMode?: ComfyUiRuntimeDeviceMode) => createComfyUiRuntimeInstaller({
         gitInstaller: gitRuntimeInstaller,
         pythonCommand: comfyUiBasePythonCommand,
         pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
-        runtimeDeviceMode: resolveComfyUiRuntimeDeviceMode({
+        runtimeDeviceMode: runtimeDeviceMode ?? resolveComfyUiRuntimeDeviceMode({
           env: process.env,
           hasNvidiaGpu: detectNvidiaGpu(),
           gpuType: process.env.COMFYUI_GPU_TYPE,
+          cudaTorchWheelIndexUrl: await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY),
         }),
+        cudaTorchWheelIndexUrl: await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY),
         execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true }),
         skipPythonSetup: comfyUiSkipPythonSetup,
         skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
@@ -737,17 +751,31 @@ export function composeDesktopHost(
         directMlPackageName: process.env.COMFYUI_DIRECTML_PACKAGE,
         logging: loggingPort,
       });
+      const comfyUiInstaller: RuntimeInstallerPort = {
+        async ensureInstalled(request) {
+          return (await createConfiguredComfyUiInstaller()).ensureInstalled(request);
+        },
+        async getInstallStatus(request) {
+          return (await createConfiguredComfyUiInstaller()).getInstallStatus(request);
+        },
+        async repairInstall(request) {
+          const installer = await createConfiguredComfyUiInstaller();
+          return installer.repairInstall?.(request) ?? installer.ensureInstalled({ ...request, allowUpdate: true });
+        },
+      };
       let comfyUiSupervisor: ReturnType<typeof createComfyUiRuntimeSupervisor> | undefined;
       let activeRuntimeDeviceMode: ComfyUiRuntimeDeviceMode | undefined;
       const comfyUiSupervisorPort = {
         async start() {
           const persistedValue = (await applicationSettings.readValues({ keys: [IMAGE_GENERATION_GPU_TYPE_SETTING_KEY] }))[0]?.value;
           const persistedGpuType = typeof persistedValue === "string" ? persistedValue : undefined;
+          const cudaTorchWheelIndexUrl = await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY);
           const envOverride = readComfyUiEnvOverride(process.env);
           const resolvedRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode({
             env: process.env,
             hasNvidiaGpu: detectNvidiaGpu(),
             gpuType: persistedGpuType,
+            cudaTorchWheelIndexUrl,
           });
           const modeChanged = activeRuntimeDeviceMode !== undefined && activeRuntimeDeviceMode !== resolvedRuntimeDeviceMode;
           if (modeChanged && comfyUiSupervisor) {
@@ -755,20 +783,7 @@ export function composeDesktopHost(
             comfyUiSupervisor = undefined;
           }
           if (!comfyUiSupervisor) {
-            const comfyUiInstaller = createComfyUiRuntimeInstaller({
-              gitInstaller: gitRuntimeInstaller,
-              pythonCommand: comfyUiBasePythonCommand,
-              pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
-              runtimeDeviceMode: resolvedRuntimeDeviceMode,
-              execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true }),
-              skipPythonSetup: comfyUiSkipPythonSetup,
-              skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
-              directMlTorchVersion: process.env.COMFYUI_DIRECTML_TORCH_VERSION,
-              directMlTorchAudioVersion: process.env.COMFYUI_DIRECTML_TORCHAUDIO_VERSION,
-              directMlTorchVisionVersion: process.env.COMFYUI_DIRECTML_TORCHVISION_VERSION,
-              directMlPackageName: process.env.COMFYUI_DIRECTML_PACKAGE,
-              logging: loggingPort,
-            });
+            const comfyUiInstaller = await createConfiguredComfyUiInstaller(resolvedRuntimeDeviceMode);
             comfyUiSupervisor = createComfyUiRuntimeSupervisor({
               workingDirectory: comfyUiInstallRoot,
               pythonExecutable: comfyUiPythonCommand,
@@ -791,6 +806,7 @@ export function composeDesktopHost(
             subsystem: "runtime",
             data: {
               persistedGpuType,
+              cudaTorchWheelIndexConfigured: Boolean(cudaTorchWheelIndexUrl),
               envOverride,
               envOverrideWon: Boolean(envOverride),
               runtimeDeviceMode: resolvedRuntimeDeviceMode,

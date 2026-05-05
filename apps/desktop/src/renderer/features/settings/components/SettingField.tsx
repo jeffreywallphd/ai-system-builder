@@ -92,9 +92,11 @@ export function SettingField(props: SettingFieldProps) {
         className="ui-input"
         type={isNumber ? "number" : "text"}
         value={draft}
+        placeholder={props.definition.placeholder}
         disabled={props.disabled}
         onChange={(event) => setDraft(event.target.value)}
       />
+      {props.definition.instructions ? <p className="ui-text-muted">{props.definition.instructions}</p> : null}
       <div className="ui-grid ui-grid--two">
         <button
           data-testid={`setting-${props.definition.key}-save`}

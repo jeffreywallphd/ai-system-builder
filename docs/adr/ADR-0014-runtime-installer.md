@@ -81,6 +81,7 @@ Installer request/result/status flows may include:
 - Installer operations must be idempotent.
 - Repair/update behavior must be explicit (opt-in), not implicit.
 - Force-repair for unmanaged non-empty directories must remain non-destructive and may fail safely until an explicit safe strategy is designed.
+- CUDA torch dependency installation may use a user-configured PyTorch wheel index URL, but it must stay inside the managed Python dependency stage and must not require UI code to run installer commands directly.
 - DirectML dependency repair is scoped to managed Python dependencies; it should not implicitly mutate repository refs or delete runtime/model files.
 
 ## ComfyUI DirectML Startup Repair Behavior
