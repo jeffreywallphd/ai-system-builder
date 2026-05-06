@@ -38,8 +38,10 @@
 - Shared readiness contracts live under `modules/contracts/runtime/` and are exported from the runtime family barrel.
 - Capability ids currently cover Python runtime, ComfyUI runtime, image generation, dataset preparation, model training, model validation, and model publishing.
 - Readiness status/action values are shared vocabulary for later host/API/IPC/UI mapping only.
-- Host composition will later translate installer status, supervisor health, and task state into readiness snapshots.
+- The application runtime readiness service translates composed host-owned provider signals (for example supervisor health or installer status readers) into readiness snapshots using this vocabulary.
+- Host composition provides concrete signal readers/providers; desktop IPC and server API exposure are deferred to later prompts.
 - Runtime-specific protocol details, filesystem paths, temp paths, secrets, tokens, and raw process data stay in adapters or diagnostics, not required readiness fields.
+- The readiness service does not own process lifecycle, installation/discovery/repair/update status, or runtime task execution; supervisors, installer ports, and Runtime Task Registry remain the respective authorities.
 
 ## Key Constraints
 

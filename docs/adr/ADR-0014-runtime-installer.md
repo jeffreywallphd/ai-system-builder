@@ -18,7 +18,7 @@ Introduce a generic **Runtime Installer** abstraction.
 - Runtime installer responsibilities are separate from runtime supervisor responsibilities.
 - Supervisors may call installer operations before startup when configured to do so.
 - Installation targets are runtime-specific, but they share common install request/result/status contracts and application ports.
-- Shared runtime readiness contracts may later expose host-owned capability availability derived partly from installer status, but installer contracts remain the source of truth for install/discovery/repair/update status.
+- Shared runtime readiness contracts and the application readiness service may expose host-owned capability availability derived partly from installer status, but installer contracts remain the source of truth for install/discovery/repair/update status.
 
 ## Layering
 
@@ -26,7 +26,7 @@ Introduce a generic **Runtime Installer** abstraction.
 - **Application port** defines generic install and status operations.
 - **Adapters** implement concrete install strategies.
 - **Runtime-specific adapters** (for example ComfyUI) compose generic installers with target defaults, without changing shared contracts.
-- **Host composition** later maps installer status together with supervisor health and task state into transport-neutral readiness snapshots.
+- **Host composition** supplies installer/supervisor/task state readers to the application runtime readiness service, which maps them into transport-neutral readiness snapshots without taking ownership of installation or process lifecycle.
 
 ## Runtime Target Model
 
