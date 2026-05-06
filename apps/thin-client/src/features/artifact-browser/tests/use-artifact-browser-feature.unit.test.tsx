@@ -208,14 +208,55 @@ describe("ArtifactBrowserFeature", () => {
     mountedRoot = root;
     mountedContainer = container;
     await act(async () => { root.render(<ArtifactBrowserFeature client={client} />); });
-    const checkboxes = Array.from(container.querySelectorAll("input[type='checkbox']")) as HTMLInputElement[];
-    await act(async () => { checkboxes[0]?.click(); checkboxes[1]?.click(); });
+    const artifactCheckboxes = Array.from(container.querySelectorAll("li:not(:first-child) input[type='checkbox']")) as HTMLInputElement[];
+    await act(async () => { artifactCheckboxes[0]?.click(); artifactCheckboxes[1]?.click(); });
     const deleteAllInput = Array.from(container.querySelectorAll("input")).find((input) => input.getAttribute("placeholder") === "Delete All") as HTMLInputElement;
     setInputValue(deleteAllInput, "Delete All");
     const deleteSelected = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Delete Selected")) as HTMLButtonElement;
     await act(async () => { deleteSelected.click(); });
     expect(client.deleteRegisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/a.png" });
     expect(client.deleteRegisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/b.png" });
+  });
+
+  it("selects and deselects every listed artifact from the bulk checkbox", async () => {
+    const client = {
+      browseArtifacts: vi.fn().mockResolvedValue([
+        { storageKey: "uploads/a.png", artifactFamily: "image" as const },
+        { storageKey: "uploads/b.png", artifactFamily: "image" as const },
+      ]),
+      readArtifactDetail: vi.fn(),
+      readArtifactContent: vi.fn(),
+      createArtifactMediaViewUrl: vi.fn().mockReturnValue(""),
+      deleteRegisteredArtifact: vi.fn().mockResolvedValue({}),
+      getHuggingFaceTokenStatus: vi.fn().mockResolvedValue({ configured: false }),
+      setHuggingFaceToken: vi.fn(),
+      clearHuggingFaceToken: vi.fn(),
+      publishArtifactToHuggingFace: vi.fn(),
+      verifyPublishedArtifactBacking: vi.fn(),
+      registerArtifactFromRepo: vi.fn(),
+      localizeArtifactFromRepo: vi.fn(),
+    };
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => { root.render(<ArtifactBrowserFeature client={client} />); });
+
+    const [selectAllCheckbox, ...artifactCheckboxes] = Array.from(container.querySelectorAll("input[type='checkbox']")) as HTMLInputElement[];
+    expect(selectAllCheckbox?.checked).toBe(false);
+    expect(artifactCheckboxes.map((checkbox) => checkbox.checked)).toEqual([false, false]);
+
+    await act(async () => { selectAllCheckbox?.click(); });
+    expect(selectAllCheckbox?.checked).toBe(true);
+    expect(artifactCheckboxes.map((checkbox) => checkbox.checked)).toEqual([true, true]);
+    expect(container.textContent).toContain("Delete Selected (2)");
+
+    await act(async () => { selectAllCheckbox?.click(); });
+    expect(selectAllCheckbox?.checked).toBe(false);
+    expect(artifactCheckboxes.map((checkbox) => checkbox.checked)).toEqual([false, false]);
+    expect(container.textContent).toContain("Delete Selected (0)");
   });
 
   it("does not render Hugging Face token settings", async () => {

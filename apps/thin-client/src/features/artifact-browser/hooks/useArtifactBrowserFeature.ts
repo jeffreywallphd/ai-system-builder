@@ -55,6 +55,8 @@ export interface UseArtifactBrowserFeatureResult {
   setDeleteConfirmationInput: (value: string) => void;
   toggleSelectedArtifactKey: (storageKey: string) => void;
   clearSelectedArtifactKeys: () => void;
+  toggleAllArtifactKeys: () => void;
+  areAllArtifactKeysSelected: boolean;
   setBulkDeleteConfirmationInput: (value: string) => void;
   deleteSelectedArtifacts: () => Promise<void>;
   publishArtifactToHuggingFace: (input?: {
@@ -267,6 +269,20 @@ export function useArtifactBrowserFeature(
     setSelectedArtifactKeys([]);
     setBulkDeleteConfirmationInput("");
   }
+
+  const listedArtifactKeys = items.map((item) => item.storageKey);
+  const areAllArtifactKeysSelected = listedArtifactKeys.length > 0
+    && listedArtifactKeys.every((storageKey) => selectedArtifactKeys.includes(storageKey));
+
+  function toggleAllArtifactKeys(): void {
+    if (areAllArtifactKeysSelected) {
+      clearSelectedArtifactKeys();
+      return;
+    }
+
+    setSelectedArtifactKeys(listedArtifactKeys);
+  }
+
   async function deleteSelectedArtifacts(): Promise<void> {
     if (selectedArtifactKeys.length === 0) return;
     if (bulkDeleteConfirmationInput !== "Delete All") {
@@ -532,6 +548,8 @@ export function useArtifactBrowserFeature(
     cancelPendingDelete,
     toggleSelectedArtifactKey,
     clearSelectedArtifactKeys,
+    toggleAllArtifactKeys,
+    areAllArtifactKeysSelected,
     setBulkDeleteConfirmationInput,
     deleteSelectedArtifacts,
     publishArtifactToHuggingFace,
