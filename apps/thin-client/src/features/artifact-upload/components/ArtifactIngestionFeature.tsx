@@ -19,19 +19,68 @@ type ExpandedPanelsState = {
   importFromHuggingFace: boolean;
 };
 
-let persistedExpandedPanels: ExpandedPanelsState = {
+const DEFAULT_EXPANDED_PANELS: ExpandedPanelsState = {
   uploadData: false,
   scrapeWebData: false,
   importFromHuggingFace: false,
 };
 
+const EXPANDED_PANELS_STORAGE_KEY = "thin-client.artifact-ingestion.expanded-panels";
+
+let persistedExpandedPanels: ExpandedPanelsState = DEFAULT_EXPANDED_PANELS;
+
+function isExpandedPanelsState(value: unknown): value is ExpandedPanelsState {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<Record<keyof ExpandedPanelsState, unknown>>;
+  return (
+    typeof candidate.uploadData === "boolean"
+    && typeof candidate.scrapeWebData === "boolean"
+    && typeof candidate.importFromHuggingFace === "boolean"
+  );
+}
+
+function readStoredExpandedPanels(): ExpandedPanelsState {
+  if (typeof window === "undefined") {
+    return persistedExpandedPanels;
+  }
+
+  try {
+    const storedValue = window.sessionStorage.getItem(EXPANDED_PANELS_STORAGE_KEY);
+    if (!storedValue) {
+      return DEFAULT_EXPANDED_PANELS;
+    }
+
+    const parsedValue = JSON.parse(storedValue) as unknown;
+    if (!isExpandedPanelsState(parsedValue)) {
+      return DEFAULT_EXPANDED_PANELS;
+    }
+
+    persistedExpandedPanels = parsedValue;
+    return parsedValue;
+  } catch {
+    return DEFAULT_EXPANDED_PANELS;
+  }
+}
+
+function writeStoredExpandedPanels(expandedPanels: ExpandedPanelsState): void {
+  persistedExpandedPanels = expandedPanels;
+
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(EXPANDED_PANELS_STORAGE_KEY, JSON.stringify(expandedPanels));
+  } catch {
+    // Panel expansion is ephemeral UI state, so unavailable session storage should not affect ingestion.
+  }
+}
+
 export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComplete }: ArtifactIngestionFeatureProps) {
-  const shouldPersistPanelState = client === undefined && ingestionClient === undefined;
-  const [expandedPanels, setExpandedPanels] = useState<ExpandedPanelsState>(shouldPersistPanelState ? persistedExpandedPanels : {
-    uploadData: false,
-    scrapeWebData: false,
-    importFromHuggingFace: false,
-  });
+  const [expandedPanels, setExpandedPanels] = useState<ExpandedPanelsState>(() => readStoredExpandedPanels());
 
   function togglePanel(panel: keyof typeof expandedPanels): void {
     setExpandedPanels((current) => ({
@@ -61,9 +110,8 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
   } = useArtifactUploadFeature(client, onUploadComplete);
 
   useEffect(() => {
-    if (!shouldPersistPanelState) return;
-    persistedExpandedPanels = expandedPanels;
-  }, [expandedPanels, shouldPersistPanelState]);
+    writeStoredExpandedPanels(expandedPanels);
+  }, [expandedPanels]);
 
   return (
     <section className="ui-stack ui-stack--sm">
