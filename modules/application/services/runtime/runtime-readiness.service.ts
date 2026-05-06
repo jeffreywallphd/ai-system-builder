@@ -1,6 +1,7 @@
 import {
   RUNTIME_CAPABILITY_IDS,
   createRuntimeCapabilityStatus,
+  normalizeRuntimeCapabilityId,
   type RuntimeCapabilityDependencyStatus,
   type RuntimeCapabilityId,
   type RuntimeCapabilityStatus,
@@ -21,6 +22,7 @@ export interface RuntimeCapabilityStatusProvider {
 
 export interface RuntimeReadinessServiceOptions {
   providers: readonly RuntimeCapabilityStatusProvider[];
+  capabilityIds?: readonly RuntimeCapabilityId[];
   now?: () => string;
 }
 
@@ -48,6 +50,12 @@ export interface DerivedRuntimeCapabilityStatusProviderOptions {
   now?: () => string;
 }
 
+export interface CompositeRuntimeCapabilityStatusProviderOptions {
+  capabilityId: RuntimeCapabilityId;
+  providers: readonly RuntimeCapabilityStatusProvider[];
+  now?: () => string;
+}
+
 const DEFAULT_NOW = () => new Date().toISOString();
 
 const SNAPSHOT_STATUS_PRIORITY: readonly RuntimeReadinessStatus[] = [
@@ -69,6 +77,17 @@ const DERIVED_BLOCKING_STATUS_PRIORITY: readonly RuntimeReadinessStatus[] = [
   "unavailable",
   "unknown",
   "degraded",
+  "ready",
+];
+
+const COMPOSITE_STATUS_PRIORITY: readonly RuntimeReadinessStatus[] = [
+  "failed",
+  "not-installed",
+  "installing",
+  "starting",
+  "unavailable",
+  "degraded",
+  "unknown",
   "ready",
 ];
 
@@ -178,13 +197,169 @@ export function mapRuntimeInstallStatusToReadinessStatus(
   }
 }
 
+function normalizeRuntimeCapabilityIds(
+  capabilityIds: readonly RuntimeCapabilityId[],
+): readonly RuntimeCapabilityId[] {
+  const normalized = capabilityIds.map((capabilityId) => normalizeRuntimeCapabilityId(capabilityId));
+  return Array.from(new Set(normalized));
+}
+
+function mergeDetails(
+  statuses: readonly RuntimeCapabilityStatus[],
+): Record<string, unknown> | undefined {
+  const details = Object.assign(
+    {},
+    ...statuses.map((status) => status.details ?? {}),
+  ) as Record<string, unknown>;
+  return Object.keys(details).length > 0 ? details : undefined;
+}
+
+function mergeDependencies(
+  statuses: readonly RuntimeCapabilityStatus[],
+): RuntimeCapabilityDependencyStatus[] | undefined {
+  const dependencies = statuses.flatMap((status) => status.dependencies ?? []);
+  return dependencies.length > 0 ? dependencies : undefined;
+}
+
+function mergeRecommendedActions(
+  statuses: readonly RuntimeCapabilityStatus[],
+  status: RuntimeReadinessStatus,
+): RuntimeReadinessAction[] | undefined {
+  const actions = new Set<RuntimeReadinessAction>();
+  for (const action of statusActions(status) ?? []) {
+    actions.add(action);
+  }
+  for (const capabilityStatus of statuses) {
+    for (const action of capabilityStatus.recommendedActions ?? []) {
+      actions.add(action);
+    }
+  }
+  return actions.size > 0 ? Array.from(actions) : undefined;
+}
+
+function selectCompositeReason(
+  statuses: readonly RuntimeCapabilityStatus[],
+  status: RuntimeReadinessStatus,
+): RuntimeCapabilityStatus["reason"] {
+  if (status === "ready") {
+    return undefined;
+  }
+  return statuses.find((capabilityStatus) => capabilityStatus.status === status && capabilityStatus.reason)?.reason
+    ?? statuses.find((capabilityStatus) => capabilityStatus.reason)?.reason;
+}
+
+function readInstallStatus(status: RuntimeCapabilityStatus): RuntimeInstallStatus | undefined {
+  const installStatus = status.details?.installStatus;
+  if (
+    installStatus === "not-installed"
+    || installStatus === "installing"
+    || installStatus === "checking"
+    || installStatus === "installed"
+    || installStatus === "update-available"
+    || installStatus === "failed"
+    || installStatus === "unknown"
+  ) {
+    return installStatus;
+  }
+  return undefined;
+}
+
+function supervisorStatusesForComposite(
+  statuses: readonly RuntimeCapabilityStatus[],
+): readonly RuntimeReadinessStatus[] {
+  return statuses
+    .filter((status) => readInstallStatus(status) === undefined)
+    .map((status) => status.status);
+}
+
+function combineInstallAndSupervisorStatus(
+  installStatus: RuntimeInstallStatus,
+  supervisorStatuses: readonly RuntimeReadinessStatus[],
+): RuntimeReadinessStatus {
+  switch (installStatus) {
+    case "failed":
+      return "failed";
+    case "not-installed":
+      return "not-installed";
+    case "installing":
+    case "checking":
+      return "installing";
+    case "installed":
+      return supervisorStatuses.length > 0
+        ? highestPriorityStatus(supervisorStatuses, COMPOSITE_STATUS_PRIORITY)
+        : "unknown";
+    case "update-available": {
+      const supervisorStatus = supervisorStatuses.length > 0
+        ? highestPriorityStatus(supervisorStatuses, COMPOSITE_STATUS_PRIORITY)
+        : "unknown";
+      return supervisorStatus === "ready" || supervisorStatus === "degraded"
+        ? "degraded"
+        : supervisorStatus;
+    }
+    case "unknown": {
+      const supervisorStatus = supervisorStatuses.length > 0
+        ? highestPriorityStatus(supervisorStatuses, COMPOSITE_STATUS_PRIORITY)
+        : "unknown";
+      return supervisorStatus === "ready" ? "degraded" : supervisorStatus;
+    }
+  }
+}
+
+function combineRuntimeCapabilityStatuses(
+  capabilityId: RuntimeCapabilityId,
+  statuses: readonly RuntimeCapabilityStatus[],
+  now: () => string,
+): RuntimeCapabilityStatus {
+  if (statuses.length === 0) {
+    return createRuntimeCapabilityStatus({
+      capabilityId,
+      status: "unknown",
+      summary: `No runtime readiness signals are composed for ${capabilityId}.`,
+      reason: {
+        code: "runtime.readiness.composite-empty",
+        message: `No runtime readiness signals are composed for ${capabilityId}.`,
+        category: "unknown",
+        retryable: false,
+      },
+      recommendedActions: ["configure"],
+      updatedAt: now(),
+    });
+  }
+
+  const installStatuses = statuses
+    .map(readInstallStatus)
+    .filter((status): status is RuntimeInstallStatus => Boolean(status));
+  const status = installStatuses.length > 0
+    ? combineInstallAndSupervisorStatus(installStatuses[0], supervisorStatusesForComposite(statuses))
+    : statuses.every((capabilityStatus) => capabilityStatus.status === "ready")
+      ? "ready"
+      : highestPriorityStatus(statuses.map((capabilityStatus) => capabilityStatus.status), COMPOSITE_STATUS_PRIORITY);
+
+  return createRuntimeCapabilityStatus({
+    capabilityId,
+    status,
+    summary: status === "ready"
+      ? `${capabilityId} readiness signals are ready.`
+      : `${capabilityId} readiness signals combine to ${status}.`,
+    reason: selectCompositeReason(statuses, status),
+    recommendedActions: mergeRecommendedActions(statuses, status),
+    details: mergeDetails(statuses),
+    dependencies: mergeDependencies(statuses),
+    updatedAt: now(),
+  });
+}
+
 export class RuntimeReadinessService implements RuntimeReadinessPort {
   private readonly providersByCapabilityId: Map<RuntimeCapabilityId, RuntimeCapabilityStatusProvider>;
+  private readonly snapshotCapabilityIds?: readonly RuntimeCapabilityId[];
   private readonly now: () => string;
 
   public constructor(options: RuntimeReadinessServiceOptions) {
     this.now = options.now ?? DEFAULT_NOW;
     this.providersByCapabilityId = new Map();
+    this.snapshotCapabilityIds = options.capabilityIds
+      ? normalizeRuntimeCapabilityIds(options.capabilityIds)
+      : undefined;
 
     for (const provider of options.providers) {
       if (this.providersByCapabilityId.has(provider.capabilityId)) {
@@ -220,8 +395,9 @@ export class RuntimeReadinessService implements RuntimeReadinessPort {
   }
 
   public async getReadinessSnapshot(): Promise<RuntimeReadinessSnapshot> {
+    const capabilityIds = this.snapshotCapabilityIds ?? this.defaultSnapshotCapabilityIds();
     const capabilities = await Promise.all(
-      RUNTIME_CAPABILITY_IDS.map((capabilityId) => this.getCapabilityStatus(capabilityId)),
+      capabilityIds.map((capabilityId) => this.getCapabilityStatus(capabilityId)),
     );
     const status = this.aggregateSnapshotStatus(capabilities);
     const available = capabilities.some(isCapabilityAvailable);
@@ -239,6 +415,11 @@ export class RuntimeReadinessService implements RuntimeReadinessPort {
       recommendedActions: recommendedActions.length > 0 ? recommendedActions : undefined,
       updatedAt: this.now(),
     };
+  }
+
+  private defaultSnapshotCapabilityIds(): readonly RuntimeCapabilityId[] {
+    const composedCapabilityIds = new Set(this.providersByCapabilityId.keys());
+    return RUNTIME_CAPABILITY_IDS.filter((capabilityId) => composedCapabilityIds.has(capabilityId));
   }
 
   private aggregateSnapshotStatus(capabilities: readonly RuntimeCapabilityStatus[]): RuntimeReadinessStatus {
@@ -359,6 +540,40 @@ export function createRuntimeInstallerCapabilityStatusProvider(
         recommendedActions: statusActions(status),
         updatedAt: now(),
       });
+    },
+  };
+}
+
+export function createCompositeRuntimeCapabilityStatusProvider(
+  options: CompositeRuntimeCapabilityStatusProviderOptions,
+): RuntimeCapabilityStatusProvider {
+  if (options.providers.length === 0) {
+    throw new Error(
+      `Composite provider for '${options.capabilityId}' requires at least one signal provider.`,
+    );
+  }
+  for (const provider of options.providers) {
+    if (provider.capabilityId !== options.capabilityId) {
+      throw new Error(
+        `Composite provider for '${options.capabilityId}' received signal provider for '${provider.capabilityId}'.`,
+      );
+    }
+  }
+
+  const now = options.now ?? DEFAULT_NOW;
+  return {
+    capabilityId: options.capabilityId,
+    async getStatus() {
+      const statuses = await Promise.all(
+        options.providers.map(async (provider) => {
+          try {
+            return await provider.getStatus();
+          } catch (error) {
+            return providerFailureStatus(options.capabilityId, error, now);
+          }
+        }),
+      );
+      return combineRuntimeCapabilityStatuses(options.capabilityId, statuses, now);
     },
   };
 }
