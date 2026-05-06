@@ -56,24 +56,27 @@ describe("registerImageGenerationIpc", () => {
     expect(JSON.stringify(response)).not.toContain("/tmp/secret");
   });
 
-  it("does not apply readiness mapping to read cancel or finalize paths", async () => {
+  it("sanitizes internal read cancel and finalize failures", async () => {
     const { map, ipcMain } = handlers();
     registerImageGenerationIpc({
       ipcMain,
       generateImageUseCase: {
         startImageGeneration: testDouble.fn(),
-        readImageGeneration: testDouble.fn(async () => { throw new Error("read raw failure"); }),
-        cancelImageGeneration: testDouble.fn(async () => { throw new Error("cancel raw failure"); }),
+        readImageGeneration: testDouble.fn(async () => { throw new Error("read raw failure at /tmp/secret\nstack trace"); }),
+        cancelImageGeneration: testDouble.fn(async () => { throw new Error("cancel raw failure at C:\\tmp\\secret"); }),
       },
-      imageGenerationFinalizationOrchestrator: { finalizeIfCompleted: testDouble.fn(async () => { throw new Error("finalize raw failure"); }) },
+      imageGenerationFinalizationOrchestrator: { finalizeIfCompleted: testDouble.fn(async () => { throw new Error("finalize raw failure at /var/tmp/secret"); }) },
     });
 
     const read = await map.get("ipc.image-generation.read.request")({}, createDesktopImageGenerationReadRequest({ requestId: "r1" }));
     const cancel = await map.get("ipc.image-generation.cancel.request")({}, createDesktopImageGenerationCancelRequest({ requestId: "r1" }));
     const finalize = await map.get("ipc.image-generation.finalize-if-completed.request")({}, createDesktopImageGenerationFinalizeRequest({ requestId: "r1" }));
 
-    expect(read.error).toMatchObject({ code: "internal", message: "read raw failure" });
-    expect(cancel.error).toMatchObject({ code: "internal", message: "cancel raw failure" });
-    expect(finalize.error).toMatchObject({ code: "internal", message: "finalize raw failure" });
+    expect(read.error).toMatchObject({ code: "internal", message: "Image generation request failed." });
+    expect(cancel.error).toMatchObject({ code: "internal", message: "Image generation request failed." });
+    expect(finalize.error).toMatchObject({ code: "internal", message: "Image generation request failed." });
+    expect(JSON.stringify({ read, cancel, finalize })).not.toContain("/tmp/secret");
+    expect(JSON.stringify({ read, cancel, finalize })).not.toContain("C:\\tmp\\secret");
+    expect(JSON.stringify({ read, cancel, finalize })).not.toContain("stack trace");
   });
 });

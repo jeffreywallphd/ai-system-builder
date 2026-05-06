@@ -120,5 +120,5 @@ No automatic trust-store installation is performed. Trust installation is manual
 ## Runtime readiness API security
 
 - Runtime-backed feature-start guard failures may include `capabilityId`, readiness `status`, safe `summary`, `reason.code`, `reason.category`, and `recommendedActions`; they must not include stack traces, paths, env values, secrets, tokens, command lines, raw adapter payloads, or raw exception messages.
-- Runtime readiness API and IPC internal failures must remain sanitized: no stack traces, filesystem/temp paths, secrets, tokens, raw environment values, command lines, raw adapter details, or process internals in response payloads.
+- Runtime readiness API and IPC internal failures must remain sanitized: no stack traces, filesystem/temp paths, secrets, tokens, raw environment values, command lines, raw adapter details, or process internals in response payloads. Runtime/model/image-generation API and IPC adapters should use generic messages for unexpected internal failures while preserving safe structured runtime-unavailable guard details.
 - Readiness reads are informational and must not mutate runtime state by starting, installing, repairing, or probing heavy sidecars.

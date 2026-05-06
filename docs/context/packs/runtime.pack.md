@@ -31,12 +31,12 @@
 - Keep runtime-specific mechanics out of domain/application logic.
 - Treat Python as an adapter path, not a co-equal architecture center.
 - Define or update runtime contracts before adding runtime-specific behavior.
-- Runtime readiness describes capability availability before/around execution; the Runtime Task Registry remains the lifecycle authority for accepted long-running tasks. Runtime-backed feature starts should guard the derived feature capability when available, reject non-ready statuses as unavailable before task creation, and leave task read/cancel/list/status semantics to the registry. Rejected starts should not return pollable task ids.
+- Runtime readiness describes capability availability before/around execution; the Runtime Task Registry remains the lifecycle authority for accepted long-running tasks. Runtime-backed feature starts should guard the derived feature capability when available, reject non-ready statuses as unavailable before task creation, and leave task read/cancel/list/status semantics to the registry. Rejected starts should not return pollable task ids. Model publishing has a composed readiness capability today, but desktop/server intentionally report it as unavailable/not implemented until a runtime task implementation exists.
 
 ## Runtime readiness vocabulary
 
 - Shared readiness contracts live under `modules/contracts/runtime/` and are exported from the runtime family barrel.
-- Capability ids currently cover Python runtime, ComfyUI runtime, image generation, dataset preparation, model training, model validation, and model publishing.
+- Capability ids currently cover Python runtime, ComfyUI runtime, image generation, dataset preparation, model training, model validation, and model publishing; model publishing is explicitly unavailable/not implemented in current desktop/server composition.
 - Readiness status/action values are shared vocabulary for host/API/IPC/UI mapping; transports wrap these contracts rather than redefining them.
 - The application runtime readiness service translates composed host-owned provider signals (for example supervisor health or installer status readers) into readiness snapshots using this vocabulary.
 - A single readiness snapshot should use snapshot-scoped capability resolution: each top-level capability provider is read at most once, and derived feature dependency statuses should match the capability statuses resolved for that same snapshot.

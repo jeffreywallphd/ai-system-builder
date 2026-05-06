@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type {
   CancelRuntimeTaskResult,
   RuntimeTaskRecord,
+  RuntimeTaskStatusRecord,
   RuntimeTaskStatus,
   StartRuntimeTaskRequest,
   StartRuntimeTaskResult,
@@ -91,12 +92,12 @@ export function createPythonRuntimeTaskRegistryAdapter(
         metadata: request.metadata,
       });
     },
-    async getTaskStatus(requestId: string): Promise<RuntimeTaskRecord> {
+    async getTaskStatus(requestId: string): Promise<RuntimeTaskStatusRecord> {
       const status = await runtimePort.readTaskStatus(requestId);
       if (status.status === "unknown" && !status.taskType) {
         return {
+          recordType: "not-found",
           requestId: status.requestId,
-          taskType: "unknown" as unknown as TaskType,
           status: "unknown",
           concurrencyClass: "unknown",
           error: {

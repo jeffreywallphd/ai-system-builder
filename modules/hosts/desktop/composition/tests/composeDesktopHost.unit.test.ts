@@ -333,8 +333,8 @@ describe("composeDesktopHost", () => {
       "model-publishing",
     ]);
     expect(snapshot.capabilities.find((capability) => capability.capabilityId === "model-publishing")).toMatchObject({
-      status: "unknown",
-      reason: { code: "runtime.readiness.provider-missing" },
+      status: "unavailable",
+      reason: { code: "runtime.model-publishing.not-implemented", category: "unavailable" },
     });
     expect(calls).toContain("read-python-status");
     expect(calls).toContain("read-comfyui-install-status");
@@ -613,6 +613,16 @@ describe("desktop host composition decomposition", () => {
 
     expect(hostSource).toContain("./composeDesktopRuntimeReadiness");
     expect(helperSource).toContain("RuntimeReadinessService");
+    expect(helperSource).not.toContain("ipc-electron");
+    expect(helperSource).not.toContain("registerElectronIpc");
+  });
+
+  it("keeps runtime task registry routing in a focused helper without IPC transport imports", () => {
+    const hostSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopHost.ts"), "utf8");
+    const helperSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopRuntimeTaskRegistry.ts"), "utf8");
+
+    expect(hostSource).toContain("./composeDesktopRuntimeTaskRegistry");
+    expect(helperSource).toContain("createRuntimeTaskRegistryRouter");
     expect(helperSource).not.toContain("ipc-electron");
     expect(helperSource).not.toContain("registerElectronIpc");
   });

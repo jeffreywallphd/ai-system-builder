@@ -1,12 +1,12 @@
 import { describe, expect, it, testDouble } from "../../../testing/node-test";
 import type { RuntimeTaskRegistryPort } from "../../../application/ports/runtime";
-import { TaskType, type RuntimeTaskListRequest, type RuntimeTaskListResult, type RuntimeTaskRecord } from "../../../contracts/runtime";
+import { TaskType, type RuntimeTaskListRequest, type RuntimeTaskListResult, type RuntimeTaskRecord, type RuntimeTaskStatusRecord } from "../../../contracts/runtime";
 import { createRuntimeTaskRegistryRouter } from "../createRuntimeTaskRegistryRouter";
 
 function createRegistryStub(overrides: Partial<RuntimeTaskRegistryPort> = {}): RuntimeTaskRegistryPort {
   return {
     startTask: testDouble.fn(async (request) => ({ requestId: request.requestId ?? `${request.taskType}-1`, status: "queued" })),
-    getTaskStatus: testDouble.fn(async (requestId) => ({ requestId, taskType: TaskType.IMAGE_GENERATION, status: "unknown", concurrencyClass: "unknown", error: { code: "runtime_task_not_found", message: "missing" } } as RuntimeTaskRecord)),
+    getTaskStatus: testDouble.fn(async (requestId) => ({ recordType: "not-found", requestId, status: "unknown", concurrencyClass: "unknown", error: { code: "runtime_task_not_found", message: "missing", retryable: false } } as RuntimeTaskStatusRecord)),
     cancelTask: testDouble.fn(async (requestId) => ({ requestId, cancelled: false, status: "unknown", message: "Runtime task was not found in this task registry delegate." })),
     listTasks: testDouble.fn(async () => ({ tasks: [] })),
     ...overrides,
@@ -61,10 +61,12 @@ describe("createRuntimeTaskRegistryRouter", () => {
     const router = createRuntimeTaskRegistryRouter({ image: createRegistryStub(), python: createRegistryStub() });
     const record = await router.getTaskStatus("missing");
     expect(record).toMatchObject({
+      recordType: "not-found",
       requestId: "missing",
       status: "unknown",
       error: { code: "runtime_task_not_found" },
     });
+    expect("taskType" in record).toBe(false);
   });
 
   it("cancelTask uses known correlation when available", async () => {

@@ -37,6 +37,27 @@ function createMissingComfyUiSupervisorProvider(now: () => string): RuntimeCapab
   };
 }
 
+function createUnavailableModelPublishingProvider(now: () => string): RuntimeCapabilityStatusProvider {
+  return {
+    capabilityId: "model-publishing",
+    getStatus() {
+      return createRuntimeCapabilityStatus({
+        capabilityId: "model-publishing",
+        status: "unavailable",
+        summary: "Model publishing runtime execution is not implemented on this desktop host.",
+        reason: {
+          code: "runtime.model-publishing.not-implemented",
+          message: "Model publishing readiness is explicit but unavailable until a runtime task implementation is composed.",
+          category: "unavailable",
+          retryable: false,
+        },
+        recommendedActions: ["configure"],
+        updatedAt: now(),
+      });
+    },
+  };
+}
+
 export interface CreateDesktopRuntimeReadinessServiceOptions {
   readPythonSupervisorState: () => "stopped" | "starting" | "ready" | "failed";
   readComfyUiLifecycleState: () => ComfyUiRuntimeLifecycleState | "uninitialized" | Promise<ComfyUiRuntimeLifecycleState | "uninitialized">;
@@ -134,6 +155,7 @@ export function createDesktopRuntimeReadinessService(
       readDependencyStatus,
       now,
     }),
+    createUnavailableModelPublishingProvider(now),
   ];
 
   for (const provider of derivedProviders) {

@@ -68,6 +68,13 @@ function mapFailureCode(error: unknown): "internal" | "validation" | "not-found"
   return "internal";
 }
 
+function safeFailureMessage(code: "internal" | "validation" | "not-found" | "unavailable", error: unknown): string {
+  if (code === "unavailable") return "Required runtime capability is not ready.";
+  if (code === "validation") return error instanceof Error ? error.message : "Request validation failed.";
+  if (code === "not-found") return "Image generation request was not found.";
+  return "Image generation request failed.";
+}
+
 export function registerImageGenerationApiRoutes(dependencies: RegisterImageGenerationApiRoutesDependencies): void {
   dependencies.app.post("/api/image-generation/start", async (request, response) => {
     const context = contextFrom(request);
@@ -77,8 +84,8 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
       const unavailable = isRuntimeCapabilityUnavailableError(error);
-      const message = unavailable ? "Required runtime capability is not ready." : (error instanceof Error ? error.message : "Unexpected error.");
-      const apiResponse = failure(API_IMAGE_GENERATION_START_OPERATION, unavailable ? "unavailable" : mapFailureCode(error), message, context, unavailable ? error.details : undefined);
+      const code = unavailable ? "unavailable" : mapFailureCode(error);
+      const apiResponse = failure(API_IMAGE_GENERATION_START_OPERATION, code, safeFailureMessage(code, error), context, unavailable ? error.details : undefined);
       response.status(statusCode(apiResponse)).json(apiResponse);
     }
   });
@@ -90,8 +97,8 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_READ_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unexpected error.";
-      const apiResponse = failure(API_IMAGE_GENERATION_READ_OPERATION, mapFailureCode(error), message, context);
+      const code = mapFailureCode(error);
+      const apiResponse = failure(API_IMAGE_GENERATION_READ_OPERATION, code, safeFailureMessage(code, error), context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     }
   });
@@ -103,8 +110,8 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_CANCEL_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unexpected error.";
-      const apiResponse = failure(API_IMAGE_GENERATION_CANCEL_OPERATION, mapFailureCode(error), message, context);
+      const code = mapFailureCode(error);
+      const apiResponse = failure(API_IMAGE_GENERATION_CANCEL_OPERATION, code, safeFailureMessage(code, error), context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     }
   });
@@ -123,8 +130,8 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_FINALIZE_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unexpected error.";
-      const apiResponse = failure(API_IMAGE_GENERATION_FINALIZE_OPERATION, mapFailureCode(error), message, context);
+      const code = mapFailureCode(error);
+      const apiResponse = failure(API_IMAGE_GENERATION_FINALIZE_OPERATION, code, safeFailureMessage(code, error), context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     }
   });
@@ -141,8 +148,8 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_UNLOAD_MODEL_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unexpected error.";
-      const apiResponse = failure(API_IMAGE_GENERATION_UNLOAD_MODEL_OPERATION, mapFailureCode(error), message, context);
+      const code = mapFailureCode(error);
+      const apiResponse = failure(API_IMAGE_GENERATION_UNLOAD_MODEL_OPERATION, code, safeFailureMessage(code, error), context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     }
   });
@@ -154,8 +161,8 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_RUNTIME_RESOURCES_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unexpected error.";
-      const apiResponse = failure(API_IMAGE_GENERATION_RUNTIME_RESOURCES_OPERATION, mapFailureCode(error), message, context);
+      const code = mapFailureCode(error);
+      const apiResponse = failure(API_IMAGE_GENERATION_RUNTIME_RESOURCES_OPERATION, code, safeFailureMessage(code, error), context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     }
   });
