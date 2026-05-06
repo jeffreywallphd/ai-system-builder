@@ -2,7 +2,7 @@ import type { ImageGenerationRequest } from "../../../contracts/image-generation
 import {
   TaskType,
   type CancelRuntimeTaskResult,
-  type RuntimeTaskRecord,
+  type RuntimeTaskStatusRecord,
   type StartRuntimeTaskResult,
 } from "../../../contracts/runtime";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
@@ -59,7 +59,7 @@ export class GenerateImageUseCase {
     return result;
   }
 
-  public async readImageGeneration(requestId: string, _context?: ApplicationRequestContext): Promise<RuntimeTaskRecord> {
+  public async readImageGeneration(requestId: string, _context?: ApplicationRequestContext): Promise<RuntimeTaskStatusRecord> {
     return this.dependencies.runtimeTaskRegistry.getTaskStatus(requestId);
   }
 

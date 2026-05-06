@@ -71,7 +71,6 @@ import {
 } from "../../../adapters/runtime/comfyui";
 import { createComfyUiRuntimeInstaller } from "../../../adapters/runtime/installer/comfyui/createComfyUiRuntimeInstaller";
 import { createGitRuntimeInstallerAdapter } from "../../../adapters/runtime/installer/git/createGitRuntimeInstallerAdapter";
-import { createRuntimeTaskRegistryRouter } from "../../../adapters/runtime/createRuntimeTaskRegistryRouter";
 import { createElectronPowerSuspensionBlocker } from "../../../adapters/runtime/electron";
 import {
   createFilesystemArtifactBrowserReadAdapter,
@@ -104,6 +103,7 @@ import {
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 import type { PowerSuspensionBlockerPort } from "../../../application/ports/desktop";
 import { createDesktopRuntimeReadinessService } from "./composeDesktopRuntimeReadiness";
+import { createDesktopRuntimeTaskRegistry } from "./composeDesktopRuntimeTaskRegistry";
 import type { RuntimeInstallerPort } from "../../../application/ports/runtime-installer";
 import type { DesktopPythonRuntimeLogEntry, DesktopPythonRuntimeStatusPayload } from "../../../contracts/ipc";
 import {
@@ -876,7 +876,7 @@ export function composeDesktopHost(
         },
         mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT },
       });
-      const runtimeTaskRegistry = createRuntimeTaskRegistryRouter({ python: pythonRuntimeTaskRegistry, image: comfyUiRuntimeTaskRegistry });
+      const runtimeTaskRegistry = createDesktopRuntimeTaskRegistry({ pythonRuntimeTaskRegistry, imageRuntimeTaskRegistry: comfyUiRuntimeTaskRegistry });
 
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,

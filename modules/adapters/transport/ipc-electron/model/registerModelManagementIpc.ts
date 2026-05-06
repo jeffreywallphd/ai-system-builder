@@ -98,12 +98,13 @@ function toFailureResponse<
   error: unknown,
   request: { requestId?: string; correlationId?: string },
 ): TResponse {
+  const unavailable = isRuntimeCapabilityUnavailableError(error);
   return createIpcFailureResponse(
     createIpcError(
       channel,
-      isRuntimeCapabilityUnavailableError(error) ? "unavailable" : "internal",
-      isRuntimeCapabilityUnavailableError(error) ? "Required runtime capability is not ready." : (error instanceof Error ? error.message : "Unexpected IPC model handler failure."),
-      { details: isRuntimeCapabilityUnavailableError(error) ? error.details : undefined, requestId: request.requestId, correlationId: request.correlationId },
+      unavailable ? "unavailable" : "internal",
+      unavailable ? "Required runtime capability is not ready." : "Model management request failed.",
+      { details: unavailable ? error.details : undefined, requestId: request.requestId, correlationId: request.correlationId },
     ),
   ) as TResponse;
 }

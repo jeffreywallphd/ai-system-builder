@@ -1,5 +1,5 @@
 import type { RuntimeTaskRegistryPort } from "../../application/ports/runtime";
-import { TaskType, type CancelRuntimeTaskResult, type RuntimeTaskListRequest, type RuntimeTaskListResult, type RuntimeTaskRecord, type StartRuntimeTaskRequest, type StartRuntimeTaskResult } from "../../contracts/runtime";
+import { TaskType, type CancelRuntimeTaskResult, type RuntimeTaskListRequest, type RuntimeTaskListResult, type RuntimeTaskRecord, type RuntimeTaskStatusRecord, type StartRuntimeTaskRequest, type StartRuntimeTaskResult } from "../../contracts/runtime";
 
 export function createRuntimeTaskRegistryRouter(delegates: { image: RuntimeTaskRegistryPort; python: RuntimeTaskRegistryPort }): RuntimeTaskRegistryPort {
   if (!delegates?.image || !delegates?.python) throw new Error("createRuntimeTaskRegistryRouter requires both image and python delegates.");
@@ -13,9 +13,9 @@ export function createRuntimeTaskRegistryRouter(delegates: { image: RuntimeTaskR
   };
 
   const requestToTaskType = new Map<string, TaskType>();
-  const unknown = (requestId: string, reason: string): RuntimeTaskRecord => ({
+  const unknown = (requestId: string, reason: string): RuntimeTaskStatusRecord => ({
+    recordType: "not-found",
     requestId,
-    taskType: "unknown" as unknown as TaskType,
     status: "unknown",
     concurrencyClass: "unknown",
     error: {
@@ -60,10 +60,12 @@ export function createRuntimeTaskRegistryRouter(delegates: { image: RuntimeTaskR
     return { ...request, taskTypes };
   };
 
-  const isExplicitNotFoundRecord = (record: RuntimeTaskRecord): boolean => record.status === "unknown"
+  const isExplicitNotFoundRecord = (record: RuntimeTaskStatusRecord): boolean => record.status === "unknown"
     && (record.error?.code === "runtime_task_not_found"
       || record.error?.code === "comfyui_task_not_found"
       || record.error?.code === "python_runtime_task_not_found");
+
+  const isRuntimeTaskRecord = (record: RuntimeTaskStatusRecord): record is RuntimeTaskRecord => "taskType" in record;
 
   return {
     async startTask(request: StartRuntimeTaskRequest): Promise<StartRuntimeTaskResult> {
@@ -72,17 +74,17 @@ export function createRuntimeTaskRegistryRouter(delegates: { image: RuntimeTaskR
       requestToTaskType.set(result.requestId, request.taskType);
       return result;
     },
-    async getTaskStatus(requestId: string): Promise<RuntimeTaskRecord> {
+    async getTaskStatus(requestId: string): Promise<RuntimeTaskStatusRecord> {
       const taskType = requestToTaskType.get(requestId);
       if (taskType) {
         return taskTypeDelegates[taskType].getTaskStatus(requestId);
       }
 
-      const notFoundRecords: RuntimeTaskRecord[] = [];
+      const notFoundRecords: RuntimeTaskStatusRecord[] = [];
       for (const delegate of delegateEntries) {
         try {
           const record = await delegate.registry.getTaskStatus(requestId);
-          if (!isExplicitNotFoundRecord(record)) {
+          if (!isExplicitNotFoundRecord(record) && isRuntimeTaskRecord(record)) {
             requestToTaskType.set(requestId, record.taskType);
             return record;
           }

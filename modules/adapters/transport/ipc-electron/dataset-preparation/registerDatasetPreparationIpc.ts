@@ -2,7 +2,7 @@ import type {
   PrepareTrainingDatasetFromArtifactsCommand,
 } from "../../../../application/use-cases";
 import type { ContractResult } from "../../../../contracts/shared";
-import type { RuntimeTaskRecord } from "../../../../contracts/runtime";
+import type { RuntimeTaskProgress, RuntimeTaskStatusRecord } from "../../../../contracts/runtime";
 import {
   DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL,
   DESKTOP_DATASET_PREPARE_TRAINING_START_RESPONSE_CHANNEL,
@@ -27,7 +27,7 @@ import {
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
 type StartResultValue = { requestId: string; taskType: string; accepted: true; status: "queued" | "running"; startedAt?: string; updatedAt?: string; metadata?: Record<string, unknown> };
-type RuntimeTaskStatusReadResult = RuntimeTaskRecord & {
+type RuntimeTaskStatusReadResult = RuntimeTaskStatusRecord & {
   message?: string;
 };
 type ReadResultValue = RuntimeTaskStatusReadResult | { requestId: string; taskType: string; status: "succeeded"; result: DesktopPrepareTrainingDatasetFinalResult; startedAt?: string; updatedAt?: string; completedAt?: string };
@@ -40,7 +40,7 @@ export interface PrepareTrainingDatasetFromArtifactsUseCasePort {
 }
 export interface RegisterDatasetPreparationIpcDependencies { ipcMain: IpcMainHandlePort; prepareTrainingDatasetUseCase: PrepareTrainingDatasetFromArtifactsUseCasePort; }
 
-function mapTaskProgress(progress: RuntimeTaskRecord["progress"]): { message?: string; processed?: number; total?: number } | undefined {
+function mapTaskProgress(progress: RuntimeTaskProgress | undefined): { message?: string; processed?: number; total?: number } | undefined {
   if (!progress) {
     return undefined;
   }
@@ -76,7 +76,7 @@ function mapTaskError(value: RuntimeTaskStatusReadResult): { code?: string; mess
 }
 
 function mapPrepareTrainingDatasetTaskStatusToIpcValue(value: ReadResultValue): DesktopPrepareTrainingDatasetTaskReadSuccessValue {
-  const shared = { requestId: value.requestId, taskType: value.taskType, startedAt: value.startedAt, updatedAt: value.updatedAt };
+  const shared = { requestId: value.requestId, taskType: "taskType" in value ? value.taskType : undefined, startedAt: value.startedAt, updatedAt: value.updatedAt };
   if (value.status === "succeeded") {
     if ("result" in value) {
       return { ...shared, status: "succeeded", result: value.result, completedAt: value.completedAt };

@@ -25,14 +25,14 @@ Hosts are implemented under `modules/hosts/` and surfaced through `apps/*` entry
   - renderer: React UI composition only (no filesystem or IPC internals),
   - host composition (`modules/hosts/desktop`): adapter/use-case wiring.
 - Desktop artifact publish/verification uses the same shared application use case path as server/thin-client (`PublishArtifactToRepoUseCase`, `VerifyPublishedArtifactBackingUseCase`) and is exposed through preload+IPC transport wiring rather than renderer-side orchestration.
-- Desktop host composition may use focused helper modules for runtime readiness, storage, model management, image generation, and transport registration, but those helpers remain composition-only wiring seams and must not absorb business policy, runtime protocol logic, or IPC payload shaping.
+- Desktop host composition may use focused helper modules for runtime readiness, storage, model management, image generation, and transport registration, but those helpers remain composition-only wiring seams and must not absorb business policy, runtime protocol logic, or IPC payload shaping. Phase 1 extracted runtime readiness helpers plus small runtime-task-registry wiring helpers; broader storage/model/image-generation decomposition remains future cleanup unless completed in a later change.
 
 ## Server host
 
 - Owns server process lifecycle and composition.
 - Uses transport adapters (default: Express) for API exposure.
 - Keeps route/controller logic thin and delegates use-case behavior inward.
-- Server host composition may use focused helper modules for runtime readiness, storage, model management, image generation, and API registration, but those helpers remain composition-only wiring seams and must not absorb business policy, runtime protocol logic, or Express payload shaping.
+- Server host composition may use focused helper modules for runtime readiness, storage, model management, image generation, and API registration, but those helpers remain composition-only wiring seams and must not absorb business policy, runtime protocol logic, or Express payload shaping. Phase 1 extracted runtime readiness helpers plus small runtime-task-registry wiring helpers; broader storage/model/image-generation decomposition remains future cleanup unless completed in a later change.
 
 ## Why hosts are separate from transport adapters
 

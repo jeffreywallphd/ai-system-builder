@@ -60,6 +60,16 @@ describe("registerModelManagementApiRoutes",()=>{
     registerModelManagementApiRoutes({app,logger,browseModelsUseCase:{execute:testDouble.fn(async()=>{throw {code:'unavailable',message:'hf down'};})},getModelDetailsUseCase:{execute:testDouble.fn(async()=>({}))},listModelsUseCase:{execute:testDouble.fn(async()=>({models:[]}))},saveModelReferenceUseCase:{execute:testDouble.fn(async()=>({}))},downloadModelUseCase:{execute:testDouble.fn(async()=>({}))},updateModelRecordUseCase:{execute:testDouble.fn(async()=>({}))},deleteModelRecordUseCase:{execute:testDouble.fn(async()=>({}))}});
     await handlers.get('/api/model/browse')({body:{provider:'huggingface',query:'flux'},headers:{}},response().res);
     const warnCalls = logger.warn.mock.calls;
-    expect(warnCalls.some((call:any[]) => call[0]==='api.model.request.failed' && call[1]?.operation==='model.browse' && call[1]?.code==='unavailable' && call[1]?.message==='hf down')).toBe(true);
+    expect(warnCalls.some((call:any[]) => call[0]==='api.model.request.failed' && call[1]?.operation==='model.browse' && call[1]?.code==='unavailable' && call[1]?.message==='Required runtime capability is not ready.')).toBe(true);
+  });
+
+  it("sanitizes internal model API failures", async()=>{
+    const handlers=new Map<string,any>(); const app:ModelManagementExpressRoutePort={post:testDouble.fn((p,h)=>handlers.set(p,h))};
+    registerModelManagementApiRoutes({app,browseModelsUseCase:{execute:testDouble.fn(async()=>{throw new Error('raw model failure at /tmp/secret\nstack trace');})},getModelDetailsUseCase:{execute:testDouble.fn(async()=>({}))},listModelsUseCase:{execute:testDouble.fn(async()=>({models:[]}))},saveModelReferenceUseCase:{execute:testDouble.fn(async()=>({}))},downloadModelUseCase:{execute:testDouble.fn(async()=>({}))},updateModelRecordUseCase:{execute:testDouble.fn(async()=>({}))},deleteModelRecordUseCase:{execute:testDouble.fn(async()=>({}))}});
+    const out=response(); await handlers.get('/api/model/browse')({body:{provider:'huggingface',query:'flux'},headers:{}},out.res);
+    expect(out.status).toHaveBeenCalledWith(500);
+    expect(out.json.mock.calls[0]?.[0]).toMatchObject({ok:false,error:{code:'internal',message:'Model management request failed.'}});
+    expect(JSON.stringify(out.json.mock.calls[0]?.[0])).not.toContain('/tmp/secret');
+    expect(JSON.stringify(out.json.mock.calls[0]?.[0])).not.toContain('stack trace');
   });
 });

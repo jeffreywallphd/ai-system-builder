@@ -11,6 +11,7 @@ import type { HuggingFaceFetchImplementation } from "../../../../adapters/storag
 
 import {
   composeServerHost,
+  createServerRuntimeReadinessService,
   resolveServerComfyUiInstallRoot,
   resolveServerComfyUiLaunchPythonExecutable,
   resolveServerComfyUiPythonEnvironmentMode,
@@ -200,6 +201,21 @@ describe("composeServerHost", () => {
       "/api/runtime/readiness",
       "/api/runtime/capabilities/:capabilityId",
     ]);
+  });
+
+  it("builds server model-publishing readiness as explicit unavailable, not missing", async () => {
+    const service = createServerRuntimeReadinessService({
+      pythonSupervisor: { getStatus: () => "ready" },
+      readComfyUiSupervisor: () => undefined,
+      readComfyUiInstallStatus: async () => "installed" as const,
+      now: () => "2026-05-06T00:00:00.000Z",
+    });
+
+    const snapshot = await service.getReadinessSnapshot();
+    expect(snapshot.capabilities.find((capability) => capability.capabilityId === "model-publishing")).toMatchObject({
+      status: "unavailable",
+      reason: { code: "runtime.model-publishing.not-implemented", category: "unavailable" },
+    });
   });
 
   it("wires Hugging Face browse use-cases to the dedicated Hugging Face adapter seam", () => {
@@ -461,6 +477,16 @@ describe("server host composition decomposition", () => {
 
     expect(hostSource).toContain("./composeServerRuntimeReadiness");
     expect(helperSource).toContain("RuntimeReadinessService");
+    expect(helperSource).not.toContain("api-express");
+    expect(helperSource).not.toContain("registerExpressApi");
+  });
+
+  it("keeps image-generation runtime task registry wiring in a focused helper without Express transport imports", () => {
+    const hostSource = readFileSync(resolve("modules/hosts/server/composition/composeServerHost.ts"), "utf8");
+    const helperSource = readFileSync(resolve("modules/hosts/server/composition/composeServerImageGenerationRuntimeTaskRegistry.ts"), "utf8");
+
+    expect(hostSource).toContain("./composeServerImageGenerationRuntimeTaskRegistry");
+    expect(helperSource).toContain("createComfyUiImageGenerationRuntimeAdapter");
     expect(helperSource).not.toContain("api-express");
     expect(helperSource).not.toContain("registerExpressApi");
   });

@@ -19,7 +19,7 @@ Use this pack when prompt scope includes long-running runtime-backed tasks (data
 ## Progress + Status Source of Truth
 
 - Use structured task status/progress from registry contracts.
-- Unknown `requestId` reads/cancels must be explicit not-found/unknown results with structured reason metadata or task errors; do not return synthetic records that imply accepted work.
+- Unknown `requestId` reads/cancels must be explicit not-found/unknown results with structured reason metadata or task errors, using `recordType: "not-found"` when no valid task family is known; do not return synthetic records that imply accepted work, and do not cast `"unknown"` into `TaskType` when the task family is not known.
 - Registry routers may recover missing in-process correlation by asking safe delegates, but status/cancel/list reads must not start, install, repair, or heavy-probe runtimes.
 - `listTasks` should aggregate delegates that can list current-process records and report unsupported delegate families as warnings/metadata instead of failing the whole aggregate read generically.
 - Logs remain useful diagnostics but should not be primary UI state source.

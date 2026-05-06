@@ -68,10 +68,10 @@ describe("registerModelManagementIpc", () => {
     expect(response.ok).toBe(true);
   });
 
-  it("maps handler errors to failure envelope", async () => {
+  it("sanitizes handler internal errors in failure envelopes", async () => {
     const handler = createBrowseModelsIpcHandler({
       execute: testDouble.fn(async () => {
-        throw new Error("browse failed");
+        throw new Error("browse failed at /tmp/secret\nstack trace");
       }),
     });
 
@@ -85,8 +85,10 @@ describe("registerModelManagementIpc", () => {
       channel: DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL.value,
       requestId: "req-model-browse",
       correlationId: "corr-model-browse",
-      error: { code: "internal", message: "browse failed" },
+      error: { code: "internal", message: "Model management request failed." },
     });
+    expect(JSON.stringify(response)).not.toContain("/tmp/secret");
+    expect(JSON.stringify(response)).not.toContain("stack trace");
   });
 });
 

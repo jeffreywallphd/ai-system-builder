@@ -18,3 +18,17 @@ export interface RuntimeTaskRecord {
   updatedAt?: string;
   completedAt?: string;
 }
+
+export interface RuntimeTaskNotFoundRecord {
+  recordType: "not-found";
+  requestId: string;
+  status: "unknown";
+  concurrencyClass: "unknown";
+  error: RuntimeTaskError & {
+    retryable: false;
+  };
+  metadata?: Record<string, unknown>;
+  updatedAt?: string;
+}
+
+export type RuntimeTaskStatusRecord = RuntimeTaskRecord | RuntimeTaskNotFoundRecord;

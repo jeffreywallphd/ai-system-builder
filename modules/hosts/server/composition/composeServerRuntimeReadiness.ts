@@ -62,18 +62,18 @@ function createMissingComfyUiSupervisorStatusProvider(
   };
 }
 
-function createUnknownModelPublishingStatusProvider(options: { now?: () => string }): RuntimeCapabilityStatusProvider {
+function createUnavailableModelPublishingStatusProvider(options: { now?: () => string }): RuntimeCapabilityStatusProvider {
   return {
     capabilityId: "model-publishing",
     getStatus() {
       return createRuntimeCapabilityStatus({
         capabilityId: "model-publishing",
-        status: "unknown",
-        summary: "Model publishing runtime readiness is not implemented on this server host.",
+        status: "unavailable",
+        summary: "Model publishing runtime execution is not implemented on this server host.",
         reason: {
           code: "runtime.model-publishing.not-implemented",
-          message: "Model publishing runtime readiness is not implemented on this server host.",
-          category: "unknown",
+          message: "Model publishing readiness is explicit but unavailable until a runtime task implementation is composed.",
+          category: "unavailable",
           retryable: false,
         },
         recommendedActions: ["configure"],
@@ -133,7 +133,7 @@ export function createServerRuntimeReadinessService(
       derivedFromPython("dataset-preparation"),
       derivedFromPython("model-training"),
       derivedFromPython("model-validation"),
-      createUnknownModelPublishingStatusProvider({ now: options.now }),
+      createUnavailableModelPublishingStatusProvider({ now: options.now }),
     ],
     now: options.now,
   });

@@ -28,7 +28,7 @@ import type { ArtifactStorageBindingPort, ArtifactObjectStoragePort, ArtifactRep
 import type { ArtifactStorageBinding } from "../../contracts/storage";
 import { TaskType } from "../../contracts/runtime";
 import type { RuntimeCapabilityGuardService, TaskPowerLifecyclePort } from "../services/runtime";
-import type { RuntimeTaskRecord, RuntimeTaskStatus } from "../../contracts/runtime";
+import type { RuntimeTaskStatus, RuntimeTaskStatusRecord } from "../../contracts/runtime";
 
 export interface PrepareTrainingDatasetFromArtifactsCommand {
   sourceArtifactIds: string[];
@@ -411,7 +411,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
   public async readPrepareTrainingDataset(
     requestId: string,
     context?: ApplicationRequestContext,
-  ): Promise<ContractResult<RuntimeTaskRecord | { requestId: string; taskType: string; status: "succeeded"; result: PrepareTrainingDatasetFromArtifactsValue }>> {
+  ): Promise<ContractResult<RuntimeTaskStatusRecord | { requestId: string; taskType: string; status: "succeeded"; result: PrepareTrainingDatasetFromArtifactsValue }>> {
     try {
       const cached = this.materializedResultsByRequestId.get(requestId);
       if (cached) {

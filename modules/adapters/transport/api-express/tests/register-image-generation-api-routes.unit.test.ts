@@ -71,6 +71,38 @@ describe("registerImageGenerationApiRoutes", () => {
     expect(JSON.stringify(payload)).not.toContain("PATH=abc");
   });
 
+  it("sanitizes internal image-generation API failures while keeping validation actionable", async () => {
+    const handlers = new Map<string, any>();
+    const app: ExpressRoutePort = { post: testDouble.fn((p, h) => handlers.set(p, h)) };
+    registerImageGenerationApiRoutes({
+      app,
+      generateImageUseCase: {
+        startImageGeneration: testDouble.fn(async () => { throw new Error("adapter failed at /tmp/secret\nstack trace"); }),
+        readImageGeneration: testDouble.fn(async () => { throw new Error("read failed at C:\\tmp\\secret"); }),
+        cancelImageGeneration: testDouble.fn(),
+      } as any,
+    });
+
+    const start = response();
+    await handlers.get("/api/image-generation/start")({ body: { prompt: "x" }, headers: {} }, start.res);
+    expect(start.status).toHaveBeenCalledWith(500);
+    expect(start.json.mock.calls[0]?.[0]).toMatchObject({ ok: false, error: { code: "internal", message: "Image generation request failed." } });
+
+    const read = response();
+    await handlers.get("/api/image-generation/read")({ body: { requestId: "r1" }, headers: {} }, read.res);
+    expect(read.status).toHaveBeenCalledWith(500);
+    expect(read.json.mock.calls[0]?.[0]).toMatchObject({ ok: false, error: { code: "internal", message: "Image generation request failed." } });
+
+    const validation = response();
+    await handlers.get("/api/image-generation/read")({ body: {}, headers: {} }, validation.res);
+    expect(validation.status).toHaveBeenCalledWith(400);
+    expect(validation.json.mock.calls[0]?.[0]).toMatchObject({ ok: false, error: { code: "validation", message: "requestId is required." } });
+
+    expect(JSON.stringify({ start: start.json.mock.calls[0]?.[0], read: read.json.mock.calls[0]?.[0] })).not.toContain("/tmp/secret");
+    expect(JSON.stringify({ start: start.json.mock.calls[0]?.[0], read: read.json.mock.calls[0]?.[0] })).not.toContain("C:\\tmp\\secret");
+    expect(JSON.stringify({ start: start.json.mock.calls[0]?.[0], read: read.json.mock.calls[0]?.[0] })).not.toContain("stack trace");
+  });
+
   it("returns unavailable finalize response when orchestrator is absent", async () => {
     const handlers = new Map<string, any>();
     const app: ExpressRoutePort = { post: testDouble.fn((p,h)=>handlers.set(p,h)) };

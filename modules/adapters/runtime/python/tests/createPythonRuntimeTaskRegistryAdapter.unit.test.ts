@@ -157,6 +157,7 @@ it("generates non-timestamp request ids when caller does not provide one", async
     const runtimePort: any = { startTask: testDouble.fn(), readTaskStatus: testDouble.fn(async () => ({ requestId: "req-404", status: "unknown" })), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
     const record = await adapter.getTaskStatus("req-404");
-    expect(record).toMatchObject({ requestId: "req-404", status: "unknown", error: { code: "python_runtime_task_not_found" } });
+    expect(record).toMatchObject({ recordType: "not-found", requestId: "req-404", status: "unknown", error: { code: "python_runtime_task_not_found" } });
+    expect("taskType" in record).toBe(false);
   });
 });

@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
 import { FinalizeImageGenerationService } from "../../../application/services/image/finalize-image-generation.service";
 import { ImageGenerationFinalizationOrchestratorService } from "../../../application/services/image/image-generation-finalization-orchestrator.service";
-import { createComfyUiHttpClient, createComfyUiImageGenerationRuntimeAdapter, createComfyUiRuntimeSupervisor } from "../../../adapters/runtime/comfyui";
+import { createComfyUiHttpClient, createComfyUiRuntimeSupervisor } from "../../../adapters/runtime/comfyui";
 import { createComfyUiRuntimeInstaller } from "../../../adapters/runtime/installer/comfyui/createComfyUiRuntimeInstaller";
 import { createPythonRuntimeAdapterFoundation, ensurePythonRuntimeWorkerDependencies } from "../../../adapters/runtime/python";
 import { createGitRuntimeInstallerAdapter } from "../../../adapters/runtime/installer/git/createGitRuntimeInstallerAdapter";
@@ -83,6 +83,7 @@ import type { ComfyUiRuntimeDeviceMode } from "../../../adapters/runtime/comfyui
 import { RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY } from "../../../contracts/settings";
 import { RuntimeCapabilityGuardService } from "../../../application/services/runtime/runtime-capability-guard.service";
 import { createServerRuntimeReadinessService } from "./composeServerRuntimeReadiness";
+import { createServerImageGenerationRuntimeTaskRegistry } from "./composeServerImageGenerationRuntimeTaskRegistry";
 
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
 const execFile = promisify(nodeExecFile);
@@ -707,7 +708,7 @@ export function composeServerHost(
           return { memoryUsagePercent, cpuUsagePercent, gpuUsagePercent };
         },
       };
-      const runtimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
+      const runtimeTaskRegistry = createServerImageGenerationRuntimeTaskRegistry({
         client: comfyUiClient,
         supervisor: comfyUiSupervisorPort,
         prepareLatentReferenceImage: async ({ artifactId }) => {

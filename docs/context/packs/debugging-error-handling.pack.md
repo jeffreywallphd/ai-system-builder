@@ -39,7 +39,7 @@
   - `finally` teardown can incorrectly kill active progress monitoring
   - polling/subscriptions should survive recoverable disconnects
   - readiness-guard-rejected starts should surface unavailable responses and should not tell callers to poll nonexistent tasks
-  - unknown task status/cancel reads should be explicit not-found/unknown outcomes and should not start runtimes
+  - unknown task status/cancel reads should be explicit not-found/unknown outcomes, should use `recordType: "not-found"` when no valid task family is known, should not start runtimes, and should not fake an invalid `TaskType` when the task family is unknown
 - Fix lifecycle behavior first; do not stop at improving error wording.
 - Preserve architecture boundaries while debugging:
   - UI handles UI state and progress display

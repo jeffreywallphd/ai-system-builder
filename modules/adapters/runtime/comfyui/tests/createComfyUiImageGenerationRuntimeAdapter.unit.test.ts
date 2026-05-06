@@ -233,6 +233,7 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
     const cancel = await adapter.cancelTask("missing");
 
     expect(status).toMatchObject({ status: "unknown", error: { code: "comfyui_task_not_found" }, metadata: { reason: "request-id-not-tracked" } });
+    expect(status).toMatchObject({ taskType: TaskType.IMAGE_GENERATION });
     expect(cancel).toMatchObject({ requestId: "missing", cancelled: false, status: "unknown" });
   });
 
