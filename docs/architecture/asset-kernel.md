@@ -6,7 +6,7 @@ The Asset Kernel is the canonical shared foundation for assets in `ai-system-bui
 
 An asset is a versioned, configurable, AI-readable, machine-composable building block that can represent structure, behavior, interface, data, instructions, resources, compositions, or logic containers, and can be assembled into features, systems, subsystems, and systems composed of subsystems.
 
-This document prevents parallel vocabularies for artifacts, resources, UI components, tools, workflows, pages, systems, generated outputs, previews, and AI context. It is an architecture baseline for Phase 2A; it does not implement TypeScript contracts, services, adapters, persistence, API/IPC routes, UI, migrations, or runtime behavior.
+This document prevents parallel vocabularies for artifacts, resources, UI components, tools, workflows, pages, systems, generated outputs, previews, and AI context. It is an architecture baseline for Phase 2A. Prompt 3 adds the first core TypeScript contract family in `modules/contracts/asset` for identity, lifecycle, review, provenance, definitions, instances, references, minimal binding/composition shells, and validation issue shapes only; it does not implement services, adapters, persistence, API/IPC routes, UI, migrations, runtime behavior, or detailed deferred asset subsystems.
 
 ## Relationship to ADRs and existing architecture
 
@@ -139,7 +139,7 @@ Example asset types include `ui-component`, `page`, `tool`, `workflow`, `workflo
 
 Logic containers are a descriptive umbrella for behavioral and composition assets such as tools, workflows, workflow steps, policies, feature logic, and system/subsystem behavior; they are not a separate required asset type in the initial Phase 2A kernel.
 
-The initial Phase 2A contract should remain small and extensible. These examples are vocabulary and direction, not a requirement to fully implement every type in Phase 2A.
+The initial Phase 2A contract family remains small and extensible. Prompt 3 records this vocabulary in `modules/contracts/asset` without requiring every type to be fully supported in Phase 2A.
 
 ## Assets, artifacts, resources, generated outputs, previews, and external objects
 
@@ -188,7 +188,7 @@ Guidance:
 - AI context should be structured enough for retrieval, validation, and prompt assembly.
 - AI context should not be the only source of machine validation.
 - Machine contracts and AI-readable context must complement each other.
-- Prompt 5 will implement AI-context contracts separately from core contracts because this is central to AI-assisted asset composition.
+- Prompt 3 includes only a minimal `AssetAiContextSummary` placeholder for core shapes. Prompt 5 will implement detailed AI-context contracts separately from core contracts because this is central to AI-assisted asset composition.
 
 ## Configuration surface
 
@@ -208,7 +208,7 @@ Guidance:
 - Asset instances own selected configuration values.
 - Arbitrary unvalidated JSON should be avoided for composable assets.
 - Phase 2A should stay JSON-schema-compatible or schema-engine-neutral unless a canonical schema engine is explicitly adopted.
-- Prompt 4 will implement configuration contracts separately from core contracts.
+- Prompt 3 includes only a minimal `AssetConfigurationSummary` placeholder for core shapes. Prompt 4 will implement detailed configuration contracts separately from core contracts.
 
 ## Ports, contracts, and composition rules
 
@@ -234,7 +234,7 @@ Guidance:
 - Ports/bindings are how systems prevent arbitrary invalid wiring.
 - UI components, workflow steps, tools, and resource-backed assets may expose different port families.
 - Ports and bindings belong in shared asset contracts, not renderer-specific models.
-- Prompt 6 will implement ports, bindings, and composition contracts separately after core/configuration/AI-context contracts.
+- Prompt 3 includes minimal reference, binding, and composition shells so core definitions/instances/compositions can refer to each other. Prompt 6 will implement detailed ports, binding compatibility, and composition-rule contracts separately after core/configuration/AI-context contracts.
 
 ## Lifecycle, versioning, review, and provenance
 
@@ -344,11 +344,11 @@ Guidance:
 
 1. Prompt 1 — Asset Kernel audit and plan.
 2. Prompt 2 — ADR and canonical terminology baseline.
-3. Prompt 3 — Core Asset Kernel contracts.
-4. Prompt 4 — Asset configuration contracts.
-5. Prompt 5 — Asset AI-context contracts.
-6. Prompt 6 — Asset ports, bindings, and composition contracts.
-7. Prompt 7 — Asset validation service.
+3. Prompt 3 — Core Asset Kernel contracts: first shared `modules/contracts/asset` family only.
+4. Prompt 4 — Detailed asset configuration contracts.
+5. Prompt 5 — Detailed asset AI-context contracts.
+6. Prompt 6 — Detailed asset ports, binding compatibility, and composition-rule contracts.
+7. Prompt 7 — Asset validation service; Prompt 3 only adds issue/summary shapes.
 8. Prompt 8 — Asset registry and application ports.
 9. Prompt 9 — Local persistence adapter.
 10. Prompt 10 — Resource-backed asset mapping and final Phase 2A regression.
@@ -365,15 +365,19 @@ Asset Kernel work must preserve clean architecture boundaries:
 - host wiring belongs in `modules/hosts`,
 - UI belongs in apps/modules UI areas.
 
-Non-goals for this baseline and Prompt 2:
+Non-goals preserved after Prompt 3:
 
-- no TypeScript implementation,
-- no contract files,
+- no detailed configuration contracts before Prompt 4,
+- no detailed AI-context contracts before Prompt 5,
+- no detailed ports, binding compatibility, or composition-rule contracts before Prompt 6,
+- no validation service before Prompt 7,
+- no asset registry or application ports before Prompt 8,
 - no application service files,
-- no persistence adapter,
+- no persistence adapter before Prompt 9,
 - no migrations,
 - no renderer/thin-client UI,
 - no API/IPC routes,
+- no resource-backed mapping implementation before Prompt 10,
 - no broad refactor,
 - no asset marketplace/plugin system,
 - no scheduler/queue/workflow execution engine changes,

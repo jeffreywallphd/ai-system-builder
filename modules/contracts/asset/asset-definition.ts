@@ -1,0 +1,37 @@
+import type { AssetFamily } from "./asset-family";
+import type { AssetId } from "./asset-id";
+import type { AssetLifecycleStatus } from "./asset-lifecycle-status";
+import type { AssetProvenance } from "./asset-provenance";
+import type { AssetReference } from "./asset-reference";
+import type { AssetReviewStatus } from "./asset-review-status";
+import type { AssetType } from "./asset-type";
+import type { AssetVersion } from "./asset-version";
+
+export interface AssetConfigurationSummary {
+  readonly schemaRef?: AssetReference;
+  readonly defaultValues?: Record<string, unknown>;
+}
+
+export interface AssetAiContextSummary {
+  readonly purpose?: string;
+  readonly userFacingSummary?: string;
+  readonly developerFacingSummary?: string;
+}
+
+export interface AssetDefinition {
+  readonly definitionId: AssetId | string;
+  readonly assetType: AssetType;
+  readonly assetFamily: AssetFamily;
+  readonly version: AssetVersion;
+  readonly displayName: string;
+  readonly description: string;
+  readonly lifecycleStatus: AssetLifecycleStatus;
+  readonly reviewStatus?: AssetReviewStatus;
+  readonly provenance: AssetProvenance;
+  readonly configurationSummary?: AssetConfigurationSummary;
+  readonly aiContextSummary?: AssetAiContextSummary;
+  readonly requirementRefs?: readonly AssetReference[];
+  readonly portRefs?: readonly AssetReference[];
+  readonly compositionRuleRefs?: readonly AssetReference[];
+  readonly metadata?: Record<string, unknown>;
+}

@@ -63,7 +63,7 @@ This keeps desktop workflow stable while making thin-client/server dependency in
 
 The Asset Kernel is a central platform concept for user-composable systems. It defines assets as versioned, configurable, AI-readable, machine-composable building blocks that can represent structure, behavior, interface, data, instructions, resources, compositions, or logic containers, and can be assembled into features, systems, subsystems, and systems composed of subsystems. Canonical terminology and Phase 2A sequencing live in `docs/architecture/asset-kernel.md`; ADR-0016 refines the directional asset concept from ADR-0005.
 
-The Asset Kernel does not rename or replace existing artifact, resource, runtime, host, or storage concepts. Resource-backed assets reference artifact/resource storage, asset runtime requirements reference shared runtime capability IDs, and transport/UI-specific asset models are not allowed.
+The Asset Kernel does not rename or replace existing artifact, resource, runtime, host, or storage concepts. Resource-backed assets reference artifact/resource storage, asset runtime requirements reference shared runtime capability IDs, and transport/UI-specific asset models are not allowed. Prompt 3 adds the initial `modules/contracts/asset` family for core identity, lifecycle, provenance, definitions, instances, references, minimal binding/composition shells, and validation issue contracts only; detailed configuration, AI context, port/rule validation, registry ports, persistence, and resource-backed mapping remain later Phase 2A prompts.
 
 ### Core logic
 
@@ -93,6 +93,7 @@ The Asset Kernel does not rename or replace existing artifact, resource, runtime
   - Root-level contracts exports are namespace-only by family; do not rely on a flattened catch-all surface.
   - Includes shared result/error contracts so boundaries reuse one success/failure vocabulary.
   - Includes shared operation identity helpers so transport/runtime/persistence families use a consistent operation naming pattern.
+  - Includes the initial asset contract family for core Asset Kernel identity, lifecycle, provenance, references, definitions, instances, minimal binding/composition shells, and validation issue shapes.
   - Includes typed configuration contracts for host, runtime, logging,
     persistence, and storage concerns.
   - Keeps `SystemConfig` as a shallow composition convenience only; concern-specific
