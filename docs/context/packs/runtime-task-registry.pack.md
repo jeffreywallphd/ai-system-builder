@@ -44,6 +44,7 @@ Use this pack when prompt scope includes long-running runtime-backed tasks (data
 
 ## Readiness Boundary
 
+- Runtime readiness guards may prevent starting new runtime-backed work when a required derived feature capability is not ready, but they do not replace task registry reads, cancellation, status records, or retention.
 - Runtime readiness answers whether a host-owned capability is available, degraded, installing, failed, or otherwise unavailable before/around task execution. The application readiness service may derive feature capability status from runtime dependencies but must not start tasks or own task progress.
 - Runtime Task Registry remains the source of truth for long-running task `startTask` / `getTaskStatus` / `cancelTask` lifecycle and progress.
 - Do not encode task progress, Python protocol status payloads, or ComfyUI runtime internals as generic readiness fields.

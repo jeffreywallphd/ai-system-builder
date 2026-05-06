@@ -6,6 +6,7 @@ import {
   type StartRuntimeTaskResult,
 } from "../../../contracts/runtime";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
+import type { RuntimeCapabilityGuardService } from "../../services/runtime";
 import type { ModelCheckpointResolverPort } from "../../ports/model";
 
 import type { ApplicationRequestContext } from "../../ports";
@@ -30,6 +31,7 @@ export class GenerateImageUseCase {
     private readonly dependencies: {
       runtimeTaskRegistry: RuntimeTaskRegistryPort;
       modelCheckpointResolver?: ModelCheckpointResolverPort;
+      runtimeCapabilityGuard?: Pick<RuntimeCapabilityGuardService, "requireCapabilityReady">;
     },
   ) {}
 
@@ -38,6 +40,7 @@ export class GenerateImageUseCase {
     context?: ApplicationRequestContext,
   ): Promise<StartRuntimeTaskResult> {
     assertValidPrompt(request);
+    await this.dependencies.runtimeCapabilityGuard?.requireCapabilityReady("image-generation");
 
     const resolvedModel = await this.dependencies.modelCheckpointResolver?.resolveCheckpoint({
       selectedModel: request.model,

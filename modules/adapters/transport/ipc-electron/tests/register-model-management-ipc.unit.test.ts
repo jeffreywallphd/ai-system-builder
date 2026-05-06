@@ -1,4 +1,6 @@
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
+import { RuntimeCapabilityUnavailableError } from "../../../../application/services/runtime";
+import { createRuntimeCapabilityStatus } from "../../../../contracts/runtime";
 
 import {
   DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
@@ -10,6 +12,7 @@ import {
   DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL,
   DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL,
   DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
+  DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL,
   DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL,
   DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL,
   DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL,
@@ -114,4 +117,31 @@ it("maps train status handler to use case read", async () => {
 
   expect(read).toHaveBeenCalledWith("run-1");
   expect(response.ok).toBe(true);
+});
+
+it("maps model runtime capability unavailable errors to sanitized IPC unavailable responses", async () => {
+  const unavailable = new RuntimeCapabilityUnavailableError(createRuntimeCapabilityStatus({
+    capabilityId: "model-training",
+    status: "failed",
+    summary: "Model training runtime failed readiness checks.",
+    reason: { code: "runtime.python.failed", message: "trace /tmp/secret", category: "startup", retryable: true },
+    recommendedActions: ["retry", "view-logs"],
+  }));
+  const handler = createTrainModelIpcHandler({ execute: testDouble.fn(async () => { throw unavailable; }) });
+  const response = await handler({}, createDesktopModelTrainRequest({
+    baseModel: { modelRecordId: "base-1" },
+    datasets: [{ artifactId: "dataset-1", splitRole: "train" }],
+    method: "lora",
+    commonParameters: {},
+    output: { outputModelName: "demo-adapter", destination: { local: { enabled: true } } },
+  }, { requestId: "req-train", correlationId: "corr-train" }));
+
+  expect(response).toMatchObject({
+    ok: false,
+    channel: DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL.value,
+    requestId: "req-train",
+    correlationId: "corr-train",
+    error: { code: "unavailable", message: "Required runtime capability is not ready.", details: { capabilityId: "model-training", status: "failed" } },
+  });
+  expect(JSON.stringify(response)).not.toContain("/tmp/secret");
 });

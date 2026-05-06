@@ -2,6 +2,7 @@ import { TaskType, type RuntimeTaskRecord } from "../../../contracts/runtime";
 import { type PublishModelRequest, type PublishModelResult } from "../../../contracts/model";
 import type { ModelRegistryPort } from "../../ports/model";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
+import type { RuntimeCapabilityGuardService } from "../../services/runtime";
 
 export class PublishModelUseCase {
   private readonly requestContext = new Map<string, { request: PublishModelRequest; modelRecordId: string; repository: string; provider: "huggingface" }>();
@@ -11,6 +12,7 @@ export class PublishModelUseCase {
     private readonly dependencies: {
       modelRegistry: ModelRegistryPort;
       runtimeTaskRegistry: RuntimeTaskRegistryPort;
+      runtimeCapabilityGuard?: Pick<RuntimeCapabilityGuardService, "requireCapabilityReady">;
     },
   ) {}
 
@@ -19,6 +21,7 @@ export class PublishModelUseCase {
     if (!model || !model.localPath) {
       throw new Error(`Model '${request.modelRecordId}' is missing a local model path and cannot be published.`);
     }
+    await this.dependencies.runtimeCapabilityGuard?.requireCapabilityReady("model-publishing");
     const started = await this.dependencies.runtimeTaskRegistry.startTask({ taskType: TaskType.MODEL_PUBLISHING, payload: request });
     this.requestContext.set(started.requestId, { request, modelRecordId: request.modelRecordId, repository: request.repository, provider: "huggingface" });
     return { modelRecordId: request.modelRecordId, published: false, provider: "huggingface", repository: request.repository, requestId: started.requestId } as PublishModelResult;

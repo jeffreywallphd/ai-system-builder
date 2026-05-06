@@ -90,6 +90,7 @@ import {
   createRuntimeInstallerCapabilityStatusProvider,
   type RuntimeCapabilityStatusProvider,
 } from "../../../application/services/runtime/runtime-readiness.service";
+import { RuntimeCapabilityGuardService } from "../../../application/services/runtime/runtime-capability-guard.service";
 import { createRuntimeCapabilityStatus, type RuntimeCapabilityId } from "../../../contracts/runtime";
 import type { RuntimeInstallStatus } from "../../../contracts/runtime-installer";
 
@@ -964,6 +965,19 @@ export function composeServerHost(
       });
       const updateModelRecordUseCase = new UpdateModelRecordUseCase({ modelRegistry });
       const deleteModelRecordUseCase = new DeleteModelRecordUseCase({ modelRegistry });
+      const runtimeReadiness = createServerRuntimeReadinessService({
+        pythonSupervisor: pythonRuntimeFoundation.supervisor,
+        readComfyUiSupervisor: () => comfyUiSupervisor,
+        readComfyUiInstallStatus: async () => {
+          const installer = await createComfyUiInstallerForMode(activeRuntimeDeviceMode ?? runtimeDeviceMode);
+          return (await installer.getInstallStatus({
+            targetId: "comfyui",
+            installRoot: comfyUiInstallRoot,
+          })).status;
+        },
+        now: options.now,
+      });
+      const runtimeCapabilityGuard = new RuntimeCapabilityGuardService(runtimeReadiness);
       const localModelCheckpointResolver = createLocalModelCheckpointResolverAdapter({
         modelRegistry,
         comfyUiCheckpointDirectory: joinHostPath(comfyUiInstallRoot, "models", "checkpoints"),
@@ -974,6 +988,7 @@ export function composeServerHost(
           runtime: comfyUiSupervisorPort,
           modelCheckpointResolver: localModelCheckpointResolver,
         }),
+        runtimeCapabilityGuard,
       });
       const listSettingsDefinitionsUseCase = new ListSettingsDefinitionsUseCase({
         settings: applicationSettings,
@@ -1011,18 +1026,6 @@ export function composeServerHost(
       });
 
 
-      const runtimeReadiness = createServerRuntimeReadinessService({
-        pythonSupervisor: pythonRuntimeFoundation.supervisor,
-        readComfyUiSupervisor: () => comfyUiSupervisor,
-        readComfyUiInstallStatus: async () => {
-          const installer = await createComfyUiInstallerForMode(activeRuntimeDeviceMode ?? runtimeDeviceMode);
-          return (await installer.getInstallStatus({
-            targetId: "comfyui",
-            installRoot: comfyUiInstallRoot,
-          })).status;
-        },
-        now: options.now,
-      });
       registerExpressApi({
         app: registerOptions.app,
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),

@@ -62,3 +62,35 @@ describe("PublishModelUseCase", () => {
     expect(startTask).toHaveBeenCalledWith({ taskType: TaskType.MODEL_PUBLISHING, payload: { modelRecordId: "m1", repository: "owner/repo" } });
   });
 });
+
+it("rejects validation start when runtime capability is not ready", async () => {
+  const startTask = testDouble.fn();
+  const unavailable = new Error("Runtime capability 'model-validation' is starting.") as Error & { code: "unavailable"; details: Record<string, unknown> };
+  unavailable.name = "RuntimeCapabilityUnavailableError";
+  unavailable.code = "unavailable";
+  unavailable.details = { capabilityId: "model-validation", status: "starting", recommendedActions: ["wait"] };
+  const useCase = new ValidateModelUseCase({
+    modelRegistry: { getModelRecord: testDouble.fn().mockResolvedValue({ modelRecordId: "m1", localPath: "/tmp/m1" }) } as never,
+    runtimeTaskRegistry: { startTask, getTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), listTasks: testDouble.fn() } as never,
+    runtimeCapabilityGuard: { requireCapabilityReady: testDouble.fn(async () => { throw unavailable; }) },
+  });
+
+  await useCase.execute({ modelRecordId: "m1" }).catch((error) => expect(error).toMatchObject({ code: "unavailable", details: { capabilityId: "model-validation", status: "starting" } }));
+  expect(startTask).not.toHaveBeenCalled();
+});
+
+it("guards model publishing because current publish path is runtime-backed", async () => {
+  const startTask = testDouble.fn();
+  const unavailable = new Error("Runtime capability 'model-publishing' is unavailable.") as Error & { code: "unavailable"; details: Record<string, unknown> };
+  unavailable.name = "RuntimeCapabilityUnavailableError";
+  unavailable.code = "unavailable";
+  unavailable.details = { capabilityId: "model-publishing", status: "unavailable", recommendedActions: ["start"] };
+  const useCase = new PublishModelUseCase({
+    modelRegistry: { getModelRecord: testDouble.fn().mockResolvedValue({ modelRecordId: "m1", localPath: "/tmp/m1" }) } as never,
+    runtimeTaskRegistry: { startTask, getTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), listTasks: testDouble.fn() } as never,
+    runtimeCapabilityGuard: { requireCapabilityReady: testDouble.fn(async () => { throw unavailable; }) },
+  });
+
+  await useCase.execute({ modelRecordId: "m1", repository: "owner/repo" }).catch((error) => expect(error).toMatchObject({ code: "unavailable", details: { capabilityId: "model-publishing", status: "unavailable" } }));
+  expect(startTask).not.toHaveBeenCalled();
+});
