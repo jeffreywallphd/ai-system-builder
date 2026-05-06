@@ -77,6 +77,8 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     setDeleteConfirmationInput,
     toggleSelectedArtifactKey,
     clearSelectedArtifactKeys,
+    toggleAllArtifactKeys,
+    areAllArtifactKeysSelected,
     setBulkDeleteConfirmationInput,
     deleteSelectedArtifacts,
     registerArtifactFromHuggingFace,
@@ -212,6 +214,17 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
       ) : null}
 
       <ul className="ui-stack ui-stack--sm">
+        <li className="ui-stack ui-stack--sm">
+          <label>
+            <input
+              type="checkbox"
+              checked={areAllArtifactKeysSelected}
+              onChange={toggleAllArtifactKeys}
+              disabled={items.length === 0}
+            />
+            {areAllArtifactKeysSelected ? " Deselect all artifacts" : " Select all artifacts"}
+          </label>
+        </li>
         <li className="ui-grid ui-grid--two">
           <label className="ui-stack ui-stack--sm">
             <span>Bulk delete confirmation</span>

@@ -20,22 +20,14 @@ function navigateToPage(page: ThinClientPageKey): void {
 
 export function App() {
   const [activePage, setActivePage] = useState<ThinClientPageKey>(resolveThinClientPage(window.location.pathname));
-  const [artifactRefreshToken, setArtifactRefreshToken] = useState(0);
-
   const content = useMemo(() => {
     if (activePage === "artifacts") {
-      return (
-        <ArtifactsPage
-          refreshToken={artifactRefreshToken}
-          onUploaded={() => setArtifactRefreshToken((current) => current + 1)}
-        />
-      );
+      return <ArtifactsPage />;
     }
 
     if (activePage === "image-generation") {
       return (
         <ImageGenerationPage
-          onGenerated={() => setArtifactRefreshToken((current) => current + 1)}
           onNavigateToArtifacts={() => { navigateToPage("artifacts"); setActivePage("artifacts"); }}
           onNavigateToModels={() => { navigateToPage("models"); setActivePage("models"); }}
         />
@@ -58,7 +50,7 @@ export function App() {
       navigateToPage("artifacts");
       setActivePage("artifacts");
     }} />;
-  }, [activePage, artifactRefreshToken]);
+  }, [activePage]);
 
   return (
     <AppShell

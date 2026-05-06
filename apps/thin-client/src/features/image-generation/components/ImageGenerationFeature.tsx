@@ -169,7 +169,7 @@ export function ImageGenerationFeature({
                 className="ui-input"
                 id={id}
                 type={type}
-                value={feature.form[formKey]}
+                value={String(feature.form[formKey])}
                 onInput={(event) => setFormValue(formKey, (event.target as HTMLInputElement).value)}
               />
             </div>
