@@ -77,3 +77,9 @@
 
 - Desktop remote server credentials should live behind desktop host credential-store seams (not renderer-local ad hoc storage).
 - Future remote feature execution must use secure API client adapters behind desktop IPC boundaries.
+
+## Asset Kernel Notes
+
+- Include `asset-kernel.pack.md` when desktop work exposes or composes assets, asset-backed pages/components, generated outputs as reusable assets, or resource-backed previews.
+- Desktop IPC/preload and renderer models must wrap shared asset contracts; they must not define desktop-specific asset semantics.
+- Desktop host composition wires concrete runtime/readiness/storage providers for asset requirements; assets remain declarative.

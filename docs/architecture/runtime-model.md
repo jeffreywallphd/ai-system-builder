@@ -1,5 +1,9 @@
 # Runtime Model
 
+## Asset Kernel relationship
+
+Assets may declare runtime requirements, but they must not create a parallel runtime readiness model. Asset requirements should reference shared `RuntimeCapabilityId` values and can be structurally validated before execution or composition. Runtime readiness remains the transport-neutral answer to whether a required capability is currently available, and validation must not execute runtimes or probe heavy sidecars.
+
 ## Runtime posture
 
 `ai-system-builder` is **TypeScript-first**.

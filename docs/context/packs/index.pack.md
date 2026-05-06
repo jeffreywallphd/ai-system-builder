@@ -30,6 +30,7 @@
 - Update canonical docs in the same change when documented behavior/architecture/standards change.
 - Use structured, meaningful logs with configurable verbosity and stage-level timing for long operations.
 - Keep runtime diagnostics as a strict specialization of shared structured logging contracts (`runtime.*` events, mechanical mapping).
+- Treat the Asset Kernel as the canonical platform guardrail for assets: assets are versioned, configurable, AI-readable, machine-composable semantic units; do not invent parallel models for artifacts/resources/UI/workflows/tools/generated outputs/previews/AI context.
 - Keep runtime readiness as transport-neutral shared vocabulary for host-owned capability availability; application readiness mapping reads host-composed, host-scoped provider signals but must not own task registry lifecycle, installer operations, supervisor process lifecycle, or UI/API/IPC payload design. Desktop IPC and server API transports wrap shared readiness contracts for host-scoped reads without redefining readiness shapes. Runtime task not-found status must remain an honest explicit `recordType: "not-found"` contract rather than a fake `TaskType`.
 - Keep persistence and storage contract families mechanically distinct (record-aligned operations vs key-based artifact operations).
 - Use ingestion/staged-artifact contracts for inbound-content semantics; treat upload flows as specialized intake paths rather than isolated file-operation worlds.
@@ -55,6 +56,7 @@ Only use these when needed. Do not overload the context window with uncessary in
 - `docs/adr/README.md` — ADR workflow and decision-record discipline.
 - `docs/architecture/module-dependency-rules.md` — boundary and dependency direction constraints.
 - `docs/architecture/system-overview.md` — repository shape and packaging restraint posture.
+- `docs/architecture/asset-kernel.md` — canonical Asset Kernel terminology, boundaries, and Phase 2A sequence.
 - `docs/standards/coding-standards.md` — implementation discipline and abstraction restraint.
 - `docs/standards/naming-standards.md` — role-revealing naming requirements.
 - `docs/standards/documentation-standards.md` — canonical documentation responsibilities and update rules.
