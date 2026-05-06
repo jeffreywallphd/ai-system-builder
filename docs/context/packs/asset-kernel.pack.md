@@ -82,14 +82,16 @@ Outside-but-referenceable concepts:
 
 1. Prompt 1 — Asset Kernel audit and plan.
 2. Prompt 2 — ADR and canonical terminology baseline.
-3. Prompt 3 — Core Asset Kernel contracts.
-4. Prompt 4 — Asset configuration contracts.
-5. Prompt 5 — Asset AI-context contracts.
-6. Prompt 6 — Asset ports, bindings, and composition contracts.
-7. Prompt 7 — Asset validation service.
+3. Prompt 3 — Core Asset Kernel contracts: first shared `modules/contracts/asset` family only.
+4. Prompt 4 — Detailed asset configuration contracts.
+5. Prompt 5 — Detailed asset AI-context contracts.
+6. Prompt 6 — Detailed asset ports, binding compatibility, and composition-rule contracts.
+7. Prompt 7 — Asset validation service; Prompt 3 only adds issue/summary shapes.
 8. Prompt 8 — Asset registry and application ports.
 9. Prompt 9 — Local persistence adapter.
 10. Prompt 10 — Resource-backed asset mapping and final Phase 2A regression.
+
+Prompt 3 status: `modules/contracts/asset` now holds the first core contract family for asset identity, family/type vocabularies, version, lifecycle/review status, safe references, provenance, definitions, instances, minimal binding/composition shells, and validation issue shapes. Detailed configuration remains Prompt 4, detailed AI context remains Prompt 5, detailed ports/binding compatibility/composition rules remain Prompt 6, validation services remain Prompt 7, registry/application ports remain Prompt 8, persistence remains Prompt 9, and resource-backed mapping remains Prompt 10.
 
 Transport/UI work is deferred until after the kernel is proven through shared contracts, configuration, AI context, ports/composition, validation, registry ports, persistence, and resource-backed mapping.
 
