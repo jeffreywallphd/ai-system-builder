@@ -8,6 +8,9 @@ import {
   type DatasetPreparationWarning,
   type DatasetSplitConfig,
   KNOWN_RUNTIME_KINDS,
+  RUNTIME_CAPABILITY_IDS,
+  RUNTIME_READINESS_ACTIONS,
+  RUNTIME_READINESS_STATUSES,
   type PrepareTrainingDatasetRequest,
   type PrepareTrainingDatasetResult,
   type PythonRuntimeCapabilitiesResult,
@@ -30,6 +33,7 @@ import {
   type RuntimeTaskRecord,
   type RuntimeTaskRetentionPolicy,
   TaskType,
+  createRuntimeCapabilityStatus,
   createRuntimeOperation,
   createRuntimeExecutionDiagnostic,
   createRuntimeExecutionError,
@@ -42,7 +46,13 @@ import {
   mapRuntimeDiagnosticToStructuredLogEvent,
   normalizeRuntimeDiagnosticEvent,
   isKnownRuntimeKind,
+  isRuntimeCapabilityId,
+  isRuntimeReadinessAction,
+  isRuntimeReadinessStatus,
+  normalizeRuntimeCapabilityId,
   normalizeRuntimeOperation,
+  normalizeRuntimeReadinessAction,
+  normalizeRuntimeReadinessStatus,
   resolveRuntimeKind,
 } from ".";
 
@@ -62,6 +72,127 @@ describe("runtime contracts", () => {
     expect(resolveRuntimeKind(undefined)).toBe("node");
     expect(resolveRuntimeKind(" PYTHON ")).toBe("python");
     expect(resolveRuntimeKind("java")).toBe("java");
+  });
+
+  it("defines the shared runtime readiness status vocabulary", () => {
+    expect(RUNTIME_READINESS_STATUSES).toEqual([
+      "unknown",
+      "unavailable",
+      "not-installed",
+      "installing",
+      "starting",
+      "ready",
+      "degraded",
+      "failed",
+    ]);
+    expect(isRuntimeReadinessStatus("ready")).toBe(true);
+    expect(isRuntimeReadinessStatus("installed")).toBe(false);
+    expect(normalizeRuntimeReadinessStatus(" DEGRADED ")).toBe("degraded");
+    expect(() => normalizeRuntimeReadinessStatus("running")).toThrow(
+      "Unknown runtime readiness status",
+    );
+  });
+
+  it("defines host-owned runtime capability ids without making them adapter protocols", () => {
+    expect(RUNTIME_CAPABILITY_IDS).toEqual([
+      "python-runtime",
+      "comfyui-runtime",
+      "image-generation",
+      "dataset-preparation",
+      "model-training",
+      "model-validation",
+      "model-publishing",
+    ]);
+    expect(isRuntimeCapabilityId("image-generation")).toBe(true);
+    expect(isRuntimeCapabilityId("comfyui-prompt-endpoint")).toBe(false);
+    expect(normalizeRuntimeCapabilityId(" MODEL-TRAINING ")).toBe("model-training");
+  });
+
+  it("defines shared runtime readiness recovery actions", () => {
+    expect(RUNTIME_READINESS_ACTIONS).toEqual([
+      "wait",
+      "start",
+      "install",
+      "repair",
+      "configure",
+      "retry",
+      "view-logs",
+    ]);
+    expect(isRuntimeReadinessAction("view-logs")).toBe(true);
+    expect(isRuntimeReadinessAction("open-comfyui")).toBe(false);
+    expect(normalizeRuntimeReadinessAction(" RETRY ")).toBe("retry");
+  });
+
+  it("creates transport-neutral runtime capability statuses with generic details only", () => {
+    const capability = createRuntimeCapabilityStatus({
+      capabilityId: " IMAGE-GENERATION ",
+      status: " degraded ",
+      summary: "Image generation can run with reduced acceleration.",
+      reason: {
+        code: "accelerator_unavailable",
+        message: "GPU acceleration is unavailable.",
+        category: "health",
+        retryable: true,
+      },
+      recommendedActions: [" configure ", "view-logs"],
+      details: {
+        accelerator: "cpu-fallback",
+      },
+      dependencies: [
+        {
+          capabilityId: "comfyui-runtime",
+          status: "ready",
+          summary: "ComfyUI runtime is healthy.",
+        },
+      ],
+      updatedAt: "2026-05-06T00:00:00.000Z",
+      host: { kind: "desktop", id: "desktop-main" },
+    });
+
+    expect(capability).toEqual({
+      capabilityId: "image-generation",
+      status: "degraded",
+      healthy: false,
+      available: true,
+      summary: "Image generation can run with reduced acceleration.",
+      reason: {
+        code: "accelerator_unavailable",
+        message: "GPU acceleration is unavailable.",
+        category: "health",
+        retryable: true,
+      },
+      recommendedActions: ["configure", "view-logs"],
+      details: {
+        accelerator: "cpu-fallback",
+      },
+      dependencies: [
+        {
+          capabilityId: "comfyui-runtime",
+          status: "ready",
+          healthy: true,
+          available: true,
+          summary: "ComfyUI runtime is healthy.",
+        },
+      ],
+      updatedAt: "2026-05-06T00:00:00.000Z",
+      host: { kind: "desktop", id: "desktop-main" },
+    });
+  });
+
+  it("does not require adapter-specific readiness fields", () => {
+    const capability = createRuntimeCapabilityStatus({
+      capabilityId: "python-runtime",
+      status: "unknown",
+    });
+
+    expect(capability).toEqual({
+      capabilityId: "python-runtime",
+      status: "unknown",
+      healthy: false,
+      available: false,
+      recommendedActions: undefined,
+      dependencies: undefined,
+    });
   });
 
   it("creates runtime execution requests with target and correlation context", () => {
