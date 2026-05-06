@@ -94,7 +94,8 @@ describe("RuntimeTaskRegistryService", () => {
     const onTerminal = testDouble.fn(async () => { throw new Error("boom"); });
     const service = new RuntimeTaskRegistryService(registry, lifecycle);
 
-    await expect(service.readTaskAndCompleteLifecycleIfTerminal("r-1", { onTerminal })).resolves.toMatchObject({
+    const result = await service.readTaskAndCompleteLifecycleIfTerminal("r-1", { onTerminal });
+    expect(result).toMatchObject({
       requestId: "r-1",
       status: "succeeded",
     });

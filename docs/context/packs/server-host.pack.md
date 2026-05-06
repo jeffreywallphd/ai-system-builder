@@ -102,4 +102,5 @@
 ## Runtime readiness API
 
 - Server host composition owns the server `RuntimeReadinessService` and passes an explicit capability scope for Python runtime, ComfyUI runtime, image generation, dataset preparation, model training, model validation, and model publishing.
+- Focused server composition helper modules are allowed for concrete adapter/use-case wiring and API registration; keep them role-specific and composition-only so they do not become dumping grounds for business rules, runtime protocol details, or Express payload mapping.
 - Server readiness providers should read bounded supervisor/installer status only and must not start/stop/install/repair runtimes. Runtime-backed API starts should reuse the composed `RuntimeReadinessPort` through the application guard and map not-ready capabilities to HTTP 503/unavailable envelopes with safe details.  Thin-client UI consumption is deferred to later prompts.

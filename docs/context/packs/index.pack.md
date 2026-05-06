@@ -30,7 +30,7 @@
 - Update canonical docs in the same change when documented behavior/architecture/standards change.
 - Use structured, meaningful logs with configurable verbosity and stage-level timing for long operations.
 - Keep runtime diagnostics as a strict specialization of shared structured logging contracts (`runtime.*` events, mechanical mapping).
-- Keep runtime readiness as transport-neutral shared vocabulary for host-owned capability availability; application readiness mapping reads host-composed, host-scoped provider signals but must not own task registry lifecycle, installer operations, supervisor process lifecycle, or UI/API/IPC payload design. Desktop IPC may wrap shared readiness contracts for host-scoped reads, but server API readiness remains a separate server prompt.
+- Keep runtime readiness as transport-neutral shared vocabulary for host-owned capability availability; application readiness mapping reads host-composed, host-scoped provider signals but must not own task registry lifecycle, installer operations, supervisor process lifecycle, or UI/API/IPC payload design. Desktop IPC and server API transports wrap shared readiness contracts for host-scoped reads without redefining readiness shapes.
 - Keep persistence and storage contract families mechanically distinct (record-aligned operations vs key-based artifact operations).
 - Use ingestion/staged-artifact contracts for inbound-content semantics; treat upload flows as specialized intake paths rather than isolated file-operation worlds.
 - Import contracts via family barrels (`modules/contracts/<family>`); avoid deep internal contract imports and flattened catch-all usage.
