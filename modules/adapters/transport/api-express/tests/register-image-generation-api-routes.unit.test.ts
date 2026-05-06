@@ -1,5 +1,7 @@
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 import { registerImageGenerationApiRoutes, type ExpressRoutePort } from "../image-generation/registerImageGenerationApiRoutes";
+import { RuntimeCapabilityUnavailableError } from "../../../../application/services/runtime";
+import { createRuntimeCapabilityStatus } from "../../../../contracts/runtime";
 
 function response() { const json = testDouble.fn(); const status = testDouble.fn(); const res:any={status:status.mockImplementation(()=>res),json}; return {res,json,status}; }
 
@@ -14,7 +16,7 @@ describe("registerImageGenerationApiRoutes", () => {
       const { res, status, json } = response();
       await handlers.get(path)({ body: {}, headers: {} }, res);
       expect(status).toHaveBeenCalledWith(400);
-      expect(json).toHaveBeenCalledWith(expect.objectContaining({ ok: false, error: expect.objectContaining({ code: "validation" }) }));
+      expect(json.mock.calls[json.mock.calls.length - 1]?.[0]).toMatchObject({ ok: false, error: { code: "validation" } });
     }
     expect(handlers.has("/api/image-generation/unload-model")).toBe(true);
   });
@@ -34,6 +36,41 @@ describe("registerImageGenerationApiRoutes", () => {
     const c=response(); await handlers.get("/api/image-generation/cancel")({ body: { requestId: "r1" }, headers: {} }, c.res); expect(c.status).toHaveBeenCalledWith(400);
   });
 
+
+  it("maps runtime capability unavailable start failures to sanitized 503 details", async () => {
+    const handlers = new Map<string, any>();
+    const app: ExpressRoutePort = { post: testDouble.fn((p, h) => handlers.set(p, h)) };
+    const unavailable = new RuntimeCapabilityUnavailableError(createRuntimeCapabilityStatus({
+      capabilityId: "image-generation",
+      status: "failed",
+      summary: "Image generation runtime failed readiness checks.",
+      reason: { code: "runtime.comfyui.failed", message: "raw stack /tmp/secret PATH=abc", category: "startup", retryable: true },
+      recommendedActions: ["retry", "view-logs"],
+    }));
+    registerImageGenerationApiRoutes({
+      app,
+      generateImageUseCase: { startImageGeneration: testDouble.fn(async () => { throw unavailable; }), readImageGeneration: testDouble.fn(), cancelImageGeneration: testDouble.fn() } as any,
+    });
+
+    const { res, status, json } = response();
+    await handlers.get("/api/image-generation/start")({ body: { prompt: "x" }, headers: { "x-request-id": "req-1", "x-correlation-id": "corr-1" } }, res);
+
+    expect(status).toHaveBeenCalledWith(503);
+    const payload = json.mock.calls[0]?.[0];
+    expect(payload).toMatchObject({
+      ok: false,
+      requestId: "req-1",
+      correlationId: "corr-1",
+      error: {
+        code: "unavailable",
+        message: "Required runtime capability is not ready.",
+        details: { capabilityId: "image-generation", status: "failed", reason: { code: "runtime.comfyui.failed", category: "startup" }, recommendedActions: ["retry", "view-logs"] },
+      },
+    });
+    expect(JSON.stringify(payload)).not.toContain("/tmp/secret");
+    expect(JSON.stringify(payload)).not.toContain("PATH=abc");
+  });
+
   it("returns unavailable finalize response when orchestrator is absent", async () => {
     const handlers = new Map<string, any>();
     const app: ExpressRoutePort = { post: testDouble.fn((p,h)=>handlers.set(p,h)) };
@@ -41,7 +78,7 @@ describe("registerImageGenerationApiRoutes", () => {
     const { res, status, json } = response();
     await handlers.get('/api/image-generation/finalize')({ body: { requestId: 'r1' }, headers: {} }, res);
     expect(status).toHaveBeenCalledWith(200);
-    expect(json).toHaveBeenCalledWith(expect.objectContaining({ ok: true, value: { finalized: false, reason: 'image generation finalization is unavailable' } }));
+    expect(json.mock.calls[0]?.[0]).toMatchObject({ ok: true, value: { finalized: false, reason: 'image generation finalization is unavailable' } });
   });
 
   it("maps unload-model route to runtime control port", async () => {
@@ -61,7 +98,7 @@ describe("registerImageGenerationApiRoutes", () => {
 
     expect(imageGenerationRuntimeControl.unloadModel).toHaveBeenCalledTimes(1);
     expect(status).toHaveBeenCalledWith(200);
-    expect(json).toHaveBeenCalledWith(expect.objectContaining({ ok: true, value: { unloaded: true, message: "released" } }));
+    expect(json.mock.calls[0]?.[0]).toMatchObject({ ok: true, value: { unloaded: true, message: "released" } });
   });
 
   it("returns succeeded read records without mutating runtime outputs for preview", async () => {
@@ -75,6 +112,6 @@ describe("registerImageGenerationApiRoutes", () => {
     const { res, json } = response();
     await handlers.get("/api/image-generation/read")({ body: { requestId: "r1" }, headers: {} }, res);
     expect(json.mock.calls[0]?.[0]).toMatchObject({ ok: true, value: readTask });
-    expect(json.mock.calls[0]?.[0]?.value?.data?.outputs?.[0]).not.toHaveProperty("contentBase64");
+    expect(json.mock.calls[0]?.[0]?.value?.data?.outputs?.[0]?.contentBase64).toBeUndefined();
   });
 });

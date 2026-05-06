@@ -17,6 +17,7 @@
 - Handlers should depend on application ports/use cases rather than desktop internals, Electron objects, or renderer code.
 - Preserve `requestId` and `correlationId` across success and failure responses.
 - Do not leak stack traces, local filesystem paths, process environment, secrets, or raw adapter protocol details through IPC errors; unexpected internal failures should use generic transport messages instead of raw exception messages.
+- Runtime-backed desktop start handlers should surface application runtime guard failures as IPC `unavailable` failures with safe capability details and preserved request/correlation ids; do not apply those guards to task read/cancel/finalize paths unless the operation contract explicitly requires it.
 - Desktop runtime readiness IPC wraps shared runtime readiness contracts from `modules/contracts/runtime`; it exposes host-scoped reads through the application `RuntimeReadinessPort` and must not start/stop/install/repair/probe runtimes merely to read readiness.
 - Python-specific runtime IPC remains a detailed control/diagnostic surface and is not the generic runtime readiness model.
 - Server API readiness routes are out of scope for desktop IPC work.

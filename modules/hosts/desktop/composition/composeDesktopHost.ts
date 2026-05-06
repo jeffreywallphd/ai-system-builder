@@ -9,6 +9,7 @@ import { ImageGenerationFinalizationOrchestratorService } from "../../../applica
 import {
   TaskPowerLifecycleService,
   RuntimeReadinessService,
+  RuntimeCapabilityGuardService,
   createComfyUiRuntimeCapabilityStatusProvider,
   createCompositeRuntimeCapabilityStatusProvider,
   createDerivedRuntimeCapabilityStatusProvider,
@@ -991,6 +992,7 @@ export function composeDesktopHost(
         },
         now,
       });
+      const runtimeCapabilityGuard = new RuntimeCapabilityGuardService(runtimeReadiness);
       let latentReferenceStorage: Pick<ArtifactObjectStoragePort, "retrieveArtifact"> | undefined;
       const comfyUiRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
         client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }),
@@ -1142,6 +1144,7 @@ export function composeDesktopHost(
         artifactCatalog,
         now: options.now,
         taskPowerLifecycle,
+        runtimeCapabilityGuard,
       });
       const listSettingsDefinitions = new ListSettingsDefinitionsUseCase({
         settings: applicationSettings,
@@ -1227,15 +1230,18 @@ export function composeDesktopHost(
         }),
         modelPublisher,
         taskPowerLifecycle,
+        runtimeCapabilityGuard,
       });
       const validateModel = new ValidateModelUseCase({
         runtimeTaskRegistry,
         modelRegistry,
+        runtimeCapabilityGuard,
       });
       // TODO(prompt-7): remove legacy modelPublisher/modelValidationPort wiring after executeTask deprecation cleanup.
       const publishModel = new PublishModelUseCase({
         modelRegistry,
         runtimeTaskRegistry,
+        runtimeCapabilityGuard,
       });
       const localModelCheckpointResolver = createLocalModelCheckpointResolverAdapter({
         modelRegistry,
@@ -1248,6 +1254,7 @@ export function composeDesktopHost(
           runtime: comfyUiSupervisorPort,
           modelCheckpointResolver: localModelCheckpointResolver,
         }),
+        runtimeCapabilityGuard,
       });
       const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({
         runtimeTaskRegistry,

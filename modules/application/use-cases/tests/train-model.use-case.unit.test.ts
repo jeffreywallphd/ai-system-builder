@@ -302,4 +302,31 @@ describe("TrainModelUseCase", () => {
     expect(startRequest.payload.datasets[0].format).toBe("parquet");
   });
 
+
+it("rejects model training start when runtime capability is not ready", async () => {
+  const lifecycle = createLifecycleFake();
+  const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
+  const unavailable = new Error("Runtime capability 'model-training' is failed.") as Error & { code: "unavailable"; details: Record<string, unknown> };
+  unavailable.name = "RuntimeCapabilityUnavailableError";
+  unavailable.code = "unavailable";
+  unavailable.details = { capabilityId: "model-training", status: "failed", recommendedActions: ["retry", "view-logs"] };
+  const useCase = new TrainModelUseCase({
+    runtimeTaskRegistry,
+    modelRegistry: baseRegistry,
+    storageBindings: createStorageBindingsFake(),
+    storage: createStorageFake(),
+    taskPowerLifecycle: lifecycle,
+    runtimeCapabilityGuard: { requireCapabilityReady: testDouble.fn(async () => { throw unavailable; }) },
+  });
+
+  await useCase.execute({
+    baseModel: { modelId: "base", localPath: "/models/base" },
+    datasets: [{ artifactId: "dataset-1", splitRole: "train" }],
+    method: "lora",
+    commonParameters: {},
+    output: { outputModelName: "demo", destination: { local: { enabled: true } } },
+  }).catch((error) => expect(error).toMatchObject({ code: "unavailable", details: { capabilityId: "model-training", status: "failed" } }));
+  expect(runtimeTaskRegistry.startTask).not.toHaveBeenCalled();
+});
+
 });

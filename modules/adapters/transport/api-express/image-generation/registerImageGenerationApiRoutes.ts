@@ -2,6 +2,7 @@ import type { ImageGenerationRequest } from "../../../../contracts/image-generat
 import { createApiError, createApiFailureResponse, createApiSuccessResponse } from "../../../../contracts/api";
 import type { GenerateImageUseCase } from "../../../../application/use-cases/image-generation/generate-image.use-case";
 import type { ImageGenerationFinalizationOrchestratorService } from "../../../../application/services/image/image-generation-finalization-orchestrator.service";
+import { isRuntimeCapabilityUnavailableError } from "../../../../application/services/runtime";
 
 const API_IMAGE_GENERATION_START_OPERATION = "image-generation.start" as const;
 const API_IMAGE_GENERATION_READ_OPERATION = "image-generation.read" as const;
@@ -44,8 +45,8 @@ function mapRequestIdBody(body: unknown): string {
   if (!requestId) throw new Error("requestId is required.");
   return requestId;
 }
-function failure(operation: ImageGenerationOperation, code: "internal" | "validation" | "not-found" | "unavailable", message: string, context: { requestId?: string; correlationId?: string }) {
-  return createApiFailureResponse(createApiError(operation, code, message, context), context);
+function failure(operation: ImageGenerationOperation, code: "internal" | "validation" | "not-found" | "unavailable", message: string, context: { requestId?: string; correlationId?: string }, details?: Record<string, unknown>) {
+  return createApiFailureResponse(createApiError(operation, code, message, { ...context, details }), context);
 }
 
 function statusCode(response: { ok: boolean; error?: { code: string } }): number {
@@ -75,8 +76,9 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_START_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unexpected error.";
-      const apiResponse = failure(API_IMAGE_GENERATION_START_OPERATION, mapFailureCode(error), message, context);
+      const unavailable = isRuntimeCapabilityUnavailableError(error);
+      const message = unavailable ? "Required runtime capability is not ready." : (error instanceof Error ? error.message : "Unexpected error.");
+      const apiResponse = failure(API_IMAGE_GENERATION_START_OPERATION, unavailable ? "unavailable" : mapFailureCode(error), message, context, unavailable ? error.details : undefined);
       response.status(statusCode(apiResponse)).json(apiResponse);
     }
   });

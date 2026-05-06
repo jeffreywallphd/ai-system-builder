@@ -27,7 +27,7 @@ import type { ArtifactCatalogReadPort } from "../ports/artifact-catalog";
 import type { ArtifactStorageBindingPort, ArtifactObjectStoragePort, ArtifactRepoStoragePort } from "../ports/storage";
 import type { ArtifactStorageBinding } from "../../contracts/storage";
 import { TaskType } from "../../contracts/runtime";
-import type { TaskPowerLifecyclePort } from "../services/runtime";
+import type { RuntimeCapabilityGuardService, TaskPowerLifecyclePort } from "../services/runtime";
 import type { RuntimeTaskRecord, RuntimeTaskStatus } from "../../contracts/runtime";
 
 export interface PrepareTrainingDatasetFromArtifactsCommand {
@@ -74,6 +74,7 @@ export interface PrepareTrainingDatasetFromArtifactsUseCaseDependencies {
   artifactRepoStorage?: ArtifactRepoStoragePort;
   artifactCatalog?: ArtifactCatalogReadPort;
   taskPowerLifecycle: TaskPowerLifecyclePort;
+  runtimeCapabilityGuard?: Pick<RuntimeCapabilityGuardService, "requireCapabilityReady">;
   now?: () => string;
 }
 
@@ -323,6 +324,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
   private readonly artifactRepoStorage?: ArtifactRepoStoragePort;
   private readonly artifactCatalog?: ArtifactCatalogReadPort;
   private readonly taskPowerLifecycle: TaskPowerLifecyclePort;
+  private readonly runtimeCapabilityGuard?: Pick<RuntimeCapabilityGuardService, "requireCapabilityReady">;
   private readonly now: () => string;
   private readonly runtimeWorkingDirsByRequestId = new Map<string, string>();
   private readonly commandByRequestId = new Map<string, PrepareTrainingDatasetFromArtifactsCommand>();
@@ -335,6 +337,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     this.artifactRepoStorage = dependencies.artifactRepoStorage;
     this.artifactCatalog = dependencies.artifactCatalog;
     this.taskPowerLifecycle = dependencies.taskPowerLifecycle;
+    this.runtimeCapabilityGuard = dependencies.runtimeCapabilityGuard;
     this.now = dependencies.now ?? (() => new Date().toISOString());
   }
 
@@ -342,6 +345,15 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     command: PrepareTrainingDatasetFromArtifactsCommand,
     context?: ApplicationRequestContext,
   ): Promise<ContractResult<{ requestId: string; taskType: string; accepted: true; status: "queued" | "running"; startedAt?: string; updatedAt?: string; metadata?: Record<string, unknown> }>> {
+    try {
+      await this.runtimeCapabilityGuard?.requireCapabilityReady("dataset-preparation");
+    } catch (error) {
+      if (error instanceof Error && "code" in error && (error as { code?: string }).code === "unavailable") {
+        return createFailureResult(createContractError("unavailable", error.message, { details: (error as { details?: Record<string, unknown> }).details }), context);
+      }
+      throw error;
+    }
+
     const staged = await this.stageRuntimeInputs(command, context);
     if (!staged.ok) {
       return staged;

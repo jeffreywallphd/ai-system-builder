@@ -31,7 +31,7 @@
 - Keep runtime-specific mechanics out of domain/application logic.
 - Treat Python as an adapter path, not a co-equal architecture center.
 - Define or update runtime contracts before adding runtime-specific behavior.
-- Runtime readiness describes capability availability before/around execution; the Runtime Task Registry remains the lifecycle authority for long-running tasks.
+- Runtime readiness describes capability availability before/around execution; the Runtime Task Registry remains the lifecycle authority for long-running tasks. Runtime-backed feature starts should guard the derived feature capability when available, reject non-ready statuses as unavailable, and leave task read/cancel/status semantics to the registry.
 
 ## Runtime readiness vocabulary
 
