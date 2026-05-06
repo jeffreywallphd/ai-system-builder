@@ -131,9 +131,32 @@ it("generates non-timestamp request ids when caller does not provide one", async
     expect(result.status).toBe("unknown");
   });
 
-  it("rejects listTasks when python runtime list endpoint is unavailable", async () => {
+  it("returns explicit unsupported metadata instead of throwing for listTasks", async () => {
     const runtimePort: any = { startTask: testDouble.fn(), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
-    await expect(adapter.listTasks({})).rejects.toThrow("task listing is not supported");
+    const result = await adapter.listTasks({ taskTypes: [TaskType.MODEL_TRAINING] });
+    expect(result).toMatchObject({
+      tasks: [],
+      unsupportedTaskTypes: [TaskType.MODEL_TRAINING],
+      warnings: [{ code: "python_runtime_task_listing_unsupported", taskTypes: [TaskType.MODEL_TRAINING] }],
+    });
+  });
+
+  it("does not call ensureRuntimeReady when listing tasks", async () => {
+    const runtimePort: any = { startTask: testDouble.fn(), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
+    const ensureRuntimeReady = testDouble.fn(async () => undefined);
+    const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort, { ensureRuntimeReady });
+
+    await adapter.listTasks({});
+
+    expect(ensureRuntimeReady).not.toHaveBeenCalled();
+    expect(runtimePort.startTask).not.toHaveBeenCalled();
+  });
+
+  it("maps unknown runtime status without a task type to structured not-found", async () => {
+    const runtimePort: any = { startTask: testDouble.fn(), readTaskStatus: testDouble.fn(async () => ({ requestId: "req-404", status: "unknown" })), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
+    const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
+    const record = await adapter.getTaskStatus("req-404");
+    expect(record).toMatchObject({ requestId: "req-404", status: "unknown", error: { code: "python_runtime_task_not_found" } });
   });
 });

@@ -31,12 +31,15 @@
   - progress/status monitor failure
   - cancellation/stop flow
   - stale async state
+  - missing runtime task correlation or unsupported task listing
 - Treat long-running work carefully:
   - for desktop long-running tasks, combine async task lifecycle (start/poll/cancel) with Electron power-suspension blocking instead of relying on long-held transport requests
   - transport failure does not necessarily mean task failure
   - background task can continue after request disconnect
   - `finally` teardown can incorrectly kill active progress monitoring
   - polling/subscriptions should survive recoverable disconnects
+  - readiness-guard-rejected starts should surface unavailable responses and should not tell callers to poll nonexistent tasks
+  - unknown task status/cancel reads should be explicit not-found/unknown outcomes and should not start runtimes
 - Fix lifecycle behavior first; do not stop at improving error wording.
 - Preserve architecture boundaries while debugging:
   - UI handles UI state and progress display

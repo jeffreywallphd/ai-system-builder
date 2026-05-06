@@ -93,6 +93,22 @@ export function createPythonRuntimeTaskRegistryAdapter(
     },
     async getTaskStatus(requestId: string): Promise<RuntimeTaskRecord> {
       const status = await runtimePort.readTaskStatus(requestId);
+      if (status.status === "unknown" && !status.taskType) {
+        return {
+          requestId: status.requestId,
+          taskType: "unknown" as unknown as TaskType,
+          status: "unknown",
+          concurrencyClass: "unknown",
+          error: {
+            code: "python_runtime_task_not_found",
+            message: "Python runtime task was not found.",
+            details: { reason: "runtime-returned-unknown-without-task-type" },
+            retryable: false,
+          },
+          metadata: status.metadata,
+          updatedAt: status.updatedAt,
+        };
+      }
       return {
         requestId: status.requestId,
         taskType: toGenericTaskType(status.taskType),
@@ -104,6 +120,7 @@ export function createPythonRuntimeTaskRegistryAdapter(
         metadata: status.metadata,
         startedAt: status.startedAt,
         updatedAt: status.updatedAt,
+        completedAt: status.completedAt,
       };
     },
     async cancelTask(requestId: string): Promise<CancelRuntimeTaskResult> {
@@ -115,8 +132,22 @@ export function createPythonRuntimeTaskRegistryAdapter(
         message: result.message,
       };
     },
-    async listTasks(_request: RuntimeTaskListRequest): Promise<RuntimeTaskListResult> {
-      throw new Error("Python runtime task listing is not supported by the current runtime port.");
+    async listTasks(request: RuntimeTaskListRequest): Promise<RuntimeTaskListResult> {
+      const unsupportedTaskTypes = request.taskTypes ?? [
+        TaskType.DATASET_PREPARATION,
+        TaskType.MODEL_TRAINING,
+        TaskType.MODEL_VALIDATION,
+        TaskType.MODEL_PUBLISHING,
+      ];
+      return {
+        tasks: [],
+        unsupportedTaskTypes,
+        warnings: [{
+          code: "python_runtime_task_listing_unsupported",
+          message: "Python runtime task listing is not supported by the current runtime port.",
+          taskTypes: unsupportedTaskTypes,
+        }],
+      };
     },
   };
 }
