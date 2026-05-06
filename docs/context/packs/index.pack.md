@@ -79,3 +79,7 @@ Only use these when needed. Do not overload the context window with uncessary in
 
 - Treat runtime instances as host-owned: shared contracts/use cases define behavior, while host composition selects local or future remote execution placement; see ADR-0013 for cross-host runtime ownership.
 - Security is layered and adapter-based; use ADR-0015 and `security.pack.md` for authn/authz, transport encryption, storage security, credential handling, audit, and runtime security work.
+
+## Server readiness API baseline
+
+- Server API runtime readiness wraps shared host-scoped readiness contracts via the application readiness service; it remains separate from desktop IPC readiness and from feature-specific runtime execution endpoints.

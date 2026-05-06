@@ -83,3 +83,7 @@
 - Runtime env vars and logs must be redacted for secrets.
 - Runtime temp paths should not be exposed to clients/contracts.
 - Runtime/model/plugin downloads are supply-chain security concerns.
+
+## Server API readiness note
+
+- Server API readiness is now a server transport wrapper over the application `RuntimeReadinessService` and shared runtime readiness contracts. Reads are host-scoped and must remain no-start/no-install/no-repair; do not use image-generation/model endpoints as general readiness probes.

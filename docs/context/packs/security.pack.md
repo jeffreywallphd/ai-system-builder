@@ -116,3 +116,8 @@ Identity/authentication, authorization/policy, transport security, storage secur
 
 
 No automatic trust-store installation is performed. Trust installation is manual; browser/mobile trust limitations apply. Do not commit private keys or SERVER_TOKEN_HASH_SECRET.
+
+## Runtime readiness API security
+
+- Runtime readiness API failures must remain sanitized: no stack traces, filesystem/temp paths, secrets, tokens, raw environment values, or process internals in response payloads.
+- Readiness reads are informational and must not mutate runtime state by starting, installing, repairing, or probing heavy sidecars.
