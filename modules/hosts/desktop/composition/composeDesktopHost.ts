@@ -6,7 +6,17 @@ import { promisify } from "node:util";
 import type { LoggingPort } from "../../../application/ports/logging";
 import { FinalizeImageGenerationService } from "../../../application/services/image/finalize-image-generation.service";
 import { ImageGenerationFinalizationOrchestratorService } from "../../../application/services/image/image-generation-finalization-orchestrator.service";
-import { TaskPowerLifecycleService } from "../../../application/services/runtime";
+import {
+  TaskPowerLifecycleService,
+  RuntimeReadinessService,
+  createComfyUiRuntimeCapabilityStatusProvider,
+  createCompositeRuntimeCapabilityStatusProvider,
+  createDerivedRuntimeCapabilityStatusProvider,
+  createPythonRuntimeCapabilityStatusProvider,
+  createRuntimeInstallerCapabilityStatusProvider,
+  type RuntimeCapabilityStatusProvider,
+  type ComfyUiRuntimeLifecycleState,
+} from "../../../application/services/runtime";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
   BrowseArtifactsUseCase,
@@ -95,10 +105,17 @@ import {
 } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
-import { PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES } from "../../../contracts/runtime";
+import {
+  PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES,
+  RUNTIME_CAPABILITY_IDS,
+  createRuntimeCapabilityStatus,
+  type RuntimeCapabilityId,
+  type RuntimeCapabilityStatus,
+} from "../../../contracts/runtime";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 import type { PowerSuspensionBlockerPort } from "../../../application/ports/desktop";
 import type { RuntimeInstallerPort } from "../../../application/ports/runtime-installer";
+import type { RuntimeReadinessPort } from "../../../application/ports/runtime";
 import type { DesktopPythonRuntimeLogEntry, DesktopPythonRuntimeStatusPayload } from "../../../contracts/ipc";
 import {
   IMAGE_GENERATION_GPU_TYPE_SETTING_KEY,
@@ -421,6 +438,138 @@ function resolvePythonRuntimeHostAndPort(env: NodeJS.ProcessEnv = process.env): 
   };
 }
 
+
+function createMissingComfyUiSupervisorProvider(now: () => string): RuntimeCapabilityStatusProvider {
+  return {
+    capabilityId: "comfyui-runtime",
+    getStatus() {
+      return createRuntimeCapabilityStatus({
+        capabilityId: "comfyui-runtime",
+        status: "unknown",
+        summary: "ComfyUI runtime supervisor has not been initialized on this desktop host.",
+        reason: {
+          code: "runtime.comfyui.supervisor-uninitialized",
+          message: "ComfyUI runtime readiness is unknown because the supervisor has not been initialized without starting the runtime.",
+          category: "unknown",
+          retryable: false,
+        },
+        recommendedActions: ["configure"],
+        updatedAt: now(),
+      });
+    },
+  };
+}
+
+export interface CreateDesktopRuntimeReadinessServiceOptions {
+  readPythonSupervisorState: () => "stopped" | "starting" | "ready" | "failed";
+  readComfyUiLifecycleState: () => ComfyUiRuntimeLifecycleState | "uninitialized" | Promise<ComfyUiRuntimeLifecycleState | "uninitialized">;
+  readComfyUiInstallStatus: () => Promise<"not-installed" | "installing" | "checking" | "installed" | "update-available" | "failed" | "unknown">;
+  now?: () => string;
+}
+
+export function createDesktopRuntimeReadinessService(
+  options: CreateDesktopRuntimeReadinessServiceOptions,
+): RuntimeReadinessPort {
+  const now = options.now ?? (() => new Date().toISOString());
+  const providersByCapabilityId = new Map<RuntimeCapabilityId, RuntimeCapabilityStatusProvider>();
+  const setProvider = (provider: RuntimeCapabilityStatusProvider) => {
+    providersByCapabilityId.set(provider.capabilityId, provider);
+    return provider;
+  };
+
+  const pythonProvider = setProvider(createPythonRuntimeCapabilityStatusProvider({
+    readState: options.readPythonSupervisorState,
+    now,
+  }));
+
+  const comfyUiSupervisorProvider: RuntimeCapabilityStatusProvider = {
+    capabilityId: "comfyui-runtime",
+    async getStatus() {
+      const state = await options.readComfyUiLifecycleState();
+      if (state === "uninitialized") {
+        return createMissingComfyUiSupervisorProvider(now).getStatus();
+      }
+
+      return createComfyUiRuntimeCapabilityStatusProvider({
+        readState: () => state,
+        now,
+      }).getStatus();
+    },
+  };
+
+  const comfyUiProvider = setProvider(createCompositeRuntimeCapabilityStatusProvider({
+    capabilityId: "comfyui-runtime",
+    providers: [
+      createRuntimeInstallerCapabilityStatusProvider({
+        capabilityId: "comfyui-runtime",
+        targetId: "comfyui",
+        readStatus: options.readComfyUiInstallStatus,
+        now,
+      }),
+      comfyUiSupervisorProvider,
+    ],
+    now,
+  }));
+
+  const readDependencyStatus = async (capabilityId: RuntimeCapabilityId): Promise<RuntimeCapabilityStatus> => {
+    const provider = providersByCapabilityId.get(capabilityId);
+    if (!provider) {
+      return createRuntimeCapabilityStatus({
+        capabilityId,
+        status: "unknown",
+        summary: `No desktop runtime readiness provider is composed for ${capabilityId}.`,
+        reason: {
+          code: "runtime.readiness.provider-missing",
+          message: `No desktop runtime readiness provider is composed for ${capabilityId}.`,
+          category: "unknown",
+          retryable: false,
+        },
+        recommendedActions: ["configure"],
+        updatedAt: now(),
+      });
+    }
+
+    return provider.getStatus();
+  };
+
+  const derivedProviders = [
+    createDerivedRuntimeCapabilityStatusProvider({
+      capabilityId: "image-generation",
+      dependencies: [comfyUiProvider.capabilityId],
+      readDependencyStatus,
+      now,
+    }),
+    createDerivedRuntimeCapabilityStatusProvider({
+      capabilityId: "dataset-preparation",
+      dependencies: [pythonProvider.capabilityId],
+      readDependencyStatus,
+      now,
+    }),
+    createDerivedRuntimeCapabilityStatusProvider({
+      capabilityId: "model-training",
+      dependencies: [pythonProvider.capabilityId],
+      readDependencyStatus,
+      now,
+    }),
+    createDerivedRuntimeCapabilityStatusProvider({
+      capabilityId: "model-validation",
+      dependencies: [pythonProvider.capabilityId],
+      readDependencyStatus,
+      now,
+    }),
+  ];
+
+  for (const provider of derivedProviders) {
+    setProvider(provider);
+  }
+
+  return new RuntimeReadinessService({
+    providers: Array.from(providersByCapabilityId.values()),
+    capabilityIds: RUNTIME_CAPABILITY_IDS,
+    now,
+  });
+}
+
 export function composeDesktopHost(
   options: ComposeDesktopHostOptions = {},
 ): DesktopHostComposition {
@@ -731,27 +880,30 @@ export function composeDesktopHost(
           ? configuredComfyUiInstallCommandTimeoutMs
           : COMFYUI_INSTALL_COMMAND_TIMEOUT_MS_DEFAULT;
       const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort });
-      const createConfiguredComfyUiInstaller = async (runtimeDeviceMode?: ComfyUiRuntimeDeviceMode) => createComfyUiRuntimeInstaller({
-        gitInstaller: gitRuntimeInstaller,
-        pythonCommand: comfyUiBasePythonCommand,
-        pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
-        runtimeDeviceMode: runtimeDeviceMode ?? resolveComfyUiRuntimeDeviceMode({
-          env: process.env,
-          hasNvidiaGpu: detectNvidiaGpu(),
-          gpuType: process.env.COMFYUI_GPU_TYPE,
+      const createConfiguredComfyUiInstaller = async (runtimeDeviceMode?: ComfyUiRuntimeDeviceMode) => {
+        const comfyUiInstaller = createComfyUiRuntimeInstaller({
+          gitInstaller: gitRuntimeInstaller,
+          pythonCommand: comfyUiBasePythonCommand,
+          pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
+          runtimeDeviceMode: runtimeDeviceMode ?? resolveComfyUiRuntimeDeviceMode({
+            env: process.env,
+            hasNvidiaGpu: detectNvidiaGpu(),
+            gpuType: process.env.COMFYUI_GPU_TYPE,
+            cudaTorchWheelIndexUrl: await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY),
+          }),
           cudaTorchWheelIndexUrl: await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY),
-        }),
-        cudaTorchWheelIndexUrl: await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY),
-        execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true }),
-        skipPythonSetup: comfyUiSkipPythonSetup,
-        skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
-        directMlTorchVersion: process.env.COMFYUI_DIRECTML_TORCH_VERSION,
-        directMlTorchAudioVersion: process.env.COMFYUI_DIRECTML_TORCHAUDIO_VERSION,
-        directMlTorchVisionVersion: process.env.COMFYUI_DIRECTML_TORCHVISION_VERSION,
-        directMlPackageName: process.env.COMFYUI_DIRECTML_PACKAGE,
-        logging: loggingPort,
-      });
-      const comfyUiInstaller: RuntimeInstallerPort = {
+          execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true }),
+          skipPythonSetup: comfyUiSkipPythonSetup,
+          skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
+          directMlTorchVersion: process.env.COMFYUI_DIRECTML_TORCH_VERSION,
+          directMlTorchAudioVersion: process.env.COMFYUI_DIRECTML_TORCHAUDIO_VERSION,
+          directMlTorchVisionVersion: process.env.COMFYUI_DIRECTML_TORCHVISION_VERSION,
+          directMlPackageName: process.env.COMFYUI_DIRECTML_PACKAGE,
+          logging: loggingPort,
+        });
+        return comfyUiInstaller;
+      };
+      const comfyUiInstaller = {
         async ensureInstalled(request) {
           return (await createConfiguredComfyUiInstaller()).ensureInstalled(request);
         },
@@ -762,7 +914,7 @@ export function composeDesktopHost(
           const installer = await createConfiguredComfyUiInstaller();
           return installer.repairInstall?.(request) ?? installer.ensureInstalled({ ...request, allowUpdate: true });
         },
-      };
+      } satisfies RuntimeInstallerPort;
       let comfyUiSupervisor: ReturnType<typeof createComfyUiRuntimeSupervisor> | undefined;
       let activeRuntimeDeviceMode: ComfyUiRuntimeDeviceMode | undefined;
       const comfyUiSupervisorPort = {
@@ -822,6 +974,23 @@ export function composeDesktopHost(
           return activeRuntimeDeviceMode ?? "cpu";
         },
       };
+      const runtimeReadiness = createDesktopRuntimeReadinessService({
+        readPythonSupervisorState: () => pythonRuntimeFoundation.supervisor.getStatus(),
+        async readComfyUiLifecycleState() {
+          if (!comfyUiSupervisor) {
+            return "uninitialized";
+          }
+          return comfyUiSupervisor.getStatus();
+        },
+        async readComfyUiInstallStatus() {
+          const status = await comfyUiInstaller.getInstallStatus({
+            targetId: "comfyui",
+            installRoot: comfyUiInstallRoot,
+          });
+          return status.status;
+        },
+        now,
+      });
       let latentReferenceStorage: Pick<ArtifactObjectStoragePort, "retrieveArtifact"> | undefined;
       const comfyUiRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
         client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }),
@@ -1125,6 +1294,7 @@ export function composeDesktopHost(
           },
           readPythonRuntimeStatus,
         },
+        runtimeReadiness,
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
         setHuggingFaceToken: (token) => tokenConfigStore.setToken(token),
         clearHuggingFaceToken: () => tokenConfigStore.clearToken(),

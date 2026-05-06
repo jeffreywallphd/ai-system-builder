@@ -346,6 +346,8 @@ interface DesktopApiBridge {
   startPrepareTrainingDataset?: (input: DesktopPrepareTrainingDatasetInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   cancelPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readRuntimeReadiness?: (context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readRuntimeCapabilityStatus?: (input: { capabilityId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readPythonRuntimeStatus?: () => Promise<unknown>;
   controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
   startImageGeneration?: (input: ImageGenerationRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;

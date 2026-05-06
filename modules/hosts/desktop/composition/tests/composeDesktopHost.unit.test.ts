@@ -35,6 +35,8 @@ import {
   DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_REQUEST_CHANNEL,
@@ -59,6 +61,7 @@ import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-elect
 import {
   classifyPythonRuntimeStdioLogLevel,
   composeDesktopHost,
+  createDesktopRuntimeReadinessService,
   resolveComfyUiLaunchPythonExecutable,
   resolveComfyUiPythonEnvironmentMode,
   resolveComfyUiRuntimeDeviceMode,
@@ -241,9 +244,11 @@ describe("composeDesktopHost", () => {
       storageRootDirectory: join(tmpdir(), `desktop-artifact-upload-test-${Date.now()}`),
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(49);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(51);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
+      DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL.value,
+      DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_REQUEST_CHANNEL.value,
       DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value,
@@ -296,6 +301,47 @@ describe("composeDesktopHost", () => {
     ]);
     const listener = ipcMain.handle.mock.calls[0]?.[1];
     expect(listener).toBeTypeOf("function");
+  });
+
+  it("builds desktop runtime readiness providers from read-only runtime signals", async () => {
+    const calls: string[] = [];
+    const service = createDesktopRuntimeReadinessService({
+      readPythonSupervisorState: () => {
+        calls.push("read-python-status");
+        return "stopped";
+      },
+      readComfyUiLifecycleState: () => {
+        calls.push("read-comfyui-health");
+        return "uninitialized";
+      },
+      readComfyUiInstallStatus: async () => {
+        calls.push("read-comfyui-install-status");
+        return "not-installed";
+      },
+      now: () => "2026-05-06T00:00:00.000Z",
+    });
+
+    const snapshot = await service.getReadinessSnapshot();
+
+    expect(snapshot.capabilities.map((capability) => capability.capabilityId)).toEqual([
+      "python-runtime",
+      "comfyui-runtime",
+      "image-generation",
+      "dataset-preparation",
+      "model-training",
+      "model-validation",
+      "model-publishing",
+    ]);
+    expect(snapshot.capabilities.find((capability) => capability.capabilityId === "model-publishing")).toMatchObject({
+      status: "unknown",
+      reason: { code: "runtime.readiness.provider-missing" },
+    });
+    expect(calls).toContain("read-python-status");
+    expect(calls).toContain("read-comfyui-install-status");
+    expect(calls).toContain("read-comfyui-health");
+    expect(calls).not.toContain("start-python-runtime");
+    expect(calls).not.toContain("start-comfyui-runtime");
+    expect(calls).not.toContain("repair-comfyui-install");
   });
 
   it("keeps the composition seam usable for upload success and failure event logging", async () => {
