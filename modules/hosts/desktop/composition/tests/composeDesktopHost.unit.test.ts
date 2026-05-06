@@ -605,3 +605,15 @@ describe("composeDesktopHost", () => {
     expect(healthTransitionLogsSecondRead.length).toBe(1);
   });
 });
+
+describe("desktop host composition decomposition", () => {
+  it("keeps runtime readiness wiring in a focused helper without IPC transport imports", () => {
+    const hostSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopHost.ts"), "utf8");
+    const helperSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopRuntimeReadiness.ts"), "utf8");
+
+    expect(hostSource).toContain("./composeDesktopRuntimeReadiness");
+    expect(helperSource).toContain("RuntimeReadinessService");
+    expect(helperSource).not.toContain("ipc-electron");
+    expect(helperSource).not.toContain("registerElectronIpc");
+  });
+});

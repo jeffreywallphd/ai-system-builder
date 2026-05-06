@@ -154,8 +154,8 @@ describe("composeServerHost", () => {
       runtimeRootDirectory: "/tmp/server-runtime",
     });
 
-    expect(app.post).toHaveBeenCalledTimes(26);
-    expect(app.get).toHaveBeenCalledTimes(3);
+    expect(app.post).toHaveBeenCalledTimes(33);
+    expect(app.get).toHaveBeenCalledTimes(5);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
       "/api/artifact/upload",
@@ -184,9 +184,22 @@ describe("composeServerHost", () => {
       "/api/image-generation/read",
       "/api/image-generation/cancel",
       "/api/image-generation/finalize",
+      "/api/image-generation/unload-model",
+      "/api/image-generation/runtime-resources",
+      "/api/application-settings/list-definitions",
+      "/api/application-settings/read",
+      "/api/application-settings/update",
+      "/api/application-settings/clear",
+      "/api/server/restart",
     ]);
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
-    expect(registeredGetPaths).toEqual(["/api/artifact/upload/policy", "/api/artifact/media/view", "/api/config/huggingface-token"]);
+    expect(registeredGetPaths).toEqual([
+      "/api/artifact/upload/policy",
+      "/api/artifact/media/view",
+      "/api/config/huggingface-token",
+      "/api/runtime/readiness",
+      "/api/runtime/capabilities/:capabilityId",
+    ]);
   });
 
   it("wires Hugging Face browse use-cases to the dedicated Hugging Face adapter seam", () => {
@@ -438,5 +451,17 @@ describe("server ComfyUI python/runtime resolution", () => {
     expect(source).toContain("HF_XET_CACHE");
     expect(source).toContain("joinHostPath(pythonRuntimeRoot, \"xet\")");
     expect(source).not.toContain("HF_HUB_DISABLE_XET: env.HF_HUB_DISABLE_XET ?? \"1\"");
+  });
+});
+
+describe("server host composition decomposition", () => {
+  it("keeps runtime readiness wiring in a focused helper without Express transport imports", () => {
+    const hostSource = readFileSync(resolve("modules/hosts/server/composition/composeServerHost.ts"), "utf8");
+    const helperSource = readFileSync(resolve("modules/hosts/server/composition/composeServerRuntimeReadiness.ts"), "utf8");
+
+    expect(hostSource).toContain("./composeServerRuntimeReadiness");
+    expect(helperSource).toContain("RuntimeReadinessService");
+    expect(helperSource).not.toContain("api-express");
+    expect(helperSource).not.toContain("registerExpressApi");
   });
 });
