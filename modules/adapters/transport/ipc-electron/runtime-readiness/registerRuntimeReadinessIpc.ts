@@ -21,14 +21,8 @@ export interface RegisterRuntimeReadinessIpcDependencies {
   runtimeReadiness: RuntimeReadinessPort;
 }
 
-function sanitizeHandlerError(error: unknown, fallback: string): string {
-  if (!(error instanceof Error)) {
-    return fallback;
-  }
-
-  const message = error.message.trim();
-  return message.length > 0 ? message : fallback;
-}
+const RUNTIME_READINESS_INTERNAL_ERROR_MESSAGE = "Unable to read runtime readiness.";
+const RUNTIME_CAPABILITY_STATUS_INTERNAL_ERROR_MESSAGE = "Unable to read runtime capability status.";
 
 export function createDesktopRuntimeReadinessReadIpcHandler(
   dependencies: Pick<RegisterRuntimeReadinessIpcDependencies, "runtimeReadiness">,
@@ -43,11 +37,11 @@ export function createDesktopRuntimeReadinessReadIpcHandler(
         requestId: request.requestId,
         correlationId: request.correlationId,
       });
-    } catch (error) {
+    } catch {
       return createIpcFailureResponse(createIpcError(
         DESKTOP_RUNTIME_READINESS_READ_RESPONSE_CHANNEL,
         "internal",
-        sanitizeHandlerError(error, "Failed to read runtime readiness."),
+        RUNTIME_READINESS_INTERNAL_ERROR_MESSAGE,
         { requestId: request.requestId, correlationId: request.correlationId },
       ));
     }
@@ -83,11 +77,11 @@ export function createDesktopRuntimeCapabilityStatusReadIpcHandler(
         requestId: request.requestId,
         correlationId: request.correlationId,
       });
-    } catch (error) {
+    } catch {
       return createIpcFailureResponse(createIpcError(
         DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_RESPONSE_CHANNEL,
         "internal",
-        sanitizeHandlerError(error, "Failed to read runtime capability status."),
+        RUNTIME_CAPABILITY_STATUS_INTERNAL_ERROR_MESSAGE,
         { requestId: request.requestId, correlationId: request.correlationId },
       ));
     }

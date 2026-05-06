@@ -61,6 +61,35 @@ describe("registerRuntimeReadinessApiRoutes", () => {
     });
   });
 
+
+  it("keeps internal readiness failures generic without raw exception details", async () => {
+    const handlers = new Map<string, any>();
+    const app: ExpressRoutePort = { get: testDouble.fn((path, handler) => handlers.set(path, handler)) };
+    const runtimeReadiness = {
+      getReadinessSnapshot: testDouble.fn(async () => {
+        throw new Error("/tmp/runtime failed at Adapter.read TOKEN=abc");
+      }),
+      getCapabilityStatus: testDouble.fn(),
+    };
+
+    registerRuntimeReadinessApiRoutes({ app, runtimeReadiness });
+    const { res, status, json } = response();
+    await handlers.get("/api/runtime/readiness")({ headers: { "x-request-id": "r-fail", "x-correlation-id": "c-fail" } }, res);
+
+    expect(status).toHaveBeenCalledWith(500);
+    const body = json.mock.calls[0]?.[0];
+    expect(body).toMatchObject({
+      ok: false,
+      requestId: "r-fail",
+      correlationId: "c-fail",
+      error: { code: "internal", message: "Unable to read runtime readiness." },
+    });
+    const payload = JSON.stringify(body);
+    expect(payload).not.toContain("/tmp/runtime");
+    expect(payload).not.toContain("TOKEN=abc");
+    expect(payload).not.toContain("Adapter.read");
+  });
+
   it("maps invalid capability ids to validation failures without stack traces", async () => {
     const handlers = new Map<string, any>();
     const app: ExpressRoutePort = { get: testDouble.fn((path, handler) => handlers.set(path, handler)) };

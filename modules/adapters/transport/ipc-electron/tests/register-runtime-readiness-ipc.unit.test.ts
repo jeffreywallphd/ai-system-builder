@@ -76,6 +76,69 @@ describe("registerRuntimeReadinessIpc", () => {
     });
   });
 
+
+  it("returns a generic internal message when readiness snapshot reads throw", async () => {
+    const runtimeReadiness = createRuntimeReadiness({
+      getReadinessSnapshot: testDouble.fn(async () => {
+        throw new Error("C:/Users/name/AppData/Local/runtime secret TOKEN=abc\n    at RuntimeReader.read");
+      }),
+    });
+    const handler = createDesktopRuntimeReadinessReadIpcHandler({ runtimeReadiness });
+    const request = createDesktopRuntimeReadinessReadRequest(
+      { boundary: { host: "desktop", source: "desktop.renderer.runtime-readiness" } },
+      { requestId: "req-ready-fail", correlationId: "corr-ready-fail" },
+    );
+
+    const response = await handler({}, request);
+
+    expect(response).toMatchObject({
+      ok: false,
+      requestId: "req-ready-fail",
+      correlationId: "corr-ready-fail",
+      error: {
+        code: "internal",
+        message: "Unable to read runtime readiness.",
+      },
+    });
+    const payload = JSON.stringify(response);
+    expect(payload).not.toContain("C:/Users/name");
+    expect(payload).not.toContain("TOKEN=abc");
+    expect(payload).not.toContain("RuntimeReader.read");
+  });
+
+  it("returns a generic internal message when capability status reads throw", async () => {
+    const runtimeReadiness = createRuntimeReadiness({
+      getCapabilityStatus: testDouble.fn(async () => {
+        throw new Error("/tmp/runtime/socket failed\n    at Adapter.readStatus --token abc");
+      }),
+    });
+    const handler = createDesktopRuntimeCapabilityStatusReadIpcHandler({ runtimeReadiness });
+    const request = createDesktopRuntimeCapabilityStatusReadRequest(
+      {
+        capabilityId: "python-runtime",
+        boundary: { host: "desktop", source: "desktop.renderer.runtime-readiness" },
+      },
+      { requestId: "req-cap-fail", correlationId: "corr-cap-fail" },
+    );
+
+    const response = await handler({}, request);
+
+    expect(runtimeReadiness.getCapabilityStatus).toHaveBeenCalledWith("python-runtime");
+    expect(response).toMatchObject({
+      ok: false,
+      requestId: "req-cap-fail",
+      correlationId: "corr-cap-fail",
+      error: {
+        code: "internal",
+        message: "Unable to read runtime capability status.",
+      },
+    });
+    const payload = JSON.stringify(response);
+    expect(payload).not.toContain("/tmp/runtime");
+    expect(payload).not.toContain("Adapter.readStatus");
+    expect(payload).not.toContain("--token abc");
+  });
+
   it("maps invalid capability ids to validation failures without calling the service", async () => {
     const runtimeReadiness = createRuntimeReadiness();
     const handler = createDesktopRuntimeCapabilityStatusReadIpcHandler({ runtimeReadiness });
