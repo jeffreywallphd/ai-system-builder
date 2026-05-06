@@ -119,5 +119,5 @@ No automatic trust-store installation is performed. Trust installation is manual
 
 ## Runtime readiness API security
 
-- Runtime readiness API failures must remain sanitized: no stack traces, filesystem/temp paths, secrets, tokens, raw environment values, or process internals in response payloads.
+- Runtime readiness API and IPC internal failures must remain sanitized: no stack traces, filesystem/temp paths, secrets, tokens, raw environment values, command lines, raw adapter details, or process internals in response payloads.
 - Readiness reads are informational and must not mutate runtime state by starting, installing, repairing, or probing heavy sidecars.

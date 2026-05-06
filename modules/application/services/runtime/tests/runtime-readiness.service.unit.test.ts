@@ -103,6 +103,212 @@ describe("RuntimeReadinessService", () => {
     });
   });
 
+  it("uses snapshot-scoped dependency statuses for derived capabilities without duplicate runtime reads", async () => {
+    let pythonReads = 0;
+    let comfyUiInstallReads = 0;
+    let comfyUiSupervisorReads = 0;
+
+    const pythonProvider: RuntimeCapabilityStatusProvider = {
+      capabilityId: "python-runtime",
+      getStatus: async () => {
+        pythonReads += 1;
+        return createRuntimeCapabilityStatus({
+          capabilityId: "python-runtime",
+          status: "ready",
+          summary: `Python runtime snapshot read ${pythonReads}.`,
+          details: { readCount: pythonReads },
+          updatedAt: `python-read-${pythonReads}`,
+        });
+      },
+    };
+
+    const comfyUiProvider = createCompositeRuntimeCapabilityStatusProvider({
+      capabilityId: "comfyui-runtime",
+      providers: [
+        createRuntimeInstallerCapabilityStatusProvider({
+          capabilityId: "comfyui-runtime",
+          readStatus: async () => {
+            comfyUiInstallReads += 1;
+            return "installed";
+          },
+          targetId: "comfyui",
+          now: () => `comfyui-install-read-${comfyUiInstallReads}`,
+        }),
+        {
+          capabilityId: "comfyui-runtime",
+          getStatus: async () => {
+            comfyUiSupervisorReads += 1;
+            return createRuntimeCapabilityStatus({
+              capabilityId: "comfyui-runtime",
+              status: "ready",
+              summary: `ComfyUI supervisor snapshot read ${comfyUiSupervisorReads}.`,
+              details: { supervisorReadCount: comfyUiSupervisorReads },
+              updatedAt: `comfyui-supervisor-read-${comfyUiSupervisorReads}`,
+            });
+          },
+        },
+      ],
+      now,
+    });
+
+    const unavailableFallback = () => createRuntimeCapabilityStatus({
+      capabilityId: "python-runtime",
+      status: "failed",
+      summary: "Fallback dependency reader should not be used during snapshots.",
+      updatedAt: "fallback-read",
+    });
+
+    const service = new RuntimeReadinessService({
+      providers: [
+        pythonProvider,
+        comfyUiProvider,
+        createDerivedRuntimeCapabilityStatusProvider({
+          capabilityId: "image-generation",
+          dependencies: ["comfyui-runtime"],
+          readDependencyStatus: unavailableFallback,
+          now,
+        }),
+        createDerivedRuntimeCapabilityStatusProvider({
+          capabilityId: "dataset-preparation",
+          dependencies: ["python-runtime"],
+          readDependencyStatus: unavailableFallback,
+          now,
+        }),
+        createDerivedRuntimeCapabilityStatusProvider({
+          capabilityId: "model-training",
+          dependencies: ["python-runtime"],
+          readDependencyStatus: unavailableFallback,
+          now,
+        }),
+      ],
+      now,
+    });
+
+    const snapshot = await service.getReadinessSnapshot();
+    const pythonStatus = snapshot.capabilities.find((capability) => capability.capabilityId === "python-runtime");
+    const comfyUiStatus = snapshot.capabilities.find((capability) => capability.capabilityId === "comfyui-runtime");
+    const imageGeneration = snapshot.capabilities.find((capability) => capability.capabilityId === "image-generation");
+    const datasetPreparation = snapshot.capabilities.find((capability) => capability.capabilityId === "dataset-preparation");
+    const modelTraining = snapshot.capabilities.find((capability) => capability.capabilityId === "model-training");
+
+    expect(pythonReads).toBe(1);
+    expect(comfyUiInstallReads).toBe(1);
+    expect(comfyUiSupervisorReads).toBe(1);
+    expect(pythonStatus).toMatchObject({ updatedAt: "python-read-1", details: { readCount: 1 } });
+    expect(comfyUiStatus).toMatchObject({
+      updatedAt: NOW,
+      details: { installStatus: "installed", targetId: "comfyui", supervisorReadCount: 1 },
+    });
+    expect(imageGeneration?.dependencies).toEqual([
+      {
+        capabilityId: "comfyui-runtime",
+        status: comfyUiStatus?.status,
+        healthy: comfyUiStatus?.healthy,
+        available: comfyUiStatus?.available,
+        summary: comfyUiStatus?.summary,
+        reason: comfyUiStatus?.reason,
+        updatedAt: comfyUiStatus?.updatedAt,
+      },
+    ]);
+    for (const featureStatus of [datasetPreparation, modelTraining]) {
+      expect(featureStatus?.dependencies).toEqual([
+        {
+          capabilityId: "python-runtime",
+          status: pythonStatus?.status,
+          healthy: pythonStatus?.healthy,
+          available: pythonStatus?.available,
+          summary: pythonStatus?.summary,
+          reason: pythonStatus?.reason,
+          updatedAt: pythonStatus?.updatedAt,
+        },
+      ]);
+    }
+  });
+
+  it("memoizes snapshot reads before provider execution for out-of-order derived dependencies", async () => {
+    let pythonReads = 0;
+    const service = new RuntimeReadinessService({
+      providers: [
+        createDerivedRuntimeCapabilityStatusProvider({
+          capabilityId: "dataset-preparation",
+          dependencies: ["python-runtime"],
+          readDependencyStatus: () => {
+            throw new Error("snapshot context should read python-runtime");
+          },
+          now,
+        }),
+        createDerivedRuntimeCapabilityStatusProvider({
+          capabilityId: "model-training",
+          dependencies: ["python-runtime"],
+          readDependencyStatus: () => {
+            throw new Error("snapshot context should read python-runtime");
+          },
+          now,
+        }),
+        {
+          capabilityId: "python-runtime",
+          getStatus: () => {
+            pythonReads += 1;
+            return createRuntimeCapabilityStatus({
+              capabilityId: "python-runtime",
+              status: "ready",
+              summary: `Python runtime explicit-scope read ${pythonReads}.`,
+              updatedAt: `python-explicit-read-${pythonReads}`,
+            });
+          },
+        },
+      ],
+      capabilityIds: ["dataset-preparation", "model-training", "python-runtime"],
+      now,
+    });
+
+    const snapshot = await service.getReadinessSnapshot();
+    const pythonStatus = snapshot.capabilities.find((capability) => capability.capabilityId === "python-runtime");
+
+    expect(pythonReads).toBe(1);
+    expect(snapshot.capabilities.map((capability) => capability.capabilityId)).toEqual([
+      "dataset-preparation",
+      "model-training",
+      "python-runtime",
+    ]);
+    for (const featureStatus of snapshot.capabilities.slice(0, 2)) {
+      expect(featureStatus.dependencies).toEqual([{
+        capabilityId: "python-runtime",
+        status: pythonStatus?.status,
+        healthy: pythonStatus?.healthy,
+        available: pythonStatus?.available,
+        summary: pythonStatus?.summary,
+        reason: pythonStatus?.reason,
+        updatedAt: pythonStatus?.updatedAt,
+      }]);
+    }
+  });
+
+  it("reads direct capability status requests through the provider each time", async () => {
+    let reads = 0;
+    const service = new RuntimeReadinessService({
+      providers: [{
+        capabilityId: "python-runtime",
+        getStatus: () => {
+          reads += 1;
+          return createRuntimeCapabilityStatus({
+            capabilityId: "python-runtime",
+            status: "ready",
+            details: { reads },
+            updatedAt: NOW,
+          });
+        },
+      }],
+      now,
+    });
+
+    await service.getCapabilityStatus("python-runtime");
+    const second = await service.getCapabilityStatus("python-runtime");
+
+    expect(reads).toBe(2);
+    expect(second.details).toEqual({ reads: 2 });
+  });
+
   it("isolates provider failures when reading an individual capability", async () => {
     const service = new RuntimeReadinessService({
       providers: [{

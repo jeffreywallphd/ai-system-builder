@@ -43,6 +43,8 @@
   - preload/IPC remain proxy/transport boundaries
   - use cases enforce application rules
   - adapters translate provider/runtime details
+  - provider-level failures should become structured readiness/status objects where the application service can isolate them
+  - unexpected transport handler failures should return sanitized, generic internal errors rather than raw exception text
   - runtime workers execute tasks
 - Add tests for execution timelines and state transitions, not only final outputs.
 

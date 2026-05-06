@@ -15,9 +15,13 @@ import type { RuntimeReadinessPort } from "../../ports/runtime";
 export type PythonRuntimeLifecycleState = "stopped" | "starting" | "ready" | "failed";
 export type ComfyUiRuntimeLifecycleState = "stopped" | "starting" | "ready" | "unhealthy";
 
+export interface RuntimeReadinessProviderContext {
+  getCapabilityStatus(capabilityId: RuntimeCapabilityId): Promise<RuntimeCapabilityStatus>;
+}
+
 export interface RuntimeCapabilityStatusProvider {
   capabilityId: RuntimeCapabilityId;
-  getStatus(): RuntimeCapabilityStatus | Promise<RuntimeCapabilityStatus>;
+  getStatus(context?: RuntimeReadinessProviderContext): RuntimeCapabilityStatus | Promise<RuntimeCapabilityStatus>;
 }
 
 export interface RuntimeReadinessServiceOptions {
@@ -370,6 +374,48 @@ export class RuntimeReadinessService implements RuntimeReadinessPort {
   }
 
   public async getCapabilityStatus(capabilityId: RuntimeCapabilityId): Promise<RuntimeCapabilityStatus> {
+    return this.readCapabilityStatus(capabilityId);
+  }
+
+  public async getReadinessSnapshot(): Promise<RuntimeReadinessSnapshot> {
+    const capabilityIds = this.snapshotCapabilityIds ?? this.defaultSnapshotCapabilityIds();
+    const snapshotStatusReads = new Map<RuntimeCapabilityId, Promise<RuntimeCapabilityStatus>>();
+    const context: RuntimeReadinessProviderContext = {
+      getCapabilityStatus: (capabilityId) => {
+        const existing = snapshotStatusReads.get(capabilityId);
+        if (existing) {
+          return existing;
+        }
+        const statusRead = Promise.resolve().then(() => this.readCapabilityStatus(capabilityId, context));
+        snapshotStatusReads.set(capabilityId, statusRead);
+        return statusRead;
+      },
+    };
+    const capabilities = await Promise.all(
+      capabilityIds.map((capabilityId) => context.getCapabilityStatus(capabilityId)),
+    );
+    const status = this.aggregateSnapshotStatus(capabilities);
+    const available = capabilities.some(isCapabilityAvailable);
+    const healthy = capabilities.length > 0 && capabilities.every((capability) => capability.healthy === true);
+    const recommendedActions = Array.from(
+      new Set(capabilities.flatMap((capability) => capability.recommendedActions ?? [])),
+    );
+
+    return {
+      status,
+      healthy,
+      available,
+      capabilities,
+      summary: this.snapshotSummary(status),
+      recommendedActions: recommendedActions.length > 0 ? recommendedActions : undefined,
+      updatedAt: this.now(),
+    };
+  }
+
+  private async readCapabilityStatus(
+    capabilityId: RuntimeCapabilityId,
+    context?: RuntimeReadinessProviderContext,
+  ): Promise<RuntimeCapabilityStatus> {
     const provider = this.providersByCapabilityId.get(capabilityId);
     if (!provider) {
       return createRuntimeCapabilityStatus({
@@ -388,33 +434,10 @@ export class RuntimeReadinessService implements RuntimeReadinessPort {
     }
 
     try {
-      return await provider.getStatus();
+      return await provider.getStatus(context);
     } catch (error) {
       return providerFailureStatus(capabilityId, error, this.now);
     }
-  }
-
-  public async getReadinessSnapshot(): Promise<RuntimeReadinessSnapshot> {
-    const capabilityIds = this.snapshotCapabilityIds ?? this.defaultSnapshotCapabilityIds();
-    const capabilities = await Promise.all(
-      capabilityIds.map((capabilityId) => this.getCapabilityStatus(capabilityId)),
-    );
-    const status = this.aggregateSnapshotStatus(capabilities);
-    const available = capabilities.some(isCapabilityAvailable);
-    const healthy = capabilities.length > 0 && capabilities.every((capability) => capability.healthy === true);
-    const recommendedActions = Array.from(
-      new Set(capabilities.flatMap((capability) => capability.recommendedActions ?? [])),
-    );
-
-    return {
-      status,
-      healthy,
-      available,
-      capabilities,
-      summary: this.snapshotSummary(status),
-      recommendedActions: recommendedActions.length > 0 ? recommendedActions : undefined,
-      updatedAt: this.now(),
-    };
   }
 
   private defaultSnapshotCapabilityIds(): readonly RuntimeCapabilityId[] {
@@ -584,11 +607,12 @@ export function createDerivedRuntimeCapabilityStatusProvider(
   const now = options.now ?? DEFAULT_NOW;
   return {
     capabilityId: options.capabilityId,
-    async getStatus() {
+    async getStatus(context) {
+      const readDependencyStatus = context?.getCapabilityStatus ?? options.readDependencyStatus;
       const dependencies = await Promise.all(
         options.dependencies.map(async (dependencyId): Promise<RuntimeCapabilityDependencyStatus> => {
           try {
-            const dependency = await options.readDependencyStatus(dependencyId);
+            const dependency = await readDependencyStatus(dependencyId);
             return {
               capabilityId: dependency.capabilityId,
               status: dependency.status,
