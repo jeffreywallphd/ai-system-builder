@@ -105,3 +105,11 @@
 - Artifact reads/writes should be authorized by shared policy seams.
 - Secrets are not ordinary settings payloads.
 - Future at-rest encryption should use a data-protection port seam.
+
+## Asset Kernel Notes
+
+- Include `asset-kernel.pack.md` when storage/artifact work affects reusable/composable asset semantics.
+- Artifacts/resources can back assets, but they do not replace `AssetDefinition`, `AssetInstance`, `AssetBinding`, or `AssetComposition`.
+- Resource-backed assets should reference artifact/resource storage identities rather than embedding raw paths or bytes in asset metadata.
+- Generated outputs become reusable only after finalization/registration as artifacts or resource-backed assets; Hugging Face objects remain external repository objects until registered/imported.
+- Do not rename existing artifact/model/dataset/image concepts in Phase 2A.

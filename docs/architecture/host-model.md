@@ -1,5 +1,9 @@
 # Host Model
 
+## Asset Kernel relationship
+
+Assets may declare host and permission requirements, but hosts remain responsible for composition and concrete runtime/readiness provider wiring. Asset metadata should stay declarative and transport/UI-neutral; desktop IPC, server API, and renderer models must not redefine asset semantics. Permission requirements can be validated structurally first, with enforcement added later through application and host policy seams.
+
 ## What a host means in this repository
 
 A **host** is the runtime environment composition layer that starts and operates the system in a specific deployment mode.

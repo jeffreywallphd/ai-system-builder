@@ -88,3 +88,9 @@
 ## Server API readiness note
 
 - Server API readiness is now a server transport wrapper over the application `RuntimeReadinessService` and shared runtime readiness contracts. Reads are host-scoped and must remain no-start/no-install/no-repair; do not use image-generation/model endpoints as general readiness probes.
+
+## Asset Kernel Notes
+
+- Include `asset-kernel.pack.md` when assets declare runtime requirements or bind tools/workflows/models to runtime capabilities.
+- Asset requirements should reference shared `RuntimeCapabilityId` values and must not duplicate runtime readiness or task-registry contracts.
+- Asset validation may structurally check declared requirements, but it must not execute runtimes or probe heavy sidecars.

@@ -59,6 +59,12 @@ This keeps desktop workflow stable while making thin-client/server dependency in
 
 ## High-level layers and boundaries
 
+### Asset Kernel
+
+The Asset Kernel is a central platform concept for user-composable systems. It defines assets as versioned, configurable, AI-readable, machine-composable building blocks that can represent structure, behavior, interface, data, instructions, resources, or compositions. Canonical terminology and Phase 2A sequencing live in `docs/architecture/asset-kernel.md`; ADR-0016 refines the directional asset concept from ADR-0005.
+
+The Asset Kernel does not rename or replace existing artifact, resource, runtime, host, or storage concepts. Resource-backed assets reference artifact/resource storage, asset runtime requirements reference shared runtime capability IDs, and transport/UI-specific asset models are not allowed.
+
 ### Core logic
 
 - `modules/domain/`

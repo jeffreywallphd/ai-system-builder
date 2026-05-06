@@ -1,5 +1,11 @@
 # Persistence and Storage
 
+## Asset Kernel relationship
+
+The Asset Kernel is the semantic composition model for reusable building blocks. Persistence and storage remain separate lower-level architecture concerns. Asset metadata may later be persisted as structured records for asset definitions, instances, bindings, compositions, lifecycle, provenance, and version history; binary/content payloads remain storage concerns.
+
+Resource-backed assets should reference artifact/resource storage identities instead of embedding raw file paths or bytes in asset metadata. Generated outputs produced by runtime tasks become reusable only after finalization/registration as artifacts or resource-backed assets. Hugging Face repository objects remain external repository objects until registered/imported as resource-backed assets. Existing artifact, model, dataset, and image concepts should not be renamed during Phase 2A.
+
 ## Core distinction
 
 `ai-system-builder` treats **persistence** and **storage** as separate architecture concerns.
