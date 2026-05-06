@@ -130,6 +130,12 @@ import {
   DESKTOP_PYTHON_RUNTIME_CONTROL_OPERATION,
   DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_CONTROL_RESPONSE_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_OPERATION,
+  DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_RESPONSE_CHANNEL,
+  DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_OPERATION,
+  DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_RESPONSE_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_OPERATION,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL,
@@ -155,6 +161,8 @@ import {
   createDesktopComfyUiRepairInstallRequest,
   createDesktopPrepareTrainingDatasetStartRequest,
   createDesktopPrepareTrainingDatasetTaskReadRequest,
+  createDesktopRuntimeReadinessReadRequest,
+  createDesktopRuntimeCapabilityStatusReadRequest,
   createDesktopPythonRuntimeControlRequest,
   createDesktopPythonRuntimeStatusReadRequest,
   createDesktopImageGenerationStartRequest,
@@ -165,6 +173,8 @@ import {
   type DesktopPrepareTrainingDatasetStartResponse,
   type DesktopPrepareTrainingDatasetTaskReadRequest,
   type DesktopPrepareTrainingDatasetTaskReadResponse,
+  type DesktopRuntimeReadinessReadResponse,
+  type DesktopRuntimeCapabilityStatusReadResponse,
   type DesktopPythonRuntimeControlResponse,
   type DesktopPythonRuntimeStatusReadResponse,
   type DesktopImageGenerationStartRequest,
@@ -257,6 +267,7 @@ import {
   DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL,
 } from "../../../../modules/contracts/ipc";
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
+import type { RuntimeCapabilityId } from "../../../../modules/contracts/runtime";
 import type {
   ListApplicationSettingDefinitionsRequest,
   ReadApplicationSettingsRequest,
@@ -340,6 +351,13 @@ export interface DesktopPreloadApi {
     input: { requestId: string },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopPrepareTrainingDatasetTaskReadResponse>;
+  readRuntimeReadiness: (
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopRuntimeReadinessReadResponse>;
+  readRuntimeCapabilityStatus: (
+    input: { capabilityId: RuntimeCapabilityId },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopRuntimeCapabilityStatusReadResponse>;
   readPythonRuntimeStatus: (
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopPythonRuntimeStatusReadResponse>;
@@ -777,6 +795,51 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_OPERATION,
         channel: DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop dataset preparation task-read IPC response envelope.",
+      });
+    },
+
+    async readRuntimeReadiness(context = {}) {
+      const request = createDesktopRuntimeReadinessReadRequest(
+        {
+          boundary: {
+            host: "desktop",
+            source: "desktop.renderer.runtime-readiness",
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopRuntimeReadinessReadResponse>(response, {
+        operation: DESKTOP_RUNTIME_READINESS_READ_OPERATION,
+        channel: DESKTOP_RUNTIME_READINESS_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop runtime readiness IPC response envelope.",
+      });
+    },
+
+    async readRuntimeCapabilityStatus(input, context = {}) {
+      const request = createDesktopRuntimeCapabilityStatusReadRequest(
+        {
+          capabilityId: input.capabilityId,
+          boundary: {
+            host: "desktop",
+            source: "desktop.renderer.runtime-readiness",
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopRuntimeCapabilityStatusReadResponse>(response, {
+        operation: DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_OPERATION,
+        channel: DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop runtime capability status IPC response envelope.",
       });
     },
 

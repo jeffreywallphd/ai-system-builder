@@ -31,6 +31,7 @@ export type ComfyUiRuntimeDeviceMode = "auto" | "cpu" | "directml" | "cuda";
 export interface ComfyUiRuntimeSupervisor {
   start(): Promise<void>;
   isRunning(): boolean;
+  getStatus(): ComfyUiRuntimeHealth["status"];
   getHealth(): Promise<ComfyUiRuntimeHealth>;
   getRecentRuntimeOutput(): string[];
   getRuntimeDeviceMode(): ComfyUiRuntimeDeviceMode;
@@ -390,6 +391,10 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
 
     isRunning() {
       return Boolean(processHandle) && status !== "stopped";
+    },
+
+    getStatus() {
+      return status;
     },
 
     async getHealth() {

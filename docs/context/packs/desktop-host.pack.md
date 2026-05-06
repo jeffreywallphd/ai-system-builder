@@ -25,8 +25,8 @@
 - IPC contracts must remain transport specializations: reuse transport request/response/error semantics and add only channel identity context.
 - Keep IPC channel naming constrained and operation-derived (`ipc.<operation>.<kind>`), so operation and channel do not drift independently.
 - Restrict IPC channel kind to `request`, `response`, or `event`; do not introduce ad hoc kind variants.
-- Keep business policy and use-case orchestration in application/domain, not `main`/preload/IPC glue.
-- Desktop host code should compose adapters and lifecycle behavior, then delegate inward.
+- Keep business policy and use-case orchestration in application/domain, not `main`/preload/IPC glue. Desktop runtime readiness IPC should depend on the application `RuntimeReadinessPort` and wrap shared runtime readiness contracts without duplicating readiness shapes.
+- Desktop host code should compose adapters and lifecycle behavior, then delegate inward. Runtime readiness providers in desktop composition must read non-starting supervisor/installer signals only; Python-specific IPC remains a separate detailed control/diagnostic surface.
 - When adding desktop host features, typecheck the full desktop composition dependency closure under `apps/desktop/tsconfig.webpack.json`; `ts-loader` with `noEmitOnError` can surface reachable TypeScript diagnostics as a vague `emitted no output` failure at `composeDesktopHost.ts`.
 - When desktop composition wraps a typed adapter/application port to add logging or host lifecycle behavior, spread the full existing port first and override only the adapted method(s); hand-built partial port objects can drift when port contracts add methods and surface as vague `ts-loader` no-output failures.
 - Pass inward host metadata through `modules/contracts/host` host-context shapes,

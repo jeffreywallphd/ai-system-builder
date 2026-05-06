@@ -36,8 +36,12 @@ import {
   DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL,
   createDesktopPrepareTrainingDatasetStartSuccessResponse,
   createDesktopPrepareTrainingDatasetTaskReadSuccessResponse,
+  DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
+  createDesktopRuntimeReadinessReadSuccessResponse,
+  createDesktopRuntimeCapabilityStatusReadSuccessResponse,
   createDesktopPythonRuntimeStatusReadSuccessResponse,
   createDesktopPythonRuntimeControlSuccessResponse,
   DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
@@ -61,6 +65,48 @@ import {
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
 describe("desktop preload exposedApi bridge", () => {
+  it("maps runtime readiness reads to dedicated request channel", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+      createDesktopRuntimeReadinessReadSuccessResponse({
+        status: "unknown",
+        healthy: false,
+        available: false,
+        capabilities: [],
+      }),
+    );
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    const response = await api.readRuntimeReadiness({ requestId: "req-ready" });
+
+    expect(response.ok).toBe(true);
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL.value);
+    expect(invoke.mock.calls[0]?.[1]).toMatchObject({
+      requestId: "req-ready",
+      payload: { boundary: { host: "desktop", source: "desktop.renderer.runtime-readiness" } },
+    });
+  });
+
+  it("maps runtime capability status reads to dedicated request channel", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+      createDesktopRuntimeCapabilityStatusReadSuccessResponse({
+        capabilityId: "python-runtime",
+        status: "ready",
+        healthy: true,
+        available: true,
+      }),
+    );
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    const response = await api.readRuntimeCapabilityStatus({ capabilityId: "python-runtime" });
+
+    expect(response.ok).toBe(true);
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL.value);
+    expect(invoke.mock.calls[0]?.[1]).toMatchObject({
+      payload: {
+        capabilityId: "python-runtime",
+        boundary: { host: "desktop", source: "desktop.renderer.runtime-readiness" },
+      },
+    });
+  });
+
   it("maps hugging face token status bridge calls to dedicated request channel", async () => {
     const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createDesktopHuggingFaceTokenGetSuccessResponse({ configured: true, maskedToken: "••••1234" }),
