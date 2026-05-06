@@ -89,5 +89,6 @@ Include this pack when prompts involve:
 ## Readiness Boundary
 
 - Installer status values remain installer-owned and are not replaced by runtime readiness status values.
-- Later host composition may map installer states such as `not-installed`, `installing`, `installed`, `update-available`, `failed`, and `unknown` into shared readiness snapshots.
+- The application runtime readiness service can map installer states such as `not-installed`, `installing`, `checking`, `installed`, `update-available`, `failed`, and `unknown` into shared readiness snapshots when host composition provides installer status readers.
 - Installer contracts may include install roots and metadata where appropriate; shared readiness contracts must not require filesystem paths or installer implementation details.
+- `installed` is not automatically runtime `ready`; process readiness still comes from runtime supervisors.
