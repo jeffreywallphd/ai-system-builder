@@ -14,6 +14,7 @@ import { registerImageGenerationApiRoutes, type RegisterImageGenerationApiRoutes
 import { registerModelManagementApiRoutes, type RegisterModelManagementApiRoutesDependencies } from "./model/registerModelManagementApiRoutes";
 import { registerApplicationSettingsApiRoutes, type RegisterApplicationSettingsApiRoutesDependencies } from "./settings/registerApplicationSettingsApiRoutes";
 import { registerServerControlApiRoutes, type RegisterServerControlApiRoutesDependencies } from "./server-control/registerServerControlApiRoutes";
+import { registerRuntimeReadinessApiRoutes, type RegisterRuntimeReadinessApiRoutesDependencies } from "./runtime-readiness/registerRuntimeReadinessApiRoutes";
 
 export interface RegisterExpressApiDependencies {
   app: RegisterArtifactUploadApiRouteDependencies["app"]
@@ -22,7 +23,8 @@ export interface RegisterExpressApiDependencies {
     & RegisterImageGenerationApiRoutesDependencies["app"]
     & RegisterModelManagementApiRoutesDependencies["app"]
     & RegisterApplicationSettingsApiRoutesDependencies["app"]
-    & RegisterServerControlApiRoutesDependencies["app"];
+    & RegisterServerControlApiRoutesDependencies["app"]
+    & RegisterRuntimeReadinessApiRoutesDependencies["app"];
   getHuggingFaceTokenStatus: RegisterArtifactRepoApiRoutesDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];
@@ -59,6 +61,7 @@ export interface RegisterExpressApiDependencies {
   updateSettingUseCase?: RegisterApplicationSettingsApiRoutesDependencies["updateSettingUseCase"];
   clearSettingUseCase?: RegisterApplicationSettingsApiRoutesDependencies["clearSettingUseCase"];
   restartServer?: RegisterServerControlApiRoutesDependencies["restartServer"];
+  runtimeReadiness?: RegisterRuntimeReadinessApiRoutesDependencies["runtimeReadiness"];
 }
 
 export function registerExpressApi(
@@ -127,6 +130,13 @@ export function registerExpressApi(
       readSettingsUseCase: dependencies.readSettingsUseCase,
       updateSettingUseCase: dependencies.updateSettingUseCase,
       clearSettingUseCase: dependencies.clearSettingUseCase,
+    });
+  }
+
+  if (dependencies.runtimeReadiness) {
+    registerRuntimeReadinessApiRoutes({
+      app: dependencies.app,
+      runtimeReadiness: dependencies.runtimeReadiness,
     });
   }
 

@@ -98,3 +98,8 @@
 - Unknown `/api/*` routes should be denied by centralized route policy (`security.route-policy-missing`).
 - Server app bootstraps HTTP/HTTPS listener; host/transport layers own route/middleware behavior.
 - Do not place business logic or token verification directly in feature routes.
+
+## Runtime readiness API
+
+- Server host composition owns the server `RuntimeReadinessService` and passes an explicit capability scope for Python runtime, ComfyUI runtime, image generation, dataset preparation, model training, model validation, and model publishing.
+- Server readiness providers should read bounded supervisor/installer status only and must not start/stop/install/repair runtimes. Thin-client UI consumption is deferred to later prompts.
