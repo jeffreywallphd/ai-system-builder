@@ -4,14 +4,14 @@
 
 The Asset Kernel is the canonical shared foundation for assets in `ai-system-builder`.
 
-An asset is a versioned, configurable, AI-readable, machine-composable building block that can represent structure, behavior, interface, data, instructions, resources, or compositions, and can be assembled into features, systems, subsystems, and systems-of-subsystems.
+An asset is a versioned, configurable, AI-readable, machine-composable building block that can represent structure, behavior, interface, data, instructions, resources, compositions, or logic containers, and can be assembled into features, systems, subsystems, and systems composed of subsystems.
 
 This document prevents parallel vocabularies for artifacts, resources, UI components, tools, workflows, pages, systems, generated outputs, previews, and AI context. It is an architecture baseline for Phase 2A; it does not implement TypeScript contracts, services, adapters, persistence, API/IPC routes, UI, migrations, or runtime behavior.
 
 ## Relationship to ADRs and existing architecture
 
 - ADR-0005 established **Asset** as the directional composition umbrella for reusable managed units in user-built systems.
-- ADR-0016 refines ADR-0005 into the implementation-ready Asset Kernel baseline.
+- ADR-0016 refines ADR-0005 into the accepted Phase 2A Asset Kernel baseline.
 - ADR-0004 and `docs/architecture/persistence-and-storage.md` remain authoritative for persistence/storage separation.
 - ADR-0011, ADR-0013, and `docs/architecture/runtime-model.md` remain authoritative for runtime task/readiness ownership and host-owned execution.
 - ADR-0015 remains authoritative for security and policy boundaries.
@@ -22,7 +22,7 @@ The Asset Kernel does not replace these decisions. It defines how assets referen
 
 | Concept | Kernel status | Canonical meaning |
 | --- | --- | --- |
-| `Asset` | Kernel concept | The reusable/composable semantic unit known to AI System Builder. Assets may represent structure, behavior, interface, data, instructions, resources, or compositions. |
+| `Asset` | Kernel concept | The reusable/composable semantic unit known to AI System Builder. Assets may represent structure, behavior, interface, data, instructions, resources, compositions, or logic containers. |
 | `AssetDefinition` | Kernel concept | A reusable versioned blueprint/template for a composable building block. Definitions own type/family, version, lifecycle, AI-readable context, configuration surface, ports, composition rules, requirements, and provenance. |
 | `AssetInstance` | Kernel concept | A configured use of an asset definition in a specific feature, system, workflow, page, or composition. Instances own the definition reference, selected configuration, instance lifecycle/state, bindings, parent composition reference, applicable resource references, and use-specific provenance. |
 | `AssetBinding` | Kernel concept | A typed connection between asset instances, ports, resources, runtime capabilities, storage objects, or external repository objects. |
@@ -133,9 +133,11 @@ High-level asset families:
 2. **Behavioral assets**: tools, workflows, workflow steps, runtime-bound operations, adapters, tests, and policies.
 3. **Resource-backed assets**: assets whose semantic value is backed by resources/artifacts such as models, datasets, images, documents, or provider repo files.
 4. **Context assets**: prompts, instructions, AI-readable summaries, policies, examples, and composition guidance.
-5. **Composition assets**: features, pages, workflows, subsystems, systems, and systems-of-subsystems assembled from instances and bindings.
+5. **Composition assets**: features, pages, workflows, logic containers, subsystems, systems, and systems composed of subsystems assembled from instances and bindings.
 
 Example asset types include `ui-component`, `page`, `tool`, `workflow`, `workflow-step`, `schema`, `prompt-template`, `data-source`, `runtime-binding`, `adapter-binding`, `model`, `dataset`, `image`, `document`, `feature`, `subsystem`, `system`, `policy`, and `test`.
+
+Logic containers are a descriptive umbrella for behavioral and composition assets such as tools, workflows, workflow steps, policies, feature logic, and system/subsystem behavior; they are not a separate required asset type in the initial Phase 2A kernel.
 
 The initial Phase 2A contract should remain small and extensible. These examples are vocabulary and direction, not a requirement to fully implement every type in Phase 2A.
 
