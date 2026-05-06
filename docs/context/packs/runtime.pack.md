@@ -31,7 +31,7 @@
 - Keep runtime-specific mechanics out of domain/application logic.
 - Treat Python as an adapter path, not a co-equal architecture center.
 - Define or update runtime contracts before adding runtime-specific behavior.
-- Runtime readiness describes capability availability before/around execution; the Runtime Task Registry remains the lifecycle authority for long-running tasks. Runtime-backed feature starts should guard the derived feature capability when available, reject non-ready statuses as unavailable, and leave task read/cancel/status semantics to the registry.
+- Runtime readiness describes capability availability before/around execution; the Runtime Task Registry remains the lifecycle authority for accepted long-running tasks. Runtime-backed feature starts should guard the derived feature capability when available, reject non-ready statuses as unavailable before task creation, and leave task read/cancel/list/status semantics to the registry. Rejected starts should not return pollable task ids.
 
 ## Runtime readiness vocabulary
 
@@ -44,7 +44,7 @@
 - Missing-provider statuses are for direct capability reads or explicitly requested snapshot capabilities without providers, not for every capability a host intentionally does not support.
 - Host composition provides concrete signal readers/providers and may combine multiple same-capability signals into one capability status; desktop IPC exposes the desktop host-scoped snapshot, while server API exposure remains deferred to a server prompt.
 - Runtime-specific protocol details, filesystem paths, temp paths, secrets, tokens, and raw process data stay in adapters or diagnostics, not required readiness fields.
-- The readiness service does not own process lifecycle, installation/discovery/repair/update status, or runtime task execution; supervisors, installer ports, and Runtime Task Registry remain the respective authorities. Readiness reads must not start, stop, install, repair, or unboundedly probe runtimes. Provider-level failures should be isolated into readiness status objects where possible.
+- The readiness service does not own process lifecycle, installation/discovery/repair/update status, or runtime task execution; supervisors, installer ports, and Runtime Task Registry remain the respective authorities. Readiness reads and task status/cancel/list reads must not start, stop, install, repair, or unboundedly probe runtimes. Provider-level failures should be isolated into readiness/status objects where possible.
 
 ## Key Constraints
 

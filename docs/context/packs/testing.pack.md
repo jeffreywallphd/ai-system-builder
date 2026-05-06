@@ -34,6 +34,7 @@
 - For application seams that drift across families, keep a minimal cross-family invariant layer in `modules/application/ports/tests`.
 - Keep application-port anti-drift tests inside `tests` folders only; avoid ad hoc placement that hides seam guarantees.
 - Add regression tests for bug fixes when practical in the layer where defect should be caught.
+- For runtime task registry changes, cover start correlation, unknown request ids, delegate recovery, list aggregation/unsupported metadata, cancellation, and no-start behavior on status/list/cancel reads.
 - Keep tests deterministic, CI-suitable, and non-flaky; avoid performative coverage-only tests.
 
 ## Key Constraints

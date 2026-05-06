@@ -104,7 +104,49 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
   const finalResults = new Map<string, RuntimeTaskRecord>();
   const now = deps.now ?? (() => new Date().toISOString());
 
-  const unknown = (requestId: string): RuntimeTaskRecord => ({ requestId, taskType: TaskType.IMAGE_GENERATION, status: "unknown", concurrencyClass: "gpu-exclusive", updatedAt: now() });
+  const unknown = (requestId: string): RuntimeTaskRecord => ({
+    requestId,
+    taskType: TaskType.IMAGE_GENERATION,
+    status: "unknown",
+    concurrencyClass: "gpu-exclusive",
+    error: {
+      code: "comfyui_task_not_found",
+      message: "ComfyUI image generation task was not found in the current-process registry.",
+      details: { reason: "request-id-not-tracked" },
+      retryable: false,
+    },
+    metadata: { engine: "comfyui", reason: "request-id-not-tracked" },
+    updatedAt: now(),
+  });
+
+  const matchesListRequest = (record: RuntimeTaskRecord, request: RuntimeTaskListRequest): boolean => {
+    if (request.taskTypes && request.taskTypes.length > 0 && !request.taskTypes.includes(record.taskType)) return false;
+    if (request.statuses && request.statuses.length > 0 && !request.statuses.includes(record.status)) return false;
+    if (!request.includeCompleted && (record.status === "succeeded" || record.status === "failed" || record.status === "cancelled")) return false;
+    return true;
+  };
+
+  const taskRecordFromTracked = (requestId: string, tracked: { promptId: string; request: ImageGenerationRequest; submittedAt: string }): RuntimeTaskRecord => ({
+    requestId,
+    taskType: TaskType.IMAGE_GENERATION,
+    status: "queued",
+    concurrencyClass: "gpu-exclusive",
+    progress: { message: "Accepted by the ComfyUI runtime task registry.", details: { promptId: tracked.promptId } },
+    startedAt: tracked.submittedAt,
+    updatedAt: tracked.submittedAt,
+    metadata: {
+      engine: "comfyui",
+      comfyUiPromptId: tracked.promptId,
+      request: {
+        prompt: tracked.request.prompt,
+        negativePrompt: tracked.request.negativePrompt,
+        seed: tracked.request.seed,
+        model: tracked.request.model,
+        width: tracked.request.width,
+        height: tracked.request.height,
+      },
+    },
+  });
 
   return {
     async startTask(request: StartRuntimeTaskRequest) {
@@ -211,10 +253,21 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
     },
 
     async cancelTask(requestId) {
-      return { requestId, cancelled: false, status: byRequest.has(requestId) ? "running" : "unknown", message: "ComfyUI image generation cancellation is not implemented yet." };
+      if (!byRequest.has(requestId) && !finalResults.has(requestId)) {
+        return { requestId, cancelled: false, status: "unknown", message: "Runtime task was not found in this task registry delegate." };
+      }
+      return { requestId, cancelled: false, status: finalResults.get(requestId)?.status ?? "running", message: "ComfyUI image generation cancellation is not implemented yet." };
     },
-    async listTasks(_request: RuntimeTaskListRequest): Promise<RuntimeTaskListResult> {
-      return { tasks: [] };
+    async listTasks(request: RuntimeTaskListRequest): Promise<RuntimeTaskListResult> {
+      const records = new Map<string, RuntimeTaskRecord>();
+      for (const [requestId, tracked] of byRequest.entries()) {
+        records.set(requestId, finalResults.get(requestId) ?? taskRecordFromTracked(requestId, tracked));
+      }
+      for (const [requestId, record] of finalResults.entries()) {
+        records.set(requestId, record);
+      }
+      const tasks = [...records.values()].filter((record) => matchesListRequest(record, request));
+      return { tasks: typeof request.limit === "number" ? tasks.slice(0, Math.max(0, request.limit)) : tasks };
     },
   };
 }
