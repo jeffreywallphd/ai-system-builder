@@ -1,6 +1,6 @@
 # ADR-0016: Asset Kernel Terminology and Architecture Baseline
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-05-06
 - Deciders: ai-system-builder maintainers
 - Related: docs/adr/ADR-0005-builder-core-platform-capabilities-and-user-composable-assets.md, docs/adr/ADR-0004-persistence-and-storage-separation.md, docs/adr/ADR-0009-artifact-identity-and-backing-domain-model.md, docs/adr/ADR-0011-runtime-task-registry.md, docs/adr/ADR-0013-host-owned-runtime-execution-and-feature-placement.md, docs/adr/ADR-0015-security-architecture-and-policy-boundaries.md, docs/architecture/asset-kernel.md, docs/architecture/system-overview.md, docs/architecture/persistence-and-storage.md, docs/architecture/runtime-model.md, docs/architecture/host-model.md
@@ -25,7 +25,7 @@ The Asset Kernel must build on those decisions rather than replace or duplicate 
 
 Create the **Asset Kernel** as the canonical baseline for assets in `ai-system-builder`.
 
-Assets are versioned, configurable, AI-readable, machine-composable building blocks that can represent structure, behavior, interface, data, instructions, resources, or compositions, and can be assembled into features, systems, subsystems, and systems-of-subsystems.
+Assets are versioned, configurable, AI-readable, machine-composable building blocks that can represent structure, behavior, interface, data, instructions, resources, compositions, or logic containers, and can be assembled into features, systems, subsystems, and systems composed of subsystems.
 
 The Asset Kernel defines these core concepts:
 
@@ -53,13 +53,15 @@ It also defines how assets relate to outside-but-referenceable concepts:
 - `Preview`
 - `External Repository Object`
 
+Logic containers are preserved as descriptive coverage for behavioral and composition assets such as tools, workflows, workflow steps, policies, feature logic, and system/subsystem behavior; ADR-0016 does not introduce a separate `logic-container` type.
+
 The canonical terminology and implementation guidance live in `docs/architecture/asset-kernel.md`.
 
 ## Relationship to ADR-0005
 
 This ADR **refines** ADR-0005. It does not supersede ADR-0005.
 
-ADR-0005 remains the directional boundary decision separating builder-core internal use cases, reusable platform capabilities, and user-composable assets. ADR-0016 narrows that directional asset concept into a practical Asset Kernel vocabulary and Phase 2A implementation sequence.
+ADR-0005 remains the directional boundary decision separating builder-core internal use cases, reusable platform capabilities, and user-composable assets. ADR-0016 narrows that directional asset concept into the accepted Phase 2A Asset Kernel vocabulary and implementation sequence.
 
 ADR-0005 said the final taxonomy was not yet decided. ADR-0016 decides the initial shared kernel vocabulary, asset/resource/artifact distinctions, and incremental implementation order while preserving ADR-0005's builder-core/platform-capability/user-asset separation.
 
