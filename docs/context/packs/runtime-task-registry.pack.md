@@ -12,6 +12,7 @@ Use this pack when prompt scope includes long-running runtime-backed tasks (data
 ## Shared vs Feature-Specific Responsibilities
 
 - Registry lifecycle/state/progress/retention concerns are shared across runtime tasks.
+- Runtime readiness contracts are adjacent shared vocabulary for capability availability and do not replace registry task records or registry lifecycle operations.
 - Task handlers remain feature-specific.
 - Do not introduce feature-specific task queues for dataset/model/etc.
 
@@ -40,3 +41,9 @@ Use this pack when prompt scope includes long-running runtime-backed tasks (data
 - Legacy dataset-preparation synchronous `/tasks/execute` path is removed from dataset-preparation production flows.
 - Model training/validation/publishing use Runtime Task Registry start/read/cancel lifecycle APIs.
 - No new long-running runtime-backed feature should use legacy `/tasks/execute`; use Runtime Task Registry lifecycle APIs.
+
+## Readiness Boundary
+
+- Runtime readiness answers whether a host-owned capability is available, degraded, installing, failed, or otherwise unavailable before/around task execution.
+- Runtime Task Registry remains the source of truth for long-running task `startTask` / `getTaskStatus` / `cancelTask` lifecycle and progress.
+- Do not encode task progress, Python protocol status payloads, or ComfyUI runtime internals as generic readiness fields.

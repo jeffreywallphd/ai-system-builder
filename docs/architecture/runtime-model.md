@@ -57,7 +57,18 @@ Current baseline runtime contract family:
 - `modules/contracts/runtime/runtime-execution-request.ts` for request envelope and execution options.
 - `modules/contracts/runtime/runtime-execution-result.ts` and `runtime-execution-error.ts` for shared success/failure envelopes.
 - `modules/contracts/runtime/runtime-execution-event.ts` and `runtime-execution-diagnostic.ts` for optional progress/output/diagnostic streaming.
+- `modules/contracts/runtime/runtime-capability-id.ts`, `runtime-readiness-status.ts`, `runtime-readiness-action.ts`, `runtime-capability-status.ts`, and `runtime-readiness-snapshot.ts` for transport-neutral runtime readiness vocabulary.
 - `modules/application/ports/runtime/runtime-execution.port.ts` as the application-facing runtime execution seam.
+
+## Runtime readiness contracts
+
+Runtime readiness contracts describe host-owned capability availability before and around runtime task execution. They are shared contracts, not IPC/API/UI contracts and not Python or ComfyUI protocol models.
+
+The readiness vocabulary covers these capability ids: `python-runtime`, `comfyui-runtime`, `image-generation`, `dataset-preparation`, `model-training`, `model-validation`, and `model-publishing`. Readiness statuses are `unknown`, `unavailable`, `not-installed`, `installing`, `starting`, `ready`, `degraded`, and `failed`. Recovery/action hints are `wait`, `start`, `install`, `repair`, `configure`, `retry`, and `view-logs`.
+
+Readiness snapshots may include `capabilityId`, `status`, `healthy`, `available`, `summary`, structured `reason`, `recommendedActions`, generic `details`, `updatedAt`, dependency statuses, and optional host identity metadata. Runtime-specific mechanics such as Python protocol payloads, ComfyUI workflow/server details, local filesystem paths, temporary paths, process environment, secrets, and tokens must remain adapter-layer details and are not required shared readiness fields.
+
+Readiness does not replace `RuntimeTaskRegistryPort`. Readiness answers whether a host-owned capability appears available; the Runtime Task Registry still owns long-running task lifecycle operations (`startTask`, `getTaskStatus`, `cancelTask`, and listing/retention). Runtime installer contracts still own install/discovery/repair/update status. Runtime supervisors still own concrete process lifecycle and health checks. Host composition will later map installer, supervisor, and task-registry state into readiness snapshots for transports and clients.
 
 Runtime diagnostic normalization rule:
 

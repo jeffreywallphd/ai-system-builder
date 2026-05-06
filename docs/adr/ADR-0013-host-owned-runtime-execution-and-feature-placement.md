@@ -32,6 +32,7 @@ Server/thin-client image-generation work also exposed the need to keep runtime r
 - contract families
 - operation identity conventions
 - runtime task lifecycle semantics
+- transport-neutral runtime readiness vocabulary for host-owned capability availability
 - transport envelopes
 - reusable adapter implementations where appropriate
 - documentation, standards, and ADR rules
@@ -41,8 +42,9 @@ Server/thin-client image-generation work also exposed the need to keep runtime r
 - ComfyUI install roots
 - Python managed environments
 - runtime process ownership
-- runtime health/status/log state
+- raw runtime health/status/log state before host composition maps it into shared readiness snapshots
 - runtime temp folders and sidecar output folders
+- local filesystem paths, process environment, secrets, and tokens in readiness/transport payloads
 - host-local artifact storage roots
 - host-local model caches/registries unless deliberately configured
 - host token/config files unless explicitly configured through a safe config seam
@@ -80,6 +82,7 @@ Server/thin-client image-generation work also exposed the need to keep runtime r
 - Add remote HTTP client adapters for feature ports later.
 - Add artifact localization/import flow for remote-generated assets if needed.
 - Add runtime-root config helpers and tests.
+- Map installer/supervisor/task state into shared runtime readiness snapshots at host composition boundaries.
 - Update prompts/context packs when feature routing work begins.
 
 
