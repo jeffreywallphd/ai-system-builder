@@ -1,3 +1,4 @@
+import type { AssetBindingConstraint } from "./asset-binding-constraint";
 import type { AssetId } from "./asset-id";
 import type { AssetLifecycleStatus } from "./asset-lifecycle-status";
 import type { AssetProvenance } from "./asset-provenance";
@@ -23,6 +24,7 @@ export interface AssetBinding {
   readonly targetRef: AssetReference;
   readonly sourcePortRef?: AssetReference;
   readonly targetPortRef?: AssetReference;
+  readonly constraints?: readonly AssetBindingConstraint[];
   readonly lifecycleStatus?: AssetLifecycleStatus;
   readonly provenance?: AssetProvenance;
   readonly metadata?: Record<string, unknown>;

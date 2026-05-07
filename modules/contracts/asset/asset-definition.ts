@@ -2,9 +2,12 @@ import type { AssetAiContext } from "./asset-ai-context";
 import type { AssetConfigurationExample } from "./asset-configuration-example";
 import type { AssetConfigurationSchema } from "./asset-configuration-schema";
 import type { AssetConfigurationValues } from "./asset-configuration-value";
+import type { AssetCompositionDependency } from "./asset-composition-dependency";
+import type { AssetCompositionRule } from "./asset-composition-rule";
 import type { AssetFamily } from "./asset-family";
 import type { AssetId } from "./asset-id";
 import type { AssetLifecycleStatus } from "./asset-lifecycle-status";
+import type { AssetPort } from "./asset-port";
 import type { AssetProvenance } from "./asset-provenance";
 import type { AssetReference } from "./asset-reference";
 import type { AssetReviewStatus } from "./asset-review-status";
@@ -27,6 +30,9 @@ export interface AssetDefinition {
   readonly aiContext?: AssetAiContext;
   readonly requirementRefs?: readonly AssetReference[];
   readonly portRefs?: readonly AssetReference[];
+  readonly ports?: readonly AssetPort[];
   readonly compositionRuleRefs?: readonly AssetReference[];
+  readonly compositionRules?: readonly AssetCompositionRule[];
+  readonly dependencies?: readonly AssetCompositionDependency[];
   readonly metadata?: Record<string, unknown>;
 }

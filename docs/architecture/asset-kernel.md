@@ -6,7 +6,7 @@ The Asset Kernel is the canonical shared foundation for assets in `ai-system-bui
 
 An asset is a versioned, configurable, AI-readable, machine-composable building block that can represent structure, behavior, interface, data, instructions, resources, compositions, or logic containers, and can be assembled into features, systems, subsystems, and systems composed of subsystems.
 
-This document prevents parallel vocabularies for artifacts, resources, UI components, tools, workflows, pages, systems, generated outputs, previews, and AI context. It is an architecture baseline for Phase 2A. Prompt 3 added the first core TypeScript contract family in `modules/contracts/asset` for identity, lifecycle, review, provenance, definitions, instances, references, minimal binding/composition shells, and validation issue shapes. Prompt 4 added detailed configuration contracts for schemas, fields, JSON-compatible values, defaults, selected values, constraints, generic UI hints, validation rule descriptors, and examples. Prompt 5 adds detailed structured AI-context contracts only; these contracts do not implement services, validators, adapters, persistence, API/IPC routes, UI, migrations, prompt assembly, retrieval, embeddings, generation, or runtime behavior.
+This document prevents parallel vocabularies for artifacts, resources, UI components, tools, workflows, pages, systems, generated outputs, previews, and AI context. It is an architecture baseline for Phase 2A. Prompt 3 added the first core TypeScript contract family in `modules/contracts/asset` for identity, lifecycle, review, provenance, definitions, instances, references, minimal binding/composition shells, and validation issue shapes. Prompt 4 added detailed configuration contracts for schemas, fields, JSON-compatible values, defaults, selected values, constraints, generic UI hints, validation rule descriptors, and examples. Prompt 5 added detailed structured AI-context contracts. Prompt 6 adds detailed shared contracts for machine-readable ports, port contracts, binding constraints, dependencies, composition rules, composition cardinality, and composition validation summary shells only; these contracts do not implement services, validators, adapters, persistence, API/IPC routes, UI, migrations, prompt assembly, retrieval, embeddings, generation, workflow execution, graph execution, automatic composition, or runtime behavior.
 
 ## Relationship to ADRs and existing architecture
 
@@ -185,8 +185,8 @@ Guidance:
 - AI context is asset metadata owned by the asset definition, not only external docs.
 - AI context should be structured enough to support future retrieval, validation support, and prompt assembly.
 - AI context complements machine contracts and must not replace configuration schemas, formal ports, binding compatibility, composition rules, or validation services.
-- AI-context input/output and composition guidance is semantic guidance only; detailed ports, binding compatibility, and composition-rule contracts remain Prompt 6.
-- AI-context completeness validation remains Prompt 7; registry/application ports remain Prompt 8; persistence remains Prompt 9; resource-backed mapping remains Prompt 10.
+- AI-context input/output and composition guidance is semantic guidance only; Prompt 6 ports, binding constraints, dependencies, and composition rules are the separate machine-readable structure.
+- AI-context completeness and composition compatibility validation remains Prompt 7; registry/application ports remain Prompt 8; persistence remains Prompt 9; resource-backed mapping remains Prompt 10.
 - AI context must not store or require secrets, tokens, local/temp/provider-native paths, raw prompts with sensitive content, raw private transcripts, raw environment values, command lines, stack traces, adapter payloads, file/blob bytes, or embeddings/vector arrays. Use redacted summaries and safe references instead.
 
 ## Configuration surface
@@ -209,26 +209,22 @@ Guidance:
 - Configuration values must remain JSON-compatible for future persistence and transport; functions, host/runtime objects, filesystem handles, bytes, paths, secrets, raw environment values, raw adapter details, and executable code are not part of configuration values.
 - Arbitrary unvalidated JSON should be avoided for composable assets; validation remains deferred to Prompt 7.
 - Configuration contracts are schema-engine-neutral and future JSON-schema-compatible, with no runtime schema parser, validation service, conditional schema engine, migration framework, or form renderer in Prompt 4.
-- Detailed AI context is handled by Prompt 5 and complements configuration schemas without duplicating the entire configuration schema; detailed ports/bindings/composition-rule contracts remain deferred to Prompt 6, registry ports remain deferred to Prompt 8, persistence remains deferred to Prompt 9, and resource-backed mapping remains deferred to Prompt 10.
+- Detailed AI context is handled by Prompt 5 and complements configuration schemas without duplicating the entire configuration schema; Prompt 6 port/composition contracts may reference configuration as a carried contract or dependency but do not duplicate configuration schemas, execute conditional validation, or implement a form/schema engine. Registry ports remain deferred to Prompt 8, persistence remains deferred to Prompt 9, and resource-backed mapping remains deferred to Prompt 10.
 - Transport and UI exposure remain deferred until after the Asset Kernel is proven.
 
 ## Ports, contracts, and composition rules
 
 Composable assets should describe formal connection points.
 
-Planned concepts:
+Prompt 6 contract concepts now include:
 
-- input ports,
-- output ports,
-- event ports,
-- control/action ports,
-- data contracts,
-- error contracts,
-- allowed parent/child types,
-- required dependencies,
-- optional dependencies,
-- incompatible assets,
-- ordering/cardinality constraints.
+- input, output, event, and control ports,
+- lightweight port contracts for assets, resources, artifacts, configuration, runtime capabilities, events, control, JSON/text, and binary references,
+- port and composition cardinality descriptors,
+- binding constraints such as same contract kind, asset type/family, resource kind, runtime capability, single-source/single-target, ordering, and custom future-rule descriptors,
+- composition rules for allowed parents/children, required/optional/incompatible children, required dependencies, cardinality, ordering, binding-required, runtime requirements, and custom descriptors,
+- composition dependencies for assets, asset types/families, resources, artifacts, runtime capabilities, external repository objects, configuration, and custom descriptors,
+- composition validation summary status shells for future validation results.
 
 Guidance:
 
@@ -236,7 +232,7 @@ Guidance:
 - Ports/bindings are how systems prevent arbitrary invalid wiring.
 - UI components, workflow steps, tools, and resource-backed assets may expose different port families.
 - Ports and bindings belong in shared asset contracts, not renderer-specific models.
-- Prompt 3 includes minimal reference, binding, and composition shells so core definitions/instances/compositions can refer to each other. Prompt 6 will implement detailed ports, binding compatibility, and composition-rule contracts separately after core/configuration/AI-context contracts.
+- Prompt 6 keeps these contracts descriptor-only. It adds no compatibility checker, composition validator, runtime readiness lookup, registry port, persistence model, resource-backed mapping, workflow execution, graph execution, UI page routing, API/IPC transport, or automatic composition behavior.
 
 ## Lifecycle, versioning, review, and provenance
 
@@ -367,9 +363,8 @@ Asset Kernel work must preserve clean architecture boundaries:
 - host wiring belongs in `modules/hosts`,
 - UI belongs in apps/modules UI areas.
 
-Non-goals preserved after Prompt 5:
+Non-goals preserved after Prompt 6:
 
-- no detailed ports, binding compatibility, or composition-rule contracts before Prompt 6,
 - no validation service before Prompt 7,
 - no asset registry or application ports before Prompt 8,
 - no application service files,

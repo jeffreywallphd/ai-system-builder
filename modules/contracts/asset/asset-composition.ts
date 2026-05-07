@@ -1,9 +1,12 @@
+import type { AssetBinding } from "./asset-binding";
+import type { AssetCompositionDependency } from "./asset-composition-dependency";
+import type { AssetCompositionRule } from "./asset-composition-rule";
+import type { AssetCompositionValidationSummary } from "./asset-composition-validation-summary";
 import type { AssetId } from "./asset-id";
 import type { AssetLifecycleStatus } from "./asset-lifecycle-status";
 import type { AssetProvenance } from "./asset-provenance";
 import type { AssetReference } from "./asset-reference";
 import type { AssetReviewStatus } from "./asset-review-status";
-import type { AssetValidationSummary } from "./asset-validation-issue";
 import type { AssetVersion } from "./asset-version";
 
 export const ASSET_COMPOSITION_TYPES = [
@@ -27,9 +30,12 @@ export interface AssetComposition {
   readonly reviewStatus?: AssetReviewStatus;
   readonly rootInstanceRefs: readonly AssetReference[];
   readonly instanceRefs: readonly AssetReference[];
-  readonly bindingRefs: readonly AssetReference[];
+  readonly bindingRefs?: readonly AssetReference[];
+  readonly bindings?: readonly AssetBinding[];
+  readonly compositionRules?: readonly AssetCompositionRule[];
+  readonly dependencies?: readonly AssetCompositionDependency[];
   readonly provenance: AssetProvenance;
-  readonly validationSummary?: AssetValidationSummary;
+  readonly validationSummary?: AssetCompositionValidationSummary;
   readonly metadata?: Record<string, unknown>;
 }
 
