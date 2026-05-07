@@ -97,7 +97,6 @@ const COMPOSITE_STATUS_PRIORITY: readonly RuntimeReadinessStatus[] = [
 
 function providerFailureStatus(
   capabilityId: RuntimeCapabilityId,
-  error: unknown,
   now: () => string,
 ): RuntimeCapabilityStatus {
   return createRuntimeCapabilityStatus({
@@ -106,9 +105,10 @@ function providerFailureStatus(
     summary: `Unable to read ${capabilityId} readiness provider.`,
     reason: {
       code: "runtime.readiness.provider-failed",
-      message: error instanceof Error ? error.message : "Runtime readiness provider failed.",
+      message: "Runtime readiness provider failed. See logs for diagnostic details.",
       category: "unknown",
       retryable: true,
+      details: { failureKind: "provider-threw", capabilityId },
     },
     recommendedActions: ["retry", "view-logs"],
     updatedAt: now(),
@@ -435,8 +435,8 @@ export class RuntimeReadinessService implements RuntimeReadinessPort {
 
     try {
       return await provider.getStatus(context);
-    } catch (error) {
-      return providerFailureStatus(capabilityId, error, this.now);
+    } catch {
+      return providerFailureStatus(capabilityId, this.now);
     }
   }
 
@@ -591,8 +591,8 @@ export function createCompositeRuntimeCapabilityStatusProvider(
         options.providers.map(async (provider) => {
           try {
             return await provider.getStatus();
-          } catch (error) {
-            return providerFailureStatus(options.capabilityId, error, now);
+          } catch {
+            return providerFailureStatus(options.capabilityId, now);
           }
         }),
       );
@@ -622,8 +622,8 @@ export function createDerivedRuntimeCapabilityStatusProvider(
               reason: dependency.reason,
               updatedAt: dependency.updatedAt,
             };
-          } catch (error) {
-            const failed = providerFailureStatus(dependencyId, error, now);
+          } catch {
+            const failed = providerFailureStatus(dependencyId, now);
             return {
               capabilityId: failed.capabilityId,
               status: failed.status,

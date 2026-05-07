@@ -46,9 +46,9 @@
   - preload/IPC remain proxy/transport boundaries
   - use cases enforce application rules
   - adapters translate provider/runtime details
-  - provider-level failures should become structured readiness/status objects where the application service can isolate them
+  - provider-level failures should become sanitized structured readiness/status objects where the application service can isolate them; raw provider exception text must stay out of readiness snapshots/statuses
   - guarded runtime-backed starts should fail as structured unavailable responses rather than generic internals when readiness reports the required feature capability is not ready
-  - unexpected transport handler failures should return sanitized, generic internal errors rather than raw exception text
+  - unexpected transport handler failures and task-list delegate failures should return sanitized, generic messages/metadata rather than raw exception text
   - runtime workers execute tasks
 - Add tests for execution timelines and state transitions, not only final outputs.
 

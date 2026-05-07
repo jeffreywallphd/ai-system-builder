@@ -43,8 +43,8 @@
 - Snapshot scope is host-composed; default snapshots include composed provider capabilities only, while all known capabilities are reported only when a host explicitly chooses that scope.
 - Missing-provider statuses are for direct capability reads or explicitly requested snapshot capabilities without providers, not for every capability a host intentionally does not support.
 - Host composition provides concrete signal readers/providers and may combine multiple same-capability signals into one capability status; desktop IPC exposes the desktop host-scoped snapshot, while server API exposure remains deferred to a server prompt.
-- Runtime-specific protocol details, filesystem paths, temp paths, secrets, tokens, and raw process data stay in adapters or diagnostics, not required readiness fields.
-- The readiness service does not own process lifecycle, installation/discovery/repair/update status, or runtime task execution; supervisors, installer ports, and Runtime Task Registry remain the respective authorities. Readiness reads and task status/cancel/list reads must not start, stop, install, repair, or unboundedly probe runtimes. Provider-level failures should be isolated into readiness/status objects where possible.
+- Runtime-specific protocol details, filesystem paths, temp paths, secrets, tokens, raw exception messages, command lines, HTTP internals, and raw process data stay in adapters or diagnostics, not readiness fields; provider exceptions become sanitized `runtime.readiness.provider-failed` statuses with retry/view-logs actions and safe `failureKind`/`capabilityId` details only.
+- The readiness service does not own process lifecycle, installation/discovery/repair/update status, or runtime task execution; supervisors, installer ports, and Runtime Task Registry remain the respective authorities. Readiness reads and task status/cancel/list reads must not start, stop, install, repair, or unboundedly probe runtimes. Provider-level failures should be isolated into sanitized readiness/status objects where possible.
 
 ## Key Constraints
 

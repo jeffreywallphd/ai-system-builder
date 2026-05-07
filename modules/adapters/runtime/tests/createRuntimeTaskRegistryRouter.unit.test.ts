@@ -126,14 +126,26 @@ describe("createRuntimeTaskRegistryRouter", () => {
   it("listTasks does not fail the whole call when one delegate throws", async () => {
     const router = createRuntimeTaskRegistryRouter({
       image: createRegistryStub({ listTasks: testDouble.fn(async () => ({ tasks: [{ requestId: "img-1", taskType: TaskType.IMAGE_GENERATION, status: "running", concurrencyClass: "gpu-exclusive" }] })) }),
-      python: createRegistryStub({ listTasks: testDouble.fn(async () => { throw new Error("not supported"); }) }),
+      python: createRegistryStub({ listTasks: testDouble.fn(async () => { throw new Error("not supported at /tmp/secret TOKEN=abc C:\\cache"); }) }),
     });
 
     const result = await router.listTasks({ taskTypes: [TaskType.IMAGE_GENERATION, TaskType.MODEL_TRAINING] });
 
     expect(result.tasks.length).toBe(1);
     expect(result.unsupportedTaskTypes).toEqual([TaskType.MODEL_TRAINING]);
-    expect(result.warnings?.[0]).toMatchObject({ code: "runtime_task_list_delegate_failed" });
+    expect(result.warnings?.[0]).toMatchObject({
+      code: "runtime_task_list_delegate_failed",
+      taskTypes: [TaskType.MODEL_TRAINING],
+      details: {
+        failureKind: "delegate-list-failed",
+        delegate: "python",
+        requestedTaskTypes: [TaskType.MODEL_TRAINING],
+      },
+    });
+    const payload = JSON.stringify(result);
+    expect(payload).not.toContain("/tmp/secret");
+    expect(payload).not.toContain("TOKEN=abc");
+    expect(payload).not.toContain("C:\\cache");
   });
 
   it("task status list and cancel paths do not call delegate start functions", async () => {

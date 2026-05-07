@@ -140,6 +140,9 @@ it("generates non-timestamp request ids when caller does not provide one", async
       unsupportedTaskTypes: [TaskType.MODEL_TRAINING],
       warnings: [{ code: "python_runtime_task_listing_unsupported", taskTypes: [TaskType.MODEL_TRAINING] }],
     });
+    expect(result.warnings?.[0]?.details).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain("/tmp");
+    expect(JSON.stringify(result)).not.toContain("TOKEN=");
   });
 
   it("does not call ensureRuntimeReady when listing tasks", async () => {

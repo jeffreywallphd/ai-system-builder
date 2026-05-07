@@ -121,7 +121,7 @@ export function createRuntimeTaskRegistryRouter(delegates: { image: RuntimeTaskR
         if (!delegateRequest) return { tasks: [] } satisfies RuntimeTaskListResult;
         try {
           return await delegate.registry.listTasks(delegateRequest);
-        } catch (error) {
+        } catch {
           const taskTypes = delegateRequest.taskTypes ?? [...delegate.taskTypes];
           return {
             tasks: [],
@@ -130,7 +130,7 @@ export function createRuntimeTaskRegistryRouter(delegates: { image: RuntimeTaskR
               code: "runtime_task_list_delegate_failed",
               message: `Runtime task registry delegate '${delegate.name}' could not list tasks.`,
               taskTypes,
-              details: { reason: error instanceof Error ? error.message : String(error) },
+              details: { failureKind: "delegate-list-failed", delegate: delegate.name, requestedTaskTypes: taskTypes },
             }],
           } satisfies RuntimeTaskListResult;
         }
