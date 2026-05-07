@@ -116,7 +116,7 @@
 
 ## Asset Kernel local persistence checkpoint
 
-- Prompt 9 adds `modules/adapters/persistence/asset` as a minimal local JSON persistence adapter behind Asset Kernel application repository ports; Phase 2B Prompt 2 provides a shared internal host helper for composition from `storageRootDirectory` under `<storageRoot>/asset-kernel/`, but desktop/server startup execution is deferred to avoid side-effect-only initialization; it remains separate from artifact/resource bytes and runtime roots.
+- Prompt 9 adds `modules/adapters/persistence/asset` as a minimal local JSON persistence adapter behind Asset Kernel application repository ports; Phase 2B Prompt 2 provides shared local kernel composition from `storageRootDirectory` under `<storageRoot>/asset-kernel/`, and Phase 2B Prompt 7 adds shared internal Asset Registry read-facade composition on top of that store. Desktop/server public startup execution, automatic seeding, transport exposure, and resource scans remain deferred; the store remains separate from artifact/resource bytes and runtime roots.
 - It stores definitions, instances, compositions, and bindings as structured JSON-compatible records with a `schemaVersion: 1` manifest; it checks the current schema version/store kind on read, implements no migrations, is not artifact/object storage, and does not store bytes or resource payloads.
 - Local repository text filtering is simple case-insensitive substring matching over selected saved record values.
 - Validation remains in application services/use cases before save; the adapter is a storage mechanism, but the durable write boundary rejects non-JSON record values instead of silently coercing them.

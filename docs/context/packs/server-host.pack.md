@@ -74,7 +74,7 @@
 
 
 
-- `composeLocalAssetKernel` exists as a shared internal helper for local Asset Kernel repositories/use cases under `<storageRoot>/asset-kernel/`, but host startup/registration must not initialize it solely for side effects; execution remains deferred until an internal registry facade, seeding flow, or real private consumer needs it. This must not add asset IPC/API/preload/UI surface, seeding execution, a registry read facade, resource-backed scans/views, or runtime start/probe/install behavior.
+- `composeInternalAssetRegistry` exists as a shared internal helper for local Asset Kernel repositories/use cases plus the application Asset Registry read facade under `<storageRoot>/asset-kernel/`. Server public composition still must not initialize it solely for side effects or expose it through Express routes/API/thin-client UI; seeding execution, resource-backed scans/views, and runtime start/probe/install behavior remain out of scope until an explicit private consumer or later transport/UI wrapper is added.
 
 ## Current implementation checkpoint (server host)
 
