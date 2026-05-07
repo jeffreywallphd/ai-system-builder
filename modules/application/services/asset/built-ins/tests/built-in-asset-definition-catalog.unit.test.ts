@@ -14,6 +14,7 @@ import { validateAssetDefinition } from "../../validate-asset-definition.service
 import {
   BUILT_IN_ASSET_DEFINITION_CATALOG,
 } from "../built-in-asset-definition-catalog";
+import { createBuiltInAssetDefinitionFingerprint } from "../built-in-asset-definition-fingerprint";
 import { BUILT_IN_ASSET_DEFINITION_IDS, BUILT_IN_ASSET_DEFINITION_VERSION } from "../built-in-asset-definition-ids";
 
 const REQUIRED_AI_CONTEXT_FIELDS = [
@@ -58,6 +59,7 @@ describe("built-in asset definition catalog", () => {
       assert.match(String(seed.definition.definitionId), /^builtin\.[a-z0-9.-]+$/);
       assert.equal(seed.source, "built-in");
       assert.match(seed.fingerprint ?? "", /^fnv1a:[0-9a-f]{8}$/);
+      assert.equal(seed.fingerprint, createBuiltInAssetDefinitionFingerprint(seed.definition));
       assert.equal(JSON.stringify(seed).includes("lastSeededAt"), false);
       assert.doesNotMatch(JSON.stringify(seed), /(?:token|secret|password|api[_-]?key|process\.env)/i);
     }
@@ -116,6 +118,21 @@ describe("built-in asset definition catalog", () => {
     }
   });
 
+  test("keeps generic artifact and document built-ins distinct resource-backed definitions", () => {
+    const artifact = definitionById("builtin.artifact");
+    const document = definitionById("builtin.document");
+
+    assert.equal(artifact.assetType, "data-source");
+    assert.equal(document.assetType, "document");
+    assert.equal(artifact.assetFamily, "resource-backed");
+    assert.equal(document.assetFamily, "resource-backed");
+    assert.deepEqual(runtimeRequirements("builtin.artifact"), []);
+    assert.deepEqual(runtimeRequirements("builtin.document"), []);
+    assert.match(JSON.stringify(artifact.aiContext), /stored or managed artifact descriptor|descriptor\/reference/i);
+    assert.doesNotMatch(JSON.stringify(artifact.aiContext), /uploaded document/i);
+    assert.match(JSON.stringify(document.aiContext), /uploaded or imported document/i);
+  });
+
   test("marks model publishing runtime execution as unavailable or not implemented in AI context", () => {
     const modelPublishing = definitionById("builtin.model-publishing");
     const aiContext = JSON.stringify(modelPublishing.aiContext).toLowerCase();
@@ -157,6 +174,7 @@ describe("built-in asset definition catalog", () => {
       "modules/application/services/asset/built-ins/built-in-asset-definition-catalog.ts",
       "modules/application/services/asset/built-ins/built-in-asset-definition-ids.ts",
       "modules/application/services/asset/built-ins/createBuiltInAssetDefinitionSeed.ts",
+      "modules/application/services/asset/built-ins/built-in-asset-definition-fingerprint.ts",
     ];
 
     for (const file of files) {

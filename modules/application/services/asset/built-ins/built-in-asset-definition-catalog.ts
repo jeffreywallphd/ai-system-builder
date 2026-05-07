@@ -126,11 +126,11 @@ const runtimeBackedDefinitionSpecs: readonly DefinitionSpec[] = [
 ];
 
 const resourceBackedDefinitionSpecs: readonly DefinitionSpec[] = [
-  resourceSpec("builtin.artifact", "document", "Artifact", "Artifact descriptor or reference", "Represents an artifact descriptor or reference without storing file payload content."),
+  resourceSpec("builtin.artifact", "data-source", "Artifact", "Stored or managed artifact descriptor or reference", "Represents a stored or managed artifact descriptor/reference that may back assets without being treated as an uploaded document or storing file payload content."),
   resourceSpec("builtin.resource-backed-image", "image", "Resource-backed Image", "Image asset, artifact, or finalized generated output", "Represents a registered image resource after explicit finalization."),
   resourceSpec("builtin.dataset", "dataset", "Dataset", "Dataset descriptor or materialization reference", "Represents a registered dataset resource for preparation, training, or review workflows."),
   resourceSpec("builtin.model", "model", "Model", "Model inventory record and backing artifacts", "Represents a registered model resource without training or validation execution by default."),
-  resourceSpec("builtin.document", "document", "Document", "Uploaded document or artifact reference", "Represents an uploaded or imported document by descriptor/reference only."),
+  resourceSpec("builtin.document", "document", "Document", "Uploaded or imported document descriptor", "Represents an uploaded or imported document by descriptor/reference only."),
 ];
 
 const compositionDefinitionSpecs: readonly DefinitionSpec[] = [

@@ -69,7 +69,6 @@ import {
   type HuggingFaceTokenStatus,
 } from "../../shared/huggingFaceTokenConfigStore";
 import { createRuntimePreparedModelCheckpointResolver } from "../../shared/createRuntimePreparedModelCheckpointResolver";
-import { composeLocalAssetKernel } from "../../shared/composition/composeLocalAssetKernel";
 import {
   registerExpressApi,
   type RegisterExpressApiDependencies,
@@ -493,8 +492,6 @@ export function composeServerHost(
           transformersCache,
         },
       });
-      void composeLocalAssetKernel({ rootDirectory: registerOptions.storageRootDirectory, now: options.now });
-
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
       });

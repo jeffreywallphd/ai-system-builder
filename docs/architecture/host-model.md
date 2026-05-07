@@ -154,7 +154,7 @@ If host code starts accumulating business logic, move that logic inward before i
 
 ### Private Asset Kernel composition
 
-Desktop and server hosts may compose the local Asset Kernel internally from their host-owned storage root through the shared host composition helper. The helper initializes and validates the adapter-owned `<storageRoot>/asset-kernel/` record store and returns repository ports plus existing application registry use cases for host-internal use. This wiring deliberately keeps public host shapes, IPC channels, API routes, preload methods, renderer UI, thin-client UI, seeding, resource-backed scans/views, and registry read facades deferred to later prompts. Runtime roots remain separate and must not be used for Asset Kernel persistence.
+`modules/hosts/shared/composition/composeLocalAssetKernel.ts` is the shared internal helper for local Asset Kernel composition. It initializes and validates the adapter-owned `<storageRoot>/asset-kernel/` record store and returns repository ports plus existing application registry use cases for a future host-internal consumer. Desktop and server startup/registration avoid side-effect-only Asset Kernel initialization until an internal registry facade, seeding flow, or comparable private consumer needs the composed kernel. Public host shapes, IPC channels, API routes, preload methods, renderer UI, thin-client UI, seeding execution, resource-backed scans/views, registry read facades, and runtime behavior remain deferred; runtime roots remain separate and must not be used for Asset Kernel persistence.
 
 ### Current host parity for repo-backed artifact workflows
 

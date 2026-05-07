@@ -10,6 +10,8 @@ import {
   BuiltInAssetDefinitionSeedingService,
   type BuiltInAssetDefinitionSeed,
 } from "../built-in-asset-definition-seeding.service";
+import { createBuiltInAssetDefinitionFingerprint } from "../built-ins/built-in-asset-definition-fingerprint";
+import { createBuiltInAssetDefinitionSeed } from "../built-ins/createBuiltInAssetDefinitionSeed";
 
 class FakeDefinitionRepository implements AssetDefinitionRepositoryPort {
   public readonly definitions = new Map<string, AssetDefinition>();
@@ -77,7 +79,7 @@ describe("BuiltInAssetDefinitionSeedingService", () => {
     assert.equal(repository.saveCount, 0);
   });
 
-  test("is idempotent when run twice with the same seed fingerprint", async () => {
+  test("is idempotent when run twice with the same seed id, version, and fingerprint", async () => {
     const repository = new FakeDefinitionRepository();
     const service = createService(repository);
     const seed = validSeed({ fingerprint: "fixture:fingerprint" });
@@ -89,6 +91,42 @@ describe("BuiltInAssetDefinitionSeedingService", () => {
     assert.equal(second.diagnostics[0]?.status, "already-current");
     assert.equal(second.unchangedCount, 1);
     assert.equal(repository.saveCount, 1);
+  });
+
+  test("does not treat matching seed id and fingerprint as current when seed version differs", async () => {
+    const repository = new FakeDefinitionRepository();
+    const seed = validSeed({ fingerprint: "fixture:fingerprint", seedVersion: "1.0.0" });
+    await createService(repository).seedDefinitions([seed]);
+    repository.saveCount = 0;
+
+    const result = await createService(repository).seedDefinitions([validSeed({
+      fingerprint: "fixture:fingerprint",
+      seedVersion: "1.0.1",
+    })]);
+
+    assert.equal(result.diagnostics[0]?.status, "skipped-seed-version-mismatch");
+    assert.equal(result.unchangedCount, 0);
+    assert.equal(result.skippedCount, 1);
+    assert.equal(repository.saveCount, 0);
+    assert.deepEqual(result.diagnostics[0]?.metadata, { existingBuiltInSeed: true, seedVersionMismatch: true });
+    assert.doesNotMatch(JSON.stringify(result.diagnostics[0]), /(?:\/tmp|Users|secret|token|API_KEY|stack|node --inspect|"owner"|"builtInSeed"|"fingerprint")/i);
+    assert.equal(builtInSeedMetadata(await repository.getDefinition(referenceFor(seed.definition)))?.seedVersion, "1.0.0");
+  });
+
+  test("uses the shared built-in fingerprint helper for catalog seed creation and service fallback", async () => {
+    const repository = new FakeDefinitionRepository();
+    const definition = validDefinition({ description: "Fingerprint fixture." });
+    const catalogSeed = createBuiltInAssetDefinitionSeed(definition);
+
+    const result = await createService(repository).seedDefinitions([validSeed({
+      definition,
+      seedId: String(definition.definitionId),
+      fingerprint: undefined,
+    })]);
+
+    assert.equal(catalogSeed.fingerprint, createBuiltInAssetDefinitionFingerprint(definition));
+    assert.equal(result.diagnostics[0]?.status, "created");
+    assert.equal(builtInSeedMetadata(await repository.getDefinition(referenceFor(definition)))?.fingerprint, catalogSeed.fingerprint);
   });
 
   test("skips a custom definition with the same definitionId and version", async () => {
