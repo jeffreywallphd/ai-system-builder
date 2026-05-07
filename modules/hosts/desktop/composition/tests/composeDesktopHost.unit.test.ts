@@ -304,7 +304,7 @@ describe("composeDesktopHost", () => {
       DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
     ]);
     expect(channels.some((channel) => String(channel).includes("asset"))).toBe(false);
-    expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(true);
+    expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     const listener = ipcMain.handle.mock.calls[0]?.[1];
     expect(listener).toBeTypeOf("function");

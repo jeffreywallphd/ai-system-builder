@@ -197,7 +197,7 @@ describe("composeServerHost", () => {
       "/api/server/restart",
     ]);
     expect(registeredPaths.some((path) => String(path).startsWith("/api/asset"))).toBe(false);
-    expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(true);
+    expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
     expect(registeredGetPaths).toEqual([

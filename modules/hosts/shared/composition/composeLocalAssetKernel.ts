@@ -61,9 +61,9 @@ export interface LocalAssetKernelComposition {
     readonly validateAssetComposition: ValidateAssetCompositionUseCase;
   };
   readonly diagnostics: {
-    readonly rootDirectory: string;
     readonly storeKind: typeof ASSET_KERNEL_LOCAL_STORE_KIND;
     readonly schemaVersion: typeof ASSET_KERNEL_LOCAL_SCHEMA_VERSION;
+    readonly initialized: true;
   };
 }
 
@@ -115,9 +115,9 @@ export function composeLocalAssetKernel(options: ComposeLocalAssetKernelOptions)
       }),
     },
     diagnostics: {
-      rootDirectory: options.rootDirectory,
       storeKind: ASSET_KERNEL_LOCAL_STORE_KIND,
       schemaVersion: ASSET_KERNEL_LOCAL_SCHEMA_VERSION,
+      initialized: true,
     },
   };
 }

@@ -85,8 +85,13 @@ describe("composeLocalAssetKernel", () => {
       assert.equal(typeof (useCase as { execute?: unknown }).execute, "function");
     }
     assert.equal(typeof composition.repositories.bindingRepository.saveBinding, "function");
-    assert.equal(composition.diagnostics.storeKind, "asset-kernel-local-store");
-    assert.equal(composition.diagnostics.schemaVersion, 1);
+    assert.deepEqual(composition.diagnostics, {
+      storeKind: "asset-kernel-local-store",
+      schemaVersion: 1,
+      initialized: true,
+    });
+    assert.equal("rootDirectory" in composition.diagnostics, false);
+    assert.doesNotMatch(JSON.stringify(composition.diagnostics), /(?:\/tmp|[A-Za-z]:\\|\.\.\/|\.\/)/);
   });
 
   it("initializes missing stores and stores records under the host root asset-kernel directory", async () => {
@@ -158,7 +163,7 @@ describe("composeLocalAssetKernel", () => {
     assert.throws(() => composeLocalAssetKernel({ rootDirectory }), (error: unknown) => {
       assert.equal(error instanceof LocalAssetRecordStoreError, true);
       assert.match((error as Error).message, /malformed JSON/);
-      assert.doesNotMatch((error as Error).message, /(?:\/tmp|asset-kernel|secret|token|stack)/i);
+      assert.doesNotMatch((error as Error).message, /(?:\/tmp|secret|token|stack)/i);
       return true;
     });
 
@@ -166,7 +171,7 @@ describe("composeLocalAssetKernel", () => {
     assert.throws(() => composeLocalAssetKernel({ rootDirectory }), (error: unknown) => {
       assert.equal(error instanceof LocalAssetRecordStoreError, true);
       assert.match((error as Error).message, /schema version is unsupported/);
-      assert.doesNotMatch((error as Error).message, /(?:\/tmp|asset-kernel|secret|token|stack)/i);
+      assert.doesNotMatch((error as Error).message, /(?:\/tmp|secret|token|stack)/i);
       return true;
     });
   });

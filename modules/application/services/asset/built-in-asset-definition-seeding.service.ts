@@ -1,7 +1,8 @@
-import type { AssetDefinition, AssetJsonValue, AssetMetadata, AssetReference, AssetValidationIssue } from "../../../contracts/asset";
+import type { AssetDefinition, AssetMetadata, AssetReference, AssetValidationIssue } from "../../../contracts/asset";
 import { isAssetId, isAssetVersion } from "../../../contracts/asset";
 import type { AssetDefinitionRepositoryPort } from "../../ports/asset";
 import { validateAssetDefinition, type AssetValidationResult } from "./validate-asset-definition.service";
+import { createBuiltInAssetDefinitionFingerprint } from "./built-ins/built-in-asset-definition-fingerprint";
 
 export interface BuiltInAssetDefinitionSeed {
   readonly seedId: string;
@@ -15,6 +16,7 @@ export type BuiltInAssetDefinitionSeedStatus =
   | "created"
   | "already-current"
   | "skipped-user-modified"
+  | "skipped-seed-version-mismatch"
   | "invalid"
   | "failed";
 
@@ -118,7 +120,7 @@ export class BuiltInAssetDefinitionSeedingService {
       };
     }
 
-    const fingerprint = seed.fingerprint ?? stableAssetDefinitionFingerprint(seed.definition);
+    const fingerprint = seed.fingerprint ?? createBuiltInAssetDefinitionFingerprint(seed.definition);
     const reference: AssetReference = { kind: "asset-definition-version", id: definitionId as AssetReference["id"], version };
 
     let existing: AssetDefinition | undefined;
@@ -131,13 +133,24 @@ export class BuiltInAssetDefinitionSeedingService {
     if (existing) {
       const existingMarker = getBuiltInSeedMetadata(existing.metadata);
       if (existingMarker?.seedId === seed.seedId && existingMarker.fingerprint === fingerprint) {
+        if (existingMarker.seedVersion === seed.seedVersion) {
+          return {
+            seedId: seed.seedId,
+            definitionId,
+            version,
+            status: "already-current",
+            message: "Built-in asset definition seed is already current.",
+            metadata: { managedBy: existingMarker.managedBy },
+          };
+        }
+
         return {
           seedId: seed.seedId,
           definitionId,
           version,
-          status: "already-current",
-          message: "Built-in asset definition seed is already current.",
-          metadata: { managedBy: existingMarker.managedBy },
+          status: "skipped-seed-version-mismatch",
+          message: "Existing asset definition was not overwritten because its built-in seed version does not match.",
+          metadata: { existingBuiltInSeed: true, seedVersionMismatch: true },
         };
       }
 
@@ -201,7 +214,9 @@ function summarizeDiagnostics(diagnostics: readonly BuiltInAssetDefinitionSeedDi
   return {
     createdCount: diagnostics.filter((diagnostic) => diagnostic.status === "created").length,
     unchangedCount: diagnostics.filter((diagnostic) => diagnostic.status === "already-current").length,
-    skippedCount: diagnostics.filter((diagnostic) => diagnostic.status === "skipped-user-modified").length,
+    skippedCount: diagnostics.filter((diagnostic) =>
+      diagnostic.status === "skipped-user-modified" || diagnostic.status === "skipped-seed-version-mismatch",
+    ).length,
     invalidCount: diagnostics.filter((diagnostic) => diagnostic.status === "invalid").length,
     failedCount: diagnostics.filter((diagnostic) => diagnostic.status === "failed").length,
     diagnostics,
@@ -274,29 +289,6 @@ function failedDiagnostic(seed: BuiltInAssetDefinitionSeed, operation: "read" | 
     message: SAFE_FAILURE_MESSAGE,
     metadata: { operation },
   };
-}
-
-function stableAssetDefinitionFingerprint(definition: AssetDefinition): string {
-  return `fnv1a:${fnv1a(stableStringify(definition))}`;
-}
-
-function stableStringify(value: AssetJsonValue | AssetDefinition | undefined): string {
-  if (value === undefined) return "undefined";
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item as AssetJsonValue)).join(",")}]`;
-  const entries = Object.entries(value as Record<string, AssetJsonValue | undefined>)
-    .filter(([, entryValue]) => entryValue !== undefined)
-    .sort(([left], [right]) => left.localeCompare(right));
-  return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${stableStringify(entryValue)}`).join(",")}}`;
-}
-
-function fnv1a(value: string): string {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

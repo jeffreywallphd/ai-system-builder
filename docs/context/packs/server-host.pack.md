@@ -74,7 +74,7 @@
 
 
 
-- Local Asset Kernel persistence is privately composed from the host `storageRootDirectory` through the shared host helper and initializes `<storageRoot>/asset-kernel/`; this must not add asset IPC/API/preload/UI surface, seeding, a registry read facade, resource-backed scans/views, or runtime start/probe/install behavior.
+- `composeLocalAssetKernel` exists as a shared internal helper for local Asset Kernel repositories/use cases under `<storageRoot>/asset-kernel/`, but host startup/registration must not initialize it solely for side effects; execution remains deferred until an internal registry facade, seeding flow, or real private consumer needs it. This must not add asset IPC/API/preload/UI surface, seeding execution, a registry read facade, resource-backed scans/views, or runtime start/probe/install behavior.
 
 ## Current implementation checkpoint (server host)
 
