@@ -113,3 +113,11 @@
 - Resource-backed assets should reference artifact/resource storage identities rather than embedding raw paths or bytes in asset metadata.
 - Generated outputs become reusable only after finalization/registration as artifacts or resource-backed assets; Hugging Face objects remain external repository objects until registered/imported.
 - Do not rename existing artifact/model/dataset/image concepts in Phase 2A.
+
+## Asset Kernel local persistence checkpoint
+
+- Prompt 9 adds `modules/adapters/persistence/asset` as a minimal local JSON persistence adapter behind Asset Kernel application repository ports.
+- It stores definitions, instances, compositions, and bindings as structured records with a `schemaVersion: 1` manifest; it is not artifact/object storage and does not store bytes or resource payloads.
+- Validation remains in application services/use cases before save; the adapter is a storage mechanism.
+- Resource-backed mapping and explicit persistence-to-storage linkage remain deferred to Prompt 10+.
+- API/IPC/UI, runtime execution/readiness, workflow/graph execution, prompt assembly, embeddings, and host wiring remain out of scope for this adapter checkpoint.

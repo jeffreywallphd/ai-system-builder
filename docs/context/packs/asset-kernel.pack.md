@@ -18,7 +18,7 @@ Read this pack for tasks involving:
 - asset configuration,
 - persistence adapters or resource-backed mapping.
 
-Prompt 7 has added pure application-layer validation services under `modules/application/services/asset` for definitions, instances, bindings, and compositions. Prompt 8 has added application-layer repository ports under `modules/application/ports/asset` and use cases under `modules/application/use-cases/asset` for registering/creating, reading, listing, updating, and validating asset definitions, instances, and compositions. The ports are interfaces only; do not treat them as persistence, runtime, transport, UI, automatic-composition, prompt-assembly, retrieval, embedding, or AI-generation behavior.
+Prompt 7 has added pure application-layer validation services under `modules/application/services/asset` for definitions, instances, bindings, and compositions. Prompt 8 has added application-layer repository ports under `modules/application/ports/asset` and use cases under `modules/application/use-cases/asset` for registering/creating, reading, listing, updating, and validating asset definitions, instances, and compositions. Prompt 9 adds minimal local JSON persistence adapters under `modules/adapters/persistence/asset` behind those ports. Treat those adapters as record storage only, not runtime, transport, UI, automatic-composition, prompt-assembly, retrieval, embedding, AI-generation, artifact storage, or resource-backed mapping behavior.
 
 ## Canonical Asset Terminology
 
@@ -89,18 +89,27 @@ Outside-but-referenceable concepts:
 6. Prompt 6 — Detailed asset ports, binding compatibility, and composition-rule contracts.
 7. Prompt 7 — Asset validation services for definitions, instances, bindings, and compositions.
 8. Prompt 8 — Asset registry and application ports.
-9. Prompt 9 — Local persistence adapter.
+9. Prompt 9 — Local persistence adapter for definitions, instances, compositions, and bindings.
 10. Prompt 10 — Resource-backed asset mapping and final Phase 2A regression.
 
 Prompt 7 validation services are pure/deterministic and transport/UI-neutral. They validate configuration structure, AI-context completeness, port/binding compatibility, composition structure, lifecycle/provenance, dependencies, and declared requirements; they do not execute workflows, query runtime readiness, start runtimes, access filesystem/network, call LLMs, or persist anything.
 
-Prompt 8 status: `modules/contracts/asset` remains the shared contract family, `modules/application/services/asset` provides validation services over those contracts, `modules/application/ports/asset` defines repository interfaces for definitions, instances, compositions, and first-class bindings, and `modules/application/use-cases/asset` provides transport/UI-neutral application seams. Create/register/update use cases validate before save, validation-only use cases return reports without saving, read/list use cases do not revalidate by default, `bindingRefs` are structurally checked as `asset-binding` references, and composition validation context may resolve them through `AssetBindingRepositoryPort`, persistence remains Prompt 9, resource-backed mapping remains Prompt 10, and API/IPC/UI remain deferred. Deferred registry concerns remain: no automatic definition version incrementing, no conflict-detection policy beyond natural adapter behavior, no version-history service, no new delete use cases, no runtime readiness/guard calls, and no direct filesystem/network access from use cases.
+Prompt 8 status: `modules/contracts/asset` remains the shared contract family, `modules/application/services/asset` provides validation services over those contracts, `modules/application/ports/asset` defines repository interfaces for definitions, instances, compositions, and first-class bindings, and `modules/application/use-cases/asset` provides transport/UI-neutral application seams. Create/register/update use cases validate before save, validation-only use cases return reports without saving, read/list use cases do not revalidate by default, `bindingRefs` are structurally checked as `asset-binding` references, and composition validation context may resolve them through `AssetBindingRepositoryPort`, minimal local JSON persistence is available through Prompt 9 adapters, resource-backed mapping remains Prompt 10, and API/IPC/UI remain deferred. Deferred registry concerns remain: no automatic definition version incrementing, no conflict-detection policy beyond natural adapter behavior, no version-history service, no new delete use cases, no runtime readiness/guard calls, and no direct filesystem/network access from use cases.
 
-Transport/UI work is deferred until after the kernel is proven through shared contracts, configuration, AI context, ports/composition, validation, registry ports, persistence, and resource-backed mapping. Prompt 8 does not add workflow execution, graph execution, UI page routing, API/IPC exposure, runtime behavior, persistence adapters, resource-backed mapping, or automatic composition.
+Transport/UI work is deferred until after the kernel is proven through shared contracts, configuration, AI context, ports/composition, validation, registry ports, persistence, and resource-backed mapping. Prompt 9 does not add workflow execution, graph execution, UI page routing, API/IPC exposure, runtime behavior, resource-backed mapping, host wiring, or automatic composition.
 
 ## Explicit Non-Goals
 
 - No TypeScript implementation when a prompt is documentation-only.
 - No API/IPC/UI asset models before shared contracts stabilize.
-- No persistence adapter before contracts, validation, and registry/application ports stabilize.
+- No persistence adapter outside `modules/adapters/persistence/asset`; local persistence stores records/metadata only and validation remains application-layer before save.
 - No marketplace/plugin package registry, persistent task history, workflow execution store, scheduler/queue changes, runtime readiness changes, storage rewrite, or broad refactor in Phase 2A unless a later prompt explicitly changes scope.
+
+## Prompt 9 local persistence checkpoint
+
+- Local Asset Kernel persistence stores `AssetDefinition`, `AssetInstance`, `AssetComposition`, and `AssetBinding` records as JSON-compatible metadata behind application repository ports.
+- The store layout is `asset-kernel/manifest.json`, `definitions.json`, `instances.json`, `compositions.json`, and `bindings.json`; the manifest currently declares `schemaVersion: 1`.
+- Definition versions are keyed by `definitionId@version`; exact version references resolve exact versions and unversioned definition references resolve a deterministic latest version without auto-incrementing.
+- The adapter does not store resource bytes, blob payloads, generated model/image/dataset bytes, secrets, filesystem handles, or raw adapter paths.
+- Application use cases continue to validate before save; adapters do not duplicate the validation services.
+- Resource-backed mapping, persistence/storage linkage, API/IPC/UI exposure, runtime behavior, and host wiring remain deferred.

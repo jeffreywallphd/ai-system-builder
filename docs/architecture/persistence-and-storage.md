@@ -2,7 +2,7 @@
 
 ## Asset Kernel relationship
 
-The Asset Kernel is the semantic composition model for reusable building blocks. Persistence and storage remain separate lower-level architecture concerns. Asset metadata may later be persisted as structured records for asset definitions, instances, bindings, compositions, lifecycle, provenance, and version history; binary/content payloads remain storage concerns.
+The Asset Kernel is the semantic composition model for reusable building blocks. Persistence and storage remain separate lower-level architecture concerns. Asset metadata may be persisted as structured records for asset definitions, instances, bindings, compositions, lifecycle, and provenance; binary/content payloads remain storage concerns. Phase 2A Prompt 9 adds a minimal local JSON Asset Kernel record adapter with schema-version manifest metadata, but it does not add a migration framework, resource-backed mapping, or a version-history service.
 
 Resource-backed assets should reference artifact/resource storage identities instead of embedding raw file paths or bytes in asset metadata. Generated outputs produced by runtime tasks become reusable only after finalization/registration as artifacts or resource-backed assets. Hugging Face repository objects remain external repository objects until registered/imported as resource-backed assets. Existing artifact, model, dataset, and image concepts should not be renamed during Phase 2A.
 
@@ -63,6 +63,13 @@ Persistence family invariants:
 - application persistence ports should stay record-oriented and operation-aware (not generic CRUD bags) and should depend on persistence contracts, not adapter-native query APIs.
 
 This keeps Postgres as the default adapter direction without coupling application/domain boundaries to Postgres-specific APIs.
+
+
+### Asset Kernel local record adapter checkpoint
+
+`modules/adapters/persistence/asset` provides the current minimal local Asset Kernel persistence adapter. It stores JSON-compatible `AssetDefinition`, `AssetInstance`, `AssetComposition`, and `AssetBinding` records under a host-supplied root in `asset-kernel/manifest.json`, `definitions.json`, `instances.json`, `compositions.json`, and `bindings.json`; the manifest currently uses `schemaVersion: 1` and `storeKind: "asset-kernel-local-store"`. The adapter implements application repository ports and remains infrastructure-only: it does not own Asset Kernel validation, business rules, host composition, API/IPC/UI exposure, resource-backed mapping, artifact/object storage, workflow execution, graph execution, runtime readiness, prompt assembly, embeddings, or AI-generated context.
+
+The local adapter persists records and references only. It must not embed raw file/blob bytes, generated model/image/dataset payload bytes, secrets, environment values, local filesystem handles, or adapter-native paths in asset records or public errors. Resource-backed asset mapping and explicit persistence-to-storage linkage remain deferred beyond this checkpoint.
 
 ## What belongs in persistence
 
