@@ -5,6 +5,9 @@ import * as assetContracts from "..";
 describe("asset family invariants", () => {
   it("exports the core Asset Kernel contract vocabulary through the family barrel", () => {
     expect(Object.keys(assetContracts).sort()).toEqual([
+      "ASSET_AI_CONTEXT_QUALITY_STATUSES",
+      "ASSET_AI_CONTEXT_SAFETY_NOTE_CATEGORIES",
+      "ASSET_AI_CONTEXT_SAFETY_NOTE_SEVERITIES",
       "ASSET_BINDING_KINDS",
       "ASSET_COMPOSITION_TYPES",
       "ASSET_CONFIGURATION_CONSTRAINT_KINDS",
@@ -20,6 +23,9 @@ describe("asset family invariants", () => {
       "ASSET_TYPES",
       "ASSET_VALIDATION_ISSUE_CATEGORIES",
       "ASSET_VALIDATION_ISSUE_SEVERITIES",
+      "isAssetAiContextQualityStatus",
+      "isAssetAiContextSafetyNoteCategory",
+      "isAssetAiContextSafetyNoteSeverity",
       "isAssetBindingKind",
       "isAssetCompositionType",
       "isAssetConfigurationConstraintKind",
@@ -36,6 +42,9 @@ describe("asset family invariants", () => {
       "isAssetValidationIssueCategory",
       "isAssetValidationIssueSeverity",
       "isAssetVersion",
+      "normalizeAssetAiContextQualityStatus",
+      "normalizeAssetAiContextSafetyNoteCategory",
+      "normalizeAssetAiContextSafetyNoteSeverity",
       "normalizeAssetBindingKind",
       "normalizeAssetCompositionType",
       "normalizeAssetConfigurationConstraintKind",
