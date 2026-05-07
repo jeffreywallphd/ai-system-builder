@@ -89,7 +89,6 @@ describe("composeInternalAssetRegistry", () => {
       schemaVersion: 1,
       registryFacadeComposed: true,
       resourceBackedViewsEnabled: false,
-      builtInCatalogDefinitionCount: BUILT_IN_ASSET_DEFINITION_CATALOG.length,
     });
   });
 
@@ -109,6 +108,7 @@ describe("composeInternalAssetRegistry", () => {
 
     assert.equal("rootDirectory" in composition.diagnostics, false);
     assert.equal("path" in composition.diagnostics, false);
+    assert.equal("builtInCatalogDefinitionCount" in composition.diagnostics, false);
     assert.doesNotMatch(JSON.stringify(composition.diagnostics), /(?:\/tmp|[A-Za-z]:\\|\.\.\/|\.\/|secret|token|stack)/i);
   });
 

@@ -37,12 +37,21 @@ class FakeDefinitionRepository implements AssetDefinitionRepositoryPort {
   private readonly definitions = new Map<string, AssetDefinition>();
 
   public constructor(definitions: readonly AssetDefinition[] = []) {
-    for (const definition of definitions) this.definitions.set(String(definition.definitionId), definition);
+    for (const definition of definitions) this.definitions.set(definitionMapKey(definition), definition);
   }
 
-  public async saveDefinition(definition: AssetDefinition): Promise<AssetDefinition> { this.saved.push(definition); this.definitions.set(String(definition.definitionId), definition); return definition; }
-  public async getDefinition(reference: AssetReference): Promise<AssetDefinition | undefined> { if (this.failReads) throw new Error("/tmp/provider secret token stack"); return this.definitions.get(reference.id); }
-  public async listDefinitions(query?: AssetDefinitionListQuery) { if (this.failReads) throw new Error("/tmp/provider secret token stack"); this.lastQuery = query; return { definitions: [...this.definitions.values()], nextCursor: query?.cursor ? "next-definition" : undefined }; }
+  public async saveDefinition(definition: AssetDefinition): Promise<AssetDefinition> { this.saved.push(definition); this.definitions.set(definitionMapKey(definition), definition); return definition; }
+  public async getDefinition(reference: AssetReference): Promise<AssetDefinition | undefined> { if (this.failReads) throw new Error("/tmp/provider secret token stack"); return this.definitions.get(`${reference.id}@${reference.version ?? ""}`) ?? this.definitions.get(`${reference.id}@1.0.0`) ?? this.definitions.get(reference.id); }
+  public async listDefinitions(query?: AssetDefinitionListQuery) {
+    if (this.failReads) throw new Error("/tmp/provider secret token stack");
+    this.lastQuery = query;
+    const definitions = [...this.definitions.values()]
+      .filter((definition) => !query?.assetType || definition.assetType === query.assetType)
+      .filter((definition) => !query?.assetFamily || definition.assetFamily === query.assetFamily)
+      .filter((definition) => !query?.lifecycleStatus || definition.lifecycleStatus === query.lifecycleStatus)
+      .filter((definition) => matchesTextQuery(query?.text, [definition.definitionId, definition.displayName, definition.description, definition.assetType, definition.assetFamily]));
+    return { definitions: takeLimit(definitions, query?.limit), nextCursor: query?.cursor ? "next-definition" : undefined };
+  }
   public async deleteDefinition(reference: AssetReference): Promise<void> { this.deleted.push(reference); }
 }
 
@@ -58,7 +67,13 @@ class FakeInstanceRepository implements AssetInstanceRepositoryPort {
 
   public async saveInstance(instance: AssetInstance): Promise<AssetInstance> { this.saved.push(instance); this.instances.set(String(instance.instanceId), instance); return instance; }
   public async getInstance(reference: AssetReference): Promise<AssetInstance | undefined> { return this.instances.get(reference.id); }
-  public async listInstances(query?: AssetInstanceListQuery) { this.lastQuery = query; return { instances: [...this.instances.values()], nextCursor: query?.cursor ? "next-instance" : undefined }; }
+  public async listInstances(query?: AssetInstanceListQuery) {
+    this.lastQuery = query;
+    const instances = [...this.instances.values()]
+      .filter((instance) => !query?.lifecycleStatus || instance.lifecycleStatus === query.lifecycleStatus)
+      .filter((instance) => matchesTextQuery(query?.text, [instance.instanceId, instance.displayName, instance.stateSummary?.summary]));
+    return { instances: takeLimit(instances, query?.limit), nextCursor: query?.cursor ? "next-instance" : undefined };
+  }
   public async deleteInstance(reference: AssetReference): Promise<void> { this.deleted.push(reference); }
 }
 
@@ -74,7 +89,13 @@ class FakeCompositionRepository implements AssetCompositionRepositoryPort {
 
   public async saveComposition(composition: AssetComposition): Promise<AssetComposition> { this.saved.push(composition); this.compositions.set(String(composition.compositionId), composition); return composition; }
   public async getComposition(reference: AssetReference): Promise<AssetComposition | undefined> { return this.compositions.get(reference.id); }
-  public async listCompositions(query?: AssetCompositionListQuery) { this.lastQuery = query; return { compositions: [...this.compositions.values()], nextCursor: query?.cursor ? "next-composition" : undefined }; }
+  public async listCompositions(query?: AssetCompositionListQuery) {
+    this.lastQuery = query;
+    const compositions = [...this.compositions.values()]
+      .filter((composition) => !query?.lifecycleStatus || composition.lifecycleStatus === query.lifecycleStatus)
+      .filter((composition) => matchesTextQuery(query?.text, [composition.compositionId, composition.displayName, composition.description, composition.compositionType]));
+    return { compositions: takeLimit(compositions, query?.limit), nextCursor: query?.cursor ? "next-composition" : undefined };
+  }
   public async deleteComposition(reference: AssetReference): Promise<void> { this.deleted.push(reference); }
 }
 
@@ -92,6 +113,21 @@ class FakeBindingRepository implements AssetBindingRepositoryPort {
   public async getBinding(reference: AssetReference): Promise<AssetBinding | undefined> { return this.bindings.get(reference.id); }
   public async listBindings(query?: AssetBindingListQuery) { this.lastQuery = query; return { bindings: [...this.bindings.values()] }; }
   public async deleteBinding(reference: AssetReference): Promise<void> { this.deleted.push(reference); }
+}
+
+
+function takeLimit<T>(values: readonly T[], limit: number | undefined): readonly T[] {
+  return typeof limit === "number" && Number.isFinite(limit) ? values.slice(0, Math.max(0, Math.floor(limit))) : values;
+}
+
+function matchesTextQuery(text: string | undefined, values: readonly (string | undefined)[]): boolean {
+  const needle = text?.trim().toLowerCase();
+  if (!needle) return true;
+  return values.some((value) => value?.toLowerCase().includes(needle));
+}
+
+function definitionMapKey(definition: AssetDefinition): string {
+  return `${definition.definitionId}@${definition.version ?? ""}`;
 }
 
 function createFacade(overrides: Partial<ConstructorParameters<typeof AssetRegistryReadFacade>[0]> = {}) {
@@ -238,6 +274,33 @@ describe("AssetRegistryReadFacade definition reads", () => {
     assert.equal(repo.deleted.length, 0);
   });
 
+
+  it("marks built-ins only by exact definition version or valid seed marker", async () => {
+    const seed = BUILT_IN_ASSET_DEFINITION_CATALOG[0]!;
+    const exactBuiltIn = { ...seed.definition };
+    const differentVersion = { ...seed.definition, version: "9.9.9", metadata: undefined };
+    const validMarker = validDefinition({
+      definitionId: "definition.marked",
+      metadata: { builtInSeed: { managedBy: "asset-kernel", seedId: "seed.custom", seedVersion: "1.0.0", fingerprint: "abc123" } },
+    });
+    const malformedMarker = validDefinition({
+      definitionId: "definition.malformed",
+      metadata: { builtInSeed: { managedBy: "asset-kernel", seedId: "seed.custom" } },
+    });
+
+    const listFacade = createFacade({ definitionRepository: new FakeDefinitionRepository([exactBuiltIn, differentVersion, validMarker, malformedMarker]) });
+    const cards = await listFacade.listDefinitionCards();
+    const byId = new Map(cards.items.map((item) => [`${item.definitionId}@${item.version}`, item]));
+
+    assert.equal(byId.get(`${seed.definition.definitionId}@${seed.definition.version}`)?.builtIn, true);
+    assert.equal(byId.get(`${seed.definition.definitionId}@9.9.9`)?.builtIn, undefined);
+    assert.equal(byId.get("definition.marked@1.0.0")?.builtIn, true);
+    assert.equal(byId.get("definition.malformed@1.0.0")?.builtIn, undefined);
+
+    const detailFacade = createFacade({ definitionRepository: new FakeDefinitionRepository([differentVersion]) });
+    assert.equal((await detailFacade.readDefinitionDetail({ kind: "asset-definition-version", id: seed.definition.definitionId, version: "9.9.9" } as AssetReference))?.builtIn, undefined);
+  });
+
   it("omits validation by default and includes validation only when requested", async () => {
     const facade = createFacade({ definitionRepository: new FakeDefinitionRepository([validDefinition({ displayName: "" })]) });
     assert.equal((await facade.readDefinitionDetail(definitionRef))?.validationSummary, undefined);
@@ -340,6 +403,39 @@ describe("AssetRegistryReadFacade query, pagination, and boundaries", () => {
     assert.equal(list.diagnostics?.[0]?.code, "cursor-passed-through");
   });
 
+
+  it("forwards supported repository filters for definitions, instances, and compositions", async () => {
+    const definitions = new FakeDefinitionRepository([validDefinition()]);
+    const instances = new FakeInstanceRepository([validInstance()]);
+    const compositions = new FakeCompositionRepository([validComposition()]);
+    const facade = createFacade({ definitionRepository: definitions, instanceRepository: instances, compositionRepository: compositions });
+
+    await facade.listDefinitionCards({ searchText: " alpha ", assetTypes: ["tool"], assetFamilies: ["behavioral"], lifecycleStatuses: ["draft"], limit: 7, cursor: "cursor" });
+    assert.deepEqual(definitions.lastQuery, { assetType: "tool", assetFamily: "behavioral", lifecycleStatus: "draft", text: "alpha", limit: 7, cursor: "cursor" });
+
+    await facade.listInstanceCards({ searchText: "instance", lifecycleStatuses: ["draft"], limit: 5 });
+    assert.deepEqual(instances.lastQuery, { lifecycleStatus: "draft", text: "instance", limit: 5, cursor: undefined });
+
+    await facade.listCompositionCards({ searchText: "feature", lifecycleStatuses: ["draft"], limit: 6 });
+    assert.deepEqual(compositions.lastQuery, { lifecycleStatus: "draft", text: "feature", limit: 6, cursor: undefined });
+  });
+
+  it("diagnoses multi-value facade-side filtering and fetches a bounded page before final limiting", async () => {
+    const repo = new FakeDefinitionRepository([
+      validDefinition({ definitionId: "definition.one", assetType: "dataset", displayName: "One" }),
+      validDefinition({ definitionId: "definition.two", assetType: "tool", displayName: "Two" }),
+      validDefinition({ definitionId: "definition.three", assetType: "dataset", displayName: "Three" }),
+    ]);
+    const facade = createFacade({ definitionRepository: repo, maxListLimit: 3 });
+
+    const list = await facade.listDefinitionCards({ assetTypes: ["dataset", "tool"], limit: 1 });
+
+    assert.equal(repo.lastQuery?.assetType, undefined);
+    assert.equal(repo.lastQuery?.limit, 3);
+    assert.deepEqual(list.items.map((item) => item.definitionId), ["definition.one"]);
+    assert.equal(list.diagnostics?.some((diagnostic) => diagnostic.code === "facade-side-filtering"), true);
+  });
+
   it("does not import adapters, hosts, transports, UI, runtime, filesystem, network, or provider clients", () => {
     const source = readFileSync("modules/application/services/asset/asset-registry-read-facade.service.ts", "utf8");
     for (const forbidden of [
@@ -381,6 +477,13 @@ describe("AssetRegistryReadFacade query, pagination, and boundaries", () => {
 
     assert.equal(definitions.saved.length + instances.saved.length + compositions.saved.length + bindings.saved.length, 0);
     assert.equal(definitions.deleted.length + instances.deleted.length + compositions.deleted.length + bindings.deleted.length, 0);
+  });
+
+
+  it("uses the centralized Asset Kernel sanitizer without a second local forbidden-key regex", () => {
+    const source = readFileSync("modules/application/services/asset/asset-registry-read-facade.service.ts", "utf8");
+    assert.equal(source.includes("FORBIDDEN_METADATA_KEY_PATTERN"), false);
+    assert.equal(source.includes("sanitizeAssetMetadata"), true);
   });
 
   it("sanitizes repository errors and serialized cards/details", async () => {

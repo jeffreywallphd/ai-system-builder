@@ -3,8 +3,6 @@ import type {
   AssetComposition,
   AssetDefinition,
   AssetInstance,
-  AssetJsonObject,
-  AssetJsonValue,
   AssetMetadata,
   AssetReference,
   AssetResourceBackedView,
@@ -12,11 +10,15 @@ import type {
 import { normalizeAssetId } from "../../../contracts/asset";
 import type {
   AssetBindingRepositoryPort,
+  AssetCompositionListQuery,
   AssetCompositionRepositoryPort,
+  AssetDefinitionListQuery,
   AssetDefinitionRepositoryPort,
+  AssetInstanceListQuery,
   AssetInstanceRepositoryPort,
 } from "../../ports/asset";
 import { BUILT_IN_ASSET_DEFINITION_CATALOG } from "./built-ins";
+import { sanitizeAssetJsonValue, sanitizeAssetMetadata, sanitizeAssetViewValue } from "./asset-safe-metadata";
 import { validateAssetComposition } from "./validate-asset-composition.service";
 import { validateAssetDefinition } from "./validate-asset-definition.service";
 import { validateAssetInstance } from "./validate-asset-instance.service";
@@ -61,15 +63,15 @@ export class AssetRegistryReadFacadeError extends Error {
 
 const DEFAULT_LIST_LIMIT = 100;
 const ABSOLUTE_MAX_LIST_LIMIT = 250;
-const FORBIDDEN_METADATA_KEY_PATTERN = /(token|secret|password|credential|authorization|auth|localpath|filesystempath|filepath|path|cache|bytes|blob|contentbase64|base64|raw|payload|command|stack|env)/i;
-const LOCAL_PATH_VALUE_PATTERN = /(^\/tmp\/|^\/var\/|^\/home\/|^\/Users\/|^[a-z]:\\|^~\/|\\Users\\|\\Temp\\)/i;
-const AUTH_BEARING_VALUE_PATTERN = /(bearer\s+[a-z0-9._-]+|api[_-]?key\s*[=:]|token=|password=|secret=|authorization:)/i;
-const LONG_BASE64_VALUE_PATTERN = /^[A-Za-z0-9+/]{80,}={0,2}$/;
+const FACADE_SIDE_FILTERING_DIAGNOSTIC: AssetRegistryListDiagnostic = {
+  severity: "info",
+  code: "facade-side-filtering",
+  message: "Some filters were applied after repository retrieval because the repository query port does not support the full query shape.",
+};
 
 const builtInDefinitionKeys = new Set(
   BUILT_IN_ASSET_DEFINITION_CATALOG.map((seed) => definitionKey(String(seed.definition.definitionId), String(seed.definition.version))),
 );
-const builtInDefinitionIds = new Set(BUILT_IN_ASSET_DEFINITION_CATALOG.map((seed) => String(seed.definition.definitionId)));
 
 export class AssetRegistryReadFacade {
   private readonly maxListLimit: number;
@@ -80,12 +82,13 @@ export class AssetRegistryReadFacade {
 
   public async listDefinitionCards(query: AssetRegistryListQuery = {}): Promise<AssetRegistryListResult<AssetDefinitionCard>> {
     const limit = this.safeLimit(query.limit);
-    const list = await this.readRepository(() => this.dependencies.definitionRepository.listDefinitions({ limit, cursor: query.cursor }), "repository-read-failed");
+    const repositoryQuery = this.definitionRepositoryQuery(query, limit);
+    const list = await this.readRepository(() => this.dependencies.definitionRepository.listDefinitions(repositoryQuery), "repository-read-failed");
     const cards = list.definitions
       .map((definition) => this.toDefinitionCard(definition, query))
       .filter((card): card is AssetDefinitionCard => Boolean(card))
       .filter((card) => this.matchesDefinitionQuery(card, query));
-    return this.toListResult(cards, limit, list.nextCursor, this.cursorDiagnostics(query));
+    return this.toListResult(cards, limit, list.nextCursor, this.listDiagnostics(query, this.definitionNeedsFacadeSideFiltering(query)));
   }
 
   public async readDefinitionDetail(ref: AssetReference, options: AssetRegistryReadOptions = {}): Promise<AssetDefinitionDetail | undefined> {
@@ -102,9 +105,10 @@ export class AssetRegistryReadFacade {
 
   public async listInstanceCards(query: AssetRegistryListQuery = {}): Promise<AssetRegistryListResult<AssetInstanceCard>> {
     const limit = this.safeLimit(query.limit);
-    const list = await this.readRepository(() => this.dependencies.instanceRepository.listInstances({ limit, cursor: query.cursor }), "repository-read-failed");
+    const repositoryQuery = this.instanceRepositoryQuery(query, limit);
+    const list = await this.readRepository(() => this.dependencies.instanceRepository.listInstances(repositoryQuery), "repository-read-failed");
     const cards = list.instances.map((instance) => this.toInstanceCard(instance, query)).filter((card) => this.matchesInstanceQuery(card, query));
-    return this.toListResult(cards, limit, list.nextCursor, this.cursorDiagnostics(query));
+    return this.toListResult(cards, limit, list.nextCursor, this.listDiagnostics(query, this.instanceNeedsFacadeSideFiltering(query)));
   }
 
   public async readInstanceDetail(ref: AssetReference, options: AssetRegistryReadOptions = {}): Promise<AssetInstanceDetail | undefined> {
@@ -122,9 +126,10 @@ export class AssetRegistryReadFacade {
 
   public async listCompositionCards(query: AssetRegistryListQuery = {}): Promise<AssetRegistryListResult<AssetCompositionCard>> {
     const limit = this.safeLimit(query.limit);
-    const list = await this.readRepository(() => this.dependencies.compositionRepository.listCompositions({ limit, cursor: query.cursor }), "repository-read-failed");
+    const repositoryQuery = this.compositionRepositoryQuery(query, limit);
+    const list = await this.readRepository(() => this.dependencies.compositionRepository.listCompositions(repositoryQuery), "repository-read-failed");
     const cards = list.compositions.map((composition) => this.toCompositionCard(composition, query)).filter((card) => this.matchesCompositionQuery(card, query));
-    return this.toListResult(cards, limit, list.nextCursor, this.cursorDiagnostics(query));
+    return this.toListResult(cards, limit, list.nextCursor, this.listDiagnostics(query, this.compositionNeedsFacadeSideFiltering(query)));
   }
 
   public async readCompositionDetail(ref: AssetReference, options: AssetRegistryReadOptions = {}): Promise<AssetCompositionDetail | undefined> {
@@ -282,13 +287,75 @@ export class AssetRegistryReadFacade {
     return Math.min(Math.floor(limit), this.maxListLimit);
   }
 
+  private repositoryFetchLimit(query: AssetRegistryListQuery, resultLimit: number, needsFacadeSideFiltering: boolean): number {
+    return needsFacadeSideFiltering && !query.cursor ? this.maxListLimit : resultLimit;
+  }
+
+  private definitionRepositoryQuery(query: AssetRegistryListQuery, limit: number): AssetDefinitionListQuery {
+    const needsFacadeFiltering = this.definitionNeedsFacadeSideFiltering(query);
+    const assetType = singleValue(query.assetTypes);
+    const assetFamily = singleValue(query.assetFamilies);
+    const lifecycleStatus = singleValue(query.lifecycleStatuses);
+    const text = trimmedText(query.searchText);
+    return {
+      ...(assetType ? { assetType } : {}),
+      ...(assetFamily ? { assetFamily } : {}),
+      ...(lifecycleStatus ? { lifecycleStatus } : {}),
+      ...(text ? { text } : {}),
+      limit: this.repositoryFetchLimit(query, limit, needsFacadeFiltering),
+      cursor: query.cursor,
+    };
+  }
+
+  private instanceRepositoryQuery(query: AssetRegistryListQuery, limit: number): AssetInstanceListQuery {
+    const needsFacadeFiltering = this.instanceNeedsFacadeSideFiltering(query);
+    const lifecycleStatus = singleValue(query.lifecycleStatuses);
+    const text = trimmedText(query.searchText);
+    return {
+      ...(lifecycleStatus ? { lifecycleStatus } : {}),
+      ...(text ? { text } : {}),
+      limit: this.repositoryFetchLimit(query, limit, needsFacadeFiltering),
+      cursor: query.cursor,
+    };
+  }
+
+  private compositionRepositoryQuery(query: AssetRegistryListQuery, limit: number): AssetCompositionListQuery {
+    const needsFacadeFiltering = this.compositionNeedsFacadeSideFiltering(query);
+    const lifecycleStatus = singleValue(query.lifecycleStatuses);
+    const text = trimmedText(query.searchText);
+    return {
+      ...(lifecycleStatus ? { lifecycleStatus } : {}),
+      ...(text ? { text } : {}),
+      limit: this.repositoryFetchLimit(query, limit, needsFacadeFiltering),
+      cursor: query.cursor,
+    };
+  }
+
+  private definitionNeedsFacadeSideFiltering(query: AssetRegistryListQuery): boolean {
+    return hasMultipleValues(query.assetTypes) || hasMultipleValues(query.assetFamilies) || hasMultipleValues(query.lifecycleStatuses) || query.includeBuiltIns === false || query.includeCustom === false;
+  }
+
+  private instanceNeedsFacadeSideFiltering(query: AssetRegistryListQuery): boolean {
+    return Boolean(query.assetTypes?.length || query.assetFamilies?.length || hasMultipleValues(query.lifecycleStatuses));
+  }
+
+  private compositionNeedsFacadeSideFiltering(query: AssetRegistryListQuery): boolean {
+    return Boolean(query.assetTypes?.length || query.assetFamilies?.length || hasMultipleValues(query.lifecycleStatuses));
+  }
+
   private toListResult<TCard>(items: readonly TCard[], limit: number, nextCursor?: string, diagnostics?: readonly AssetRegistryListDiagnostic[]): AssetRegistryListResult<TCard> {
     return sanitizeValue({ items: items.slice(0, limit), ...(nextCursor ? { nextCursor } : {}), ...(diagnostics?.length ? { diagnostics } : {}) }) as AssetRegistryListResult<TCard>;
   }
 
+  private listDiagnostics(query: AssetRegistryListQuery, facadeSideFiltering: boolean): readonly AssetRegistryListDiagnostic[] | undefined {
+    const diagnostics: AssetRegistryListDiagnostic[] = [];
+    if (query.cursor) diagnostics.push({ severity: "info", code: "cursor-passed-through", message: "Cursor pagination is passed through to repositories or providers before facade-side filtering." });
+    if (facadeSideFiltering) diagnostics.push(FACADE_SIDE_FILTERING_DIAGNOSTIC);
+    return diagnostics.length ? diagnostics : undefined;
+  }
+
   private cursorDiagnostics(query: AssetRegistryListQuery): readonly AssetRegistryListDiagnostic[] | undefined {
-    if (!query.cursor) return undefined;
-    return [{ severity: "info", code: "cursor-passed-through", message: "Cursor pagination is passed through to repositories or providers before facade-side filtering." }];
+    return this.listDiagnostics(query, false);
   }
 
   private async readRepository<T>(operation: () => Promise<T>, code: AssetRegistryReadFacadeError["code"]): Promise<T> {
@@ -326,6 +393,19 @@ function matchesSearch(searchText: string | undefined, values: readonly (string 
   return values.some((value) => value?.toLowerCase().includes(needle));
 }
 
+function singleValue<T>(values: readonly T[] | undefined): T | undefined {
+  return values?.length === 1 ? values[0] : undefined;
+}
+
+function hasMultipleValues(values: readonly unknown[] | undefined): boolean {
+  return Boolean(values && values.length > 1);
+}
+
+function trimmedText(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 function definitionKey(id: string, version?: string): string {
   return `${id}@${version ?? ""}`;
 }
@@ -334,8 +414,15 @@ function isBuiltInDefinition(definition: AssetDefinition): boolean {
   const metadata = definition.metadata as Record<string, unknown> | undefined;
   const marker = metadata?.builtInSeed;
   const markerRecord = isRecord(marker) ? marker : undefined;
-  if (markerRecord?.managedBy === "asset-kernel" && typeof markerRecord.seedId === "string") return true;
-  return builtInDefinitionKeys.has(definitionKey(String(definition.definitionId), String(definition.version))) || builtInDefinitionIds.has(String(definition.definitionId));
+  if (
+    markerRecord?.managedBy === "asset-kernel" &&
+    typeof markerRecord.seedId === "string" &&
+    typeof markerRecord.seedVersion === "string" &&
+    typeof markerRecord.fingerprint === "string"
+  ) {
+    return true;
+  }
+  return builtInDefinitionKeys.has(definitionKey(String(definition.definitionId), String(definition.version)));
 }
 
 function definitionRef(definition: AssetDefinition): AssetReference {
@@ -367,7 +454,7 @@ function toBindingSummary(binding: AssetBinding): AssetBindingSummary {
 
 function summarizeConfiguration(values: unknown): AssetConfigurationSummary | undefined {
   if (!isRecord(values)) return undefined;
-  const ids = Object.keys(values).filter((key) => typeof sanitizeJsonValue(values[key]) !== "undefined").sort();
+  const ids = Object.keys(values).filter((key) => typeof sanitizeAssetJsonValue(values[key]) !== "undefined").sort();
   return { configuredFieldCount: ids.length, configuredFieldIds: ids };
 }
 
@@ -454,39 +541,11 @@ function sanitizeResourceBackedView(view: AssetResourceBackedView, options: Asse
 }
 
 function metadataOf(metadata: AssetMetadata | undefined): AssetMetadata | undefined {
-  const sanitized = sanitizeJsonValue(metadata);
-  if (!sanitized || typeof sanitized !== "object" || Array.isArray(sanitized)) return undefined;
-  if (Object.keys(sanitized).length === 0) return undefined;
-  return sanitized as AssetMetadata;
+  return sanitizeAssetMetadata(metadata);
 }
 
 function sanitizeValue(value: unknown): unknown {
-  return sanitizeJsonValue(value);
-}
-
-function sanitizeJsonValue(value: unknown): AssetJsonValue | undefined {
-  if (value === null || typeof value === "boolean") return value as AssetJsonValue;
-  if (typeof value === "string") return sanitizeStringValue(value);
-  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
-  if (Array.isArray(value)) return value.map(sanitizeJsonValue).filter((entry): entry is AssetJsonValue => typeof entry !== "undefined");
-  if (isRecord(value)) {
-    const entries = Object.entries(value)
-      .filter(([key]) => !FORBIDDEN_METADATA_KEY_PATTERN.test(key))
-      .map(([key, entry]) => [key, sanitizeJsonValue(entry)] as const)
-      .filter((entry): entry is readonly [string, AssetJsonValue] => typeof entry[1] !== "undefined");
-    return Object.fromEntries(entries) as AssetJsonObject;
-  }
-  return undefined;
-}
-
-function sanitizeStringValue(value: string): string | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  if (LOCAL_PATH_VALUE_PATTERN.test(trimmed)) return undefined;
-  if (AUTH_BEARING_VALUE_PATTERN.test(trimmed)) return undefined;
-  if (trimmed.startsWith("data:") && trimmed.includes(";base64,")) return undefined;
-  if (LONG_BASE64_VALUE_PATTERN.test(trimmed)) return undefined;
-  return trimmed;
+  return sanitizeAssetViewValue(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

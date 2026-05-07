@@ -1,6 +1,5 @@
 import { AssetRegistryReadFacade } from "../../../application/services/asset/asset-registry-read-facade.service";
 import type { AssetResourceBackedViewProvider } from "../../../application/services/asset/asset-registry-read-facade.types";
-import { BUILT_IN_ASSET_DEFINITION_CATALOG } from "../../../application/services/asset/built-ins";
 import { composeLocalAssetKernel, type LocalAssetKernelComposition } from "./composeLocalAssetKernel";
 
 export interface ComposeInternalAssetRegistryOptions {
@@ -18,7 +17,6 @@ export interface InternalAssetRegistryComposition {
     readonly schemaVersion: LocalAssetKernelComposition["diagnostics"]["schemaVersion"];
     readonly registryFacadeComposed: true;
     readonly resourceBackedViewsEnabled: boolean;
-    readonly builtInCatalogDefinitionCount: number;
   };
 }
 
@@ -41,7 +39,6 @@ export function composeInternalAssetRegistry(options: ComposeInternalAssetRegist
       schemaVersion: assetKernel.diagnostics.schemaVersion,
       registryFacadeComposed: true,
       resourceBackedViewsEnabled: Boolean(options.resourceBackedViewProvider),
-      builtInCatalogDefinitionCount: BUILT_IN_ASSET_DEFINITION_CATALOG.length,
     },
   };
 }

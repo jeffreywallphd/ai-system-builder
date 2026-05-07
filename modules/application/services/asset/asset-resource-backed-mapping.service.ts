@@ -6,11 +6,10 @@ import type { ModelInventoryRecord } from "../../../contracts/model";
 import type { ArtifactRepoDescriptor, ArtifactRepoTarget, StorageObjectDescriptor } from "../../../contracts/storage";
 import { normalizeRuntimeCapabilityId } from "../../../contracts/runtime";
 import { normalizeAssetId } from "../../../contracts/asset";
+import { sanitizeAssetMetadata } from "./asset-safe-metadata";
 import type {
   AssetExternalRepositoryObjectReference,
   AssetGeneratedOutputReference,
-  AssetJsonObject,
-  AssetJsonValue,
   AssetMetadata,
   AssetReference,
   AssetResourceBackedAsset,
@@ -22,27 +21,6 @@ import type {
   AssetType,
 } from "../../../contracts/asset";
 
-const FORBIDDEN_METADATA_KEY_PATTERN =
-  /(token|secret|password|credential|authorization|auth|path|cache|bytes|blob|contentbase64|raw|payload|command|stack)/i;
-
-interface ResourceBackedAssetLinkInput {
-  readonly assetRef: AssetReference;
-  readonly backings: readonly AssetResourceBacking[];
-  readonly primaryBackingRef?: AssetResourceBackingReference;
-  readonly previewRefs?: readonly AssetReference[];
-  readonly generatedFrom?: AssetGeneratedOutputReference;
-  readonly metadata?: Record<string, unknown>;
-}
-
-interface PreviewInput {
-  readonly previewId: string;
-  readonly previewKind: AssetResourcePreviewKind;
-  readonly assetRef?: AssetReference;
-  readonly resourceBackingRef?: AssetReference;
-  readonly contentType?: string;
-  readonly summary?: string;
-  readonly metadata?: Record<string, unknown>;
-}
 
 function trimText(value: string | undefined): string | undefined {
   if (typeof value !== "string") {
@@ -75,42 +53,8 @@ function checksumValue(checksum: { readonly algorithm?: string; readonly value?:
   return checksum.algorithm ? `${checksum.algorithm}:${checksum.value}` : checksum.value;
 }
 
-function sanitizeJsonValue(value: unknown): AssetJsonValue | undefined {
-  if (value === null || typeof value === "string" || typeof value === "boolean") {
-    return value as AssetJsonValue;
-  }
-
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : undefined;
-  }
-
-  if (Array.isArray(value)) {
-    const sanitizedArray = value
-      .map((entry) => sanitizeJsonValue(entry))
-      .filter((entry): entry is AssetJsonValue => typeof entry !== "undefined");
-    return sanitizedArray;
-  }
-
-  if (typeof value === "object" && value !== null) {
-    const sanitizedEntries = Object.entries(value as Record<string, unknown>)
-      .filter(([key]) => !FORBIDDEN_METADATA_KEY_PATTERN.test(key))
-      .map(([key, entry]) => [key, sanitizeJsonValue(entry)] as const)
-      .filter((entry): entry is readonly [string, AssetJsonValue] => typeof entry[1] !== "undefined");
-
-    return Object.fromEntries(sanitizedEntries) as AssetJsonObject;
-  }
-
-  return undefined;
-}
-
 function metadataOf(value: Record<string, unknown> | undefined): AssetMetadata | undefined {
-  const sanitized = sanitizeJsonValue(value);
-
-  if (!sanitized || typeof sanitized !== "object" || Array.isArray(sanitized)) {
-    return undefined;
-  }
-
-  return sanitized as AssetMetadata;
+  return sanitizeAssetMetadata(value);
 }
 
 function safeAssetId(prefix: string, value: string | undefined) {
