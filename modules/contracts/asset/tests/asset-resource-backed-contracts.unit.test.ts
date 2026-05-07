@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   ASSET_EXTERNAL_REPOSITORY_OBJECT_KINDS,
   ASSET_EXTERNAL_REPOSITORY_PROVIDERS,
+  ASSET_RESOURCE_BACKED_VIEW_KINDS,
   ASSET_RESOURCE_BACKING_ROLES,
   ASSET_RESOURCE_KINDS,
   ASSET_RESOURCE_PREVIEW_KINDS,
@@ -19,6 +20,21 @@ import {
   type AssetResourceBackingReference,
   type AssetResourcePreviewReference,
 } from "..";
+
+
+
+test("resource-backed view contracts expose computed internal read model vocabulary", () => {
+  assert.deepEqual([...ASSET_RESOURCE_BACKED_VIEW_KINDS], [
+    "artifact",
+    "image-asset",
+    "generated-output",
+    "dataset",
+    "model",
+    "document",
+    "external-repository-object",
+    "preview",
+  ]);
+});
 
 test("resource-backed asset contracts expose allowed resource and backing vocabularies", () => {
   assert.deepEqual([...ASSET_RESOURCE_KINDS], [
