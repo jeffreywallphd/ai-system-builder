@@ -43,3 +43,4 @@ export * from "./asset-generated-output-reference";
 export * from "./asset-resource-preview";
 export * from "./asset-resource-backing";
 export * from "./asset-resource-backed-asset";
+export * from "./asset-resource-backed-view";
