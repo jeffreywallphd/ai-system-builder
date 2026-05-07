@@ -16,8 +16,9 @@ Read this pack for tasks involving:
 - resource-backed assets, generated outputs as assets, previews, artifacts, resources, models, datasets, images, documents, or Hugging Face objects as asset/resource backings,
 - AI-readable asset context,
 - asset configuration,
-- asset ports, bindings, composition rules, or validation,
-- asset registry/application ports or asset persistence.
+- asset validation services, registry/application ports, persistence adapters, or resource-backed mapping.
+
+Prompt 6 has added descriptor-only shared contracts for ports, port contracts, binding constraints, dependencies, composition rules, composition cardinality, and composition validation summary shells; do not treat those contracts as implemented validation or runtime composition behavior.
 
 ## Canonical Asset Terminology
 
@@ -91,9 +92,9 @@ Outside-but-referenceable concepts:
 9. Prompt 9 — Local persistence adapter.
 10. Prompt 10 — Resource-backed asset mapping and final Phase 2A regression.
 
-Prompt 5 status: `modules/contracts/asset` now holds the core contract family plus detailed configuration contracts and detailed structured AI-context contracts. Asset definitions own optional `aiContext` metadata for purpose, summaries, capabilities, limitations, input/output summaries, configuration guidance, composition guidance, examples, anti-patterns, safety notes, and quality/completeness metadata. AI context is contract-only structured metadata for future retrieval, validation support, and prompt assembly; it must not store secrets, raw paths, sensitive raw prompts, raw private transcripts, embeddings/vector arrays, bytes, raw environment values, command lines, stack traces, or raw adapter details. Detailed ports/binding compatibility/composition rules remain Prompt 6, validation services remain Prompt 7, registry/application ports remain Prompt 8, persistence remains Prompt 9, and resource-backed mapping remains Prompt 10.
+Prompt 6 status: `modules/contracts/asset` now holds the core contract family plus detailed configuration contracts, detailed structured AI-context contracts, and descriptor-only machine-readable port/composition contracts. Asset definitions can own optional reusable `ports`, `compositionRules`, and `dependencies`; asset bindings can reference source/target assets and source/target ports with optional binding constraints; asset compositions can reference instances, binding refs or inline bindings, composition rules, dependencies, and a lightweight validation summary shell. AI-context composition guidance remains semantic guidance, configuration contracts remain separate from port/composition contracts, and validation services remain Prompt 7. Registry/application ports remain Prompt 8, persistence remains Prompt 9, and resource-backed mapping remains Prompt 10.
 
-Transport/UI work is deferred until after the kernel is proven through shared contracts, configuration, AI context, ports/composition, validation, registry ports, persistence, and resource-backed mapping.
+Transport/UI work is deferred until after the kernel is proven through shared contracts, configuration, AI context, ports/composition, validation, registry ports, persistence, and resource-backed mapping. Prompt 6 does not add workflow execution, graph execution, UI page routing, API/IPC exposure, runtime behavior, or automatic composition.
 
 ## Explicit Non-Goals
 
