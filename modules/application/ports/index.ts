@@ -21,3 +21,5 @@ export * from "./image";
 
 export * from "./runtime-installer";
 export * from "./security";
+
+export * from "./asset";

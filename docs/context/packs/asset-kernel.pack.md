@@ -16,9 +16,9 @@ Read this pack for tasks involving:
 - resource-backed assets, generated outputs as assets, previews, artifacts, resources, models, datasets, images, documents, or Hugging Face objects as asset/resource backings,
 - AI-readable asset context,
 - asset configuration,
-- registry/application ports, persistence adapters, or resource-backed mapping.
+- persistence adapters or resource-backed mapping.
 
-Prompt 7 has added pure application-layer validation services under `modules/application/services/asset` for definitions, instances, bindings, and compositions. They consume shared asset contracts and return structured `AssetValidationIssue` results; do not treat them as registry, persistence, runtime, transport, UI, automatic-composition, prompt-assembly, retrieval, embedding, or AI-generation behavior.
+Prompt 7 has added pure application-layer validation services under `modules/application/services/asset` for definitions, instances, bindings, and compositions. Prompt 8 has added application-layer repository ports under `modules/application/ports/asset` and use cases under `modules/application/use-cases/asset` for registering/creating, reading, listing, updating, and validating asset definitions, instances, and compositions. The ports are interfaces only; do not treat them as persistence, runtime, transport, UI, automatic-composition, prompt-assembly, retrieval, embedding, or AI-generation behavior.
 
 ## Canonical Asset Terminology
 
@@ -94,9 +94,9 @@ Outside-but-referenceable concepts:
 
 Prompt 7 validation services are pure/deterministic and transport/UI-neutral. They validate configuration structure, AI-context completeness, port/binding compatibility, composition structure, lifecycle/provenance, dependencies, and declared requirements; they do not execute workflows, query runtime readiness, start runtimes, access filesystem/network, call LLMs, or persist anything.
 
-Prompt 7 status: `modules/contracts/asset` remains the shared contract family and `modules/application/services/asset` now provides validation services over those contracts. Asset definitions can own optional reusable `ports`, inline declarative `requirements`, future externalized `requirementRefs`, `compositionRules`, and `dependencies`; asset bindings can reference source/target assets and source/target ports with optional binding constraints; asset compositions can reference instances, binding refs or inline bindings, composition rules, dependencies, and a lightweight validation summary shell. Registry/application ports remain Prompt 8, persistence remains Prompt 9, resource-backed mapping remains Prompt 10, and API/IPC/UI remain deferred.
+Prompt 8 status: `modules/contracts/asset` remains the shared contract family, `modules/application/services/asset` provides validation services over those contracts, `modules/application/ports/asset` defines repository interfaces for definitions, instances, and compositions, and `modules/application/use-cases/asset` provides transport/UI-neutral application seams. Create/register/update use cases validate before save, validation-only use cases return reports without saving, read/list use cases do not revalidate by default, persistence remains Prompt 9, resource-backed mapping remains Prompt 10, and API/IPC/UI remain deferred.
 
-Transport/UI work is deferred until after the kernel is proven through shared contracts, configuration, AI context, ports/composition, validation, registry ports, persistence, and resource-backed mapping. Prompt 7 does not add workflow execution, graph execution, UI page routing, API/IPC exposure, runtime behavior, persistence, resource-backed mapping, or automatic composition.
+Transport/UI work is deferred until after the kernel is proven through shared contracts, configuration, AI context, ports/composition, validation, registry ports, persistence, and resource-backed mapping. Prompt 8 does not add workflow execution, graph execution, UI page routing, API/IPC exposure, runtime behavior, persistence adapters, resource-backed mapping, or automatic composition.
 
 ## Explicit Non-Goals
 

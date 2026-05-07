@@ -6,7 +6,7 @@ The Asset Kernel is the canonical shared foundation for assets in `ai-system-bui
 
 An asset is a versioned, configurable, AI-readable, machine-composable building block that can represent structure, behavior, interface, data, instructions, resources, compositions, or logic containers, and can be assembled into features, systems, subsystems, and systems composed of subsystems.
 
-This document prevents parallel vocabularies for artifacts, resources, UI components, tools, workflows, pages, systems, generated outputs, previews, and AI context. It is an architecture baseline for Phase 2A. Prompt 3 added the first core TypeScript contract family in `modules/contracts/asset` for identity, lifecycle, review, provenance, definitions, instances, references, minimal binding/composition shells, and validation issue shapes. Prompt 4 added detailed configuration contracts for schemas, fields, JSON-compatible values, defaults, selected values, constraints, generic UI hints, validation rule descriptors, and examples. Prompt 5 added detailed structured AI-context contracts. Prompt 6 added detailed shared contracts for machine-readable ports, port contracts, binding constraints, dependencies, composition rules, composition cardinality, and composition validation summary shells only; the Phase 2A pre-Prompt 7 cleanup kept those contracts descriptor-only while tightening JSON-safe metadata, first-class declarative requirements, safe references, and shared validation summary statuses. Prompt 7 adds pure application-layer validation services in `modules/application/services/asset` that return structured `AssetValidationIssue` results for definitions, instances, bindings, and compositions; these services do not implement registry ports, adapters, persistence, API/IPC routes, UI, migrations, prompt assembly, retrieval, embeddings, generation, workflow execution, graph execution, automatic composition, runtime readiness lookup, filesystem/network access, or runtime behavior.
+This document prevents parallel vocabularies for artifacts, resources, UI components, tools, workflows, pages, systems, generated outputs, previews, and AI context. It is an architecture baseline for Phase 2A. Prompt 3 added the first core TypeScript contract family in `modules/contracts/asset` for identity, lifecycle, review, provenance, definitions, instances, references, minimal binding/composition shells, and validation issue shapes. Prompt 4 added detailed configuration contracts for schemas, fields, JSON-compatible values, defaults, selected values, constraints, generic UI hints, validation rule descriptors, and examples. Prompt 5 added detailed structured AI-context contracts. Prompt 6 added detailed shared contracts for machine-readable ports, port contracts, binding constraints, dependencies, composition rules, composition cardinality, and composition validation summary shells only; the Phase 2A pre-Prompt 7 cleanup kept those contracts descriptor-only while tightening JSON-safe metadata, first-class declarative requirements, safe references, and shared validation summary statuses. Prompt 7 adds pure application-layer validation services in `modules/application/services/asset` that return structured `AssetValidationIssue` results for definitions, instances, bindings, and compositions. Prompt 8 adds application-layer asset repository ports in `modules/application/ports/asset` and transport-neutral use cases in `modules/application/use-cases/asset` for registering/creating, reading, listing, updating, and validating asset definitions, instances, and compositions; these ports are interfaces only and the use cases do not implement adapters, persistence, API/IPC routes, UI, migrations, prompt assembly, retrieval, embeddings, generation, workflow execution, graph execution, automatic composition, runtime readiness lookup, filesystem/network access, or runtime behavior.
 
 ## Relationship to ADRs and existing architecture
 
@@ -186,7 +186,7 @@ Guidance:
 - AI context should be structured enough to support future retrieval, validation support, and prompt assembly.
 - AI context complements machine contracts and must not replace configuration schemas, formal ports, binding compatibility, composition rules, or validation services.
 - AI-context input/output and composition guidance is semantic guidance only; Prompt 6 ports, binding constraints, dependencies, and composition rules are the separate machine-readable structure.
-- AI-context completeness and composition compatibility validation is initially implemented by Prompt 7 application services; registry/application ports remain Prompt 8; persistence remains Prompt 9; resource-backed mapping remains Prompt 10.
+- AI-context completeness and composition compatibility validation is initially implemented by Prompt 7 application services. Prompt 8 application use cases validate create/register/update requests before saving through repository ports, allow `valid` and `valid-with-warnings`, reject `invalid` or `unknown` results without throwing for normal validation failures, and keep read/list paths from revalidating by default. Persistence remains Prompt 9; resource-backed mapping remains Prompt 10.
 - AI context must not store or require secrets, tokens, local/temp/provider-native paths, raw prompts with sensitive content, raw private transcripts, raw environment values, command lines, stack traces, adapter payloads, file/blob bytes, or embeddings/vector arrays. Use redacted summaries and safe references instead.
 
 ## Configuration surface
@@ -316,7 +316,7 @@ Guidance:
 - Validation does not execute workflows, query runtime readiness, start runtimes, access filesystem/network, call LLMs, or persist anything.
 - Validation complements, not replaces, runtime readiness guards.
 - General asset validation summaries and composition validation summaries share the same status vocabulary: `not-validated`, `valid`, `valid-with-warnings`, `invalid`, and `unknown`.
-- Registry/application ports remain deferred to Prompt 8, persistence remains deferred to Prompt 9, and resource-backed mapping remains deferred to Prompt 10.
+- Prompt 8 provides registry/application ports and use cases only. Persistence remains deferred to Prompt 9, and resource-backed mapping remains deferred to Prompt 10.
 
 ## Persistence direction
 
@@ -352,7 +352,7 @@ Guidance:
 9. Prompt 9 — Local persistence adapter.
 10. Prompt 10 — Resource-backed asset mapping and final Phase 2A regression.
 
-Pre-Prompt 7 cleanup was limited to JSON-safe metadata/details, first-class declarative `AssetRequirement`, safe semantic references such as `schemaRef`, and shared validation summary statuses; Prompt 7 adds validation services but still does not add registry ports, persistence, or resource-backed mapping.
+Pre-Prompt 7 cleanup was limited to JSON-safe metadata/details, first-class declarative `AssetRequirement`, safe semantic references such as `schemaRef`, and shared validation summary statuses; Prompt 7 adds validation services, and Prompt 8 adds application repository ports plus use cases without adding persistence adapters or resource-backed mapping.
 
 Transport/UI work is intentionally deferred until after the kernel is proven through shared contracts, configuration contracts, AI context contracts, ports/composition contracts, validation, registry ports, persistence, and resource-backed mapping.
 
@@ -366,9 +366,8 @@ Asset Kernel work must preserve clean architecture boundaries:
 - host wiring belongs in `modules/hosts`,
 - UI belongs in apps/modules UI areas.
 
-Non-goals preserved after Prompt 7:
+Non-goals preserved after Prompt 8:
 
-- no asset registry or application ports before Prompt 8,
 - no persistence adapter before Prompt 9,
 - no migrations,
 - no renderer/thin-client UI,
