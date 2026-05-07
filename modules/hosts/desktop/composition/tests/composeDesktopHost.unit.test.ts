@@ -336,6 +336,14 @@ describe("composeDesktopHost", () => {
       status: "unavailable",
       reason: { code: "runtime.model-publishing.not-implemented", category: "unavailable" },
     });
+    expect(snapshot.capabilities.find((capability) => capability.capabilityId === "model-training")).toMatchObject({
+      status: "unavailable",
+      dependencies: [{ capabilityId: "python-runtime", status: "unavailable" }],
+    });
+    expect(snapshot.capabilities.find((capability) => capability.capabilityId === "model-validation")).toMatchObject({
+      status: "unavailable",
+      dependencies: [{ capabilityId: "python-runtime", status: "unavailable" }],
+    });
     expect(calls).toContain("read-python-status");
     expect(calls).toContain("read-comfyui-install-status");
     expect(calls).toContain("read-comfyui-health");

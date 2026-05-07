@@ -1,5 +1,6 @@
-import { TaskType } from "../../../../contracts/runtime";
+import { TaskType, createRuntimeCapabilityStatus } from "../../../../contracts/runtime";
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
+import { RuntimeCapabilityUnavailableError } from "../../../services/runtime";
 
 import { ValidateModelUseCase } from "../validate-model.use-case";
 import { PublishModelUseCase } from "../publish-model.use-case";
@@ -52,14 +53,36 @@ describe("ValidateModelUseCase", () => {
 });
 
 describe("PublishModelUseCase", () => {
-  it("starts publishing via runtime task registry", async () => {
-    const startTask = testDouble.fn().mockRejectedValue(new Error("model publishing runtime task is not implemented"));
+  it("rejects before task creation when model publishing readiness is unavailable", async () => {
+    const startTask = testDouble.fn();
+    const unavailable = new RuntimeCapabilityUnavailableError(createRuntimeCapabilityStatus({
+      capabilityId: "model-publishing",
+      status: "unavailable",
+      summary: "Model publishing runtime execution is not implemented on this host.",
+      reason: {
+        code: "runtime.model-publishing.not-implemented",
+        message: "Model publishing runtime execution is unavailable until implemented.",
+        category: "unavailable",
+        retryable: false,
+      },
+      recommendedActions: ["configure"],
+    }));
     const useCase = new PublishModelUseCase({
       modelRegistry: { getModelRecord: testDouble.fn().mockResolvedValue({ modelRecordId: "m1", localPath: "/tmp/m1" }) } as never,
       runtimeTaskRegistry: { startTask, getTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), listTasks: testDouble.fn() } as never,
+      runtimeCapabilityGuard: { requireCapabilityReady: testDouble.fn(async () => { throw unavailable; }) },
     });
-    await expect(useCase.execute({ modelRecordId: "m1", repository: "owner/repo" })).rejects.toThrow("model publishing runtime task is not implemented");
-    expect(startTask).toHaveBeenCalledWith({ taskType: TaskType.MODEL_PUBLISHING, payload: { modelRecordId: "m1", repository: "owner/repo" } });
+
+    await useCase.execute({ modelRecordId: "m1", repository: "owner/repo" })
+      .catch((error) => expect(error).toMatchObject({
+        code: "unavailable",
+        details: {
+          capabilityId: "model-publishing",
+          status: "unavailable",
+          reason: { code: "runtime.model-publishing.not-implemented", category: "unavailable" },
+        },
+      }));
+    expect(startTask).not.toHaveBeenCalled();
   });
 });
 
@@ -76,21 +99,5 @@ it("rejects validation start when runtime capability is not ready", async () => 
   });
 
   await useCase.execute({ modelRecordId: "m1" }).catch((error) => expect(error).toMatchObject({ code: "unavailable", details: { capabilityId: "model-validation", status: "starting" } }));
-  expect(startTask).not.toHaveBeenCalled();
-});
-
-it("guards model publishing because current publish path is runtime-backed", async () => {
-  const startTask = testDouble.fn();
-  const unavailable = new Error("Runtime capability 'model-publishing' is unavailable.") as Error & { code: "unavailable"; details: Record<string, unknown> };
-  unavailable.name = "RuntimeCapabilityUnavailableError";
-  unavailable.code = "unavailable";
-  unavailable.details = { capabilityId: "model-publishing", status: "unavailable", recommendedActions: ["start"] };
-  const useCase = new PublishModelUseCase({
-    modelRegistry: { getModelRecord: testDouble.fn().mockResolvedValue({ modelRecordId: "m1", localPath: "/tmp/m1" }) } as never,
-    runtimeTaskRegistry: { startTask, getTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), listTasks: testDouble.fn() } as never,
-    runtimeCapabilityGuard: { requireCapabilityReady: testDouble.fn(async () => { throw unavailable; }) },
-  });
-
-  await useCase.execute({ modelRecordId: "m1", repository: "owner/repo" }).catch((error) => expect(error).toMatchObject({ code: "unavailable", details: { capabilityId: "model-publishing", status: "unavailable" } }));
   expect(startTask).not.toHaveBeenCalled();
 });

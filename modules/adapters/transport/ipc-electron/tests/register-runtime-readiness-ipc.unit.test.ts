@@ -7,6 +7,7 @@ import {
   createDesktopRuntimeReadinessReadRequest,
 } from "../../../../contracts/ipc";
 import { createRuntimeCapabilityStatus } from "../../../../contracts/runtime";
+import { RuntimeReadinessService } from "../../../../application/services/runtime";
 import type { RuntimeReadinessPort } from "../../../../application/ports/runtime";
 import {
   createDesktopRuntimeCapabilityStatusReadIpcHandler,
@@ -52,6 +53,44 @@ describe("registerRuntimeReadinessIpc", () => {
       correlationId: "corr-ready",
       value: { status: "ready" },
     });
+  });
+
+  it("returns sanitized provider-failed snapshots without raw provider exception details", async () => {
+    const runtimeReadiness = new RuntimeReadinessService({
+      providers: [{
+        capabilityId: "python-runtime",
+        async getStatus() {
+          throw new Error("C:\\secret\\token path TOKEN=abc /tmp/runtime");
+        },
+      }],
+      now: () => "2026-05-06T00:00:00.000Z",
+    });
+    const handler = createDesktopRuntimeReadinessReadIpcHandler({ runtimeReadiness });
+    const request = createDesktopRuntimeReadinessReadRequest(
+      { boundary: { host: "desktop", source: "desktop.renderer.runtime-readiness" } },
+      { requestId: "req-ready-sanitized", correlationId: "corr-ready-sanitized" },
+    );
+
+    const response = await handler({}, request);
+
+    expect(response).toMatchObject({
+      ok: true,
+      value: {
+        capabilities: [{
+          capabilityId: "python-runtime",
+          status: "failed",
+          reason: {
+            code: "runtime.readiness.provider-failed",
+            message: "Runtime readiness provider failed. See logs for diagnostic details.",
+            details: { failureKind: "provider-threw", capabilityId: "python-runtime" },
+          },
+        }],
+      },
+    });
+    const payload = JSON.stringify(response);
+    expect(payload).not.toContain("C:\\secret");
+    expect(payload).not.toContain("TOKEN=abc");
+    expect(payload).not.toContain("/tmp/runtime");
   });
 
   it("reads individual capability status by normalized capability id", async () => {

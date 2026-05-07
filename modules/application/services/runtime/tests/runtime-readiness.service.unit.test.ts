@@ -326,11 +326,83 @@ describe("RuntimeReadinessService", () => {
       available: false,
       reason: {
         code: "runtime.readiness.provider-failed",
-        message: "boom",
+        message: "Runtime readiness provider failed. See logs for diagnostic details.",
+        details: { failureKind: "provider-threw", capabilityId: "python-runtime" },
       },
       recommendedActions: ["retry", "view-logs"],
       updatedAt: NOW,
     });
+  });
+
+  it("sanitizes thrown Error provider details from direct status and snapshot payloads", async () => {
+    const rawSecret = "C:\\secret\\token path TOKEN=abc /tmp/cache --env SECRET=abc";
+    const service = new RuntimeReadinessService({
+      providers: [{
+        capabilityId: "python-runtime",
+        async getStatus() {
+          throw new Error(rawSecret);
+        },
+      }],
+      now,
+    });
+
+    const status = await service.getCapabilityStatus("python-runtime");
+    const snapshot = await service.getReadinessSnapshot();
+    const statusPayload = JSON.stringify(status);
+    const snapshotPayload = JSON.stringify(snapshot);
+
+    expect(status).toMatchObject({
+      capabilityId: "python-runtime",
+      status: "failed",
+      available: false,
+      reason: {
+        code: "runtime.readiness.provider-failed",
+        message: "Runtime readiness provider failed. See logs for diagnostic details.",
+        category: "unknown",
+        retryable: true,
+        details: { failureKind: "provider-threw", capabilityId: "python-runtime" },
+      },
+      recommendedActions: ["retry", "view-logs"],
+    });
+    expect(status.reason?.message).not.toContain(rawSecret);
+    expect(status.summary).not.toContain(rawSecret);
+    expect(JSON.stringify(status.details)).not.toContain(rawSecret);
+    expect(statusPayload).not.toContain(rawSecret);
+    expect(statusPayload).not.toContain("TOKEN=abc");
+    expect(statusPayload).not.toContain("/tmp/cache");
+    expect(snapshotPayload).not.toContain(rawSecret);
+    expect(snapshotPayload).not.toContain("TOKEN=abc");
+    expect(snapshotPayload).not.toContain("/tmp/cache");
+  });
+
+  it("sanitizes non-Error provider throw values", async () => {
+    const service = new RuntimeReadinessService({
+      providers: [{
+        capabilityId: "python-runtime",
+        async getStatus() {
+          throw { message: "raw /tmp/path TOKEN=abc", env: process.env.PATH };
+        },
+      }],
+      now,
+    });
+
+    const status = await service.getCapabilityStatus("python-runtime");
+
+    expect(status).toMatchObject({
+      capabilityId: "python-runtime",
+      status: "failed",
+      reason: {
+        code: "runtime.readiness.provider-failed",
+        message: "Runtime readiness provider failed. See logs for diagnostic details.",
+        details: { failureKind: "provider-threw", capabilityId: "python-runtime" },
+      },
+      recommendedActions: ["retry", "view-logs"],
+    });
+    expect(status.reason?.message).not.toContain("raw /tmp/path");
+    expect(status.summary).not.toContain("raw /tmp/path");
+    expect(JSON.stringify(status.details)).not.toContain("raw /tmp/path");
+    expect(JSON.stringify(status)).not.toContain("raw /tmp/path");
+    expect(JSON.stringify(status)).not.toContain("TOKEN=abc");
   });
 
   it("snapshots only composed providers by default", async () => {
@@ -580,7 +652,10 @@ describe("RuntimeReadinessService", () => {
     expect(snapshot.capabilities[0]).toMatchObject({
       capabilityId: "python-runtime",
       status: "failed",
-      reason: { code: "runtime.readiness.provider-failed", message: "boom" },
+      reason: {
+        code: "runtime.readiness.provider-failed",
+        message: "Runtime readiness provider failed. See logs for diagnostic details.",
+      },
     });
   });
 

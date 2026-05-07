@@ -1,5 +1,6 @@
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 import { createRuntimeCapabilityStatus } from "../../../../contracts/runtime";
+import { RuntimeReadinessService } from "../../../../application/services/runtime";
 import { registerRuntimeReadinessApiRoutes, type ExpressRoutePort } from "../runtime-readiness/registerRuntimeReadinessApiRoutes";
 
 function response() {
@@ -37,6 +38,45 @@ describe("registerRuntimeReadinessApiRoutes", () => {
       correlationId: "c1",
       value: { capabilities: [capability] },
     });
+  });
+
+  it("returns sanitized provider-failed snapshots without raw provider exception details", async () => {
+    const handlers = new Map<string, any>();
+    const app: ExpressRoutePort = { get: testDouble.fn((path, handler) => handlers.set(path, handler)) };
+    const runtimeReadiness = new RuntimeReadinessService({
+      providers: [{
+        capabilityId: "python-runtime",
+        async getStatus() {
+          throw new Error("C:\\secret\\token path TOKEN=abc /tmp/runtime");
+        },
+      }],
+      now: () => "2026-05-06T00:00:00.000Z",
+    });
+
+    registerRuntimeReadinessApiRoutes({ app, runtimeReadiness });
+    const { res, status, json } = response();
+    await handlers.get("/api/runtime/readiness")({ headers: {} }, res);
+
+    const body = json.mock.calls[0]?.[0];
+    expect(status).toHaveBeenCalledWith(200);
+    expect(body).toMatchObject({
+      ok: true,
+      value: {
+        capabilities: [{
+          capabilityId: "python-runtime",
+          status: "failed",
+          reason: {
+            code: "runtime.readiness.provider-failed",
+            message: "Runtime readiness provider failed. See logs for diagnostic details.",
+            details: { failureKind: "provider-threw", capabilityId: "python-runtime" },
+          },
+        }],
+      },
+    });
+    const payload = JSON.stringify(body);
+    expect(payload).not.toContain("C:\\secret");
+    expect(payload).not.toContain("TOKEN=abc");
+    expect(payload).not.toContain("/tmp/runtime");
   });
 
   it("returns one capability status after normalizing the route parameter", async () => {

@@ -218,6 +218,30 @@ describe("composeServerHost", () => {
     });
   });
 
+  it("keeps server model training and validation readiness derived from python-runtime", async () => {
+    const service = createServerRuntimeReadinessService({
+      pythonSupervisor: { getStatus: () => "failed" },
+      readComfyUiSupervisor: () => undefined,
+      readComfyUiInstallStatus: async () => "installed" as const,
+      now: () => "2026-05-06T00:00:00.000Z",
+    });
+
+    const snapshot = await service.getReadinessSnapshot();
+
+    expect(snapshot.capabilities.find((capability) => capability.capabilityId === "model-training")).toMatchObject({
+      status: "failed",
+      dependencies: [{ capabilityId: "python-runtime", status: "failed" }],
+    });
+    expect(snapshot.capabilities.find((capability) => capability.capabilityId === "model-validation")).toMatchObject({
+      status: "failed",
+      dependencies: [{ capabilityId: "python-runtime", status: "failed" }],
+    });
+    expect(snapshot.capabilities.find((capability) => capability.capabilityId === "model-publishing")).toMatchObject({
+      status: "unavailable",
+      reason: { code: "runtime.model-publishing.not-implemented" },
+    });
+  });
+
   it("wires Hugging Face browse use-cases to the dedicated Hugging Face adapter seam", () => {
     const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
     const typeScriptPath = fileURLToPath(new URL("../composeServerHost.ts", import.meta.url));

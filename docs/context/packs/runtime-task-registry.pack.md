@@ -21,7 +21,7 @@ Use this pack when prompt scope includes long-running runtime-backed tasks (data
 - Use structured task status/progress from registry contracts.
 - Unknown `requestId` reads/cancels must be explicit not-found/unknown results with structured reason metadata or task errors, using `recordType: "not-found"` when no valid task family is known; do not return synthetic records that imply accepted work, and do not cast `"unknown"` into `TaskType` when the task family is not known.
 - Registry routers may recover missing in-process correlation by asking safe delegates, but status/cancel/list reads must not start, install, repair, or heavy-probe runtimes.
-- `listTasks` should aggregate delegates that can list current-process records and report unsupported delegate families as warnings/metadata instead of failing the whole aggregate read generically.
+- `listTasks` should aggregate delegates that can list current-process records and report unsupported or failed delegate families as warnings/metadata instead of failing the whole aggregate read generically. Delegate list-failure warnings must use safe metadata such as delegate name, requested task types, and `failureKind`; never include raw exception text, paths, env, command lines, tokens, or runtime payloads.
 - Logs remain useful diagnostics but should not be primary UI state source.
 
 ## Power Lifecycle
@@ -49,6 +49,6 @@ Use this pack when prompt scope includes long-running runtime-backed tasks (data
 
 - Runtime readiness guards may prevent starting new runtime-backed work when a required derived feature capability is not ready, but they do not replace task registry reads, cancellation, status records, or retention.
 - Runtime readiness answers whether a host-owned capability is available, degraded, installing, failed, or otherwise unavailable before/around task execution. The application readiness service may derive feature capability status from runtime dependencies but must not start tasks or own task progress.
-- Runtime Task Registry remains the source of truth for accepted long-running task `startTask` / `getTaskStatus` / `cancelTask` / `listTasks` lifecycle and progress.
+- Runtime Task Registry remains the source of truth for accepted long-running task `startTask` / `getTaskStatus` / `cancelTask` / `listTasks` lifecycle and progress, but only after a start has passed readiness guards and been accepted.
 - If a readiness guard rejects a start before task creation, no registry record should be created and later status reads for that caller correlation id should remain explicit unknown/not-found results.
 - Do not encode task progress, Python protocol status payloads, or ComfyUI runtime internals as generic readiness fields.
