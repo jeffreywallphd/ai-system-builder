@@ -136,6 +136,7 @@ describe("asset core contract vocabularies", () => {
       "asset-definition-version",
       "asset-instance",
       "asset-composition",
+      "asset-binding",
       "asset-requirement",
       "resource-backed-asset",
       "artifact",
@@ -143,6 +144,7 @@ describe("asset core contract vocabularies", () => {
       "external-repository-object",
     ]);
     expect(normalizeAssetReferenceKind(" Asset-Instance ")).toBe("asset-instance");
+    expect(normalizeAssetReferenceKind(" Asset-Binding ")).toBe("asset-binding");
   });
 
   it("allows provenance source kinds without requiring raw prompts or unsafe source details", () => {

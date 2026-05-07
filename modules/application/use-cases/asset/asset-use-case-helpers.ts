@@ -1,4 +1,5 @@
 import type {
+  AssetBinding,
   AssetComposition,
   AssetConfigurationValue,
   AssetDefinition,
@@ -8,20 +9,20 @@ import type {
   AssetValidationIssue,
   AssetValidationSummaryStatus,
 } from "../../../contracts/asset";
-import type { AssetDefinitionRepositoryPort, AssetInstanceRepositoryPort } from "../../ports/asset";
+import type { AssetBindingRepositoryPort, AssetDefinitionRepositoryPort, AssetInstanceRepositoryPort } from "../../ports/asset";
 import type { AssetValidationContext, AssetValidationResult } from "../../services/asset";
 import type { AssetUseCaseErrorCode, AssetUseCaseResult } from "./asset-use-case-result";
 
 export function definitionReferenceFor(definition: AssetDefinition): AssetReference {
-  return { kind: "asset-definition-version", id: String(definition.definitionId), version: definition.version };
+  return { kind: "asset-definition-version", id: String(definition.definitionId) as AssetReference["id"], version: definition.version };
 }
 
 export function instanceReferenceFor(instance: AssetInstance): AssetReference {
-  return { kind: "asset-instance", id: String(instance.instanceId) };
+  return { kind: "asset-instance", id: String(instance.instanceId) as AssetReference["id"] };
 }
 
 export function compositionReferenceFor(composition: AssetComposition): AssetReference {
-  return { kind: "asset-composition", id: String(composition.compositionId), version: composition.version };
+  return { kind: "asset-composition", id: String(composition.compositionId) as AssetReference["id"], version: composition.version };
 }
 
 export function isDefinitionReference(reference: AssetReference): boolean {
@@ -34,6 +35,10 @@ export function isInstanceReference(reference: AssetReference): boolean {
 
 export function isCompositionReference(reference: AssetReference): boolean {
   return reference.kind === "asset-composition";
+}
+
+export function isBindingReference(reference: AssetReference): boolean {
+  return reference.kind === "asset-binding";
 }
 
 export function invalidReferenceResult<T>(message: string, details?: AssetMetadata): AssetUseCaseResult<T> {
@@ -88,10 +93,12 @@ export async function buildCompositionValidationContext(
   dependencies: {
     definitionRepository: AssetDefinitionRepositoryPort;
     instanceRepository: AssetInstanceRepositoryPort;
+    bindingRepository?: AssetBindingRepositoryPort;
   },
 ): Promise<{ context: AssetValidationContext; issues: readonly AssetValidationIssue[] }> {
   const definitions = new Map<string, AssetDefinition>();
   const instances = new Map<string, AssetInstance>();
+  const bindings = new Map<string, AssetBinding>();
   const issues: AssetValidationIssue[] = [];
 
   for (const instanceRef of composition.instanceRefs) {
@@ -117,7 +124,23 @@ export async function buildCompositionValidationContext(
     }
   }
 
-  return { context: { definitionsById: definitions, instancesById: instances }, issues };
+  if (dependencies.bindingRepository) {
+    for (const bindingRef of composition.bindingRefs ?? []) {
+      if (!isBindingReference(bindingRef)) {
+        issues.push(contextIssue("error", "Composition bindingRefs must reference asset bindings.", compositionReferenceFor(composition), ["bindingRefs"], { referenceKind: bindingRef.kind, referenceId: bindingRef.id }));
+        continue;
+      }
+
+      const binding = await dependencies.bindingRepository.getBinding(bindingRef);
+      if (binding) {
+        bindings.set(bindingRef.id, binding);
+      } else {
+        issues.push(contextIssue("error", "Referenced asset binding was not found in the asset binding repository.", compositionReferenceFor(composition), ["bindingRefs"], { referenceKind: bindingRef.kind, referenceId: bindingRef.id }));
+      }
+    }
+  }
+
+  return { context: { definitionsById: definitions, instancesById: instances, bindingsById: bindings }, issues };
 }
 
 function contextIssue(

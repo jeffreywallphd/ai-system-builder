@@ -5,6 +5,7 @@ import { join } from "node:path";
 import * as assetPorts from "../../../ports/asset";
 import * as applicationPorts from "../../../ports";
 import * as assetUseCases from "..";
+import type { AssetBindingRepositoryPort } from "../../../ports";
 import * as applicationUseCases from "../..";
 
 describe("asset registry application boundaries", () => {
@@ -13,6 +14,12 @@ describe("asset registry application boundaries", () => {
     assert.equal(typeof applicationPorts, "object");
     assert.equal(typeof assetUseCases.RegisterAssetDefinitionUseCase, "function");
     assert.equal(typeof applicationUseCases.CreateAssetCompositionUseCase, "function");
+    const bindingRepository: AssetBindingRepositoryPort = {
+      saveBinding: async (binding) => binding,
+      getBinding: async () => undefined,
+      listBindings: async () => ({ bindings: [] }),
+    };
+    assert.equal(typeof bindingRepository.saveBinding, "function");
   });
 
   it("keeps asset use cases free of adapters, hosts, transports, UI, filesystem, persistence implementations, and runtime calls", () => {
@@ -29,7 +36,7 @@ describe("asset registry application boundaries", () => {
 
   it("returns safe structured error details", async () => {
     const reader = new assetUseCases.ReadAssetDefinitionUseCase({ definitionRepository: { saveDefinition: async (definition) => definition, getDefinition: async () => undefined, listDefinitions: async () => ({ definitions: [] }) } });
-    const result = await reader.execute({ kind: "asset-definition", id: "missing" });
+    const result = await reader.execute({ kind: "asset-definition", id: "missing" as never });
     assert.equal(result.ok, false);
     assert.deepEqual(result.error?.details, { referenceKind: "asset-definition", referenceId: "missing" });
     assert.doesNotMatch(JSON.stringify(result.error), /(?:stack|token|secret|password|\/tmp|C:\\|node_modules)/i);
