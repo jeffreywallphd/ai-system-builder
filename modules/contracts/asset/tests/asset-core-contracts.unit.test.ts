@@ -227,7 +227,7 @@ describe("asset core contract shapes", () => {
     };
 
     expect(definition.configurationSchema).toBeUndefined();
-    expect(definition.aiContextSummary).toBeUndefined();
+    expect(definition.aiContext).toBeUndefined();
     expect(definition.portRefs).toBeUndefined();
     expect(forbiddenKeys(definition)).toEqual([]);
   });

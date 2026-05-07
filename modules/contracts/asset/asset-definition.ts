@@ -1,3 +1,4 @@
+import type { AssetAiContext } from "./asset-ai-context";
 import type { AssetConfigurationExample } from "./asset-configuration-example";
 import type { AssetConfigurationSchema } from "./asset-configuration-schema";
 import type { AssetConfigurationValues } from "./asset-configuration-value";
@@ -9,12 +10,6 @@ import type { AssetReference } from "./asset-reference";
 import type { AssetReviewStatus } from "./asset-review-status";
 import type { AssetType } from "./asset-type";
 import type { AssetVersion } from "./asset-version";
-
-export interface AssetAiContextSummary {
-  readonly purpose?: string;
-  readonly userFacingSummary?: string;
-  readonly developerFacingSummary?: string;
-}
 
 export interface AssetDefinition {
   readonly definitionId: AssetId | string;
@@ -29,7 +24,7 @@ export interface AssetDefinition {
   readonly configurationSchema?: AssetConfigurationSchema;
   readonly defaultConfiguration?: AssetConfigurationValues;
   readonly configurationExamples?: readonly AssetConfigurationExample[];
-  readonly aiContextSummary?: AssetAiContextSummary;
+  readonly aiContext?: AssetAiContext;
   readonly requirementRefs?: readonly AssetReference[];
   readonly portRefs?: readonly AssetReference[];
   readonly compositionRuleRefs?: readonly AssetReference[];
