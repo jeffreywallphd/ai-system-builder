@@ -117,7 +117,8 @@
 ## Asset Kernel local persistence checkpoint
 
 - Prompt 9 adds `modules/adapters/persistence/asset` as a minimal local JSON persistence adapter behind Asset Kernel application repository ports.
-- It stores definitions, instances, compositions, and bindings as structured records with a `schemaVersion: 1` manifest; it is not artifact/object storage and does not store bytes or resource payloads.
-- Validation remains in application services/use cases before save; the adapter is a storage mechanism.
-- Resource-backed mapping and explicit persistence-to-storage linkage remain deferred to Prompt 10+.
+- It stores definitions, instances, compositions, and bindings as structured JSON-compatible records with a `schemaVersion: 1` manifest; it checks the current schema version/store kind on read, implements no migrations, is not artifact/object storage, and does not store bytes or resource payloads.
+- Local repository text filtering is simple case-insensitive substring matching over selected saved record values.
+- Validation remains in application services/use cases before save; the adapter is a storage mechanism, but the durable write boundary rejects non-JSON record values instead of silently coercing them.
+- Prompt 10 resource-backed mapping is pure mapping only: external repository object paths remain provider metadata, internal backing references use safe `asset-resource-backing` ids, and explicit persistence-to-storage linkage remains deferred.
 - API/IPC/UI, runtime execution/readiness, workflow/graph execution, prompt assembly, embeddings, and host wiring remain out of scope for this adapter checkpoint.

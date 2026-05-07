@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { Stream } from "node:stream";
 import { join } from "node:path";
 
 import type { AssetBinding, AssetComposition, AssetDefinition, AssetInstance } from "../../../contracts/asset";
@@ -66,7 +67,7 @@ export class LocalAssetRecordStore {
 
   public async readManifest(): Promise<LocalAssetKernelManifest> {
     await this.ensureStoreDirectory();
-    return this.readJsonFile<LocalAssetKernelManifest>("manifest.json", this.createManifest());
+    return validateManifest(await this.readJsonFile<unknown>("manifest.json", this.createManifest()));
   }
 
   public async readSnapshot(): Promise<LocalAssetKernelStoreSnapshot> {
@@ -105,6 +106,7 @@ export class LocalAssetRecordStore {
     records: readonly AssetKernelCollectionMap[Name][],
   ): Promise<void> {
     await this.ensureStoreDirectory();
+    assertJsonCompatibleAssetRecord(records);
     await this.writeJsonFile(COLLECTION_FILES[name], cloneJson(records));
     await this.writeJsonFile("manifest.json", this.createManifest());
   }
@@ -182,4 +184,72 @@ export class LocalAssetRecordStore {
 
 export function cloneJson<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+export function assertJsonCompatibleAssetRecord(value: unknown): void {
+  try {
+    assertJsonCompatibleValue(value, new Set());
+  } catch (error) {
+    if (error instanceof LocalAssetRecordStoreError) throw error;
+    throw new LocalAssetRecordStoreError("Asset Kernel local store record must be JSON-compatible.");
+  }
+}
+
+function validateManifest(value: unknown): LocalAssetKernelManifest {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new LocalAssetRecordStoreError("Asset Kernel local store manifest is invalid.");
+  }
+
+  const manifest = value as Partial<LocalAssetKernelManifest>;
+  if (manifest.schemaVersion !== ASSET_KERNEL_LOCAL_SCHEMA_VERSION) {
+    throw new LocalAssetRecordStoreError("Asset Kernel local store manifest schema version is unsupported.");
+  }
+
+  if (manifest.storeKind !== ASSET_KERNEL_LOCAL_STORE_KIND) {
+    throw new LocalAssetRecordStoreError("Asset Kernel local store manifest kind is unsupported.");
+  }
+
+  if (typeof manifest.updatedAt !== "string") {
+    throw new LocalAssetRecordStoreError("Asset Kernel local store manifest is invalid.");
+  }
+
+  return cloneJson(manifest as LocalAssetKernelManifest);
+}
+
+function assertJsonCompatibleValue(value: unknown, seen: Set<object>): void {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return;
+
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      throw new LocalAssetRecordStoreError("Asset Kernel local store record must be JSON-compatible.");
+    }
+    return;
+  }
+
+  if (typeof value === "undefined" || typeof value === "function" || typeof value === "symbol" || typeof value === "bigint") {
+    throw new LocalAssetRecordStoreError("Asset Kernel local store record must be JSON-compatible.");
+  }
+
+  if (typeof value !== "object") return;
+
+  if (value instanceof Date || Buffer.isBuffer(value) || value instanceof Stream) {
+    throw new LocalAssetRecordStoreError("Asset Kernel local store record must be JSON-compatible.");
+  }
+
+  if (seen.has(value)) {
+    throw new LocalAssetRecordStoreError("Asset Kernel local store record must be JSON-compatible.");
+  }
+
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== Array.prototype && prototype !== null) {
+    throw new LocalAssetRecordStoreError("Asset Kernel local store record must be JSON-compatible.");
+  }
+
+  seen.add(value);
+  if (Array.isArray(value)) {
+    for (const entry of value) assertJsonCompatibleValue(entry, seen);
+  } else {
+    for (const entry of Object.values(value as Record<string, unknown>)) assertJsonCompatibleValue(entry, seen);
+  }
+  seen.delete(value);
 }

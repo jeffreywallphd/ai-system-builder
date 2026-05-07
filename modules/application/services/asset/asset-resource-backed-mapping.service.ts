@@ -15,6 +15,7 @@ import type {
   AssetReference,
   AssetResourceBackedAsset,
   AssetResourceBacking,
+  AssetResourceBackingReference,
   AssetResourceBackingRole,
   AssetResourcePreviewKind,
   AssetResourcePreviewReference,
@@ -22,12 +23,12 @@ import type {
 } from "../../../contracts/asset";
 
 const FORBIDDEN_METADATA_KEY_PATTERN =
-  /(token|secret|password|credential|authorization|auth|localpath|cachepath|temppath|filepath|filesystempath|bytes|blob|contentbase64|stacktrace|commandline|rawpayload)/i;
+  /(token|secret|password|credential|authorization|auth|path|cache|bytes|blob|contentbase64|raw|payload|command|stack)/i;
 
 interface ResourceBackedAssetLinkInput {
   readonly assetRef: AssetReference;
   readonly backings: readonly AssetResourceBacking[];
-  readonly primaryBackingRef?: AssetReference;
+  readonly primaryBackingRef?: AssetResourceBackingReference;
   readonly previewRefs?: readonly AssetReference[];
   readonly generatedFrom?: AssetGeneratedOutputReference;
   readonly metadata?: Record<string, unknown>;
@@ -114,6 +115,55 @@ function metadataOf(value: Record<string, unknown> | undefined): AssetMetadata |
 
 function safeAssetId(prefix: string, value: string | undefined) {
   return normalizeAssetId(safeId(prefix, value));
+}
+
+function backingReference(backing: AssetResourceBacking): AssetResourceBackingReference {
+  return { kind: "asset-resource-backing", id: normalizeAssetId(backing.backingId) };
+}
+
+function stableHash(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0).toString(36);
+}
+
+function safeInternalExternalBackingId(
+  prefix: "artifact-repo-object" | "external-repository-object",
+  reference: AssetExternalRepositoryObjectReference,
+): string {
+  const identitySeed = [
+    reference.provider,
+    reference.repositoryId,
+    reference.revision ?? "",
+    reference.objectKind ?? "",
+    reference.objectPath ?? "",
+  ].join("\u001f");
+  return `${prefix}.internal.${reference.provider}.${stableHash(identitySeed)}`;
+}
+
+function sanitizeExternalReferenceText(value: string | undefined): string | undefined {
+  const trimmed = trimText(value);
+  if (!trimmed) return undefined;
+
+  try {
+    const parsed = new URL(trimmed);
+    parsed.username = "";
+    parsed.password = "";
+    parsed.search = "";
+    parsed.hash = "";
+
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return `${parsed.origin}${parsed.pathname}`;
+    }
+
+    return `${parsed.protocol}${parsed.pathname}`;
+  } catch {
+    return trimmed.replace(/([^\s/@:]+):([^\s/@]+)@/g, "");
+  }
 }
 
 function artifactKeyFromReference(reference: ArtifactReference): string {
@@ -213,9 +263,9 @@ export class AssetResourceBackedMappingService {
   ): AssetExternalRepositoryObjectReference {
     return {
       provider: externalProvider(target.provider),
-      repositoryId: target.repository.trim(),
-      revision: trimText(target.revision),
-      objectPath: trimText(target.path),
+      repositoryId: sanitizeExternalReferenceText(target.repository) ?? "repository",
+      revision: sanitizeExternalReferenceText(target.revision),
+      objectPath: sanitizeExternalReferenceText(target.path),
       objectKind,
       metadata: metadataOf({ storageProvider: target.provider }),
     };
@@ -228,7 +278,7 @@ export class AssetResourceBackedMappingService {
     const ref = this.mapArtifactRepoTargetToExternalRepositoryObject(descriptor.target, "artifact");
 
     return {
-      backingId: safeId("artifact-repo-object", `${ref.provider}-${ref.repositoryId}-${ref.objectPath ?? "root"}`),
+      backingId: safeInternalExternalBackingId("artifact-repo-object", ref),
       resourceKind: "artifact-repository-object",
       ref,
       role,
@@ -242,16 +292,21 @@ export class AssetResourceBackedMappingService {
     reference: AssetExternalRepositoryObjectReference,
     role: AssetResourceBackingRole = "source",
   ): AssetResourceBacking {
+    const ref: AssetExternalRepositoryObjectReference = {
+      ...reference,
+      repositoryId: sanitizeExternalReferenceText(reference.repositoryId) ?? "repository",
+      revision: sanitizeExternalReferenceText(reference.revision),
+      objectPath: sanitizeExternalReferenceText(reference.objectPath),
+      metadata: metadataOf(reference.metadata),
+    };
+
     return {
-      backingId: safeId("external-repository-object", `${reference.provider}-${reference.repositoryId}-${reference.objectPath ?? "root"}`),
+      backingId: safeInternalExternalBackingId("external-repository-object", ref),
       resourceKind: "external-repository-object",
-      ref: {
-        ...reference,
-        metadata: metadataOf(reference.metadata),
-      },
+      ref,
       role,
       contentType: trimText(reference.contentType),
-      metadata: metadataOf({ provider: reference.provider, repositoryId: reference.repositoryId, objectKind: reference.objectKind }),
+      metadata: metadataOf({ provider: ref.provider, repositoryId: ref.repositoryId, objectKind: ref.objectKind }),
     };
   }
 
@@ -276,7 +331,7 @@ export class AssetResourceBackedMappingService {
     return this.linkResourceBackedAsset({
       assetRef: assetRef ?? { kind: "resource-backed-asset", id: safeAssetId("image-asset", image.assetId) },
       backings: [backing],
-      primaryBackingRef: { kind: "resource", id: normalizeAssetId(backing.backingId) },
+      primaryBackingRef: backingReference(backing),
       metadata: { source: image.source },
     });
   }
@@ -436,7 +491,7 @@ export class AssetResourceBackedMappingService {
     return this.linkResourceBackedAsset({
       assetRef,
       backings: [backing],
-      primaryBackingRef: { kind: "resource", id: normalizeAssetId(backing.backingId) },
+      primaryBackingRef: backingReference(backing),
       metadata: assetType ? { assetType } : undefined,
     });
   }

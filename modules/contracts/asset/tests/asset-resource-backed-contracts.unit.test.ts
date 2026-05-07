@@ -16,6 +16,7 @@ import {
   type AssetGeneratedOutputReference,
   type AssetResourceBackedAsset,
   type AssetResourceBacking,
+  type AssetResourceBackingReference,
   type AssetResourcePreviewReference,
 } from "..";
 
@@ -140,6 +141,7 @@ test("resource backing contract does not require raw paths, URLs, tokens, secret
 });
 
 test("resource-backed asset links asset refs to one or more resource backings", () => {
+  const primaryBackingRef: AssetResourceBackingReference = { kind: "asset-resource-backing", id: "image.generated" as never };
   const link: AssetResourceBackedAsset = {
     assetRef: { kind: "asset-instance", id: "instance.image" as never },
     backings: [
@@ -150,13 +152,14 @@ test("resource-backed asset links asset refs to one or more resource backings", 
         role: "primary",
       },
     ],
-    primaryBackingRef: { kind: "resource", id: "image.generated" as never },
+    primaryBackingRef,
     previewRefs: [{ kind: "resource", id: "preview.generated.thumbnail" as never }],
     metadata: { mappingOnly: true },
   };
 
   assert.equal(link.assetRef.kind, "asset-instance");
   assert.equal(link.backings.length, 1);
+  assert.equal(link.primaryBackingRef?.kind, "asset-resource-backing");
   assert.equal(link.primaryBackingRef?.id, "image.generated");
 });
 

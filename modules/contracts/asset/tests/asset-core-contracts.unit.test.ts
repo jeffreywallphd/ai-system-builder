@@ -139,6 +139,7 @@ describe("asset core contract vocabularies", () => {
       "asset-binding",
       "asset-requirement",
       "resource-backed-asset",
+      "asset-resource-backing",
       "artifact",
       "resource",
       "external-repository-object",

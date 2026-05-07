@@ -10,6 +10,7 @@ export const ASSET_REFERENCE_KINDS = [
   "asset-binding",
   "asset-requirement",
   "resource-backed-asset",
+  "asset-resource-backing",
   "artifact",
   "resource",
   "external-repository-object",
