@@ -16,9 +16,9 @@ Read this pack for tasks involving:
 - resource-backed assets, generated outputs as assets, previews, artifacts, resources, models, datasets, images, documents, or Hugging Face objects as asset/resource backings,
 - AI-readable asset context,
 - asset configuration,
-- asset validation services, registry/application ports, persistence adapters, or resource-backed mapping.
+- registry/application ports, persistence adapters, or resource-backed mapping.
 
-Prompt 6 has added descriptor-only shared contracts for ports, port contracts, binding constraints, dependencies, composition rules, composition cardinality, and composition validation summary shells. The pre-Prompt 7 cleanup keeps that direction while adding JSON-compatible shared metadata/details, first-class declarative `AssetRequirement`, safe semantic references such as `schemaRef: AssetReference`, and shared validation summary statuses; do not treat those contracts as implemented validation or runtime composition behavior.
+Prompt 7 has added pure application-layer validation services under `modules/application/services/asset` for definitions, instances, bindings, and compositions. They consume shared asset contracts and return structured `AssetValidationIssue` results; do not treat them as registry, persistence, runtime, transport, UI, automatic-composition, prompt-assembly, retrieval, embedding, or AI-generation behavior.
 
 ## Canonical Asset Terminology
 
@@ -87,16 +87,16 @@ Outside-but-referenceable concepts:
 4. Prompt 4 — Detailed asset configuration contracts.
 5. Prompt 5 — Detailed asset AI-context contracts.
 6. Prompt 6 — Detailed asset ports, binding compatibility, and composition-rule contracts.
-7. Prompt 7 — Asset validation service; Prompt 3 only adds issue/summary shapes.
+7. Prompt 7 — Asset validation services for definitions, instances, bindings, and compositions.
 8. Prompt 8 — Asset registry and application ports.
 9. Prompt 9 — Local persistence adapter.
 10. Prompt 10 — Resource-backed asset mapping and final Phase 2A regression.
 
-Pre-Prompt 7 cleanup is limited to JSON-safe metadata/details, first-class `AssetRequirement`, safe semantic references, and shared validation summary statuses only.
+Prompt 7 validation services are pure/deterministic and transport/UI-neutral. They validate configuration structure, AI-context completeness, port/binding compatibility, composition structure, lifecycle/provenance, dependencies, and declared requirements; they do not execute workflows, query runtime readiness, start runtimes, access filesystem/network, call LLMs, or persist anything.
 
-Prompt 6 status: `modules/contracts/asset` now holds the core contract family plus detailed configuration contracts, detailed structured AI-context contracts, and descriptor-only machine-readable port/composition contracts. Asset definitions can own optional reusable `ports`, inline declarative `requirements`, future externalized `requirementRefs`, `compositionRules`, and `dependencies`; asset bindings can reference source/target assets and source/target ports with optional binding constraints; asset compositions can reference instances, binding refs or inline bindings, composition rules, dependencies, and a lightweight validation summary shell. AI-context composition guidance remains semantic guidance, configuration contracts remain separate from port/composition contracts, and validation services remain Prompt 7. Registry/application ports remain Prompt 8, persistence remains Prompt 9, and resource-backed mapping remains Prompt 10.
+Prompt 7 status: `modules/contracts/asset` remains the shared contract family and `modules/application/services/asset` now provides validation services over those contracts. Asset definitions can own optional reusable `ports`, inline declarative `requirements`, future externalized `requirementRefs`, `compositionRules`, and `dependencies`; asset bindings can reference source/target assets and source/target ports with optional binding constraints; asset compositions can reference instances, binding refs or inline bindings, composition rules, dependencies, and a lightweight validation summary shell. Registry/application ports remain Prompt 8, persistence remains Prompt 9, resource-backed mapping remains Prompt 10, and API/IPC/UI remain deferred.
 
-Transport/UI work is deferred until after the kernel is proven through shared contracts, configuration, AI context, ports/composition, validation, registry ports, persistence, and resource-backed mapping. Prompt 6 does not add workflow execution, graph execution, UI page routing, API/IPC exposure, runtime behavior, or automatic composition.
+Transport/UI work is deferred until after the kernel is proven through shared contracts, configuration, AI context, ports/composition, validation, registry ports, persistence, and resource-backed mapping. Prompt 7 does not add workflow execution, graph execution, UI page routing, API/IPC exposure, runtime behavior, persistence, resource-backed mapping, or automatic composition.
 
 ## Explicit Non-Goals
 
