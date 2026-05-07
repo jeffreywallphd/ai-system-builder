@@ -239,9 +239,13 @@ describe("composeDesktopHost", () => {
       },
     });
 
+    const storageRootDirectory = join(tmpdir(), `desktop-artifact-upload-test-${Date.now()}`);
+    const runtimeRootDirectory = join(tmpdir(), `desktop-runtime-test-${Date.now()}`);
+
     host.registerArtifactUploadIpc({
       ipcMain,
-      storageRootDirectory: join(tmpdir(), `desktop-artifact-upload-test-${Date.now()}`),
+      storageRootDirectory,
+      runtimeRootDirectory,
     });
 
     expect(ipcMain.handle).toHaveBeenCalledTimes(51);
@@ -299,6 +303,9 @@ describe("composeDesktopHost", () => {
       DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value,
       DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
     ]);
+    expect(channels.some((channel) => String(channel).includes("asset"))).toBe(false);
+    expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(true);
+    expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     const listener = ipcMain.handle.mock.calls[0]?.[1];
     expect(listener).toBeTypeOf("function");
   });

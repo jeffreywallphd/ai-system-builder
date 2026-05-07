@@ -344,7 +344,8 @@ Guidance:
 - Persistence should not be added in Prompt 2.
 - Persistence should come only after contracts, validation, and registry/application ports stabilize.
 - Prompt 9 persistence adapters should implement the existing definition, instance, composition, and binding repository ports without changing registry use-case behavior. Composition-owned inline bindings remain valid asset composition content; reusable binding references use first-class `asset-binding` references, are structurally valid without a repository, and are fully validated when resolved through the binding repository port. Local text filters are deterministic case-insensitive substring checks over selected saved record values, not search indexes or AI-generated context.
-- The local asset persistence manifest checks the current schema version and store kind before reads; migrations remain intentionally unimplemented in Phase 2A. Local asset persistence accepts JSON-compatible records only and rejects functions, symbols, undefined values, non-finite numbers, Dates, buffers/streams, class instances, and circular records at the durable adapter boundary.
+- The local asset persistence manifest checks the current schema version and store kind before reads and host composition initialization; migrations remain intentionally unimplemented in Phase 2A. Local asset persistence accepts JSON-compatible records only and rejects functions, symbols, undefined values, non-finite numbers, Dates, buffers/streams, class instances, and circular records at the durable adapter boundary.
+- Desktop and server host composition can now initialize the local Asset Kernel internally through `modules/hosts/shared/composition/composeLocalAssetKernel.ts`, using the host-owned storage root and preserving the adapter-owned `<storageRoot>/asset-kernel/` subdirectory. This is private host wiring only: no asset API, IPC, preload, renderer UI, thin-client UI, seeding, registry read facade, or resource-backed scan/view is exposed yet.
 - Deferred registry concerns remain explicit: no automatic definition version incrementing, no version-history service, no delete use cases beyond optional repository-port methods, no use-case conflict detection except what a persistence adapter naturally provides, read/list use cases do not revalidate by default, validation-only use cases do not save, and registry use cases must not call runtime readiness/guards or access filesystem/network directly.
 - Asset metadata persistence should preserve the JSON-compatible metadata/detail contract and should not duplicate binary/resource storage.
 - Resource-backed assets should reference artifact/resource storage rather than embedding raw file paths or bytes in asset metadata.
@@ -365,7 +366,7 @@ Guidance:
 
 Pre-Prompt 7 cleanup was limited to JSON-safe metadata/details, first-class declarative `AssetRequirement`, safe semantic references such as `schemaRef`, and shared validation summary statuses; Prompt 7 adds validation services, and Prompt 8 adds application repository ports plus use cases without adding persistence adapters or resource-backed mapping.
 
-Transport/UI work is intentionally deferred until after the kernel is proven through shared contracts, configuration contracts, AI context contracts, ports/composition contracts, validation, registry ports, persistence, and resource-backed mapping.
+Transport/UI work is intentionally deferred until after the kernel is proven through shared contracts, configuration contracts, AI context contracts, ports/composition contracts, validation, registry ports, persistence, resource-backed mapping, and private host composition. The shared local composition helper is not a public registry facade and must not be used to add API/IPC/UI exposure before the dedicated transport prompts.
 
 ## Architecture boundaries and non-goals
 
@@ -383,7 +384,7 @@ Non-goals preserved after Prompt 8:
 - no automatic definition version incrementing, conflict-detection policy, version-history service, or additional delete use cases before a later prompt explicitly scopes them,
 - no migrations beyond current manifest schema/kind checks,
 - no renderer/thin-client UI,
-- no API/IPC routes,
+- no API/IPC routes, preload methods, renderer UI, or thin-client UI,
 - no durable resource-backed mapping repository or transport exposure in Phase 2A Prompt 10,
 - no broad refactor,
 - no asset marketplace/plugin system,

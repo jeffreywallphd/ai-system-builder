@@ -74,6 +74,8 @@
 
 
 
+- Local Asset Kernel persistence is privately composed from the host `storageRootDirectory` through the shared host helper and initializes `<storageRoot>/asset-kernel/`; this must not add asset IPC/API/preload/UI surface, seeding, a registry read facade, resource-backed scans/views, or runtime start/probe/install behavior.
+
 ## Current implementation checkpoint (server host)
 
 - `composeServerHost` now wires artifact-repo use cases and route registration for `POST /api/artifact-repo/has`, `POST /api/artifact-repo/store`, `POST /api/artifact/publish`, and `POST /api/artifact/publish/verify`.

@@ -92,6 +92,7 @@ import {
   type HuggingFaceTokenStatus,
 } from "../../shared/huggingFaceTokenConfigStore";
 import { createRuntimePreparedModelCheckpointResolver } from "../../shared/createRuntimePreparedModelCheckpointResolver";
+import { composeLocalAssetKernel } from "../../shared/composition/composeLocalAssetKernel";
 import {
   registerElectronIpc,
 } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
@@ -877,6 +878,8 @@ export function composeDesktopHost(
         mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT },
       });
       const runtimeTaskRegistry = createDesktopRuntimeTaskRegistry({ pythonRuntimeTaskRegistry, imageRuntimeTaskRegistry: comfyUiRuntimeTaskRegistry });
+
+      void composeLocalAssetKernel({ rootDirectory: registerOptions.storageRootDirectory, now });
 
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,

@@ -152,6 +152,10 @@ See ADR-0013 for canonical cross-host runtime ownership and placement guidance.
 If host code starts accumulating business logic, move that logic inward before it becomes entrenched.
 
 
+### Private Asset Kernel composition
+
+Desktop and server hosts may compose the local Asset Kernel internally from their host-owned storage root through the shared host composition helper. The helper initializes and validates the adapter-owned `<storageRoot>/asset-kernel/` record store and returns repository ports plus existing application registry use cases for host-internal use. This wiring deliberately keeps public host shapes, IPC channels, API routes, preload methods, renderer UI, thin-client UI, seeding, resource-backed scans/views, and registry read facades deferred to later prompts. Runtime roots remain separate and must not be used for Asset Kernel persistence.
+
 ### Current host parity for repo-backed artifact workflows
 
 - Server API and desktop IPC/preload both expose shared publish, published-verify, source-verify, register-from-repo, and localize-from-repo use cases.
