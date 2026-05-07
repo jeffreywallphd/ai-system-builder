@@ -355,7 +355,9 @@ Guidance:
 - Resource-backed assets should reference artifact/resource storage rather than embedding raw file paths or bytes in asset metadata.
 - No persistent task history, marketplace, plugin package registry, or workflow execution store should be introduced in Phase 2A.
 
-## Phase 2A implementation sequence
+## Phase 2A and 2B implementation sequence
+
+Phase 2A established the kernel foundation:
 
 1. Prompt 1 — Asset Kernel audit and plan.
 2. Prompt 2 — ADR and canonical terminology baseline.
@@ -368,9 +370,24 @@ Guidance:
 9. Prompt 9 — Local persistence adapter.
 10. Prompt 10 — Resource-backed asset mapping and final Phase 2A regression.
 
-Pre-Prompt 7 cleanup was limited to JSON-safe metadata/details, first-class declarative `AssetRequirement`, safe semantic references such as `schemaRef`, and shared validation summary statuses; Prompt 7 adds validation services, and Prompt 8 adds application repository ports plus use cases without adding persistence adapters or resource-backed mapping.
+Phase 2B internal integration then layered local composition, seeding, built-ins, internal resource-backed views, the read-only Asset Registry facade, shared host-private composition, and this regression stabilization pass. It deliberately stops before public transport or UI exposure.
 
-Transport/UI work is intentionally deferred until after the kernel is proven through shared contracts, configuration contracts, AI context contracts, ports/composition contracts, validation, registry ports, persistence, resource-backed mapping, and private host composition. The shared local composition helper is not a public registry facade and must not be used to add API/IPC/UI exposure before the dedicated transport prompts.
+Pre-Prompt 7 cleanup was limited to JSON-safe metadata/details, first-class declarative `AssetRequirement`, safe semantic references such as `schemaRef`, and shared validation summary statuses; later prompts keep those safety constraints while adding persistence, computed read views, and private host composition.
+
+Transport/UI work is intentionally deferred until after the kernel is proven through shared contracts, configuration contracts, AI context contracts, ports/composition contracts, validation, registry ports, persistence, resource-backed mapping, and private host composition. The shared local composition helper and internal registry composition helper are not public registry facades and must not be used to add API/IPC/UI exposure before the dedicated transport prompts.
+
+## Phase 2B stabilized internal integration state
+
+Phase 2B makes the Asset Kernel internally usable without adding a public Asset Library surface. The stable internal stack is:
+
+1. `composeLocalAssetKernel` composes local JSON record persistence for definitions, instances, compositions, and bindings under the adapter-owned `<storageRoot>/asset-kernel/` directory, returning path-safe diagnostics only.
+2. The built-in definition seeding service remains application-layer, validates before save, is idempotent by seed ID + seed version + fingerprint, and skips user/custom or conflicting built-ins without overwrite. It is not automatic host startup behavior and is not a UI navigation or route system.
+3. The application-owned built-in catalog uses stable `builtin.*` IDs and explicit versions. Runtime-backed built-ins reference shared runtime capability IDs; resource-backed built-ins have descriptor/reference semantics and no runtime requirements by default.
+4. Resource-backed views are computed internal read models from injected or existing descriptors. They are not persisted mappings, do not scan storage, do not create asset instances, and keep generated outputs/external repository objects/previews outside asset registration until explicit finalization/import/registration.
+5. `AssetRegistryReadFacade` is read-only, transport-neutral, UI-neutral, and validation-on-request. It reads repository records, binding summaries, built-in metadata, validation summaries, and optional injected resource-backed views without save/update/delete/seed behavior.
+6. `composeInternalAssetRegistry` privately wires local persistence/use cases to the read facade for future host-owned consumers. It does not seed automatically, scan resources, expose local paths, or add API/IPC/preload/renderer/thin-client/server routes.
+
+Phase 2C should begin by wrapping the internal read facade through read-only transport contracts and handlers. Asset Library UI work should consume those transport wrappers rather than local persistence adapters or host composition helpers directly.
 
 ## Architecture boundaries and non-goals
 
@@ -382,14 +399,16 @@ Asset Kernel work must preserve clean architecture boundaries:
 - host wiring belongs in `modules/hosts`,
 - UI belongs in apps/modules UI areas.
 
-Non-goals preserved after Prompt 8:
+Non-goals preserved after Phase 2B:
 
-- no persistence adapter before Prompt 9,
 - no automatic definition version incrementing, conflict-detection policy, version-history service, or additional delete use cases before a later prompt explicitly scopes them,
 - no migrations beyond current manifest schema/kind checks,
 - no renderer/thin-client UI,
 - no API/IPC routes, preload methods, renderer UI, or thin-client UI,
-- no durable resource-backed mapping repository or transport exposure in Phase 2A Prompt 10,
+- no durable resource-backed mapping repository or transport exposure before a later explicit registration/mapping prompt,
+- no automatic startup seeding,
+- no automatic asset instance creation from artifacts, generated outputs, previews, or external repository objects,
+- no resource scans,
 - no broad refactor,
 - no asset marketplace/plugin system,
 - no scheduler/queue/workflow execution engine changes,
