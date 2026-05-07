@@ -1,3 +1,4 @@
+import type { AssetMetadata } from "./asset-metadata";
 import type { AssetId } from "./asset-id";
 import type { AssetVersion } from "./asset-version";
 
@@ -6,6 +7,7 @@ export const ASSET_REFERENCE_KINDS = [
   "asset-definition-version",
   "asset-instance",
   "asset-composition",
+  "asset-requirement",
   "resource-backed-asset",
   "artifact",
   "resource",
@@ -16,10 +18,10 @@ export type AssetReferenceKind = (typeof ASSET_REFERENCE_KINDS)[number];
 
 export interface AssetReference {
   readonly kind: AssetReferenceKind;
-  readonly id: AssetId | string;
+  readonly id: AssetId;
   readonly version?: AssetVersion;
   readonly label?: string;
-  readonly metadata?: Record<string, unknown>;
+  readonly metadata?: AssetMetadata;
 }
 
 export function isAssetReferenceKind(value: string): value is AssetReferenceKind {

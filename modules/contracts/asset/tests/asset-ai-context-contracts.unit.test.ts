@@ -27,7 +27,7 @@ const provenance: AssetProvenance = {
 
 const companionRef: AssetReference = {
   kind: "asset-definition-version",
-  id: "workflow-step.summary-renderer@1.0.0",
+  id: normalizeAssetId("workflow-step.summary-renderer@1.0.0"),
   version: "1.0.0",
   label: "Summary renderer",
 };
@@ -190,7 +190,7 @@ describe("asset AI-context contract shapes", () => {
         incompatibleWith: [
           {
             kind: "asset-definition",
-            id: "workflow-step.raw-secret-dumper",
+            id: normalizeAssetId("workflow-step.raw-secret-dumper"),
             label: "Unsafe secret dumping step",
           },
         ],

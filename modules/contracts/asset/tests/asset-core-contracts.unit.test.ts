@@ -37,7 +37,7 @@ const provenance: AssetProvenance = {
 };
 
 function ref(kind: AssetReference["kind"], id: string): AssetReference {
-  return { kind, id };
+  return { kind, id: normalizeAssetId(id) };
 }
 
 function forbiddenKeys(value: object): readonly string[] {
@@ -136,6 +136,7 @@ describe("asset core contract vocabularies", () => {
       "asset-definition-version",
       "asset-instance",
       "asset-composition",
+      "asset-requirement",
       "resource-backed-asset",
       "artifact",
       "resource",

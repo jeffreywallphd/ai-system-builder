@@ -18,7 +18,7 @@ Read this pack for tasks involving:
 - asset configuration,
 - asset validation services, registry/application ports, persistence adapters, or resource-backed mapping.
 
-Prompt 6 has added descriptor-only shared contracts for ports, port contracts, binding constraints, dependencies, composition rules, composition cardinality, and composition validation summary shells; do not treat those contracts as implemented validation or runtime composition behavior.
+Prompt 6 has added descriptor-only shared contracts for ports, port contracts, binding constraints, dependencies, composition rules, composition cardinality, and composition validation summary shells. The pre-Prompt 7 cleanup keeps that direction while adding JSON-compatible shared metadata/details, first-class declarative `AssetRequirement`, safe semantic references such as `schemaRef: AssetReference`, and shared validation summary statuses; do not treat those contracts as implemented validation or runtime composition behavior.
 
 ## Canonical Asset Terminology
 
@@ -27,15 +27,15 @@ Prompt 6 has added descriptor-only shared contracts for ports, port contracts, b
 - `AssetInstance`: configured use of an asset definition in a specific composition or system context.
 - `AssetBinding`: typed connection between instances, ports, resources, runtime capabilities, storage objects, or external repository objects.
 - `AssetComposition`: validated assembly of configured instances and bindings into a feature, workflow, page, subsystem, system, or system-of-subsystems.
-- `AssetReference`: stable reference to a definition, definition version, instance, or composition.
+- `AssetReference`: stable transport-neutral reference to a definition, definition version, instance, composition, reusable asset requirement, or referenceable resource/artifact object.
 - `AssetConfiguration`: definition-owned configuration surface plus instance-selected values.
 - `AssetAiContext`: structured AI-readable metadata for retrieval, validation support, and prompt assembly.
 - `AssetPort`: formal input/output/event/control/action/data/error connection point.
 - `AssetCompositionRule`: machine-checkable parent/child, dependency, incompatibility, ordering, cardinality, or binding rule.
-- `AssetValidationIssue`: structured application-layer validation result.
+- `AssetValidationIssue`: structured application-layer validation result whose `details` are JSON-compatible metadata. General and composition validation summaries share `not-validated`, `valid`, `valid-with-warnings`, `invalid`, and `unknown`.
 - `AssetLifecycleStatus`: `draft`, `validated`, `published`, `deprecated`, `archived`, or `failed-validation`.
 - `AssetProvenance`: creation/source/derivation/authorship/review metadata that must avoid secrets and unsafe implementation details.
-- `AssetRequirement`: declarative runtime/host/permission/safety requirements.
+- `AssetRequirement`: first-class declarative runtime/host/permission/safety/resource/artifact/external-provider requirements owned inline by definitions; external reusable requirement references can use `requirementRefs` later.
 - `Resource-backed Asset`: asset whose semantic value is backed by a resource or artifact.
 
 Outside-but-referenceable concepts:
@@ -53,8 +53,8 @@ Outside-but-referenceable concepts:
 - Definitions, instances, bindings, and compositions are separate concepts.
 - Logic containers describe behavioral/composition assets; do not add a separate `logic-container` type unless a later canonical doc does so.
 - AI-readable context and machine-composable contracts are complementary; neither replaces the other.
-- Runtime requirements reference shared `RuntimeCapabilityId` values and do not replace runtime readiness contracts.
-- Asset metadata must not embed raw bytes, local file paths, temp paths, secrets, tokens, command lines, raw environment values, stack traces, or raw adapter details.
+- Runtime requirements reference shared `RuntimeCapabilityId` values and do not duplicate runtime readiness snapshots, runtime task statuses, or provider lifecycle concepts.
+- Asset metadata/details use JSON-compatible `AssetMetadata` values for future persistence/transport and must not embed raw bytes, buffers, streams, filesystem handles, local file paths, temp paths, secrets, tokens, command lines, raw environment values, stack traces, runtime objects, or raw adapter details.
 - Transport/UI-specific asset models are not allowed.
 - Preserve clean architecture placement: contracts in `modules/contracts`, application validation/use cases in `modules/application`, adapters in `modules/adapters`, host wiring in `modules/hosts`, UI in apps/modules UI areas.
 
@@ -92,7 +92,9 @@ Outside-but-referenceable concepts:
 9. Prompt 9 — Local persistence adapter.
 10. Prompt 10 — Resource-backed asset mapping and final Phase 2A regression.
 
-Prompt 6 status: `modules/contracts/asset` now holds the core contract family plus detailed configuration contracts, detailed structured AI-context contracts, and descriptor-only machine-readable port/composition contracts. Asset definitions can own optional reusable `ports`, `compositionRules`, and `dependencies`; asset bindings can reference source/target assets and source/target ports with optional binding constraints; asset compositions can reference instances, binding refs or inline bindings, composition rules, dependencies, and a lightweight validation summary shell. AI-context composition guidance remains semantic guidance, configuration contracts remain separate from port/composition contracts, and validation services remain Prompt 7. Registry/application ports remain Prompt 8, persistence remains Prompt 9, and resource-backed mapping remains Prompt 10.
+Pre-Prompt 7 cleanup is limited to JSON-safe metadata/details, first-class `AssetRequirement`, safe semantic references, and shared validation summary statuses only.
+
+Prompt 6 status: `modules/contracts/asset` now holds the core contract family plus detailed configuration contracts, detailed structured AI-context contracts, and descriptor-only machine-readable port/composition contracts. Asset definitions can own optional reusable `ports`, inline declarative `requirements`, future externalized `requirementRefs`, `compositionRules`, and `dependencies`; asset bindings can reference source/target assets and source/target ports with optional binding constraints; asset compositions can reference instances, binding refs or inline bindings, composition rules, dependencies, and a lightweight validation summary shell. AI-context composition guidance remains semantic guidance, configuration contracts remain separate from port/composition contracts, and validation services remain Prompt 7. Registry/application ports remain Prompt 8, persistence remains Prompt 9, and resource-backed mapping remains Prompt 10.
 
 Transport/UI work is deferred until after the kernel is proven through shared contracts, configuration, AI context, ports/composition, validation, registry ports, persistence, and resource-backed mapping. Prompt 6 does not add workflow execution, graph execution, UI page routing, API/IPC exposure, runtime behavior, or automatic composition.
 

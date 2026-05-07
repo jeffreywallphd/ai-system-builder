@@ -1,3 +1,4 @@
+import type { AssetMetadata } from "./asset-metadata";
 import type { AssetReference } from "./asset-reference";
 
 export const ASSET_PROVENANCE_SOURCE_KINDS = [
@@ -23,7 +24,7 @@ export interface AssetProvenance {
   readonly authorship?: "human-authored" | "ai-generated" | "mixed" | "unknown";
   readonly generationContextRefs?: readonly AssetReference[];
   readonly redactedGenerationSummary?: string;
-  readonly metadata?: Record<string, unknown>;
+  readonly metadata?: AssetMetadata;
 }
 
 export function isAssetProvenanceSourceKind(

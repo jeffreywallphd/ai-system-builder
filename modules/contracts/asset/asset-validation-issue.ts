@@ -1,3 +1,4 @@
+import type { AssetMetadata } from "./asset-metadata";
 import type { AssetReference } from "./asset-reference";
 
 export const ASSET_VALIDATION_ISSUE_SEVERITIES = [
@@ -33,16 +34,10 @@ export interface AssetValidationIssue {
   readonly message: string;
   readonly assetRef?: AssetReference;
   readonly path?: readonly string[];
-  readonly details?: Record<string, unknown>;
+  readonly details?: AssetMetadata;
   readonly createdAt?: string;
 }
 
-export interface AssetValidationSummary {
-  readonly status?: "not-validated" | "valid" | "invalid" | "unknown";
-  readonly issueRefs?: readonly AssetReference[];
-  readonly issueCounts?: Partial<Record<AssetValidationIssueSeverity, number>>;
-  readonly validatedAt?: string;
-}
 
 export function isAssetValidationIssueSeverity(
   value: string,

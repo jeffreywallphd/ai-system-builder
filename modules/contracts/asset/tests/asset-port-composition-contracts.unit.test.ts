@@ -35,7 +35,7 @@ const provenance: AssetProvenance = {
 };
 
 function ref(kind: AssetReference["kind"], id: string): AssetReference {
-  return { kind, id };
+  return { kind, id: normalizeAssetId(id) };
 }
 
 function forbiddenKeys(value: object): readonly string[] {
@@ -185,6 +185,7 @@ describe("asset port and composition vocabularies", () => {
       "valid",
       "valid-with-warnings",
       "invalid",
+      "unknown",
     ]);
     expect(normalizeAssetCompositionValidationStatus(" Valid-With-Warnings ")).toBe(
       "valid-with-warnings",
@@ -201,7 +202,7 @@ describe("asset port and composition contract shapes", () => {
       contract: {
         contractKind: "json",
         dataKind: "dashboard-record",
-        schemaRef: "schema.dashboard.summary.input",
+        schemaRef: ref("asset-definition", "schema.dashboard.summary.input"),
       },
       cardinality: {
         preset: "exactly-one",

@@ -1,17 +1,17 @@
-export type AssetConfigurationPrimitiveValue = string | number | boolean | null;
+import type {
+  AssetJsonObject,
+  AssetJsonPrimitive,
+  AssetJsonValue,
+  AssetMetadata,
+} from "./asset-metadata";
 
-export type AssetConfigurationValue =
-  | AssetConfigurationPrimitiveValue
-  | readonly AssetConfigurationValue[]
-  | { readonly [key: string]: AssetConfigurationValue };
+export type AssetConfigurationPrimitiveValue = AssetJsonPrimitive;
 
-export type AssetConfigurationValues = Readonly<
-  Record<string, AssetConfigurationValue>
->;
+export type AssetConfigurationValue = AssetJsonValue;
 
-export type AssetConfigurationMetadata = Readonly<
-  Record<string, AssetConfigurationValue>
->;
+export type AssetConfigurationValues = AssetJsonObject;
+
+export type AssetConfigurationMetadata = AssetMetadata;
 
 export const ASSET_CONFIGURATION_VALUE_KINDS = [
   "string",

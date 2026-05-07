@@ -1,3 +1,4 @@
+import type { AssetMetadata } from "./asset-metadata";
 import type { AssetBinding } from "./asset-binding";
 import type { AssetCompositionDependency } from "./asset-composition-dependency";
 import type { AssetCompositionRule } from "./asset-composition-rule";
@@ -36,7 +37,7 @@ export interface AssetComposition {
   readonly dependencies?: readonly AssetCompositionDependency[];
   readonly provenance: AssetProvenance;
   readonly validationSummary?: AssetCompositionValidationSummary;
-  readonly metadata?: Record<string, unknown>;
+  readonly metadata?: AssetMetadata;
 }
 
 export function isAssetCompositionType(value: string): value is AssetCompositionType {
