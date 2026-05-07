@@ -84,6 +84,10 @@ import { RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY } from "../../../contrac
 import { RuntimeCapabilityGuardService } from "../../../application/services/runtime/runtime-capability-guard.service";
 import { createServerRuntimeReadinessService } from "./composeServerRuntimeReadiness";
 import { createServerImageGenerationRuntimeTaskRegistry } from "./composeServerImageGenerationRuntimeTaskRegistry";
+import {
+  composeInternalAssetRegistry,
+  type InternalAssetRegistryComposition,
+} from "../../shared/composition/composeInternalAssetRegistry";
 
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
 const execFile = promisify(nodeExecFile);
@@ -314,6 +318,7 @@ export interface ServerHostComposition {
   setHuggingFaceToken: (token: string) => HuggingFaceTokenStatus;
   clearHuggingFaceToken: () => HuggingFaceTokenStatus;
   registerApi: (options: RegisterServerApiOptions) => void;
+  getInternalAssetRegistry: () => InternalAssetRegistryComposition | undefined;
 }
 
 export { createServerRuntimeReadinessService, type CreateServerRuntimeReadinessServiceOptions } from "./composeServerRuntimeReadiness";
@@ -355,6 +360,8 @@ export function composeServerHost(
     ],
   });
 
+  let internalAssetRegistry: InternalAssetRegistryComposition | undefined;
+
   return {
     loggingPort,
     loggingConfig,
@@ -368,7 +375,14 @@ export function composeServerHost(
     clearHuggingFaceToken() {
       return tokenConfigStore.clearToken();
     },
+    getInternalAssetRegistry() {
+      return internalAssetRegistry;
+    },
     registerApi(registerOptions) {
+      internalAssetRegistry = composeInternalAssetRegistry({
+        rootDirectory: registerOptions.storageRootDirectory,
+        now: options.now,
+      });
       const env = options.env ?? process.env;
       const defaultRuntimeRootDirectory = joinHostPath(dirname(registerOptions.storageRootDirectory), "server-runtime");
       const applicationSettings = createLocalApplicationSettingsAdapter({

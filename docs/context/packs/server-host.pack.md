@@ -74,7 +74,7 @@
 
 
 
-- `composeInternalAssetRegistry` exists as a shared internal helper for local Asset Kernel repositories/use cases plus the application Asset Registry read facade under `<storageRoot>/asset-kernel/`. Server public composition still must not initialize it solely for side effects or expose it through Express routes/API/thin-client UI; seeding execution, resource-backed scans/views, and runtime start/probe/install behavior remain out of scope until an explicit private consumer or later transport/UI wrapper is added.
+- Server `registerApi` composes the internal Asset Registry through `composeInternalAssetRegistry` using `storageRootDirectory`, which initializes `<storageRootDirectory>/asset-kernel/` and exposes only a host-internal getter for private composition/tests. It must not use `runtimeRootDirectory` for Asset Kernel records and must not add asset API routes, thin-client clients, automatic built-in seeding, resource scans, provider/network calls, resource-byte reads, or runtime start/probe/install behavior for the Asset Kernel.
 
 ## Current implementation checkpoint (server host)
 
