@@ -94,3 +94,8 @@
 - Include `asset-kernel.pack.md` when assets declare runtime requirements or bind tools/workflows/models to runtime capabilities.
 - Asset requirements should reference shared `RuntimeCapabilityId` values and must not duplicate runtime readiness or task-registry contracts.
 - Asset validation may structurally check declared requirements, but it must not execute runtimes or probe heavy sidecars.
+
+## Asset Kernel built-in catalog note
+
+- Phase 2B Prompt 4 built-in Asset Kernel definitions may declare `runtime-capability` requirements using shared `RuntimeCapabilityId` values (`image-generation`, `dataset-preparation`, `model-training`, `model-validation`, and `model-publishing`). These definitions do not query readiness, start runtimes, create runtime tasks, or imply executable/ready status. The `model-publishing` built-in explicitly remains unavailable/not implemented until a runtime publishing path exists.
+
