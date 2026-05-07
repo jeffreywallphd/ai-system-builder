@@ -91,7 +91,7 @@ Outside-but-referenceable concepts:
 9. Prompt 9 — Local persistence adapter.
 10. Prompt 10 — Resource-backed asset mapping and final Phase 2A regression.
 
-Prompt 3 status: `modules/contracts/asset` now holds the first core contract family for asset identity, family/type vocabularies, version, lifecycle/review status, safe references, provenance, definitions, instances, minimal binding/composition shells, and validation issue shapes. Detailed configuration remains Prompt 4, detailed AI context remains Prompt 5, detailed ports/binding compatibility/composition rules remain Prompt 6, validation services remain Prompt 7, registry/application ports remain Prompt 8, persistence remains Prompt 9, and resource-backed mapping remains Prompt 10.
+Prompt 4 status: `modules/contracts/asset` now holds the core contract family plus detailed configuration contracts for schemas, fields, JSON-compatible values, defaults, selected values, constraints, generic UI hints, validation rule descriptors, and examples. Asset definitions own configuration schemas/defaults/examples; asset instances own selected configuration values. Configuration remains schema-engine-neutral and contract-only. Detailed AI context remains Prompt 5, detailed ports/binding compatibility/composition rules remain Prompt 6, validation services remain Prompt 7, registry/application ports remain Prompt 8, persistence remains Prompt 9, and resource-backed mapping remains Prompt 10.
 
 Transport/UI work is deferred until after the kernel is proven through shared contracts, configuration, AI context, ports/composition, validation, registry ports, persistence, and resource-backed mapping.
 
