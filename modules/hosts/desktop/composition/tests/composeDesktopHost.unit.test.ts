@@ -229,7 +229,7 @@ describe("composeDesktopHost", () => {
   });
 
 
-  it("registers the desktop artifact upload IPC handler on the request channel", () => {
+  it("registers the desktop artifact upload IPC handler on the request channel", async () => {
     const ipcMain = {
       handle: testDouble.fn(),
     };
@@ -304,8 +304,21 @@ describe("composeDesktopHost", () => {
       DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
     ]);
     expect(channels.some((channel) => String(channel).includes("asset"))).toBe(false);
-    expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
+    expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(true);
     expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
+    const internalRegistry = host.getInternalAssetRegistry();
+    expect(internalRegistry).toBeDefined();
+    expect(internalRegistry?.diagnostics.resourceBackedViewsEnabled).toBe(false);
+    expect(
+      await internalRegistry?.readFacade.listDefinitionCards({ includeBuiltIns: true, includeCustom: true }),
+    ).toEqual({ items: [] });
+    const preloadSource = [
+      readFileSync(resolve("apps/desktop/src/preload/index.ts"), "utf8"),
+      readFileSync(resolve("apps/desktop/src/preload/exposedApi.ts"), "utf8"),
+    ].join("\n");
+    expect(
+      /asset(?:Kernel|Registry|Library)|listAssetDefinitions|readAssetDefinition|listAssetInstances|readAssetInstance/i.test(preloadSource),
+    ).toBe(false);
     const listener = ipcMain.handle.mock.calls[0]?.[1];
     expect(listener).toBeTypeOf("function");
   });

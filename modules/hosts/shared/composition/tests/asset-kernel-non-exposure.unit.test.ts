@@ -47,16 +47,17 @@ describe("Asset Kernel Phase 2B non-exposure boundaries", () => {
   });
 
   it("does not register asset IPC channels or desktop preload asset methods", () => {
-    const source = [
+    const publicIpcAndPreloadSource = [
       combinedSource("modules/contracts/ipc"),
       combinedSource("modules/adapters/transport/ipc-electron"),
-      combinedSource("modules/hosts/desktop/composition"),
       combinedSource("apps/desktop/src/preload"),
     ].join("\n");
+    const desktopHostCompositionSource = combinedSource("modules/hosts/desktop/composition");
 
-    assert.doesNotMatch(source, /ipc\.asset(?:\.|-|:)/i);
-    assert.doesNotMatch(source, /\bASSET_(?:KERNEL|REGISTRY|LIBRARY)?_?[A-Z_]*CHANNEL\b/);
-    assert.doesNotMatch(source, /\b(?:assetKernel|assetRegistry|assetLibrary|listAssetDefinitions|readAssetDefinition|listAssetInstances|readAssetInstance)\b/);
+    assert.doesNotMatch(publicIpcAndPreloadSource, /ipc\.asset(?:\.|-|:)/i);
+    assert.doesNotMatch(publicIpcAndPreloadSource, /\bASSET_(?:KERNEL|REGISTRY|LIBRARY)?_?[A-Z_]*CHANNEL\b/);
+    assert.doesNotMatch(publicIpcAndPreloadSource, /\b(?:assetKernel|assetRegistry|assetLibrary|listAssetDefinitions|readAssetDefinition|listAssetInstances|readAssetInstance)\b/);
+    assert.doesNotMatch(desktopHostCompositionSource, /ipc\.asset(?:\.|-|:)|\bASSET_(?:KERNEL|REGISTRY|LIBRARY)?_?[A-Z_]*CHANNEL\b/);
   });
 
   it("does not add renderer or thin-client Asset Library UI/API clients", () => {

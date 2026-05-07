@@ -80,7 +80,7 @@
 
 ## Asset Kernel Notes
 
-- `composeInternalAssetRegistry` exists as a shared internal helper for local Asset Kernel repositories/use cases plus the application Asset Registry read facade under `<storageRoot>/asset-kernel/`. Desktop public composition still must not initialize it solely for side effects or expose it through asset IPC/API/preload/UI; seeding execution, resource-backed scans/views, and runtime start/probe/install behavior remain out of scope until an explicit private consumer or later transport/UI wrapper is added.
+- Desktop `registerArtifactUploadIpc` composes the internal Asset Registry through `composeInternalAssetRegistry` using `storageRootDirectory`, which initializes `<storageRootDirectory>/asset-kernel/` and exposes only a host-internal getter for private composition/tests. It must not use `runtimeRootDirectory` for Asset Kernel records and must not add asset IPC channels, preload methods, renderer UI, automatic built-in seeding, resource scans, provider/network calls, resource-byte reads, or runtime start/probe/install behavior for the Asset Kernel.
 - Include `asset-kernel.pack.md` when desktop work exposes or composes assets, asset-backed pages/components, generated outputs as reusable assets, or resource-backed previews.
 - Desktop IPC/preload and renderer models must wrap shared asset contracts; they must not define desktop-specific asset semantics.
 - Desktop host composition wires concrete runtime/readiness/storage providers for asset requirements; assets remain declarative.

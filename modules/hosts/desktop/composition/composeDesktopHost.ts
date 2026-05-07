@@ -93,6 +93,10 @@ import {
 } from "../../shared/huggingFaceTokenConfigStore";
 import { createRuntimePreparedModelCheckpointResolver } from "../../shared/createRuntimePreparedModelCheckpointResolver";
 import {
+  composeInternalAssetRegistry,
+  type InternalAssetRegistryComposition,
+} from "../../shared/composition/composeInternalAssetRegistry";
+import {
   registerElectronIpc,
 } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
@@ -243,6 +247,7 @@ export interface DesktopHostComposition {
   getPythonRuntimeDiagnostics: () => Promise<{ status: string; healthy: boolean; capabilities: string[] }>;
   powerSuspensionBlocker: PowerSuspensionBlockerPort;
   registerArtifactUploadIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
+  getInternalAssetRegistry: () => InternalAssetRegistryComposition | undefined;
 }
 
 export function classifyPythonRuntimeStdioLogLevel(
@@ -657,6 +662,8 @@ export function composeDesktopHost(
   });
   const comfyUiBaseUrl = process.env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
 
+  let internalAssetRegistry: InternalAssetRegistryComposition | undefined;
+
   return {
     loggingPort,
     loggingConfig,
@@ -723,7 +730,14 @@ export function composeDesktopHost(
         capabilities: status.capabilities,
       };
     },
+    getInternalAssetRegistry() {
+      return internalAssetRegistry;
+    },
     registerArtifactUploadIpc(registerOptions) {
+      internalAssetRegistry = composeInternalAssetRegistry({
+        rootDirectory: registerOptions.storageRootDirectory,
+        now,
+      });
       const comfyUiInstallRoot = resolveComfyUiInstallRoot(process.env, registerOptions.runtimeRootDirectory);
       const comfyUiBasePythonCommand = process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3");
       const comfyUiPythonEnvironmentMode = resolveComfyUiPythonEnvironmentMode(process.env);

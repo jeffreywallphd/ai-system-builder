@@ -141,7 +141,7 @@ describe("composeServerHost", () => {
     expect(uploadCall.accessToken).toBe("hf_token_updated");
   });
 
-  it("registers server artifact upload routes using a provided app port without creating express", () => {
+  it("registers server artifact upload routes using a provided app port without creating express", async () => {
     const app = {
       post: testDouble.fn(),
       get: testDouble.fn(),
@@ -197,8 +197,14 @@ describe("composeServerHost", () => {
       "/api/server/restart",
     ]);
     expect(registeredPaths.some((path) => String(path).startsWith("/api/asset"))).toBe(false);
-    expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
+    expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(true);
     expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
+    const internalRegistry = host.getInternalAssetRegistry();
+    expect(internalRegistry).toBeDefined();
+    expect(internalRegistry?.diagnostics.resourceBackedViewsEnabled).toBe(false);
+    expect(
+      await internalRegistry?.readFacade.listDefinitionCards({ includeBuiltIns: true, includeCustom: true }),
+    ).toEqual({ items: [] });
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
     expect(registeredGetPaths).toEqual([
       "/api/artifact/upload/policy",
