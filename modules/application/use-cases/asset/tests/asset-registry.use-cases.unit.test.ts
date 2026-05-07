@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { AssetComposition, AssetDefinition, AssetInstance, AssetReference } from "../../../../contracts/asset";
+import type { AssetBinding, AssetComposition, AssetDefinition, AssetInstance, AssetReference } from "../../../../contracts/asset";
 import type {
+  AssetBindingListQuery,
+  AssetBindingRepositoryPort,
   AssetCompositionListQuery,
   AssetCompositionRepositoryPort,
   AssetDefinitionListQuery,
@@ -27,9 +29,10 @@ import {
   ValidateAssetInstanceUseCase,
 } from "..";
 
-const definitionRef: AssetReference = { kind: "asset-definition", id: "definition.one" };
-const instanceRef: AssetReference = { kind: "asset-instance", id: "instance.one" };
-const compositionRef: AssetReference = { kind: "asset-composition", id: "composition.one" };
+const definitionRef: AssetReference = { kind: "asset-definition", id: "definition.one" as AssetReference["id"] };
+const instanceRef: AssetReference = { kind: "asset-instance", id: "instance.one" as AssetReference["id"] };
+const compositionRef: AssetReference = { kind: "asset-composition", id: "composition.one" as AssetReference["id"] };
+const bindingRef: AssetReference = { kind: "asset-binding", id: "binding.one" as AssetReference["id"] };
 
 class FakeDefinitionRepository implements AssetDefinitionRepositoryPort {
   public readonly saved: AssetDefinition[] = [];
@@ -73,6 +76,20 @@ class FakeCompositionRepository implements AssetCompositionRepositoryPort {
   public async listCompositions(query?: AssetCompositionListQuery) { this.lastQuery = query; return { compositions: [...this.compositions.values()], nextCursor: "next-composition" }; }
 }
 
+class FakeBindingRepository implements AssetBindingRepositoryPort {
+  public readonly saved: AssetBinding[] = [];
+  public lastQuery?: AssetBindingListQuery;
+  public bindings = new Map<string, AssetBinding>();
+
+  public async saveBinding(binding: AssetBinding): Promise<AssetBinding> {
+    this.saved.push(binding);
+    this.bindings.set(String(binding.bindingId), binding);
+    return binding;
+  }
+  public async getBinding(reference: AssetReference): Promise<AssetBinding | undefined> { return this.bindings.get(reference.id); }
+  public async listBindings(query?: AssetBindingListQuery) { this.lastQuery = query; return { bindings: [...this.bindings.values()], nextCursor: "next-binding" }; }
+}
+
 function validDefinition(overrides: Partial<AssetDefinition> = {}): AssetDefinition {
   return {
     definitionId: "definition.one",
@@ -112,6 +129,18 @@ function invalidInstance(): AssetInstance {
   return validInstance({ instanceId: "../bad", definitionRef: { kind: "asset-instance", id: "not-a-definition" } });
 }
 
+function validBinding(overrides: Partial<AssetBinding> = {}): AssetBinding {
+  return {
+    bindingId: "binding.one",
+    bindingKind: "input",
+    sourceRef: definitionRef,
+    targetRef: definitionRef,
+    lifecycleStatus: "draft",
+    provenance: { sourceKind: "human-authored" },
+    ...overrides,
+  };
+}
+
 function validComposition(overrides: Partial<AssetComposition> = {}): AssetComposition {
   return {
     compositionId: "composition.one",
@@ -141,6 +170,7 @@ describe("asset definition registry use cases", () => {
     assert.equal(result.validation?.status, "valid");
     assert.equal(repo.saved.length, 1);
     assert.deepEqual(definition, before);
+    assert.equal(repo.saved[0]?.version, definition.version);
   });
 
   it("does not save invalid definitions and returns validation failure", async () => {
@@ -237,6 +267,29 @@ describe("asset composition registry use cases", () => {
     assert.deepEqual(composition, before);
   });
 
+
+
+  it("resolves composition bindingRefs through the optional binding repository before save", async () => {
+    const definitions = new FakeDefinitionRepository();
+    const instances = new FakeInstanceRepository();
+    const bindings = new FakeBindingRepository();
+    const compositions = new FakeCompositionRepository();
+    await definitions.saveDefinition(validDefinition());
+    await instances.saveInstance(validInstance());
+    await bindings.saveBinding(validBinding());
+
+    const result = await new CreateAssetCompositionUseCase({
+      compositionRepository: compositions,
+      definitionRepository: definitions,
+      instanceRepository: instances,
+      bindingRepository: bindings,
+    }).execute(validComposition({ bindingRefs: [bindingRef] }));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.validation?.status, "valid");
+    assert.equal(compositions.saved.length, 1);
+  });
+
   it("does not save invalid compositions and returns structured validation issues for incomplete context", async () => {
     const definitions = new FakeDefinitionRepository();
     const instances = new FakeInstanceRepository();
@@ -263,6 +316,34 @@ describe("asset composition registry use cases", () => {
     await new ListAssetCompositionsUseCase({ compositionRepository: compositions }).execute(query);
     assert.equal(compositions.lastQuery, query);
     assert.equal((await new UpdateAssetCompositionUseCase({ compositionRepository: compositions, definitionRepository: definitions, instanceRepository: instances }).execute(validComposition({ compositionId: "composition.two" }))).ok, true);
+  });
+});
+
+describe("asset registry deferred behavior", () => {
+  it("read and list use cases return stored records without revalidating by default", async () => {
+    const definitions = new FakeDefinitionRepository();
+    const instances = new FakeInstanceRepository();
+    const compositions = new FakeCompositionRepository();
+    const invalidStoredDefinition = invalidDefinition();
+    const invalidStoredInstance = invalidInstance();
+    const invalidStoredComposition = invalidComposition();
+    definitions.definitions.set(String(invalidStoredDefinition.definitionId), invalidStoredDefinition);
+    instances.instances.set(String(invalidStoredInstance.instanceId), invalidStoredInstance);
+    compositions.compositions.set(String(invalidStoredComposition.compositionId), invalidStoredComposition);
+
+    const definitionRead = await new ReadAssetDefinitionUseCase({ definitionRepository: definitions }).execute({ kind: "asset-definition", id: String(invalidStoredDefinition.definitionId) as AssetReference["id"] });
+    const instanceRead = await new ReadAssetInstanceUseCase({ instanceRepository: instances }).execute({ kind: "asset-instance", id: String(invalidStoredInstance.instanceId) as AssetReference["id"] });
+    const compositionRead = await new ReadAssetCompositionUseCase({ compositionRepository: compositions }).execute({ kind: "asset-composition", id: String(invalidStoredComposition.compositionId) as AssetReference["id"] });
+
+    assert.equal(definitionRead.ok, true);
+    assert.equal(instanceRead.ok, true);
+    assert.equal(compositionRead.ok, true);
+    assert.equal(definitionRead.validation, undefined);
+    assert.equal(instanceRead.validation, undefined);
+    assert.equal(compositionRead.validation, undefined);
+    assert.equal((await new ListAssetDefinitionsUseCase({ definitionRepository: definitions }).execute()).definitions[0], invalidStoredDefinition);
+    assert.equal((await new ListAssetInstancesUseCase({ instanceRepository: instances }).execute()).instances[0], invalidStoredInstance);
+    assert.equal((await new ListAssetCompositionsUseCase({ compositionRepository: compositions }).execute()).compositions[0], invalidStoredComposition);
   });
 });
 

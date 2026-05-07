@@ -7,6 +7,7 @@ export const ASSET_REFERENCE_KINDS = [
   "asset-definition-version",
   "asset-instance",
   "asset-composition",
+  "asset-binding",
   "asset-requirement",
   "resource-backed-asset",
   "artifact",

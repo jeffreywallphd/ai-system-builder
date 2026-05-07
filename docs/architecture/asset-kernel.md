@@ -316,7 +316,7 @@ Guidance:
 - Validation does not execute workflows, query runtime readiness, start runtimes, access filesystem/network, call LLMs, or persist anything.
 - Validation complements, not replaces, runtime readiness guards.
 - General asset validation summaries and composition validation summaries share the same status vocabulary: `not-validated`, `valid`, `valid-with-warnings`, `invalid`, and `unknown`.
-- Prompt 8 provides registry/application ports and use cases only. Persistence remains deferred to Prompt 9, and resource-backed mapping remains deferred to Prompt 10.
+- Prompt 8 provides registry/application ports and use cases only. Definitions, instances, compositions, and first-class bindings have repository port seams before Prompt 9; validation structurally checks `AssetComposition.bindingRefs` as `asset-binding` references, and composition validation context may resolve those refs through `AssetBindingRepositoryPort`; persistence remains deferred to Prompt 9, and resource-backed mapping remains deferred to Prompt 10.
 
 ## Persistence direction
 
@@ -335,6 +335,8 @@ Guidance:
 
 - Persistence should not be added in Prompt 2.
 - Persistence should come only after contracts, validation, and registry/application ports stabilize.
+- Prompt 9 persistence adapters should implement the existing definition, instance, composition, and binding repository ports without changing registry use-case behavior. Composition-owned inline bindings remain valid asset composition content; reusable binding references use first-class `asset-binding` references, are structurally valid without a repository, and are fully validated when resolved through the binding repository port.
+- Deferred registry concerns remain explicit: no automatic definition version incrementing, no version-history service, no delete use cases beyond optional repository-port methods, no use-case conflict detection except what a persistence adapter naturally provides, read/list use cases do not revalidate by default, validation-only use cases do not save, and registry use cases must not call runtime readiness/guards or access filesystem/network directly.
 - Asset metadata persistence should preserve the JSON-compatible metadata/detail contract and should not duplicate binary/resource storage.
 - Resource-backed assets should reference artifact/resource storage rather than embedding raw file paths or bytes in asset metadata.
 - No persistent task history, marketplace, plugin package registry, or workflow execution store should be introduced in Phase 2A.
@@ -369,6 +371,7 @@ Asset Kernel work must preserve clean architecture boundaries:
 Non-goals preserved after Prompt 8:
 
 - no persistence adapter before Prompt 9,
+- no automatic definition version incrementing, conflict-detection policy, version-history service, or additional delete use cases before a later prompt explicitly scopes them,
 - no migrations,
 - no renderer/thin-client UI,
 - no API/IPC routes,

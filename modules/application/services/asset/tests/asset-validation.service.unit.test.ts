@@ -9,6 +9,8 @@ import {
   validateAssetDefinition,
   validateAssetInstance,
 } from "../index";
+import { validateAssetBinding as validateAssetBindingRole } from "../validate-asset-binding.service";
+import { validateAssetDefinition as validateAssetDefinitionRole } from "../validate-asset-definition.service";
 
 const provenance = { sourceKind: "human-authored" as const };
 const aiContext = {
@@ -73,6 +75,27 @@ function composition(overrides: Partial<AssetComposition> = {}): AssetCompositio
     ...overrides,
   } as AssetComposition;
 }
+
+
+test("public validation facade and role-specific validators remain usable", () => {
+  const service = new AssetValidationService();
+  assert.equal(service.validateDefinition(definition()).status, "valid");
+  assert.equal(validateAssetDefinitionRole(definition()).status, "valid");
+  assert.equal(validateAssetBindingRole(binding(), {
+    definitionsById: new Map([
+      ["source.def", definition({ definitionId: "source.def", ports: [{ portId: "out", direction: "output", contract: { contractKind: "json" } }] })],
+      ["target.def", definition({ definitionId: "target.def", ports: [{ portId: "in", direction: "input", contract: { contractKind: "json" } }] })],
+    ]),
+  }).status, "valid");
+});
+
+test("binding validation issues are anchored to asset-binding references", () => {
+  const result = validateAssetBinding(binding({ bindingId: "binding.issue", sourceRef: undefined as never, targetRef: undefined as never }));
+  assert.equal(result.status, "invalid");
+  assert.ok(result.issues.length > 0);
+  assert.ok(result.issues.every((issue) => issue.assetRef?.kind === "asset-binding"));
+  assert.equal(result.issues[0]?.assetRef?.id, "binding.issue");
+});
 
 test("valid minimal asset definition returns valid and complete AI context passes", () => {
   const result = validateAssetDefinition(definition());
@@ -197,6 +220,38 @@ test("binding validation checks compatible ports, missing refs, invalid kind, co
 
   const contractMismatch = validateAssetBinding(binding(), { definitionsById: new Map([["source.def", source], ["target.def", definition({ definitionId: "target.def", ports: [{ portId: "in", direction: "input", contract: { contractKind: "text" } }] })]]) });
   assert.equal(contractMismatch.status, "invalid");
+});
+
+
+
+test("instance and composition bindingRefs must use asset-binding references", () => {
+  const invalidInstanceRef = validateAssetInstance(instance({ bindingRefs: [{ kind: "asset-definition", id: "binding.feature" } as any] }), {
+    definitionsById: new Map([["def.feature", definition()]]),
+  });
+  assert.equal(invalidInstanceRef.status, "invalid");
+  assert.ok(invalidInstanceRef.issues.some((issue) => issue.message.includes("Instance bindingRefs must reference asset bindings")));
+
+  const context = { definitionsById: new Map([["def.feature", definition()]]), instancesById: new Map([["inst.feature", instance()]]) };
+  const invalidCompositionRef = validateAssetComposition(composition({ bindingRefs: [{ kind: "asset-definition", id: "binding.feature" } as any] }), context);
+  assert.equal(invalidCompositionRef.status, "invalid");
+  assert.ok(invalidCompositionRef.issues.some((issue) => issue.message.includes("Composition bindingRefs must reference asset bindings")));
+
+  const structuralOnly = validateAssetComposition(composition({ bindingRefs: [{ kind: "asset-binding", id: "binding.feature" } as any] }), context);
+  assert.equal(structuralOnly.status, "valid");
+});
+
+test("composition validation resolves binding refs from validation context", () => {
+  const context = {
+    definitionsById: new Map([
+      ["source.def", definition({ definitionId: "source.def", ports: [{ portId: "out", direction: "input", contract: { contractKind: "json" } }] })],
+      ["target.def", definition({ definitionId: "target.def", ports: [{ portId: "in", direction: "input", contract: { contractKind: "json" } }] })],
+    ]),
+    instancesById: new Map([["inst.feature", instance()]]),
+    bindingsById: new Map([["binding.feature", binding()]]),
+  };
+  const result = validateAssetComposition(composition({ bindingRefs: [{ kind: "asset-binding", id: "binding.feature" } as any] }), context);
+  assert.equal(result.status, "invalid");
+  assert.ok(result.issues.some((issue) => issue.path?.join(".").startsWith("bindingRefs.0")));
 });
 
 test("composition validation checks roots, duplicates, inline bindings, dependencies, runtime capability, cardinality, and incompatible types", () => {
