@@ -1,7 +1,7 @@
 import type { AssetDefinition, AssetReference } from "../../../contracts/asset";
 import type { AssetDefinitionListQuery, AssetDefinitionRepositoryPort } from "../../../application/ports/asset";
 import { cloneJson, LocalAssetRecordStore, type LocalAssetRecordStoreOptions } from "./local-asset-record-store";
-import { deleteRecord, pageRecords, sortByUpdatedAtDescendingThenId, textMatches, upsertRecord } from "./local-asset-repository-helpers";
+import { deleteRecord, pageRecords, sortByUpdatedAtDescendingThenId, textValuesMatch, upsertRecord } from "./local-asset-repository-helpers";
 
 export function createLocalAssetDefinitionRepositoryAdapter(options: LocalAssetRecordStoreOptions): AssetDefinitionRepositoryPort {
   const store = new LocalAssetRecordStore(options);
@@ -47,7 +47,16 @@ function matchesDefinition(definition: AssetDefinition, query: AssetDefinitionLi
   if (query.assetFamily && definition.assetFamily !== query.assetFamily) return false;
   if (query.lifecycleStatus && definition.lifecycleStatus !== query.lifecycleStatus) return false;
   if (query.reviewStatus && definition.reviewStatus !== query.reviewStatus) return false;
-  return textMatches(definition, [String(definition.definitionId), definition.displayName, definition.description], query.text);
+  return textValuesMatch([
+    String(definition.definitionId),
+    definition.displayName,
+    definition.description,
+    definition.assetType,
+    definition.assetFamily,
+    definition.aiContext?.purpose,
+    definition.aiContext?.userFacingSummary,
+    definition.aiContext?.developerFacingSummary,
+  ], query.text);
 }
 
 function sortDefinitions(definitions: readonly AssetDefinition[]): AssetDefinition[] {

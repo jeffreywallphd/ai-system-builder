@@ -1,7 +1,7 @@
 import type { AssetBinding, AssetReference } from "../../../contracts/asset";
 import type { AssetBindingListQuery, AssetBindingRepositoryPort } from "../../../application/ports/asset";
 import { cloneJson, LocalAssetRecordStore, type LocalAssetRecordStoreOptions } from "./local-asset-record-store";
-import { deleteRecord, pageRecords, referenceEquals, sortByUpdatedAtDescendingThenId, textMatches, upsertRecord } from "./local-asset-repository-helpers";
+import { deleteRecord, pageRecords, referenceEquals, sortByUpdatedAtDescendingThenId, textValuesMatch, upsertRecord } from "./local-asset-repository-helpers";
 
 export function createLocalAssetBindingRepositoryAdapter(options: LocalAssetRecordStoreOptions): AssetBindingRepositoryPort {
   const store = new LocalAssetRecordStore(options);
@@ -40,7 +40,12 @@ function matchesBinding(binding: AssetBinding, query: AssetBindingListQuery): bo
   if (query.sourceRef && !referenceEquals(binding.sourceRef, query.sourceRef)) return false;
   if (query.targetRef && !referenceEquals(binding.targetRef, query.targetRef)) return false;
   if (query.lifecycleStatus && binding.lifecycleStatus !== query.lifecycleStatus) return false;
-  return textMatches(binding, [String(binding.bindingId), binding.bindingKind], query.text);
+  return textValuesMatch([
+    String(binding.bindingId),
+    binding.bindingKind,
+    String(binding.sourceRef.id),
+    String(binding.targetRef.id),
+  ], query.text);
 }
 
 function bindingStorageKey(binding: AssetBinding): string {

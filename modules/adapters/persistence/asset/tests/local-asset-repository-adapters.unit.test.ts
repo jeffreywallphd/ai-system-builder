@@ -156,6 +156,60 @@ describe("local Asset Kernel record store", () => {
     assert.doesNotMatch(serialized, /(?:Buffer|base64Blob|fileBytes|payloadBytes|secret|token|process\.env|\/tmp\/payload)/i);
   });
 
+
+  it("validates manifest schema version, store kind, and shape with sanitized errors", async () => {
+    const rootDir = await tempRoot();
+    const store = new LocalAssetRecordStore({ rootDir, now: fixedNow });
+    await store.initialize();
+    assert.deepEqual(await store.readManifest(), {
+      schemaVersion: ASSET_KERNEL_LOCAL_SCHEMA_VERSION,
+      storeKind: ASSET_KERNEL_LOCAL_STORE_KIND,
+      updatedAt: fixedNow(),
+    });
+
+    const manifestPath = join(rootDir, "asset-kernel", "manifest.json");
+    for (const manifest of [
+      { schemaVersion: 999, storeKind: ASSET_KERNEL_LOCAL_STORE_KIND, updatedAt: fixedNow() },
+      { schemaVersion: ASSET_KERNEL_LOCAL_SCHEMA_VERSION, storeKind: "wrong-kind", updatedAt: fixedNow() },
+      { schemaVersion: ASSET_KERNEL_LOCAL_SCHEMA_VERSION, storeKind: ASSET_KERNEL_LOCAL_STORE_KIND, updatedAt: 123 },
+      ["not", "a", "manifest"],
+    ]) {
+      await writeFile(manifestPath, `${JSON.stringify(manifest)}\n`, "utf8");
+      await assert.rejects(() => store.readManifest(), (error: unknown) => {
+        assert.equal(error instanceof LocalAssetRecordStoreError, true);
+        assert.equal((error as Error).stack, undefined);
+        assert.doesNotMatch(String((error as Error).message), /(?:asset-kernel-store-|\/tmp|secret|token|stack|wrong-kind|999)/i);
+        return true;
+      });
+    }
+  });
+
+  it("rejects unsafe non-JSON asset records before persistence writes", async () => {
+    const repositories = createRepositories(await tempRoot());
+    const circular: Record<string, unknown> = { ok: true };
+    circular.self = circular;
+
+    for (const metadata of [
+      { unsafe: undefined },
+      { unsafe: () => "nope" },
+      { unsafe: Symbol("nope") },
+      { unsafe: Number.POSITIVE_INFINITY },
+      { unsafe: new Date("2026-05-07T00:00:00.000Z") },
+      { unsafe: Buffer.from("bytes") },
+      circular,
+      { unsafe: new (class UnsafeRecord {})() },
+    ] as readonly Record<string, unknown>[]) {
+      await assert.rejects(
+        () => repositories.definitions.saveDefinition(validDefinition({ metadata })),
+        (error: unknown) => {
+          assert.equal(error instanceof LocalAssetRecordStoreError, true);
+          assert.doesNotMatch(String((error as Error).message), /(?:bytes|nope|UnsafeRecord|asset-kernel-store-|\/tmp|stack)/i);
+          return true;
+        },
+      );
+    }
+  });
+
   it("initializes missing collection files as empty stores and fails predictably on malformed JSON", async () => {
     const rootDir = await tempRoot();
     const repositories = createRepositories(rootDir);
@@ -188,13 +242,17 @@ describe("local asset definition repository adapter", () => {
   it("filters by type, family, lifecycle, review, text, and paginates deterministically", async () => {
     const repositories = createRepositories(await tempRoot());
     await repositories.definitions.saveDefinition(validDefinition({ definitionId: "definition.alpha", displayName: "Alpha Tool", assetType: "tool", assetFamily: "resource-backed", lifecycleStatus: "draft", reviewStatus: "unreviewed", provenance: { sourceKind: "human-authored", updatedAt: "2026-05-07T03:00:00.000Z" } }));
-    await repositories.definitions.saveDefinition(validDefinition({ definitionId: "definition.beta", displayName: "Beta Page", assetType: "page", assetFamily: "structural", lifecycleStatus: "published", reviewStatus: "approved", provenance: { sourceKind: "human-authored", updatedAt: "2026-05-07T02:00:00.000Z" } }));
+    await repositories.definitions.saveDefinition(validDefinition({ definitionId: "definition.beta", displayName: "Beta Page", description: "Beta description for text search.", assetType: "page", assetFamily: "structural", lifecycleStatus: "published", reviewStatus: "approved", provenance: { sourceKind: "human-authored", updatedAt: "2026-05-07T02:00:00.000Z" } }));
     await repositories.definitions.saveDefinition(validDefinition({ definitionId: "definition.gamma", displayName: "Gamma Tool", assetType: "tool", assetFamily: "structural", lifecycleStatus: "published", reviewStatus: "approved", provenance: { sourceKind: "human-authored", updatedAt: "2026-05-07T01:00:00.000Z" } }));
 
     assert.deepEqual((await repositories.definitions.listDefinitions({ assetType: "tool" })).definitions.map((record) => record.definitionId), ["definition.alpha", "definition.gamma"]);
     assert.deepEqual((await repositories.definitions.listDefinitions({ assetFamily: "structural" })).definitions.map((record) => record.definitionId), ["definition.beta", "definition.gamma"]);
     assert.deepEqual((await repositories.definitions.listDefinitions({ lifecycleStatus: "published", reviewStatus: "approved" })).definitions.map((record) => record.definitionId), ["definition.beta", "definition.gamma"]);
     assert.deepEqual((await repositories.definitions.listDefinitions({ text: "beta" })).definitions.map((record) => record.definitionId), ["definition.beta"]);
+    assert.deepEqual((await repositories.definitions.listDefinitions({ text: "definition.alpha" })).definitions.map((record) => record.definitionId), ["definition.alpha"]);
+    assert.deepEqual((await repositories.definitions.listDefinitions({ text: "Beta description" })).definitions.map((record) => record.definitionId), ["definition.beta"]);
+    assert.deepEqual((await repositories.definitions.listDefinitions({ text: "page" })).definitions.map((record) => record.definitionId), ["definition.beta"]);
+    assert.deepEqual((await repositories.definitions.listDefinitions({ text: "unrelated" })).definitions.map((record) => record.definitionId), []);
     const first = await repositories.definitions.listDefinitions({ limit: 2 });
     const second = await repositories.definitions.listDefinitions({ limit: 2, cursor: first.nextCursor });
     assert.deepEqual(first.definitions.map((record) => record.definitionId), ["definition.alpha", "definition.beta"]);
@@ -214,6 +272,10 @@ describe("local asset instance repository adapter", () => {
     assert.deepEqual((await repositories.instances.listInstances({ lifecycleStatus: "published", reviewStatus: "approved" })).instances.map((record) => record.instanceId), ["instance.one"]);
     assert.deepEqual((await repositories.instances.listInstances({ parentCompositionRef: compositionRef })).instances.map((record) => record.instanceId), ["instance.one"]);
     assert.deepEqual((await repositories.instances.listInstances({ text: "summary" })).instances.map((record) => record.instanceId), ["instance.two"]);
+    assert.deepEqual((await repositories.instances.listInstances({ text: "instance.one" })).instances.map((record) => record.instanceId), ["instance.one"]);
+    assert.deepEqual((await repositories.instances.listInstances({ text: "updated alpha" })).instances.map((record) => record.instanceId), ["instance.one"]);
+    assert.deepEqual((await repositories.instances.listInstances({ text: "definition.two" })).instances.map((record) => record.instanceId), ["instance.two"]);
+    assert.deepEqual((await repositories.instances.listInstances({ text: "unrelated" })).instances.map((record) => record.instanceId), []);
     const first = await repositories.instances.listInstances({ limit: 1 });
     const second = await repositories.instances.listInstances({ limit: 1, cursor: first.nextCursor });
     assert.deepEqual(first.instances.map((record) => record.instanceId), ["instance.one"]);
@@ -225,13 +287,15 @@ describe("local asset composition and binding repository adapters", () => {
   it("upserts, resolves, filters, and paginates compositions", async () => {
     const repositories = createRepositories(await tempRoot());
     await repositories.compositions.saveComposition(validComposition({ displayName: "Updated Feature", lifecycleStatus: "published", reviewStatus: "approved", provenance: { sourceKind: "human-authored", updatedAt: "2026-05-07T03:00:00.000Z" } }));
-    await repositories.compositions.saveComposition(validComposition({ compositionId: "composition.two", compositionType: "workflow", displayName: "Beta Workflow", rootInstanceRefs: [], instanceRefs: [], bindingRefs: [], provenance: { sourceKind: "human-authored", updatedAt: "2026-05-07T02:00:00.000Z" } }));
+    await repositories.compositions.saveComposition(validComposition({ compositionId: "composition.two", compositionType: "workflow", displayName: "Beta Workflow", description: "Workflow composition summary", rootInstanceRefs: [], instanceRefs: [], bindingRefs: [], provenance: { sourceKind: "human-authored", updatedAt: "2026-05-07T02:00:00.000Z" } }));
 
     assert.equal((await repositories.compositions.getComposition(compositionRef))?.displayName, "Updated Feature");
     assert.deepEqual((await repositories.compositions.listCompositions({ compositionType: "feature" })).compositions.map((record) => record.compositionId), ["composition.one"]);
     assert.deepEqual((await repositories.compositions.listCompositions({ lifecycleStatus: "published", reviewStatus: "approved" })).compositions.map((record) => record.compositionId), ["composition.one"]);
-    const first = await repositories.compositions.listCompositions({ text: "workflow", limit: 1 });
-    assert.deepEqual(first.compositions.map((record) => record.compositionId), ["composition.two"]);
+    assert.deepEqual((await repositories.compositions.listCompositions({ text: "workflow" })).compositions.map((record) => record.compositionId), ["composition.two"]);
+    assert.deepEqual((await repositories.compositions.listCompositions({ text: "Feature composition summary" })).compositions.map((record) => record.compositionId), ["composition.one"]);
+    assert.deepEqual((await repositories.compositions.listCompositions({ text: "composition.two" })).compositions.map((record) => record.compositionId), ["composition.two"]);
+    assert.deepEqual((await repositories.compositions.listCompositions({ text: "unrelated" })).compositions.map((record) => record.compositionId), []);
   });
 
   it("upserts, resolves, filters, and paginates bindings", async () => {
@@ -243,6 +307,11 @@ describe("local asset composition and binding repository adapters", () => {
     assert.deepEqual((await repositories.bindings.listBindings({ bindingKind: "dependency" })).bindings.map((record) => record.bindingId), ["binding.two"]);
     assert.deepEqual((await repositories.bindings.listBindings({ sourceRef: instanceRef })).bindings.map((record) => record.bindingId), ["binding.one"]);
     assert.deepEqual((await repositories.bindings.listBindings({ targetRef: instanceRef })).bindings.map((record) => record.bindingId), ["binding.one", "binding.two"]);
+    assert.deepEqual((await repositories.bindings.listBindings({ text: "dependency" })).bindings.map((record) => record.bindingId), ["binding.two"]);
+    assert.deepEqual((await repositories.bindings.listBindings({ text: "binding.two" })).bindings.map((record) => record.bindingId), ["binding.two"]);
+    assert.deepEqual((await repositories.bindings.listBindings({ text: "instance.two" })).bindings.map((record) => record.bindingId), ["binding.two"]);
+    assert.deepEqual((await repositories.bindings.listBindings({ text: "instance.one" })).bindings.map((record) => record.bindingId), ["binding.one", "binding.two"]);
+    assert.deepEqual((await repositories.bindings.listBindings({ text: "unrelated" })).bindings.map((record) => record.bindingId), []);
     const first = await repositories.bindings.listBindings({ text: "binding", limit: 1 });
     const second = await repositories.bindings.listBindings({ text: "binding", limit: 1, cursor: first.nextCursor });
     assert.deepEqual(first.bindings.map((record) => record.bindingId), ["binding.one"]);

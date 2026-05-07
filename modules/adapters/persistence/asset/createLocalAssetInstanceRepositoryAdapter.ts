@@ -1,7 +1,7 @@
 import type { AssetInstance, AssetReference } from "../../../contracts/asset";
 import type { AssetInstanceListQuery, AssetInstanceRepositoryPort } from "../../../application/ports/asset";
 import { cloneJson, LocalAssetRecordStore, type LocalAssetRecordStoreOptions } from "./local-asset-record-store";
-import { deleteRecord, pageRecords, referenceEquals, sortByUpdatedAtDescendingThenId, textMatches, upsertRecord } from "./local-asset-repository-helpers";
+import { deleteRecord, pageRecords, referenceEquals, sortByUpdatedAtDescendingThenId, textValuesMatch, upsertRecord } from "./local-asset-repository-helpers";
 
 export function createLocalAssetInstanceRepositoryAdapter(options: LocalAssetRecordStoreOptions): AssetInstanceRepositoryPort {
   const store = new LocalAssetRecordStore(options);
@@ -40,7 +40,13 @@ function matchesInstance(instance: AssetInstance, query: AssetInstanceListQuery)
   if (query.lifecycleStatus && instance.lifecycleStatus !== query.lifecycleStatus) return false;
   if (query.reviewStatus && instance.reviewStatus !== query.reviewStatus) return false;
   if (query.parentCompositionRef && !referenceEquals(instance.parentCompositionRef, query.parentCompositionRef)) return false;
-  return textMatches(instance, [String(instance.instanceId), instance.displayName ?? "", instance.stateSummary?.summary ?? "", instance.stateSummary?.status ?? ""], query.text);
+  return textValuesMatch([
+    String(instance.instanceId),
+    instance.displayName,
+    instance.stateSummary?.summary,
+    instance.stateSummary?.status,
+    String(instance.definitionRef.id),
+  ], query.text);
 }
 
 function instanceStorageKey(instance: AssetInstance): string {

@@ -1,5 +1,5 @@
 import type { AssetReference } from "../../../contracts/asset";
-import { cloneJson } from "./local-asset-record-store";
+import { assertJsonCompatibleAssetRecord, cloneJson } from "./local-asset-record-store";
 
 export interface CursorPage<T> {
   readonly records: readonly T[];
@@ -35,14 +35,14 @@ export function sortByUpdatedAtDescendingThenId<T>(records: readonly T[], getId:
   });
 }
 
-export function textMatches(record: unknown, fields: readonly string[], text?: string): boolean {
+export function textValuesMatch(values: readonly (string | undefined)[], text?: string): boolean {
   const normalized = text?.trim().toLowerCase();
   if (!normalized) return true;
-  void record;
-  return fields.some((field) => field.toLowerCase().includes(normalized));
+  return values.some((value) => typeof value === "string" && value.toLowerCase().includes(normalized));
 }
 
 export function upsertRecord<T>(records: readonly T[], nextRecord: T, keyFor: (record: T) => string): T[] {
+  assertJsonCompatibleAssetRecord(nextRecord);
   const nextKey = keyFor(nextRecord);
   const filtered = records.filter((record) => keyFor(record) !== nextKey);
   return [...filtered, cloneJson(nextRecord)];

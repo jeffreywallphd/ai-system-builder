@@ -150,6 +150,15 @@ Storage family invariants:
 
 This keeps storage responsibilities explicit and separate from persistence-record modeling.
 
+
+## Asset Kernel local persistence and resource-backed mapping boundary
+
+- Phase 2A local Asset Kernel persistence is record storage for definitions, instances, compositions, and bindings only. Its text filtering is simple deterministic substring matching over selected saved record values.
+- The local store manifest validates the current schema version, store kind, and basic timestamp shape on read; no migration framework or schema upgrade behavior is implemented.
+- Asset persistence is a JSON-compatible durable boundary. Non-JSON record values such as functions, symbols, undefined values, non-finite numbers, Dates, buffers/streams, class instances, and circular references are rejected before write.
+- Resource-backed mapping remains a pure application-layer contract mapper. External repository `objectPath` values stay provider metadata on `AssetExternalRepositoryObjectReference` and must not be promoted into canonical asset ids. Internal backing ids and `asset-resource-backing` references are sanitized mapping identifiers, not local paths, URLs, or provider-native object paths.
+- This checkpoint adds no API/IPC/UI wiring, resource-byte storage, runtime/workflow/graph execution, prompt assembly, embeddings, AI-generated context, or automatic composition behavior.
+
 ## Repo-backed storage direction (current + next)
 
 Repo-backed providers are a valid storage class under the storage adapter category.

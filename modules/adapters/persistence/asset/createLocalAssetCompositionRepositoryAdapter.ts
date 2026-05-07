@@ -1,7 +1,7 @@
 import type { AssetComposition, AssetReference } from "../../../contracts/asset";
 import type { AssetCompositionListQuery, AssetCompositionRepositoryPort } from "../../../application/ports/asset";
 import { cloneJson, LocalAssetRecordStore, type LocalAssetRecordStoreOptions } from "./local-asset-record-store";
-import { deleteRecord, pageRecords, sortByUpdatedAtDescendingThenId, textMatches, upsertRecord } from "./local-asset-repository-helpers";
+import { deleteRecord, pageRecords, sortByUpdatedAtDescendingThenId, textValuesMatch, upsertRecord } from "./local-asset-repository-helpers";
 
 export function createLocalAssetCompositionRepositoryAdapter(options: LocalAssetRecordStoreOptions): AssetCompositionRepositoryPort {
   const store = new LocalAssetRecordStore(options);
@@ -39,7 +39,12 @@ function matchesComposition(composition: AssetComposition, query: AssetCompositi
   if (query.compositionType && composition.compositionType !== query.compositionType) return false;
   if (query.lifecycleStatus && composition.lifecycleStatus !== query.lifecycleStatus) return false;
   if (query.reviewStatus && composition.reviewStatus !== query.reviewStatus) return false;
-  return textMatches(composition, [String(composition.compositionId), composition.displayName, composition.description ?? ""], query.text);
+  return textValuesMatch([
+    String(composition.compositionId),
+    composition.displayName,
+    composition.description,
+    composition.compositionType,
+  ], query.text);
 }
 
 function compositionStorageKey(composition: AssetComposition): string {

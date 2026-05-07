@@ -165,7 +165,8 @@ The Asset Kernel uses the following distinction:
 Rules:
 
 - Artifacts/resources do not replace the asset model.
-- The asset model does not duplicate low-level storage concerns such as bytes, local filesystem paths, object keys, or provider-native transfer mechanics.
+- The asset model does not duplicate low-level storage concerns such as bytes, local filesystem paths, object keys, or provider-native transfer mechanics. External repository `objectPath` values are provider object metadata only; they are not canonical Asset Kernel ids.
+- Resource-backed asset primary backing links use safe `asset-resource-backing` references to internal backing ids, not provider-native paths or URLs.
 - Generated outputs become reusable only after finalization/registration as artifacts or resource-backed assets.
 - Hugging Face objects remain external repository objects unless registered/imported as resource-backed assets.
 - Existing artifact/model/dataset/image families should not be renamed in Phase 2A.
@@ -342,7 +343,8 @@ Guidance:
 
 - Persistence should not be added in Prompt 2.
 - Persistence should come only after contracts, validation, and registry/application ports stabilize.
-- Prompt 9 persistence adapters should implement the existing definition, instance, composition, and binding repository ports without changing registry use-case behavior. Composition-owned inline bindings remain valid asset composition content; reusable binding references use first-class `asset-binding` references, are structurally valid without a repository, and are fully validated when resolved through the binding repository port.
+- Prompt 9 persistence adapters should implement the existing definition, instance, composition, and binding repository ports without changing registry use-case behavior. Composition-owned inline bindings remain valid asset composition content; reusable binding references use first-class `asset-binding` references, are structurally valid without a repository, and are fully validated when resolved through the binding repository port. Local text filters are deterministic case-insensitive substring checks over selected saved record values, not search indexes or AI-generated context.
+- The local asset persistence manifest checks the current schema version and store kind before reads; migrations remain intentionally unimplemented in Phase 2A. Local asset persistence accepts JSON-compatible records only and rejects functions, symbols, undefined values, non-finite numbers, Dates, buffers/streams, class instances, and circular records at the durable adapter boundary.
 - Deferred registry concerns remain explicit: no automatic definition version incrementing, no version-history service, no delete use cases beyond optional repository-port methods, no use-case conflict detection except what a persistence adapter naturally provides, read/list use cases do not revalidate by default, validation-only use cases do not save, and registry use cases must not call runtime readiness/guards or access filesystem/network directly.
 - Asset metadata persistence should preserve the JSON-compatible metadata/detail contract and should not duplicate binary/resource storage.
 - Resource-backed assets should reference artifact/resource storage rather than embedding raw file paths or bytes in asset metadata.
@@ -379,7 +381,7 @@ Non-goals preserved after Prompt 8:
 
 - no persistence adapter before Prompt 9,
 - no automatic definition version incrementing, conflict-detection policy, version-history service, or additional delete use cases before a later prompt explicitly scopes them,
-- no migrations,
+- no migrations beyond current manifest schema/kind checks,
 - no renderer/thin-client UI,
 - no API/IPC routes,
 - no durable resource-backed mapping repository or transport exposure in Phase 2A Prompt 10,

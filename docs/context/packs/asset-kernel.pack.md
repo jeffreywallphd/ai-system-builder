@@ -18,7 +18,7 @@ Read this pack for tasks involving:
 - asset configuration,
 - persistence adapters or resource-backed mapping.
 
-Prompt 7 has added pure application-layer validation services under `modules/application/services/asset` for definitions, instances, bindings, and compositions. Prompt 8 has added application-layer repository ports under `modules/application/ports/asset` and use cases under `modules/application/use-cases/asset` for registering/creating, reading, listing, updating, and validating asset definitions, instances, and compositions. Prompt 9 adds minimal local JSON persistence adapters under `modules/adapters/persistence/asset` behind those ports. Prompt 10 adds resource-backed mapping contracts under `modules/contracts/asset` and pure application helpers under `modules/application/services/asset`; treat the adapters as record storage only, and treat mapping helpers as deterministic contract mappers, not runtime, transport, UI, automatic-composition, prompt-assembly, retrieval, embedding, AI-generation, artifact storage, or durable resource-backed registration behavior.
+Prompt 7 has added pure application-layer validation services under `modules/application/services/asset` for definitions, instances, bindings, and compositions. Prompt 8 has added application-layer repository ports under `modules/application/ports/asset` and use cases under `modules/application/use-cases/asset` for registering/creating, reading, listing, updating, and validating asset definitions, instances, and compositions. Prompt 9 adds minimal local JSON persistence adapters under `modules/adapters/persistence/asset` behind those ports: text filters are simple value-based substring checks, manifests check schema version/store kind without migrations, and writes accept JSON-compatible records only. Prompt 10 adds resource-backed mapping contracts under `modules/contracts/asset` and pure application helpers under `modules/application/services/asset`; external repository object paths stay provider metadata, primary backing links use safe `asset-resource-backing` references, and mapping helpers are deterministic contract mappers, not runtime, transport, UI, automatic-composition, prompt-assembly, retrieval, embedding, AI-generation, artifact storage, or durable resource-backed registration behavior.
 
 ## Canonical Asset Terminology
 
@@ -27,7 +27,7 @@ Prompt 7 has added pure application-layer validation services under `modules/app
 - `AssetInstance`: configured use of an asset definition in a specific composition or system context.
 - `AssetBinding`: typed connection between instances, ports, resources, runtime capabilities, storage objects, or external repository objects.
 - `AssetComposition`: validated assembly of configured instances and bindings into a feature, workflow, page, subsystem, system, or system-of-subsystems.
-- `AssetReference`: stable transport-neutral reference to a definition, definition version, instance, composition, reusable asset requirement, or referenceable resource/artifact object.
+- `AssetReference`: stable transport-neutral reference to a definition, definition version, instance, composition, reusable asset requirement, asset-resource backing, or referenceable resource/artifact object.
 - `AssetConfiguration`: definition-owned configuration surface plus instance-selected values.
 - `AssetAiContext`: structured AI-readable metadata for retrieval, validation support, and prompt assembly.
 - `AssetPort`: formal input/output/event/control/action/data/error connection point.
