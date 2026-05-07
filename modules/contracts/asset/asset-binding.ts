@@ -1,3 +1,4 @@
+import type { AssetMetadata } from "./asset-metadata";
 import type { AssetBindingConstraint } from "./asset-binding-constraint";
 import type { AssetId } from "./asset-id";
 import type { AssetLifecycleStatus } from "./asset-lifecycle-status";
@@ -27,7 +28,7 @@ export interface AssetBinding {
   readonly constraints?: readonly AssetBindingConstraint[];
   readonly lifecycleStatus?: AssetLifecycleStatus;
   readonly provenance?: AssetProvenance;
-  readonly metadata?: Record<string, unknown>;
+  readonly metadata?: AssetMetadata;
 }
 
 export function isAssetBindingKind(value: string): value is AssetBindingKind {

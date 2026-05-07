@@ -1,5 +1,6 @@
 import type { RuntimeCapabilityId } from "../runtime";
 import type { AssetConfigurationMetadata } from "./asset-configuration-value";
+import type { AssetReference } from "./asset-reference";
 import type { AssetFamily } from "./asset-family";
 import type { AssetType } from "./asset-type";
 
@@ -30,7 +31,7 @@ export interface AssetPortContract {
   readonly assetFamily?: AssetFamily;
   readonly resourceKind?: string;
   readonly runtimeCapabilityId?: RuntimeCapabilityId;
-  readonly schemaRef?: string;
+  readonly schemaRef?: AssetReference;
   readonly description?: string;
   readonly metadata?: AssetConfigurationMetadata;
 }

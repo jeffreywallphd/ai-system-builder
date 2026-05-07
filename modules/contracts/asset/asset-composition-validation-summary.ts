@@ -1,42 +1,33 @@
-import type { AssetConfigurationMetadata } from "./asset-configuration-value";
+import {
+  ASSET_VALIDATION_SUMMARY_STATUSES,
+  isAssetValidationSummaryStatus,
+  normalizeAssetValidationSummaryStatus,
+  type AssetValidationSummaryStatus,
+} from "./asset-validation-summary";
+import type { AssetMetadata } from "./asset-metadata";
 import type { AssetReference } from "./asset-reference";
 
-export const ASSET_COMPOSITION_VALIDATION_STATUSES = [
-  "not-validated",
-  "valid",
-  "valid-with-warnings",
-  "invalid",
-] as const;
+export const ASSET_COMPOSITION_VALIDATION_STATUSES =
+  ASSET_VALIDATION_SUMMARY_STATUSES;
 
-export type AssetCompositionValidationStatus =
-  (typeof ASSET_COMPOSITION_VALIDATION_STATUSES)[number];
+export type AssetCompositionValidationStatus = AssetValidationSummaryStatus;
 
 export interface AssetCompositionValidationSummary {
   readonly status: AssetCompositionValidationStatus;
   readonly issueRefs?: readonly AssetReference[];
   readonly issueCount?: number;
   readonly lastValidatedAt?: string;
-  readonly metadata?: AssetConfigurationMetadata;
+  readonly metadata?: AssetMetadata;
 }
 
 export function isAssetCompositionValidationStatus(
   value: string,
 ): value is AssetCompositionValidationStatus {
-  return ASSET_COMPOSITION_VALIDATION_STATUSES.includes(
-    value as AssetCompositionValidationStatus,
-  );
+  return isAssetValidationSummaryStatus(value);
 }
 
 export function normalizeAssetCompositionValidationStatus(
   value: string,
 ): AssetCompositionValidationStatus {
-  const normalized = value.trim().toLowerCase();
-
-  if (!isAssetCompositionValidationStatus(normalized)) {
-    throw new Error(
-      `Asset composition validation status must be one of ${ASSET_COMPOSITION_VALIDATION_STATUSES.join(", ")}. Received "${value}".`,
-    );
-  }
-
-  return normalized;
+  return normalizeAssetValidationSummaryStatus(value);
 }

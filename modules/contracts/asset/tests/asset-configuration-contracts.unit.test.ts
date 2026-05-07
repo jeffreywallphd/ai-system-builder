@@ -312,7 +312,7 @@ describe("asset configuration contract shapes", () => {
       instanceId: normalizeAssetId("instance.dashboard.summary.primary"),
       definitionRef: {
         kind: "asset-definition-version",
-        id: "feature.dashboard.summary@1.0.0",
+        id: normalizeAssetId("feature.dashboard.summary@1.0.0"),
       },
       lifecycleStatus: "draft",
       selectedConfiguration: {
@@ -342,7 +342,10 @@ describe("asset configuration contract shapes", () => {
 
     const instance: AssetInstance = {
       instanceId: normalizeAssetId("instance.document.static.reference"),
-      definitionRef: { kind: "asset-definition", id: definition.definitionId },
+      definitionRef: {
+        kind: "asset-definition",
+        id: normalizeAssetId("document.static.reference"),
+      },
       lifecycleStatus: "draft",
       provenance,
     };

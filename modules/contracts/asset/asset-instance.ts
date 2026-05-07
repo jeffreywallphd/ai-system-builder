@@ -1,3 +1,4 @@
+import type { AssetMetadata } from "./asset-metadata";
 import type { AssetConfigurationValues } from "./asset-configuration-value";
 import type { AssetId } from "./asset-id";
 import type { AssetLifecycleStatus } from "./asset-lifecycle-status";
@@ -23,5 +24,5 @@ export interface AssetInstance {
   readonly resourceRefs?: readonly AssetReference[];
   readonly stateSummary?: AssetInstanceStateSummary;
   readonly provenance: AssetProvenance;
-  readonly metadata?: Record<string, unknown>;
+  readonly metadata?: AssetMetadata;
 }

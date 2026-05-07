@@ -6,7 +6,7 @@ The Asset Kernel is the canonical shared foundation for assets in `ai-system-bui
 
 An asset is a versioned, configurable, AI-readable, machine-composable building block that can represent structure, behavior, interface, data, instructions, resources, compositions, or logic containers, and can be assembled into features, systems, subsystems, and systems composed of subsystems.
 
-This document prevents parallel vocabularies for artifacts, resources, UI components, tools, workflows, pages, systems, generated outputs, previews, and AI context. It is an architecture baseline for Phase 2A. Prompt 3 added the first core TypeScript contract family in `modules/contracts/asset` for identity, lifecycle, review, provenance, definitions, instances, references, minimal binding/composition shells, and validation issue shapes. Prompt 4 added detailed configuration contracts for schemas, fields, JSON-compatible values, defaults, selected values, constraints, generic UI hints, validation rule descriptors, and examples. Prompt 5 added detailed structured AI-context contracts. Prompt 6 adds detailed shared contracts for machine-readable ports, port contracts, binding constraints, dependencies, composition rules, composition cardinality, and composition validation summary shells only; these contracts do not implement services, validators, adapters, persistence, API/IPC routes, UI, migrations, prompt assembly, retrieval, embeddings, generation, workflow execution, graph execution, automatic composition, or runtime behavior.
+This document prevents parallel vocabularies for artifacts, resources, UI components, tools, workflows, pages, systems, generated outputs, previews, and AI context. It is an architecture baseline for Phase 2A. Prompt 3 added the first core TypeScript contract family in `modules/contracts/asset` for identity, lifecycle, review, provenance, definitions, instances, references, minimal binding/composition shells, and validation issue shapes. Prompt 4 added detailed configuration contracts for schemas, fields, JSON-compatible values, defaults, selected values, constraints, generic UI hints, validation rule descriptors, and examples. Prompt 5 added detailed structured AI-context contracts. Prompt 6 adds detailed shared contracts for machine-readable ports, port contracts, binding constraints, dependencies, composition rules, composition cardinality, and composition validation summary shells only; the Phase 2A pre-Prompt 7 cleanup keeps those contracts descriptor-only while tightening JSON-safe metadata, first-class declarative requirements, safe references, and shared validation summary statuses; these contracts do not implement services, validators, adapters, persistence, API/IPC routes, UI, migrations, prompt assembly, retrieval, embeddings, generation, workflow execution, graph execution, automatic composition, or runtime behavior.
 
 ## Relationship to ADRs and existing architecture
 
@@ -27,7 +27,7 @@ The Asset Kernel does not replace these decisions. It defines how assets referen
 | `AssetInstance` | Kernel concept | A configured use of an asset definition in a specific feature, system, workflow, page, or composition. Instances own the definition reference, selected configuration, instance lifecycle/state, bindings, parent composition reference, applicable resource references, and use-specific provenance. |
 | `AssetBinding` | Kernel concept | A typed connection between asset instances, ports, resources, runtime capabilities, storage objects, or external repository objects. |
 | `AssetComposition` | Kernel concept | A validated assembly of asset instances and bindings into a larger unit such as a feature, workflow, page, subsystem, system, or system-of-subsystems. It is not merely a folder or UI route. |
-| `AssetReference` | Kernel concept | A stable reference to an asset definition, asset definition version, asset instance, or composition. Deterministic behavior should reference specific definition versions. |
+| `AssetReference` | Kernel concept | A stable transport-neutral reference to an asset definition, asset definition version, asset instance, composition, reusable asset requirement, or referenceable resource/artifact object. Deterministic behavior should reference specific definition versions. |
 | `AssetConfiguration` | Kernel concept | The definition-owned configuration surface plus instance-selected configuration values, constraints, UI hints, validation rules, defaults, and examples. |
 | `AssetAiContext` | Kernel concept | Structured AI-readable asset metadata used for retrieval, validation support, and prompt assembly. It complements machine contracts and is not only prose documentation. |
 | `AssetPort` | Kernel concept | A formal connection point such as an input, output, event, control/action, data, or error port. Ports belong in shared asset contracts, not renderer-specific models. |
@@ -268,13 +268,13 @@ Guidance:
 - Versioning is mandatory for definitions.
 - Systems should reference specific asset definition versions where deterministic behavior matters.
 - Generated outputs may become resource-backed assets after finalization.
-- Public asset metadata must not expose secrets, local temp paths, tokens, command lines, raw environment values, stack traces, or other sensitive implementation details.
+- Public asset metadata and validation details use JSON-compatible `AssetMetadata` values so they are safe for future persistence and transport. They must not expose secrets, local temp paths, raw bytes, buffers, streams, filesystem handles, runtime objects, tokens, command lines, raw environment values, stack traces, or other sensitive implementation details.
 
 ## Runtime, host, and permission requirements
 
 Assets express requirements declaratively without replacing Phase 1 runtime readiness.
 
-Planned `AssetRequirement` concepts:
+`AssetRequirement` is now a first-class shared contract for inline declarative requirements owned by an `AssetDefinition`. `AssetDefinition.requirementRefs` remains available only for future references to externally managed reusable requirement definitions. Requirement concepts include:
 
 - required runtime capability IDs,
 - required host type,
@@ -288,7 +288,7 @@ Planned `AssetRequirement` concepts:
 
 Guidance:
 
-- Asset runtime requirements should reference shared `RuntimeCapabilityId` values.
+- Asset runtime requirements should reference shared `RuntimeCapabilityId` values without duplicating runtime readiness snapshots, runtime task statuses, or provider lifecycle concepts.
 - Asset requirements do not replace runtime readiness contracts.
 - Runtime readiness answers whether a required capability is currently available.
 - Asset validation can structurally check declared requirements before execution or composition.
@@ -315,6 +315,7 @@ Guidance:
 - Validation should return structured `AssetValidationIssue` results.
 - Validation should not execute runtimes or probe heavy sidecars.
 - Validation should complement, not replace, runtime readiness guards.
+- General asset validation summaries and composition validation summaries share the same status vocabulary: `not-validated`, `valid`, `valid-with-warnings`, `invalid`, and `unknown`.
 - Prompt 7 will implement validation services after contracts are stable.
 
 ## Persistence direction
@@ -334,7 +335,7 @@ Guidance:
 
 - Persistence should not be added in Prompt 2.
 - Persistence should come only after contracts, validation, and registry/application ports stabilize.
-- Asset metadata persistence should not duplicate binary/resource storage.
+- Asset metadata persistence should preserve the JSON-compatible metadata/detail contract and should not duplicate binary/resource storage.
 - Resource-backed assets should reference artifact/resource storage rather than embedding raw file paths or bytes in asset metadata.
 - No persistent task history, marketplace, plugin package registry, or workflow execution store should be introduced in Phase 2A.
 
@@ -350,6 +351,8 @@ Guidance:
 8. Prompt 8 — Asset registry and application ports.
 9. Prompt 9 — Local persistence adapter.
 10. Prompt 10 — Resource-backed asset mapping and final Phase 2A regression.
+
+Pre-Prompt 7 cleanup is limited to JSON-safe metadata/details, first-class declarative `AssetRequirement`, safe semantic references such as `schemaRef`, and shared validation summary statuses; it does not add validation services, registry ports, persistence, or resource-backed mapping.
 
 Transport/UI work is intentionally deferred until after the kernel is proven through shared contracts, configuration contracts, AI context contracts, ports/composition contracts, validation, registry ports, persistence, and resource-backed mapping.
 
