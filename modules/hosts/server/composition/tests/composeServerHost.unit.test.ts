@@ -149,10 +149,13 @@ describe("composeServerHost", () => {
 
     const host = composeServerHost();
 
+    const storageRootDirectory = join(tmpdir(), `server-artifact-upload-test-${Date.now()}`);
+    const runtimeRootDirectory = join(tmpdir(), `server-runtime-${Date.now()}`);
+
     host.registerApi({
       app,
-      storageRootDirectory: "/tmp/server-artifact-upload-test",
-      runtimeRootDirectory: "/tmp/server-runtime",
+      storageRootDirectory,
+      runtimeRootDirectory,
     });
 
     expect(app.post).toHaveBeenCalledTimes(33);
@@ -193,6 +196,9 @@ describe("composeServerHost", () => {
       "/api/application-settings/clear",
       "/api/server/restart",
     ]);
+    expect(registeredPaths.some((path) => String(path).startsWith("/api/asset"))).toBe(false);
+    expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(true);
+    expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
     expect(registeredGetPaths).toEqual([
       "/api/artifact/upload/policy",

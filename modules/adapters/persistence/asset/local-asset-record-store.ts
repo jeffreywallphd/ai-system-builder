@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { Stream } from "node:stream";
 import { join } from "node:path";
@@ -29,8 +30,11 @@ export interface LocalAssetRecordStoreOptions {
 
 export class LocalAssetRecordStoreError extends Error {
   public constructor(message: string, options?: { cause?: unknown }) {
-    super(message, options);
+    super(message);
     this.name = "LocalAssetRecordStoreError";
+    if (options && "cause" in options) {
+      (this as Error & { cause?: unknown }).cause = options.cause;
+    }
     this.stack = undefined;
   }
 }
@@ -63,6 +67,10 @@ export class LocalAssetRecordStore {
 
   public async initialize(): Promise<void> {
     await this.ensureStoreFiles();
+  }
+
+  public initializeSync(): void {
+    this.ensureStoreFilesSync();
   }
 
   public async readManifest(): Promise<LocalAssetKernelManifest> {
@@ -121,13 +129,25 @@ export class LocalAssetRecordStore {
     );
   }
 
+  private ensureStoreFilesSync(): void {
+    this.ensureStoreDirectorySync();
+    this.ensureJsonFileSync("manifest.json", this.createManifest());
+    for (const name of Object.keys(COLLECTION_FILES) as AssetKernelCollectionName[]) {
+      this.ensureJsonFileSync(COLLECTION_FILES[name], []);
+    }
+  }
+
   private async ensureStoreDirectory(): Promise<void> {
     await mkdir(this.storeDir, { recursive: true });
   }
 
+  private ensureStoreDirectorySync(): void {
+    mkdirSync(this.storeDir, { recursive: true });
+  }
+
   private async ensureJsonFile(fileName: string, fallback: unknown): Promise<void> {
     try {
-      await this.readJsonFile(fileName, fallback);
+      this.validateInitializedFile(fileName, await this.readJsonFile(fileName, fallback));
     } catch (error) {
       if (error instanceof LocalAssetRecordStoreError) throw error;
       throw error;
@@ -141,20 +161,63 @@ export class LocalAssetRecordStore {
     }
   }
 
+  private ensureJsonFileSync(fileName: string, fallback: unknown): void {
+    try {
+      this.validateInitializedFile(fileName, this.readJsonFileSync(fileName, fallback));
+    } catch (error) {
+      if (error instanceof LocalAssetRecordStoreError) throw error;
+      throw error;
+    }
+
+    try {
+      readFileSync(this.filePath(fileName), "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw new LocalAssetRecordStoreError("Asset Kernel local store could not be read.", { cause: error });
+      }
+      this.writeJsonFileSync(fileName, fallback);
+    }
+  }
+
   private async readJsonFile<T>(fileName: string, fallback: T): Promise<T> {
     try {
       const source = await readFile(this.filePath(fileName), "utf8");
       const parsed = JSON.parse(source) as unknown;
       return cloneJson(parsed) as T;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return cloneJson(fallback);
-      }
-      if (error instanceof SyntaxError) {
-        throw new LocalAssetRecordStoreError("Asset Kernel local store contains malformed JSON.", { cause: error });
-      }
-      throw new LocalAssetRecordStoreError("Asset Kernel local store could not be read.", { cause: error });
+      return this.handleJsonReadError(error, fallback);
     }
+  }
+
+  private readJsonFileSync<T>(fileName: string, fallback: T): T {
+    try {
+      const source = readFileSync(this.filePath(fileName), "utf8");
+      const parsed = JSON.parse(source) as unknown;
+      return cloneJson(parsed) as T;
+    } catch (error) {
+      return this.handleJsonReadError(error, fallback);
+    }
+  }
+
+  private validateInitializedFile(fileName: string, value: unknown): void {
+    if (fileName === "manifest.json") {
+      validateManifest(value);
+      return;
+    }
+
+    if (!Array.isArray(value)) {
+      throw new LocalAssetRecordStoreError("Asset Kernel local store collection is invalid.");
+    }
+  }
+
+  private handleJsonReadError<T>(error: unknown, fallback: T): T {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return cloneJson(fallback);
+    }
+    if (error instanceof SyntaxError) {
+      throw new LocalAssetRecordStoreError("Asset Kernel local store contains malformed JSON.", { cause: error });
+    }
+    throw new LocalAssetRecordStoreError("Asset Kernel local store could not be read.", { cause: error });
   }
 
   private async writeJsonFile(fileName: string, value: unknown): Promise<void> {
@@ -165,6 +228,14 @@ export class LocalAssetRecordStore {
       await rename(temporaryPath, path);
     } catch (error) {
       await unlink(temporaryPath).catch(() => undefined);
+      throw new LocalAssetRecordStoreError("Asset Kernel local store could not be written.", { cause: error });
+    }
+  }
+
+  private writeJsonFileSync(fileName: string, value: unknown): void {
+    try {
+      writeFileSync(this.filePath(fileName), `${JSON.stringify(value, null, 2)}\n`, "utf8");
+    } catch (error) {
       throw new LocalAssetRecordStoreError("Asset Kernel local store could not be written.", { cause: error });
     }
   }

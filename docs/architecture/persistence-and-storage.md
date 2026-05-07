@@ -293,6 +293,12 @@ The Hugging Face adapter remains one provider behind the generic artifact-repo p
 
 
 
+## Asset Kernel local record persistence
+
+Local Asset Kernel persistence is structured record persistence, not artifact/blob storage. Hosts compose it from their durable storage root, and the adapter owns the `<storageRoot>/asset-kernel/` layout for `manifest.json`, definitions, instances, compositions, and bindings. The helper does not store artifact/resource bytes, generated image/model/dataset payloads, secrets, tokens, runtime installs, or provider-native file handles.
+
+Desktop and server composition initialize this store privately so application-layer registry use cases can be assembled behind host-owned roots. This does not add asset API routes, desktop IPC channels, preload methods, renderer/thin-client UI, built-in seeding, a registry read facade, resource-backed scans/views, runtime behavior, or workflow execution.
+
 ## Runtime roots are not artifact storage roots
 
 Runtime roots are neither persistence nor artifact-object storage roots. Runtime roots contain sidecar installs, managed Python environments, dependency state, runtime caches, and temporary sidecar outputs.
