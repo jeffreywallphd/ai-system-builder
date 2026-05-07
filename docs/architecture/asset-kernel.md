@@ -6,7 +6,7 @@ The Asset Kernel is the canonical shared foundation for assets in `ai-system-bui
 
 An asset is a versioned, configurable, AI-readable, machine-composable building block that can represent structure, behavior, interface, data, instructions, resources, compositions, or logic containers, and can be assembled into features, systems, subsystems, and systems composed of subsystems.
 
-This document prevents parallel vocabularies for artifacts, resources, UI components, tools, workflows, pages, systems, generated outputs, previews, and AI context. It is an architecture baseline for Phase 2A. Prompt 3 adds the first core TypeScript contract family in `modules/contracts/asset` for identity, lifecycle, review, provenance, definitions, instances, references, minimal binding/composition shells, and validation issue shapes only; it does not implement services, adapters, persistence, API/IPC routes, UI, migrations, runtime behavior, or detailed deferred asset subsystems.
+This document prevents parallel vocabularies for artifacts, resources, UI components, tools, workflows, pages, systems, generated outputs, previews, and AI context. It is an architecture baseline for Phase 2A. Prompt 3 added the first core TypeScript contract family in `modules/contracts/asset` for identity, lifecycle, review, provenance, definitions, instances, references, minimal binding/composition shells, and validation issue shapes. Prompt 4 adds detailed configuration contracts for schemas, fields, JSON-compatible values, defaults, selected values, constraints, generic UI hints, validation rule descriptors, and examples only; it does not implement services, validators, adapters, persistence, API/IPC routes, UI, migrations, or runtime behavior.
 
 ## Relationship to ADRs and existing architecture
 
@@ -192,23 +192,26 @@ Guidance:
 
 ## Configuration surface
 
-Planned `AssetConfiguration` concepts:
+Prompt 4 defines the detailed `AssetConfiguration` contract family under `modules/contracts/asset` for:
 
-- configuration schema,
-- default configuration,
-- current instance configuration,
-- constraints,
-- UI hints,
-- validation rules,
-- examples.
+- configuration schemas,
+- fields and field value-kind vocabulary,
+- JSON-compatible default and selected configuration values,
+- constraints and option lists,
+- generic UI hints,
+- validation rule descriptors,
+- examples,
+- schema and version references.
 
 Guidance:
 
-- Asset definitions own the configurable surface.
-- Asset instances own selected configuration values.
-- Arbitrary unvalidated JSON should be avoided for composable assets.
-- Phase 2A should stay JSON-schema-compatible or schema-engine-neutral unless a canonical schema engine is explicitly adopted.
-- Prompt 3 includes only a minimal `AssetConfigurationSummary` placeholder for core shapes. Prompt 4 will implement detailed configuration contracts separately from core contracts.
+- Asset definitions own the configurable surface through `configurationSchema`, `defaultConfiguration`, and `configurationExamples`.
+- Asset instances own selected configuration values through `selectedConfiguration`.
+- Configuration values must remain JSON-compatible for future persistence and transport; functions, host/runtime objects, filesystem handles, bytes, paths, secrets, raw environment values, raw adapter details, and executable code are not part of configuration values.
+- Arbitrary unvalidated JSON should be avoided for composable assets; validation remains deferred to Prompt 7.
+- Configuration contracts are schema-engine-neutral and future JSON-schema-compatible, with no runtime schema parser, validation service, conditional schema engine, migration framework, or form renderer in Prompt 4.
+- Detailed AI context remains deferred to Prompt 5, detailed ports/bindings/composition-rule contracts remain deferred to Prompt 6, registry ports remain deferred to Prompt 8, persistence remains deferred to Prompt 9, and resource-backed mapping remains deferred to Prompt 10.
+- Transport and UI exposure remain deferred until after the Asset Kernel is proven.
 
 ## Ports, contracts, and composition rules
 
@@ -365,9 +368,8 @@ Asset Kernel work must preserve clean architecture boundaries:
 - host wiring belongs in `modules/hosts`,
 - UI belongs in apps/modules UI areas.
 
-Non-goals preserved after Prompt 3:
+Non-goals preserved after Prompt 4:
 
-- no detailed configuration contracts before Prompt 4,
 - no detailed AI-context contracts before Prompt 5,
 - no detailed ports, binding compatibility, or composition-rule contracts before Prompt 6,
 - no validation service before Prompt 7,

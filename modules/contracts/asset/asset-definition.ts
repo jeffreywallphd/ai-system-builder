@@ -1,3 +1,6 @@
+import type { AssetConfigurationExample } from "./asset-configuration-example";
+import type { AssetConfigurationSchema } from "./asset-configuration-schema";
+import type { AssetConfigurationValues } from "./asset-configuration-value";
 import type { AssetFamily } from "./asset-family";
 import type { AssetId } from "./asset-id";
 import type { AssetLifecycleStatus } from "./asset-lifecycle-status";
@@ -6,11 +9,6 @@ import type { AssetReference } from "./asset-reference";
 import type { AssetReviewStatus } from "./asset-review-status";
 import type { AssetType } from "./asset-type";
 import type { AssetVersion } from "./asset-version";
-
-export interface AssetConfigurationSummary {
-  readonly schemaRef?: AssetReference;
-  readonly defaultValues?: Record<string, unknown>;
-}
 
 export interface AssetAiContextSummary {
   readonly purpose?: string;
@@ -28,7 +26,9 @@ export interface AssetDefinition {
   readonly lifecycleStatus: AssetLifecycleStatus;
   readonly reviewStatus?: AssetReviewStatus;
   readonly provenance: AssetProvenance;
-  readonly configurationSummary?: AssetConfigurationSummary;
+  readonly configurationSchema?: AssetConfigurationSchema;
+  readonly defaultConfiguration?: AssetConfigurationValues;
+  readonly configurationExamples?: readonly AssetConfigurationExample[];
   readonly aiContextSummary?: AssetAiContextSummary;
   readonly requirementRefs?: readonly AssetReference[];
   readonly portRefs?: readonly AssetReference[];

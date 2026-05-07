@@ -214,7 +214,7 @@ describe("asset core contract vocabularies", () => {
 });
 
 describe("asset core contract shapes", () => {
-  it("creates a minimal AssetDefinition without detailed configuration, AI-context, or port contracts", () => {
+  it("creates a minimal AssetDefinition without optional configuration, AI-context, or port contracts", () => {
     const definition: AssetDefinition = {
       definitionId: normalizeAssetId("feature.dashboard.summary"),
       assetType: "feature",
@@ -226,7 +226,7 @@ describe("asset core contract shapes", () => {
       provenance,
     };
 
-    expect(definition.configurationSummary).toBeUndefined();
+    expect(definition.configurationSchema).toBeUndefined();
     expect(definition.aiContextSummary).toBeUndefined();
     expect(definition.portRefs).toBeUndefined();
     expect(forbiddenKeys(definition)).toEqual([]);
