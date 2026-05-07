@@ -8,8 +8,6 @@ import { normalizeAssetId } from "../../../contracts/asset";
 import type {
   AssetExternalRepositoryObjectReference,
   AssetGeneratedOutputReference,
-  AssetJsonObject,
-  AssetJsonValue,
   AssetLifecycleStatus,
   AssetMetadata,
   AssetReference,
@@ -21,6 +19,7 @@ import type {
 } from "../../../contracts/asset";
 import { BUILT_IN_ASSET_DEFINITION_VERSION, type BuiltInAssetDefinitionId } from "./built-ins";
 import { AssetResourceBackedMappingService, assetResourceBackedMappingService } from "./asset-resource-backed-mapping.service";
+import { sanitizeAssetJsonValue, sanitizeAssetMetadata, sanitizeAssetViewValue } from "./asset-safe-metadata";
 
 type UnknownRecord = Readonly<Record<string, unknown>>;
 
@@ -41,10 +40,6 @@ interface PreviewViewInput {
 
 const DOCUMENT_MEDIA_TYPE_PATTERN = /^(application\/(pdf|msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|rtf)|text\/(plain|markdown|csv|html))$/i;
 const DOCUMENT_EXTENSION_PATTERN = /^(pdf|doc|docx|rtf|txt|md|markdown|csv|html|htm)$/i;
-const FORBIDDEN_METADATA_KEY_PATTERN = /(token|secret|password|credential|authorization|auth|localpath|filesystempath|filepath|path|cache|bytes|blob|contentbase64|base64|raw|payload|command|stack|env)/i;
-const LOCAL_PATH_VALUE_PATTERN = /(^\/tmp\/|^\/var\/|^\/home\/|^\/Users\/|^[a-z]:\\|^~\/|\\Users\\|\\Temp\\)/i;
-const AUTH_BEARING_VALUE_PATTERN = /(bearer\s+[a-z0-9._-]+|api[_-]?key\s*[=:]|token=|password=|secret=|authorization:)/i;
-const LONG_BASE64_VALUE_PATTERN = /^[A-Za-z0-9+/]{80,}={0,2}$/;
 
 function trimText(value: string | undefined): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -92,39 +87,8 @@ function builtInDefinitionRef(id: BuiltInAssetDefinitionId): AssetReference {
   };
 }
 
-function sanitizeStringValue(value: string): string | undefined {
-  const trimmed = trimText(value);
-  if (!trimmed) return undefined;
-  if (LOCAL_PATH_VALUE_PATTERN.test(trimmed)) return undefined;
-  if (AUTH_BEARING_VALUE_PATTERN.test(trimmed)) return undefined;
-  if (trimmed.startsWith("data:") && trimmed.includes(";base64,")) return undefined;
-  if (LONG_BASE64_VALUE_PATTERN.test(trimmed)) return undefined;
-  return trimmed;
-}
-
-function sanitizeJsonValue(value: unknown): AssetJsonValue | undefined {
-  if (value === null || typeof value === "boolean") return value as AssetJsonValue;
-  if (typeof value === "string") return sanitizeStringValue(value);
-  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
-  if (Array.isArray(value)) {
-    const entries = value.map(sanitizeJsonValue).filter((entry): entry is AssetJsonValue => typeof entry !== "undefined");
-    return entries;
-  }
-  if (typeof value === "object" && value !== null) {
-    const entries = Object.entries(value as Record<string, unknown>)
-      .filter(([key]) => !FORBIDDEN_METADATA_KEY_PATTERN.test(key))
-      .map(([key, entry]) => [key, sanitizeJsonValue(entry)] as const)
-      .filter((entry): entry is readonly [string, AssetJsonValue] => typeof entry[1] !== "undefined");
-    return Object.fromEntries(entries) as AssetJsonObject;
-  }
-  return undefined;
-}
-
 function metadataOf(metadata: UnknownRecord | undefined): AssetMetadata | undefined {
-  const sanitized = sanitizeJsonValue(metadata);
-  if (!sanitized || typeof sanitized !== "object" || Array.isArray(sanitized)) return undefined;
-  if (Object.keys(sanitized).length === 0) return undefined;
-  return sanitized as AssetMetadata;
+  return sanitizeAssetMetadata(metadata);
 }
 
 function diagnostic(code: string, message: string, sourceKind: string, severity: AssetResourceBackedViewDiagnostic["severity"] = "info", metadata?: UnknownRecord): AssetResourceBackedViewDiagnostic {
@@ -165,7 +129,7 @@ function validationSummaryFromModel(record: ModelInventoryRecord): AssetResource
 }
 
 function scrubView<T extends AssetResourceBackedView>(view: T): T {
-  return sanitizeJsonValue(view) as unknown as T;
+  return sanitizeAssetViewValue(view);
 }
 
 export class AssetResourceBackedViewService {
@@ -355,7 +319,7 @@ export class AssetResourceBackedViewService {
 
   unsupported(source: unknown, options: ViewBuildOptions): AssetResourceBackedView {
     return scrubView({
-      viewId: internalId("asset-view.unsupported", JSON.stringify(metadataOf({ source }) ?? {})),
+      viewId: internalId("asset-view.unsupported", JSON.stringify(sanitizeAssetJsonValue({ source }) ?? {})),
       viewKind: "artifact",
       summary: "Unsupported resource-backed source shape.",
       metadata: metadataOf(options.metadata),

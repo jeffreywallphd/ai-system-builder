@@ -306,3 +306,9 @@ test("all built-in definition IDs referenced by the service exist in the built-i
     assert.equal(BUILT_IN_ASSET_DEFINITION_IDS.includes(id as never), true, id);
   }
 });
+
+test("view service imports centralized sanitizer without a second local forbidden-key regex", () => {
+  const source = readFileSync("modules/application/services/asset/asset-resource-backed-view.service.ts", "utf8");
+  assert.equal(source.includes("FORBIDDEN_METADATA_KEY_PATTERN"), false);
+  assert.equal(source.includes("sanitizeAssetMetadata"), true);
+});

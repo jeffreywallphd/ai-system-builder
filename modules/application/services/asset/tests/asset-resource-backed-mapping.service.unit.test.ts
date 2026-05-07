@@ -241,3 +241,29 @@ test("mapping service does not import forbidden outer layers or runtime/persiste
     assert.equal(source.includes(forbidden), false, `unexpected import boundary: ${forbidden}`);
   }
 });
+
+test("mapping service uses centralized sanitizer behavior for nested unsafe metadata", () => {
+  const backing = service.mapExternalRepositoryObjectToBacking({
+    provider: "custom",
+    repositoryId: "safe-repo",
+    objectPath: "safe/object.json",
+    metadata: {
+      safe: "kept",
+      nested: { label: "visible", token: "token=hidden", safeButPathValue: "/tmp/private" },
+      values: ["ok", "Bearer abcdef", { command: "run" }],
+      contentBase64: "data:application/octet-stream;base64,AAAA",
+    },
+  });
+  const json = JSON.stringify(backing).toLowerCase();
+
+  assert.equal(json.includes("kept"), true);
+  for (const unsafe of ["token=hidden", "/tmp/private", "bearer", "command", "contentbase64", "base64,"]) {
+    assert.equal(json.includes(unsafe), false, unsafe);
+  }
+});
+
+test("mapping service imports centralized sanitizer without a second local forbidden-key regex", () => {
+  const source = readFileSync("modules/application/services/asset/asset-resource-backed-mapping.service.ts", "utf8");
+  assert.equal(source.includes("FORBIDDEN_METADATA_KEY_PATTERN"), false);
+  assert.equal(source.includes("sanitizeAssetMetadata"), true);
+});
