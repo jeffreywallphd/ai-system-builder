@@ -10,7 +10,7 @@ export interface RuntimeCapabilityGuardOptions {
   allowDegraded?: boolean;
 }
 
-export interface RuntimeCapabilityUnavailableDetails {
+export interface RuntimeCapabilityUnavailableDetails extends Readonly<Record<string, unknown>> {
   capabilityId: RuntimeCapabilityId;
   status: RuntimeCapabilityStatus["status"];
   summary?: string;
