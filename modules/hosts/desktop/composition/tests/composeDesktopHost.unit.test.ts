@@ -236,9 +236,11 @@ describe("composeDesktopHost", () => {
     const ipcMain = {
       handle: testDouble.fn(),
     };
+    const artifactRepoFetch = testDouble.fn(async () => new Response(null, { status: 404 })) as unknown as HuggingFaceFetchImplementation;
     const host = composeDesktopHost({
       artifactRepo: {
         huggingFaceTokenConfigFilePath: join(tmpdir(), `desktop-host-token-${Date.now()}.json`),
+        huggingFaceFetchImplementation: artifactRepoFetch,
       },
     });
 
@@ -319,10 +321,15 @@ describe("composeDesktopHost", () => {
     expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     const internalRegistry = host.getInternalAssetRegistry();
     expect(internalRegistry).toBeDefined();
+    expect(internalRegistry?.resourceBackedViewProvider).toBeDefined();
     expect(internalRegistry?.diagnostics.resourceBackedViewsEnabled).toBe(true);
     const resourceBacked = await internalRegistry?.readFacade.listResourceBackedViewCards({ limit: 10 });
     expect(resourceBacked?.items).toEqual([]);
     expect(resourceBacked?.diagnostics?.some((diagnostic) => diagnostic.code.includes("source-unavailable") || diagnostic.code.includes("unsupported"))).toBe(true);
+    const missingResourceBackedDetail = await internalRegistry!.readFacade.readResourceBackedViewDetail("asset-view.image.internal.missing");
+    expect(missingResourceBackedDetail).toBeUndefined();
+    expect(artifactRepoFetch).not.toHaveBeenCalled();
+    expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     expect(
       await internalRegistry?.readFacade.listDefinitionCards({ includeBuiltIns: true, includeCustom: true }),
     ).toEqual({ items: [] });
