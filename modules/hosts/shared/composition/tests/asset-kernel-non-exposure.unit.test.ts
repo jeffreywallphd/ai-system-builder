@@ -33,17 +33,21 @@ function combinedSource(relativeDir: string): string {
   return sourceFilesUnder(relativeDir).map((file) => `\n// ${file.path}\n${file.source}`).join("\n");
 }
 
-describe("Asset Kernel Phase 2B non-exposure boundaries", () => {
-  it("does not register asset API routes or API contract operations", () => {
+describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
+  it("allows only the narrow read-only asset definitions server API surface", () => {
     const source = [
       combinedSource("modules/contracts/api"),
       combinedSource("modules/adapters/transport/api-express"),
       combinedSource("modules/hosts/server/composition"),
     ].join("\n");
 
-    assert.doesNotMatch(source, /["'`]\/api\/asset(?:\/|["'`])/i);
-    assert.doesNotMatch(source, /\basset(?:Kernel|Registry|Library)?(?:Route|Router|Controller|Api)\b/i);
-    assert.doesNotMatch(source, /\bregisterAsset(?:Kernel|Registry|Library)?(?:Route|Routes|Api)\b/i);
+    assert.match(source, /["'`]\/api\/assets\/definitions["'`]/i);
+    assert.match(source, /["'`]\/api\/assets\/definitions\/:definitionId["'`]/i);
+    assert.match(source, /["'`]\/api\/assets\/definitions\/:definitionId\/versions\/:version["'`]/i);
+    assert.doesNotMatch(source, /["'`]\/api\/assets\/(?:instances|compositions|resources|registry-summary|seed|register|import|finalize|scan|execute)(?:\/|["'`?])/i);
+    assert.doesNotMatch(source, /\.(?:post|put|patch|delete)\(["'`]\/api\/assets/i);
+    assert.doesNotMatch(source, /\basset(?:Kernel|Registry|Library)?(?:Router|Controller)\b/i);
+    assert.doesNotMatch(source, /\b(?:seedBuiltIns|registerBuiltIns|importAsset|finalizeAsset|scanResources|startRuntime|probeRuntime)\b/i);
   });
 
   it("does not register asset IPC channels or desktop preload asset methods", () => {

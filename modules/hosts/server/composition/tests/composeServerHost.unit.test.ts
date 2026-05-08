@@ -159,7 +159,7 @@ describe("composeServerHost", () => {
     });
 
     expect(app.post).toHaveBeenCalledTimes(33);
-    expect(app.get).toHaveBeenCalledTimes(5);
+    expect(app.get).toHaveBeenCalledTimes(8);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
       "/api/artifact/upload",
@@ -196,7 +196,7 @@ describe("composeServerHost", () => {
       "/api/application-settings/clear",
       "/api/server/restart",
     ]);
-    expect(registeredPaths.some((path) => String(path).startsWith("/api/asset"))).toBe(false);
+    expect(registeredPaths.some((path) => String(path).startsWith("/api/assets"))).toBe(false);
     expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(true);
     expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     const internalRegistry = host.getInternalAssetRegistry();
@@ -206,10 +206,17 @@ describe("composeServerHost", () => {
       await internalRegistry?.readFacade.listDefinitionCards({ includeBuiltIns: true, includeCustom: true }),
     ).toEqual({ items: [] });
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
+
+    expect(registeredGetPaths).toContain("/api/assets/definitions");
+    expect(registeredGetPaths.some((path) => /\/api\/assets.*(create|update|delete|register|seed|import|finalize)/i.test(String(path)))).toBe(false);
+    expect(readFileSync(resolve("modules/hosts/server/composition/composeServerHost.ts"), "utf8")).toContain("assetRegistryRead: internalAssetRegistry.readFacade");
     expect(registeredGetPaths).toEqual([
       "/api/artifact/upload/policy",
       "/api/artifact/media/view",
       "/api/config/huggingface-token",
+      "/api/assets/definitions",
+      "/api/assets/definitions/:definitionId",
+      "/api/assets/definitions/:definitionId/versions/:version",
       "/api/runtime/readiness",
       "/api/runtime/capabilities/:capabilityId",
     ]);
