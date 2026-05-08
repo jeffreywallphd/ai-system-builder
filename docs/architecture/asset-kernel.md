@@ -13,6 +13,8 @@ Phase 2B Prompt 6 adds an internal application Asset Registry read facade in `mo
 
 Phase 3 Prompt 2 moves the resource-backed view provider seam to `modules/application/ports/asset`. Providers now return structured list results with `items`, optional `nextCursor`, and sanitized structured diagnostics. The application aggregate provider foundation remains read-only and computed: it can combine already-injected family providers, treat unsupported/not-wired families as safe diagnostics, and sanitize partial provider failures without scanning storage, reading bytes, calling networks, calling runtimes, or creating registered assets. Artifact, image, model, dataset, and external repository family providers remain deferred to later Phase 3 prompts.
 
+Phase 3 Prompt 3 adds the first concrete family provider for artifacts and document-like artifacts in the application layer. It projects already-registered artifact browser metadata into computed resource-backed views when explicitly injected into the read facade or aggregate provider. These views do not create `AssetInstance` records, do not persist resource-backed mappings, do not read artifact bytes or document contents, and do not expose storage paths or unsafe storage keys. Document-like classification is metadata-only, using safe media type, format/extension, family/category, or type fields already present in artifact metadata; uncertain artifacts remain generic artifact views. Host wiring and public transport/UI exposure remain deferred.
+
 
 ## Local persistence checkpoint (Prompt 9)
 

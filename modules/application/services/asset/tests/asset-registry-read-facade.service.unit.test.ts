@@ -10,6 +10,9 @@ import type {
   AssetResourceBackedView,
 } from "../../../../contracts/asset";
 import { normalizeAssetId } from "../../../../contracts/asset";
+import type { ArtifactBrowseItem, ArtifactBrowseSuccessValue } from "../../../../contracts/artifact-browser";
+import { createSuccessResult, type ContractResult } from "../../../../contracts/shared";
+import type { ArtifactBrowserMetadataReadPort } from "../../../ports/artifact-browser";
 import type {
   AssetBindingListQuery,
   AssetBindingRepositoryPort,
@@ -22,6 +25,7 @@ import type {
   AssetResourceBackedViewProvider,
 } from "../../../ports/asset";
 import { BUILT_IN_ASSET_DEFINITION_CATALOG } from "../built-ins";
+import { ArtifactResourceBackedViewProvider } from "../asset-artifact-resource-backed-view-provider.service";
 import { AssetRegistryReadFacade, AssetRegistryReadFacadeError } from "../asset-registry-read-facade.service";
 
 const definitionRef: AssetReference = { kind: "asset-definition-version", id: normalizeAssetId("definition.alpha"), version: "1.0.0" };
@@ -113,6 +117,31 @@ class FakeBindingRepository implements AssetBindingRepositoryPort {
   public async getBinding(reference: AssetReference): Promise<AssetBinding | undefined> { return this.bindings.get(reference.id); }
   public async listBindings(query?: AssetBindingListQuery) { this.lastQuery = query; return { bindings: [...this.bindings.values()] }; }
   public async deleteBinding(reference: AssetReference): Promise<void> { this.deleted.push(reference); }
+}
+
+class FakeArtifactBrowserMetadataRead implements Pick<ArtifactBrowserMetadataReadPort, "browseArtifacts"> {
+  public browseCalls = 0;
+  public readContentCalls = 0;
+
+  public constructor(private readonly items: readonly ArtifactBrowseItem[]) {}
+
+  public async browseArtifacts(): Promise<ContractResult<ArtifactBrowseSuccessValue>> {
+    this.browseCalls += 1;
+    return createSuccessResult({ items: [...this.items] });
+  }
+}
+
+function artifactItem(overrides: Partial<ArtifactBrowseItem> = {}): ArtifactBrowseItem {
+  return {
+    artifactId: "artifact-readme",
+    storageKey: "uploads/private/readme.md",
+    artifactFamily: "document",
+    mediaType: "text/markdown",
+    originalName: "Readme.md",
+    sourceKind: "upload",
+    metadata: unsafeMetadata(),
+    ...overrides,
+  };
 }
 
 
@@ -386,6 +415,36 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
       assertSafe(error);
       return true;
     });
+  });
+
+  it("lists and reads artifact/document provider cards and details without unsafe metadata or automatic validation", async () => {
+    const browser = new FakeArtifactBrowserMetadataRead([
+      artifactItem(),
+      artifactItem({
+        artifactId: "uploads/private/blob.bin",
+        storageKey: "uploads/private/blob.bin",
+        artifactFamily: "binary",
+        mediaType: "application/octet-stream",
+        originalName: "C:\\Users\\name\\blob.bin",
+      }),
+    ]);
+    const provider = new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser });
+    const facade = createFacade({ resourceBackedViewProvider: provider });
+
+    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10 });
+    assert.deepEqual(list.items.map((item) => item.viewKind), ["document", "artifact"]);
+    assert.equal(list.items[0]?.assetDefinitionRef?.id, "builtin.document");
+    assert.equal(list.items[1]?.displayName?.startsWith("artifact."), true);
+    assertSafe(list);
+
+    const detail = await facade.readResourceBackedViewDetail(list.items[0]!.viewId, { includeMetadata: true, includeResourceBackings: true });
+    assert.equal(detail?.view.viewKind, "document");
+    assert.equal(detail?.validationSummary, undefined);
+    assert.equal(detail?.view.validationSummary, undefined);
+    assertSafe(detail);
+
+    assert.equal(await facade.readResourceBackedViewDetail("missing-artifact-view"), undefined);
+    assert.equal(browser.readContentCalls, 0);
   });
 });
 
