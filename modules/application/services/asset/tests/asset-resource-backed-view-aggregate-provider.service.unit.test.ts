@@ -9,6 +9,7 @@ import type { ArtifactBrowserMetadataReadPort } from "../../../ports/artifact-br
 import type { AssetResourceBackedViewListQuery, AssetResourceBackedViewListResult, AssetResourceBackedViewProvider } from "../../../ports/asset";
 import { createUnsupportedAssetResourceBackedViewProvider } from "../../../ports/asset";
 import { ArtifactResourceBackedViewProvider } from "../asset-artifact-resource-backed-view-provider.service";
+import { AssetImageResourceBackedViewProvider, type GeneratedImageOutputDescriptorSource } from "../asset-image-resource-backed-view-provider.service";
 import { AssetResourceBackedViewAggregateProvider } from "../asset-resource-backed-view-aggregate-provider.service";
 
 function view(viewId: string, displayName: string): AssetResourceBackedView {
@@ -60,6 +61,26 @@ class FakeArtifactBrowserMetadataRead implements Pick<ArtifactBrowserMetadataRea
 
   public async browseArtifacts(): Promise<ContractResult<ArtifactBrowseSuccessValue>> {
     return createSuccessResult({ items: [...this.items] });
+  }
+}
+
+class FakeGeneratedOutputDescriptorSource implements GeneratedImageOutputDescriptorSource {
+  public constructor(private readonly outputId: string) {}
+
+  public async listGeneratedImageOutputDescriptors() {
+    return {
+      items: [
+        {
+          outputId: this.outputId,
+          output: {
+            type: "image" as const,
+            engine: "comfyui",
+            fileName: "Generated.png",
+            mediaType: "image/png",
+          },
+        },
+      ],
+    };
   }
 }
 
@@ -181,6 +202,54 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
     assert.deepEqual(result.items.map((item) => item.viewKind), ["document", "artifact"]);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "resource-backed-view-provider-unsupported"), true);
     assertSafe(result);
+  });
+
+  it("combines image/generated-output provider results with artifact/document and unsupported providers deterministically", async () => {
+    const artifactProvider = new ArtifactResourceBackedViewProvider({
+      artifactBrowserMetadataRead: new FakeArtifactBrowserMetadataRead([
+        artifactItem("artifact-report", "Report.pdf", "application/pdf"),
+      ]),
+    });
+    const imageProvider = new AssetImageResourceBackedViewProvider({
+      generatedImageOutputDescriptorSource: new FakeGeneratedOutputDescriptorSource("generated-output-1"),
+    });
+    const unsupported = createUnsupportedAssetResourceBackedViewProvider({ providerId: "dataset-provider", sourceKind: "dataset" });
+
+    const result = await new AssetResourceBackedViewAggregateProvider({
+      providers: [unsupported, artifactProvider, imageProvider],
+      maxListLimit: 10,
+    }).listResourceBackedViews({ limit: 10 });
+
+    assert.deepEqual(result.items.map((item) => item.viewKind), ["document", "generated-output"]);
+    assert.equal(result.items[1]?.assetDefinitionRef, undefined);
+    assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "resource-backed-view-provider-unsupported"), true);
+    assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "image-resource-backed-view-image-source-unavailable"), true);
+    assertSafe(result);
+  });
+
+  it("keeps generated-output views distinct from image asset views when ids could otherwise collide", async () => {
+    const imageProvider = new AssetImageResourceBackedViewProvider({
+      imageAssetDescriptorRead: {
+        async listImageAssetDescriptors() {
+          return {
+            items: [
+              {
+                assetId: "shared",
+                artifactId: "artifact-shared",
+                source: "generated" as const,
+                metadata: { originalFileName: "Final.png", createdAt: "2026-01-01T00:00:00.000Z" },
+              },
+            ],
+          };
+        },
+      },
+      generatedImageOutputDescriptorSource: new FakeGeneratedOutputDescriptorSource("shared"),
+    });
+
+    const result = await new AssetResourceBackedViewAggregateProvider({ providers: [imageProvider], maxListLimit: 10 }).listResourceBackedViews({ limit: 10 });
+
+    assert.deepEqual(result.items.map((item) => item.viewKind), ["image-asset", "generated-output"]);
+    assert.notEqual(result.items[0]?.viewId, result.items[1]?.viewId);
   });
 
   it("readResourceBackedView returns the first matching safe view and honors provider-scoped ids", async () => {
