@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { type ApiArtifactUploadClient } from "../api/apiArtifactUploadClient";
 import type { UploadViewState } from "../components/ArtifactUploadForm";
@@ -44,14 +44,30 @@ export interface UseArtifactUploadFeatureResult {
   ingestWebsiteBatch: () => Promise<void>;
 }
 
+interface PersistedFileUploadState {
+  selectedFile: File | null;
+  viewState: UploadViewState;
+}
+
+let persistedFileUploadState: PersistedFileUploadState = {
+  selectedFile: null,
+  viewState: { status: "idle" },
+};
+
 export function useArtifactUploadFeature(client?: ApiArtifactUploadClient, onUploadComplete?: () => void): UseArtifactUploadFeatureResult {
   const uploadClient = useArtifactUploadClient(client);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const shouldPersistFileUploadState = client === undefined;
+  const [selectedFile, setSelectedFile] = useState<File | null>(shouldPersistFileUploadState ? persistedFileUploadState.selectedFile : null);
   const [acceptedFileTypes, setAcceptedFileTypes] = useState<string>("*");
-  const [viewState, setViewState] = useState<UploadViewState>({
-    status: "idle",
-  });
+  const [viewState, setViewState] = useState<UploadViewState>(shouldPersistFileUploadState ? persistedFileUploadState.viewState : { status: "idle" });
+  const selectedFileRef = useRef<File | null>(selectedFile);
+  const uploadInProgressRef = useRef(false);
   const websiteIngestion = useWebsiteArtifactIngestion(uploadClient, onUploadComplete);
+
+  useEffect(() => {
+    if (!shouldPersistFileUploadState) return;
+    persistedFileUploadState = { selectedFile, viewState };
+  }, [selectedFile, shouldPersistFileUploadState, viewState]);
 
   useEffect(() => {
     void uploadClient.getAcceptedTypes().then((policy) => {
@@ -61,42 +77,25 @@ export function useArtifactUploadFeature(client?: ApiArtifactUploadClient, onUpl
     });
   }, [uploadClient]);
 
-  function onFileChange(event: FormEvent<HTMLInputElement>): void {
-    const file = event.currentTarget.files?.[0] ?? null;
-    setSelectedFile(file);
-
-    if (file) {
-      setViewState({
-        status: "idle",
-        message: `Selected ${file.name}.`,
-      });
+  async function uploadSelectedFile(file: File): Promise<void> {
+    if (uploadInProgressRef.current) {
       return;
     }
 
-    setViewState({ status: "idle", message: undefined });
-  }
-
-  async function onUploadSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-
-    if (!selectedFile) {
-      setViewState({ status: "error", message: "Select one artifact file before uploading." });
-      return;
-    }
-
-    setViewState({ status: "uploading", message: `Uploading ${selectedFile.name}...` });
+    uploadInProgressRef.current = true;
+    setViewState({ status: "uploading", message: `Uploading ${file.name}...` });
 
     try {
       const response = await uploadClient.uploadArtifact({
-        fileName: selectedFile.name,
-        mediaType: selectedFile.type,
-        bytes: new Uint8Array(await selectedFile.arrayBuffer()),
+        fileName: file.name,
+        mediaType: file.type,
+        bytes: new Uint8Array(await file.arrayBuffer()),
       });
 
       if (response.ok) {
         setViewState({
           status: "success",
-          message: `Stored ${selectedFile.name}.`,
+          message: `Stored ${file.name}.`,
           key: response.value.descriptor.key,
           mediaType: response.value.descriptor.mediaType,
           sizeBytes: response.value.descriptor.sizeBytes,
@@ -111,7 +110,38 @@ export function useArtifactUploadFeature(client?: ApiArtifactUploadClient, onUpl
         status: "error",
         message: error instanceof Error ? error.message : "Artifact upload failed.",
       });
+    } finally {
+      uploadInProgressRef.current = false;
     }
+  }
+
+  function onFileChange(event: FormEvent<HTMLInputElement>): void {
+    const file = event.currentTarget.files?.[0] ?? null;
+    selectedFileRef.current = file;
+    setSelectedFile(file);
+
+    if (file) {
+      setViewState({
+        status: "idle",
+        message: `Selected ${file.name}.`,
+      });
+      void uploadSelectedFile(file);
+      return;
+    }
+
+    setViewState({ status: "idle", message: undefined });
+  }
+
+  async function onUploadSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+
+    const file = selectedFileRef.current;
+    if (!file) {
+      setViewState({ status: "error", message: "Select one artifact file before uploading." });
+      return;
+    }
+
+    await uploadSelectedFile(file);
   }
 
   return {

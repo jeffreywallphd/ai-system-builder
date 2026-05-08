@@ -14,6 +14,9 @@ export async function createThinClientViteConfig(environment: NodeJS.ProcessEnv 
       proxy: {
         "/api": createThinClientApiProxyConfig(environment),
       },
+      watch: {
+        ignored: ["**/server-artifacts/**"],
+      },
     },
   };
 }

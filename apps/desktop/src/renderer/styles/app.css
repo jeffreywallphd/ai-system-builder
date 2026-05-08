@@ -14,6 +14,7 @@
 @import "./components/feedback.css";
 @import "./components/python-runtime-footer.css";
 @import "./components/settings.css";
+@import "./components/asset-library.css";
 
 #root {
   min-height: 100vh;

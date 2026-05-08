@@ -35,3 +35,4 @@ Use one of: `proposed`, `accepted`, `superseded`, `deprecated`.
 - ADR-0013: Host-Owned Runtime Execution and Feature Placement (important source for cross-host runtime ownership and feature execution-placement decisions)
 - ADR-0014: Runtime Installer Architecture
 - ADR-0015: Security Architecture and Policy Boundaries (canonical security architecture boundaries across host, transport, storage, runtime, and policy layering)
+- ADR-0016: Asset Kernel Terminology and Architecture Baseline (accepted Phase 2A Asset Kernel vocabulary and sequence refining ADR-0005)

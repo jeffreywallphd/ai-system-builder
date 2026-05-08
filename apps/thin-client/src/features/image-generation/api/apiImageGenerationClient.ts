@@ -42,6 +42,7 @@ export interface ImageGenerationApiClient {
   cancelImageGeneration: (input: { requestId: string }, context?: { source?: string }) => Promise<CancelImageGenerationResult>;
   finalizeImageGenerationIfCompleted: (input: { requestId: string }, context?: { source?: string }) => Promise<FinalizeImageGenerationResult>;
   unloadModel: (context?: { source?: string }) => Promise<UnloadImageGenerationModelResult>;
+  readRuntimeResources: (context?: { source?: string }) => Promise<{ memoryUsagePercent: number; cpuUsagePercent: number; gpuUsagePercent: number }>;
   createArtifactMediaViewUrl: (storageKey: string) => string;
 }
 
@@ -114,6 +115,18 @@ function expectFinalizeResult(value: unknown): FinalizeImageGenerationResult {
   if (!isRecord(value) || typeof value.finalized !== "boolean") throw new Error("Image generation finalize response is malformed.");
   return value as unknown as FinalizeImageGenerationResult;
 }
+function expectRuntimeResources(value: unknown): { memoryUsagePercent: number; cpuUsagePercent: number; gpuUsagePercent: number } {
+  if (!isRecord(value)) throw new Error("Image generation runtime resources response is malformed.");
+  const toPercent = (input: unknown) => {
+    const parsed = Number(input);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  return {
+    memoryUsagePercent: toPercent(value.memoryUsagePercent),
+    cpuUsagePercent: toPercent(value.cpuUsagePercent),
+    gpuUsagePercent: toPercent(value.gpuUsagePercent),
+  };
+}
 
 export function createApiImageGenerationClient(options: { apiBaseUrl?: string; source?: string } = {}): ImageGenerationApiClient {
   const apiBaseUrl = options.apiBaseUrl ?? "/api";
@@ -139,6 +152,10 @@ export function createApiImageGenerationClient(options: { apiBaseUrl?: string; s
     async unloadModel(context) {
       const { envelope, status, endpoint } = await postJson(apiBaseUrl, "/image-generation/unload-model", {}, context?.source ?? source);
       return ensureSuccess(envelope, status, endpoint, expectUnloadModelResult);
+    },
+    async readRuntimeResources(context) {
+      const { envelope, status, endpoint } = await postJson(apiBaseUrl, "/image-generation/runtime-resources", {}, context?.source ?? source);
+      return ensureSuccess(envelope, status, endpoint, expectRuntimeResources);
     },
     createArtifactMediaViewUrl(storageKey) {
       return `${createApiUrl(apiBaseUrl, "/artifact/media/view")}?storageKey=${encodeURIComponent(storageKey)}`;

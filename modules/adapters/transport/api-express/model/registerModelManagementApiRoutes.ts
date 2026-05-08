@@ -1,5 +1,6 @@
 import type { BrowseModelsUseCase, DeleteModelRecordUseCase, DownloadModelUseCase, GetModelDetailsUseCase, ListModelsUseCase, PublishModelUseCase, SaveModelReferenceUseCase, UpdateModelRecordUseCase, ValidateModelUseCase } from "../../../../application/use-cases/model";
 import { createApiError, createApiFailureResponse, createApiSuccessResponse } from "../../../../contracts/api";
+import { isRuntimeCapabilityUnavailableError } from "../../../../application/services/runtime";
 import {
   normalizeBrowseModelsRequest,
   normalizeDeleteModelRecordRequest,
@@ -51,6 +52,7 @@ const mapUpdateModelRecordApiRequestToCommand = (body: unknown): UpdateModelReco
 const mapDeleteModelRecordApiRequestToCommand = (body: unknown): DeleteModelRecordRequest => mapWithContractNormalizer(body, normalizeDeleteModelRecordRequest);
 
 const mapFailureCode = (error: unknown): "internal" | "validation" | "not-found" | "unavailable" => {
+  if (isRuntimeCapabilityUnavailableError(error)) return "unavailable";
   if (error instanceof ModelManagementApiValidationError) return "validation";
   if (typeof error === "object" && error && "code" in error) {
     const code = (error as { code?: string }).code;
@@ -59,6 +61,13 @@ const mapFailureCode = (error: unknown): "internal" | "validation" | "not-found"
   return "internal";
 };
 const statusCode = (response: { ok: boolean; error?: { code: string } }) => response.ok ? 200 : response.error?.code === "validation" ? 400 : response.error?.code === "not-found" ? 404 : response.error?.code === "unavailable" ? 503 : 500;
+
+const safeFailureMessage = (code: "internal" | "validation" | "not-found" | "unavailable", error: unknown): string => {
+  if (code === "unavailable") return "Required runtime capability is not ready.";
+  if (code === "validation") return error instanceof Error ? error.message : "Request validation failed.";
+  if (code === "not-found") return "Model resource was not found.";
+  return "Model management request failed.";
+};
 
 function summarizeBody(body: unknown): Record<string, unknown> {
   const record = isObjectRecord(body) ? body : {};
@@ -104,12 +113,15 @@ function registerRoute(app: ModelManagementExpressRoutePort, logger: ModelRouteL
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {
       const code = mapFailureCode(error);
-      const message = error instanceof Error ? error.message : "Unexpected error.";
+      const message = safeFailureMessage(code, error);
       const details = typeof error === "object" && error !== null && "details" in error && isObjectRecord((error as { details?: unknown }).details)
         ? (error as { details: Record<string, unknown> }).details
         : undefined;
-      logger?.warn("api.model.request.failed", { operation, code, message, details, elapsedMs: Date.now() - startedAt, ...requestSummary, ...context });
-      const apiResponse = createApiFailureResponse(createApiError(operation, code, message, context), context);
+      const safeDetails = isRuntimeCapabilityUnavailableError(error)
+        ? error.details
+        : (code === "validation" || code === "not-found" ? details : undefined);
+      logger?.warn("api.model.request.failed", { operation, code, message, details: safeDetails, elapsedMs: Date.now() - startedAt, ...requestSummary, ...context });
+      const apiResponse = createApiFailureResponse(createApiError(operation, code, message, { ...context, details: isRuntimeCapabilityUnavailableError(error) ? safeDetails : undefined }), context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     }
   });

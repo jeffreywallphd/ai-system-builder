@@ -43,6 +43,8 @@ export interface UseArtifactBrowserFeatureResult {
   viewState: ArtifactBrowserViewState;
   pendingDeleteStorageKey?: string;
   deleteConfirmationInput: string;
+  selectedArtifactKeys: string[];
+  bulkDeleteConfirmationInput: string;
   selectArtifact: (storageKey: string) => Promise<void>;
   refreshArtifacts: () => Promise<void>;
   selectPreviousImage: () => Promise<void>;
@@ -51,6 +53,12 @@ export interface UseArtifactBrowserFeatureResult {
   confirmPendingDelete: () => Promise<void>;
   cancelPendingDelete: () => void;
   setDeleteConfirmationInput: (value: string) => void;
+  toggleSelectedArtifactKey: (storageKey: string) => void;
+  clearSelectedArtifactKeys: () => void;
+  toggleAllArtifactKeys: () => void;
+  areAllArtifactKeysSelected: boolean;
+  setBulkDeleteConfirmationInput: (value: string) => void;
+  deleteSelectedArtifacts: () => Promise<void>;
   publishArtifactToHuggingFace: (input?: {
     repository: string;
     path: string;
@@ -135,6 +143,8 @@ export function useArtifactBrowserFeature(
   const [expandedHuggingFaceDataset, setExpandedHuggingFaceDataset] = useState<string | undefined>();
   const [pendingDeleteStorageKey, setPendingDeleteStorageKey] = useState<string | undefined>();
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState("");
+  const [selectedArtifactKeys, setSelectedArtifactKeys] = useState<string[]>([]);
+  const [bulkDeleteConfirmationInput, setBulkDeleteConfirmationInput] = useState("");
 
   const publishLogic = useArtifactBrowserPublishLogic<ThinClientArtifactDetail>({
     selectedStorageKey,
@@ -250,6 +260,51 @@ export function useArtifactBrowserFeature(
         status: "error",
         message: error instanceof Error ? error.message : "Failed to delete artifact.",
       });
+    }
+  }
+  function toggleSelectedArtifactKey(storageKey: string): void {
+    setSelectedArtifactKeys((current) => (current.includes(storageKey) ? current.filter((key) => key !== storageKey) : [...current, storageKey]));
+  }
+  function clearSelectedArtifactKeys(): void {
+    setSelectedArtifactKeys([]);
+    setBulkDeleteConfirmationInput("");
+  }
+
+  const listedArtifactKeys = items.map((item) => item.storageKey);
+  const areAllArtifactKeysSelected = listedArtifactKeys.length > 0
+    && listedArtifactKeys.every((storageKey) => selectedArtifactKeys.includes(storageKey));
+
+  function toggleAllArtifactKeys(): void {
+    if (areAllArtifactKeysSelected) {
+      clearSelectedArtifactKeys();
+      return;
+    }
+
+    setSelectedArtifactKeys(listedArtifactKeys);
+  }
+
+  async function deleteSelectedArtifacts(): Promise<void> {
+    if (selectedArtifactKeys.length === 0) return;
+    if (bulkDeleteConfirmationInput !== "Delete All") {
+      setViewState({ status: "error", message: "Type Delete All to confirm bulk artifact deletion." });
+      return;
+    }
+    setViewState({ status: "loading", message: `Deleting ${selectedArtifactKeys.length} artifact(s)...` });
+    try {
+      await Promise.all(selectedArtifactKeys.map(async (storageKey) => artifactClient.deleteRegisteredArtifact({ storageKey })));
+      if (selectedStorageKey && selectedArtifactKeys.includes(selectedStorageKey)) {
+        setSelectedStorageKey(undefined);
+        setDetail(undefined);
+        setContent(undefined);
+        setImageViewUrl(undefined);
+        publishLogic.setPublishedBackingFromDetail(undefined);
+      }
+      const deletedCount = selectedArtifactKeys.length;
+      clearSelectedArtifactKeys();
+      await refreshArtifacts();
+      setViewState({ status: "success", message: `Deleted ${deletedCount} artifact(s).` });
+    } catch (error) {
+      setViewState({ status: "error", message: error instanceof Error ? error.message : "Failed to delete selected artifacts." });
     }
   }
 
@@ -482,6 +537,8 @@ export function useArtifactBrowserFeature(
     viewState,
     pendingDeleteStorageKey,
     deleteConfirmationInput,
+    selectedArtifactKeys,
+    bulkDeleteConfirmationInput,
     selectArtifact,
     refreshArtifacts,
     selectPreviousImage: () => selectAdjacentImage(-1),
@@ -489,6 +546,12 @@ export function useArtifactBrowserFeature(
     requestDeleteRegisteredArtifact,
     confirmPendingDelete,
     cancelPendingDelete,
+    toggleSelectedArtifactKey,
+    clearSelectedArtifactKeys,
+    toggleAllArtifactKeys,
+    areAllArtifactKeysSelected,
+    setBulkDeleteConfirmationInput,
+    deleteSelectedArtifacts,
     publishArtifactToHuggingFace,
     registerArtifactFromHuggingFace,
     registerHuggingFaceNamespace,
@@ -515,4 +578,3 @@ export function useArtifactBrowserFeature(
     toggleRegisterForm: () => setShowRegisterForm((current) => !current),
   };
 }
-

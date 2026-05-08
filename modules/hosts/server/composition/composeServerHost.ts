@@ -3,11 +3,13 @@ import { execFile as nodeExecFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { cpus, freemem, totalmem } from "node:os";
+import { spawnSync } from "node:child_process";
 import { promisify } from "node:util";
 import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
 import { FinalizeImageGenerationService } from "../../../application/services/image/finalize-image-generation.service";
 import { ImageGenerationFinalizationOrchestratorService } from "../../../application/services/image/image-generation-finalization-orchestrator.service";
-import { createComfyUiHttpClient, createComfyUiImageGenerationRuntimeAdapter, createComfyUiRuntimeSupervisor } from "../../../adapters/runtime/comfyui";
+import { createComfyUiHttpClient, createComfyUiRuntimeSupervisor } from "../../../adapters/runtime/comfyui";
 import { createComfyUiRuntimeInstaller } from "../../../adapters/runtime/installer/comfyui/createComfyUiRuntimeInstaller";
 import { createPythonRuntimeAdapterFoundation, ensurePythonRuntimeWorkerDependencies } from "../../../adapters/runtime/python";
 import { createGitRuntimeInstallerAdapter } from "../../../adapters/runtime/installer/git/createGitRuntimeInstallerAdapter";
@@ -79,9 +81,18 @@ import {
 } from "../../../adapters/runtime/comfyui/comfyUiPythonEnvironment";
 import type { ComfyUiRuntimeDeviceMode } from "../../../adapters/runtime/comfyui/createComfyUiRuntimeSupervisor";
 import { RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY } from "../../../contracts/settings";
+import { RuntimeCapabilityGuardService } from "../../../application/services/runtime/runtime-capability-guard.service";
+import { createServerRuntimeReadinessService } from "./composeServerRuntimeReadiness";
+import { createServerImageGenerationRuntimeTaskRegistry } from "./composeServerImageGenerationRuntimeTaskRegistry";
+import {
+  composeInternalAssetRegistry,
+  type InternalAssetRegistryComposition,
+} from "../../shared/composition/composeInternalAssetRegistry";
+import { composeResourceBackedViewProviders } from "../../shared/composition/composeResourceBackedViewProviders";
 
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
 const execFile = promisify(nodeExecFile);
+
 
 function parseNumberEnv(value: string | undefined, name: string): number | undefined {
   const normalized = value?.trim();
@@ -308,7 +319,10 @@ export interface ServerHostComposition {
   setHuggingFaceToken: (token: string) => HuggingFaceTokenStatus;
   clearHuggingFaceToken: () => HuggingFaceTokenStatus;
   registerApi: (options: RegisterServerApiOptions) => void;
+  getInternalAssetRegistry: () => InternalAssetRegistryComposition | undefined;
 }
+
+export { createServerRuntimeReadinessService, type CreateServerRuntimeReadinessServiceOptions } from "./composeServerRuntimeReadiness";
 
 export function composeServerHost(
   options: ComposeServerHostOptions = {},
@@ -347,6 +361,8 @@ export function composeServerHost(
     ],
   });
 
+  let internalAssetRegistry: InternalAssetRegistryComposition | undefined;
+
   return {
     loggingPort,
     loggingConfig,
@@ -359,6 +375,9 @@ export function composeServerHost(
     },
     clearHuggingFaceToken() {
       return tokenConfigStore.clearToken();
+    },
+    getInternalAssetRegistry() {
+      return internalAssetRegistry;
     },
     registerApi(registerOptions) {
       const env = options.env ?? process.env;
@@ -669,6 +688,7 @@ export function composeServerHost(
         },
       };
       const comfyUiClient = createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl });
+      let previousCpuSample: { idle: number; total: number } | undefined;
       const imageGenerationRuntimeControl = {
         async unloadModel() {
           if (!comfyUiSupervisor?.isRunning()) {
@@ -677,8 +697,29 @@ export function composeServerHost(
           await comfyUiClient.unloadModels();
           return { unloaded: true, message: "ComfyUI model memory was released." };
         },
+        async readRuntimeResources() {
+          const cpuSamples = cpus();
+          const totalIdle = cpuSamples.reduce((sum, cpu) => sum + cpu.times.idle, 0);
+          const totalTick = cpuSamples.reduce((sum, cpu) => sum + Object.values(cpu.times).reduce((a, b) => a + b, 0), 0);
+          const deltaIdle = previousCpuSample ? totalIdle - previousCpuSample.idle : 0;
+          const deltaTotal = previousCpuSample ? totalTick - previousCpuSample.total : 0;
+          previousCpuSample = { idle: totalIdle, total: totalTick };
+          const cpuUsagePercent = deltaTotal > 0 ? Math.max(0, Math.min(100, (1 - deltaIdle / deltaTotal) * 100)) : 0;
+          const totalMemory = totalmem();
+          const memoryUsagePercent = totalMemory > 0 ? Math.max(0, Math.min(100, ((totalMemory - freemem()) / totalMemory) * 100)) : 0;
+          const gpuSample = spawnSync("nvidia-smi", ["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"], { encoding: "utf8", timeout: 800 });
+          const gpuUsagePercent = gpuSample.status === 0 && gpuSample.stdout
+            ? (() => {
+              const values = gpuSample.stdout.split("\n").map((line) => Number.parseFloat(line.trim())).filter((value) => Number.isFinite(value));
+              if (values.length === 0) return 0;
+              const avg = values.reduce((sum, value) => sum + value, 0) / values.length;
+              return Math.max(0, Math.min(100, avg));
+            })()
+            : 0;
+          return { memoryUsagePercent, cpuUsagePercent, gpuUsagePercent };
+        },
       };
-      const runtimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
+      const runtimeTaskRegistry = createServerImageGenerationRuntimeTaskRegistry({
         client: comfyUiClient,
         supervisor: comfyUiSupervisorPort,
         prepareLatentReferenceImage: async ({ artifactId }) => {
@@ -706,6 +747,20 @@ export function composeServerHost(
       };
 
       const modelRegistry = createLocalModelRegistryAdapter({ filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`, now: options.now });
+      const imageAssetRegistry = createLocalImageAssetRegistryAdapter({
+        filePath: joinHostPath(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
+        now: options.now,
+      });
+      internalAssetRegistry = composeInternalAssetRegistry({
+        rootDirectory: registerOptions.storageRootDirectory,
+        now: options.now,
+        resourceBackedViewProvider: composeResourceBackedViewProviders({
+          artifactBrowserMetadataRead: artifactBrowserRead,
+          imageAssetDescriptorRead: imageAssetRegistry,
+          modelRegistry,
+          publishedModelRegistry: modelRegistry,
+        }),
+      });
       const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({
         accessTokenProvider: () => tokenConfigStore.getToken(),
         logger: modelManagementLogger,
@@ -797,6 +852,19 @@ export function composeServerHost(
       });
       const updateModelRecordUseCase = new UpdateModelRecordUseCase({ modelRegistry });
       const deleteModelRecordUseCase = new DeleteModelRecordUseCase({ modelRegistry });
+      const runtimeReadiness = createServerRuntimeReadinessService({
+        pythonSupervisor: pythonRuntimeFoundation.supervisor,
+        readComfyUiSupervisor: () => comfyUiSupervisor,
+        readComfyUiInstallStatus: async () => {
+          const installer = await createComfyUiInstallerForMode(activeRuntimeDeviceMode ?? runtimeDeviceMode);
+          return (await installer.getInstallStatus({
+            targetId: "comfyui",
+            installRoot: comfyUiInstallRoot,
+          })).status;
+        },
+        now: options.now,
+      });
+      const runtimeCapabilityGuard = new RuntimeCapabilityGuardService(runtimeReadiness);
       const localModelCheckpointResolver = createLocalModelCheckpointResolverAdapter({
         modelRegistry,
         comfyUiCheckpointDirectory: joinHostPath(comfyUiInstallRoot, "models", "checkpoints"),
@@ -807,6 +875,7 @@ export function composeServerHost(
           runtime: comfyUiSupervisorPort,
           modelCheckpointResolver: localModelCheckpointResolver,
         }),
+        runtimeCapabilityGuard,
       });
       const listSettingsDefinitionsUseCase = new ListSettingsDefinitionsUseCase({
         settings: applicationSettings,
@@ -827,10 +896,7 @@ export function composeServerHost(
       const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({
         runtimeTaskRegistry,
         finalizeImageGenerationService: new FinalizeImageGenerationService({
-          imageAssetRegistry: createLocalImageAssetRegistryAdapter({
-            filePath: join(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
-            now: options.now,
-          }),
+          imageAssetRegistry,
           generatedImagePersistence: createFilesystemGeneratedImagePersistenceAdapter({
             comfyUiOutputRoot: joinHostPath(comfyUiInstallRoot, "output"),
             artifactStorageRoot: registerOptions.storageRootDirectory,
@@ -842,6 +908,7 @@ export function composeServerHost(
           now: options.now,
         }),
       });
+
 
       registerExpressApi({
         app: registerOptions.app,
@@ -879,6 +946,8 @@ export function composeServerHost(
         clearSettingUseCase,
         modelManagementLogger,
         restartServer: options.restartServer,
+        runtimeReadiness,
+        assetRegistryRead: internalAssetRegistry.readFacade,
       });
     },
   };

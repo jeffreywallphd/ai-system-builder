@@ -24,6 +24,8 @@ export * from "./desktop-artifact-registered-contract";
 export * from "./desktop-website-ingestion-contract";
 export * from "./desktop-dataset-preparation-contract";
 export * from "./desktop-python-runtime-contract";
+export * from "./desktop-runtime-readiness-contract";
+export * from "./desktop-asset-registry-contract";
 export * from "./desktop-application-settings-contract";
 export * from "./desktop-model-management-contract";
 

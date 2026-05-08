@@ -66,6 +66,7 @@ Configuration loading/resolution remains a composition-root responsibility today
 **Rule**: Contracts are stable cross-boundary language, not implementation containers.
 Contract families must compose, not fork:
 
+- Keep `modules/contracts/asset` as the shared Asset Kernel contract family for core asset identity/lifecycle/provenance/reference/definition/instance/binding/composition vocabulary only; detailed configuration, AI-context, port/rule validation, registry/application ports, persistence, and resource-backed mapping belong to later Phase 2A prompts/layers.
 - Treat `modules/contracts/transport` as the shared transport envelope and operation base.
 - Keep API and IPC contracts as specializations over that shared base.
 - Keep operation identity and IPC channel derivation helper-driven rather than ad hoc string assembly.

@@ -6,6 +6,7 @@ import * as contracts from "..";
 
 const CONTRACT_FAMILIES = [
   "api",
+  "asset",
   "artifact",
   "artifactBrowser",
   "config",
@@ -20,6 +21,7 @@ const CONTRACT_FAMILIES = [
   "persistence",
   "runtime",
   "runtimeInstaller",
+  "security",
   "settings",
   "shared",
   "storage",

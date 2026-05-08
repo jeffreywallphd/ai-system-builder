@@ -29,11 +29,15 @@ import {
 } from "./model/registerModelManagementIpc";
 import { registerImageGenerationIpc, type RegisterImageGenerationIpcDependencies } from "./image-generation/registerImageGenerationIpc";
 import { registerComfyUiRuntimeIpc } from "./comfyui-runtime/registerComfyUiRuntimeIpc";
+import { registerRuntimeReadinessIpc, type RegisterRuntimeReadinessIpcDependencies } from "./runtime-readiness/registerRuntimeReadinessIpc";
+import { registerAssetRegistryIpc, type RegisterAssetRegistryIpcDependencies } from "./asset-registry/registerAssetRegistryIpc";
 import type { RuntimeInstallerPort } from "../../../application/ports/runtime-installer/runtime-installer.port";
 
 export interface RegisterElectronIpcDependencies {
   ipcMain: IpcMainHandlePort;
   pythonRuntime: PythonRuntimeControlPort;
+  runtimeReadiness: RegisterRuntimeReadinessIpcDependencies["runtimeReadiness"];
+  assetRegistryRead?: RegisterAssetRegistryIpcDependencies["assetRegistryRead"];
   getHuggingFaceTokenStatus: RegisterArtifactBrowserIpcDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["clearHuggingFaceToken"];
@@ -80,10 +84,22 @@ export interface RegisterElectronIpcDependencies {
 export function registerElectronIpc(
   dependencies: RegisterElectronIpcDependencies,
 ): void {
+  registerRuntimeReadinessIpc({
+    ipcMain: dependencies.ipcMain,
+    runtimeReadiness: dependencies.runtimeReadiness,
+  });
+
   registerArtifactUploadIpc({
     ipcMain: dependencies.ipcMain,
     storeArtifactUploadUseCase: dependencies.storeArtifactUploadUseCase,
   });
+
+  if (dependencies.assetRegistryRead) {
+    registerAssetRegistryIpc({
+      ipcMain: dependencies.ipcMain,
+      assetRegistryRead: dependencies.assetRegistryRead,
+    });
+  }
 
   registerArtifactBrowserIpc({
     ipcMain: dependencies.ipcMain,

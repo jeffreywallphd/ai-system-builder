@@ -23,6 +23,7 @@ export class ImageGenerationFinalizationOrchestratorService {
       const assets = outputs
         .map((output) => this.toFinalizedAssetRef(output))
         .filter((asset): asset is { assetId: string; artifactId: string; storageKey: string; mediaType: string; source: "generated" } => Boolean(asset));
+      if (assets.length === 0) return { finalized: false, reason: "completed task did not report artifact-backed generated image outputs" };
       this.finalizedRequests.set(requestId, assets);
       return { finalized: true, assets };
     }

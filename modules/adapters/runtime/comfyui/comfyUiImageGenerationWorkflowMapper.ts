@@ -6,6 +6,7 @@ export interface ComfyUiImageGenerationWorkflowMapperOptions {
   defaultHeight?: number;
   defaultSteps?: number;
   latentReferenceImageName?: string;
+  faceReferenceImageNames?: string[];
   defaultSampler?: string;
   defaultScheduler?: string;
 }
@@ -31,19 +32,25 @@ export function mapImageGenerationRequestToComfyUiPrompt(
   const sampler = request.sampler ?? options.defaultSampler ?? "dpmpp_2m";
   const scheduler = request.scheduler ?? options.defaultScheduler ?? "karras";
   const seed = request.seed ?? (Math.floor(Math.random() * Number.MAX_SAFE_INTEGER) + 1);
-  const latentSource = request.latentSource?.kind === "artifact" && options.latentReferenceImageName
-    ? ["10", 0]
-    : ["4", 0];
+  const controlAfterGenerate = request.seed === undefined ? "randomize" : "fixed";
+  const numImages = Math.max(Math.floor(request.numImages ?? 1), 1);
+  const hasLatentReference = request.latentSource?.kind === "artifact" && Boolean(options.latentReferenceImageName);
+  const faceIdReferences = (request.faceId?.enabled ? request.faceId.references : undefined) ?? [];
+  const faceReferenceImageName = options.faceReferenceImageNames?.find((imageName) => imageName.trim().length > 0);
+  const hasFaceReference = faceIdReferences.length > 0 && Boolean(faceReferenceImageName) && !hasLatentReference;
+  const encodedLatentSource = hasLatentReference ? ["10", 0] : hasFaceReference ? ["18", 0] : undefined;
+  const latentSource = encodedLatentSource && numImages > 1 ? ["11", 0] : encodedLatentSource ?? ["4", 0];
 
   const prompt: ComfyUiPromptPayload["prompt"] = {
       "1": { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: checkpoint } },
       "2": { class_type: "CLIPTextEncode", inputs: { text: request.prompt, clip: ["1", 1] } },
       "3": { class_type: "CLIPTextEncode", inputs: { text: request.negativePrompt ?? "", clip: ["1", 1] } },
-      "4": { class_type: "EmptyLatentImage", inputs: { width, height, batch_size: request.numImages ?? 1 } },
+      "4": { class_type: "EmptyLatentImage", inputs: { width, height, batch_size: numImages } },
       "5": {
         class_type: "KSampler",
         inputs: {
           seed,
+          control_after_generate: controlAfterGenerate,
           steps,
           cfg,
           sampler_name: sampler,
@@ -64,6 +71,14 @@ export function mapImageGenerationRequestToComfyUiPrompt(
     prompt["9"] = { class_type: "ResizeAndPadImage", inputs: { image: ["8", 0], target_width: width, target_height: height, padding_color: "black", interpolation: "area" } };
     prompt["10"] = { class_type: "VAEEncode", inputs: { pixels: ["9", 0], vae: ["1", 2] } };
   }
+  if (hasFaceReference) {
+    prompt["17"] = { class_type: "LoadImage", inputs: { image: faceReferenceImageName } };
+    prompt["18"] = { class_type: "VAEEncode", inputs: { pixels: ["17", 0], vae: ["1", 2] } };
+  }
+  if (encodedLatentSource && numImages > 1) {
+    prompt["11"] = { class_type: "RepeatLatentBatch", inputs: { samples: encodedLatentSource, amount: numImages } };
+  }
 
   return { prompt };
 }
+

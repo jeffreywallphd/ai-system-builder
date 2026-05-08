@@ -1,4 +1,6 @@
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
+import { RuntimeCapabilityUnavailableError } from "../../../../application/services/runtime";
+import { createRuntimeCapabilityStatus } from "../../../../contracts/runtime";
 import { registerModelManagementApiRoutes, type ModelManagementExpressRoutePort } from "../model/registerModelManagementApiRoutes";
 
 function response(){const json=testDouble.fn();const status=testDouble.fn();const res:any={status:status.mockImplementation(()=>res),json};return{res,status,json};}
@@ -60,6 +62,42 @@ describe("registerModelManagementApiRoutes",()=>{
     registerModelManagementApiRoutes({app,logger,browseModelsUseCase:{execute:testDouble.fn(async()=>{throw {code:'unavailable',message:'hf down'};})},getModelDetailsUseCase:{execute:testDouble.fn(async()=>({}))},listModelsUseCase:{execute:testDouble.fn(async()=>({models:[]}))},saveModelReferenceUseCase:{execute:testDouble.fn(async()=>({}))},downloadModelUseCase:{execute:testDouble.fn(async()=>({}))},updateModelRecordUseCase:{execute:testDouble.fn(async()=>({}))},deleteModelRecordUseCase:{execute:testDouble.fn(async()=>({}))}});
     await handlers.get('/api/model/browse')({body:{provider:'huggingface',query:'flux'},headers:{}},response().res);
     const warnCalls = logger.warn.mock.calls;
-    expect(warnCalls.some((call:any[]) => call[0]==='api.model.request.failed' && call[1]?.operation==='model.browse' && call[1]?.code==='unavailable' && call[1]?.message==='hf down')).toBe(true);
+    expect(warnCalls.some((call:any[]) => call[0]==='api.model.request.failed' && call[1]?.operation==='model.browse' && call[1]?.code==='unavailable' && call[1]?.message==='Required runtime capability is not ready.')).toBe(true);
+  });
+
+  it("sanitizes internal model API failures", async()=>{
+    const handlers=new Map<string,any>(); const app:ModelManagementExpressRoutePort={post:testDouble.fn((p,h)=>handlers.set(p,h))};
+    registerModelManagementApiRoutes({app,browseModelsUseCase:{execute:testDouble.fn(async()=>{throw new Error('raw model failure at /tmp/secret\nstack trace');})},getModelDetailsUseCase:{execute:testDouble.fn(async()=>({}))},listModelsUseCase:{execute:testDouble.fn(async()=>({models:[]}))},saveModelReferenceUseCase:{execute:testDouble.fn(async()=>({}))},downloadModelUseCase:{execute:testDouble.fn(async()=>({}))},updateModelRecordUseCase:{execute:testDouble.fn(async()=>({}))},deleteModelRecordUseCase:{execute:testDouble.fn(async()=>({}))}});
+    const out=response(); await handlers.get('/api/model/browse')({body:{provider:'huggingface',query:'flux'},headers:{}},out.res);
+    expect(out.status).toHaveBeenCalledWith(500);
+    expect(out.json.mock.calls[0]?.[0]).toMatchObject({ok:false,error:{code:'internal',message:'Model management request failed.'}});
+    expect(JSON.stringify(out.json.mock.calls[0]?.[0])).not.toContain('/tmp/secret');
+    expect(JSON.stringify(out.json.mock.calls[0]?.[0])).not.toContain('stack trace');
+  });
+
+  it("maps runtime capability unavailable failures to sanitized API details", async()=>{
+    const handlers=new Map<string,any>(); const app:ModelManagementExpressRoutePort={post:testDouble.fn((p,h)=>handlers.set(p,h))};
+    const unavailable = new RuntimeCapabilityUnavailableError(createRuntimeCapabilityStatus({
+      capabilityId: "model-training",
+      status: "failed",
+      summary: "Model training runtime failed readiness checks.",
+      reason: { code: "runtime.python.failed", message: "raw stack /tmp/secret TOKEN=abc", category: "startup", retryable: true },
+      recommendedActions: ["retry", "view-logs"],
+    }));
+    registerModelManagementApiRoutes({app,browseModelsUseCase:{execute:testDouble.fn(async()=>{throw unavailable;})},getModelDetailsUseCase:{execute:testDouble.fn(async()=>({}))},listModelsUseCase:{execute:testDouble.fn(async()=>({models:[]}))},saveModelReferenceUseCase:{execute:testDouble.fn(async()=>({}))},downloadModelUseCase:{execute:testDouble.fn(async()=>({}))},updateModelRecordUseCase:{execute:testDouble.fn(async()=>({}))},deleteModelRecordUseCase:{execute:testDouble.fn(async()=>({}))}});
+
+    const out=response(); await handlers.get('/api/model/browse')({body:{provider:'huggingface',query:'flux'},headers:{'x-request-id':'req-model','x-correlation-id':'corr-model'}},out.res);
+
+    expect(out.status).toHaveBeenCalledWith(503);
+    expect(out.json.mock.calls[0]?.[0]).toMatchObject({
+      ok:false,
+      requestId:"req-model",
+      correlationId:"corr-model",
+      error:{code:"unavailable",message:"Required runtime capability is not ready.",details:{capabilityId:"model-training",status:"failed",reason:{code:"runtime.python.failed",category:"startup"},recommendedActions:["retry","view-logs"]}},
+    });
+    const payload = JSON.stringify(out.json.mock.calls[0]?.[0]);
+    expect(payload).not.toContain('/tmp/secret');
+    expect(payload).not.toContain('TOKEN=abc');
+    expect(payload).not.toContain('raw stack');
   });
 });

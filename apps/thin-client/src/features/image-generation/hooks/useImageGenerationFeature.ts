@@ -12,16 +12,20 @@ import { createApiModelManagementClient, type ModelManagementApiClient } from ".
 import { createApiImageGenerationClient, type FinalizedImageAsset, type ImageGenerationApiClient } from "../api/apiImageGenerationClient";
 
 const POLL_INTERVAL_MS = 1200;
+const RESOURCE_POLL_INTERVAL_MS = 5000;
 const DEFAULT_PROMPT = "raw photo quality image; 35mm camera quality image; a dog in the park";
 const DEFAULT_NEGATIVE_PROMPT = "anime; cartoon; melty; blurry";
 type UiStatus = "idle" | "starting" | "queued" | "running" | "succeeded" | "finalizing" | "finalized" | "failed" | "cancelled";
 const ACTIVE_STATUSES: UiStatus[] = ["starting", "queued", "running", "finalizing"];
 
-export interface ImageGenerationFormState { prompt: string; negativePrompt: string; seed: string; width: string; height: string; steps: string; cfg: string; denoise: string; sampler: string; scheduler: string; model: string; numImages: string; latentSourceArtifactId: string }
+export interface ImageGenerationFormState { prompt: string; negativePrompt: string; seed: string; width: string; height: string; steps: string; cfg: string; denoise: string; sampler: string; scheduler: string; model: string; numImages: string; latentSourceArtifactId: string; faceIdEnabled: boolean; faceIdArtifactId1: string; faceIdArtifactId2: string; faceIdArtifactId3: string; faceIdIdentityStrength: string; faceIdStructureStrength: string; faceIdNoise: string; }
 export type ImageGenerationRuntimeMode = "auto" | "cpu" | "cuda" | "directml";
 const defaultImageGenerationClient = createApiImageGenerationClient();
 const defaultModelManagementClient = createApiModelManagementClient();
 const defaultArtifactBrowserClient = createApiArtifactBrowserClient();
+
+interface PersistedImageGenerationState { form: ImageGenerationFormState; runtimeMode: ImageGenerationRuntimeMode; status: UiStatus; requestId?: string; error?: string; results: FinalizedImageAsset[]; }
+let persistedState: PersistedImageGenerationState | undefined;
 
 export function isServerInventoryImageGenerationModel(model: ModelInventoryRecord): boolean {
   return isImageGenerationModelCandidate(model);
@@ -40,6 +44,8 @@ const toUiStatus = (status: RuntimeTaskStatus): UiStatus => (["queued", "running
 const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 const parsePositiveInt = (v: string) => { const n = Number(v); return Number.isInteger(n) && Number.isFinite(n) && n > 0 ? n : undefined; };
 const parseSeed = (v: string) => { if (!v.trim()) return undefined; const n = Number(v); return Number.isInteger(n) && Number.isFinite(n) ? n : undefined; };
+const randomSeed = () => Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+const hasFinalizedAssets = (assets: FinalizedImageAsset[] | undefined): assets is FinalizedImageAsset[] => Array.isArray(assets) && assets.length > 0;
 
 export function useImageGenerationFeature(
   client: ImageGenerationApiClient = defaultImageGenerationClient,
@@ -47,8 +53,8 @@ export function useImageGenerationFeature(
   modelClient: ModelManagementApiClient = defaultModelManagementClient,
   artifactClient: ArtifactBrowserApiClient = defaultArtifactBrowserClient,
 ) {
-  const [form, setForm] = useState<ImageGenerationFormState>({ prompt: DEFAULT_PROMPT, negativePrompt: DEFAULT_NEGATIVE_PROMPT, seed: "", width: "1024", height: "1024", steps: "20", cfg: "8", denoise: "1", sampler: "dpmpp_2m", scheduler: "karras", model: "", numImages: "1", latentSourceArtifactId: "" });
-  const [runtimeMode, setRuntimeMode] = useState<ImageGenerationRuntimeMode>("auto");
+  const [form, setForm] = useState<ImageGenerationFormState>(persistedState?.form ?? { prompt: DEFAULT_PROMPT, negativePrompt: DEFAULT_NEGATIVE_PROMPT, seed: "", width: "1024", height: "1024", steps: "20", cfg: "8", denoise: "1", sampler: "dpmpp_2m", scheduler: "karras", model: "", numImages: "1", latentSourceArtifactId: "", faceIdEnabled: false, faceIdArtifactId1: "", faceIdArtifactId2: "", faceIdArtifactId3: "", faceIdIdentityStrength: "0.85", faceIdStructureStrength: "0.75", faceIdNoise: "0.35" });
+  const [runtimeMode, setRuntimeMode] = useState<ImageGenerationRuntimeMode>(persistedState?.runtimeMode ?? "auto");
   const [modelInventory, setModelInventory] = useState<ModelInventoryRecord[]>([]);
   const [modelInventoryLoading, setModelInventoryLoading] = useState(false);
   const [modelInventoryError, setModelInventoryError] = useState<string | undefined>(undefined);
@@ -56,12 +62,13 @@ export function useImageGenerationFeature(
   const [imageArtifacts, setImageArtifacts] = useState<ThinClientArtifactBrowseItem[]>([]);
   const [imageArtifactsLoading, setImageArtifactsLoading] = useState(false);
   const [imageArtifactsError, setImageArtifactsError] = useState<string | undefined>(undefined);
-  const [status, setStatus] = useState<UiStatus>("idle");
-  const [requestId, setRequestId] = useState<string | undefined>(undefined);
-  const [error, setError] = useState<string | undefined>(undefined);
-  const [results, setResults] = useState<FinalizedImageAsset[]>([]);
+  const [status, setStatus] = useState<UiStatus>(persistedState?.status ?? "idle");
+  const [requestId, setRequestId] = useState<string | undefined>(persistedState?.requestId);
+  const [error, setError] = useState<string | undefined>(persistedState?.error);
+  const [results, setResults] = useState<FinalizedImageAsset[]>(persistedState?.results ?? []);
   const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false);
   const [unloadModelState, setUnloadModelState] = useState<{ status: "idle" | "loading" | "success" | "error"; message?: string }>({ status: "idle" });
+  const [runtimeResources, setRuntimeResources] = useState<{ memoryUsagePercent: number; cpuUsagePercent: number; gpuUsagePercent: number }>({ memoryUsagePercent: 0, cpuUsagePercent: 0, gpuUsagePercent: 0 });
 
   const mountedRef = useRef(true);
   const activeRequestRef = useRef<string | undefined>(undefined);
@@ -76,14 +83,12 @@ export function useImageGenerationFeature(
     const requestId = ++modelInventoryRequestRef.current;
     setModelInventoryLoading(true);
     setModelInventoryError(undefined);
-    console.info("[image-generation] inventory.list.start", { operation: "list", endpoint: "/api/model/list" });
-    try {
+        try {
       const result = await modelClient.listModels();
       if (!mountedRef.current || requestId !== modelInventoryRequestRef.current) return;
       const sorted = [...result.models].sort((a, b) => rankInventoryModel(a) - rankInventoryModel(b) || a.displayName.localeCompare(b.displayName));
       const downloadedImageModel = sorted.find((m) => isServerInventoryImageGenerationModel(m) && isImageGenerationModelReady(m));
       setModelInventory(sorted);
-      console.info("[image-generation] inventory.list.success", { operation: "list", endpoint: "/api/model/list", totalModels: sorted.length, imageCandidates: sorted.filter(isServerInventoryImageGenerationModel).length, selectedModelRecordId: downloadedImageModel?.modelRecordId ?? "", manualFallback: !downloadedImageModel });
       setSelectedModelRecordId((current) => {
         if (current && sorted.some((m) => m.modelRecordId === current && isServerInventoryImageGenerationModel(m))) return current;
         if (downloadedImageModel) return downloadedImageModel.modelRecordId;
@@ -92,7 +97,6 @@ export function useImageGenerationFeature(
     } catch (e) {
       if (!mountedRef.current || requestId !== modelInventoryRequestRef.current) return;
       const message = e instanceof Error ? e.message : "Failed to load model inventory.";
-      console.warn("[image-generation] inventory.list.failure", { operation: "list", endpoint: "/api/model/list", message, selectedModelRecordId });
       setModelInventoryError(message);
     } finally {
       if (mountedRef.current && requestId === modelInventoryRequestRef.current) setModelInventoryLoading(false);
@@ -118,6 +122,23 @@ export function useImageGenerationFeature(
   }, [artifactClient]);
 
   useEffect(() => { void refreshImageArtifacts(); }, [refreshImageArtifacts]);
+  useEffect(() => {
+    let cancelled = false;
+    let timer: number | undefined;
+    const pollResources = async () => {
+      try {
+        const snapshot = await client.readRuntimeResources();
+        if (!cancelled) setRuntimeResources(snapshot);
+      } finally {
+        if (!cancelled) timer = window.setTimeout(() => { void pollResources(); }, RESOURCE_POLL_INTERVAL_MS);
+      }
+    };
+    void pollResources();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [client]);
 
   const validationError = useMemo(() => {
     if (!form.prompt.trim()) return "Prompt is required.";
@@ -125,6 +146,9 @@ export function useImageGenerationFeature(
     if (form.seed.trim() && parseSeed(form.seed) === undefined) return "Seed must be a finite integer when provided.";
     const cfg = Number(form.cfg); if (!Number.isFinite(cfg) || cfg <= 0) return "CFG must be a positive number.";
     const denoise = Number(form.denoise); if (!Number.isFinite(denoise) || denoise < 0 || denoise > 1) return "Denoise must be between 0 and 1.";
+    if (form.faceIdEnabled) {
+      if (!form.faceIdArtifactId1.trim()) return "FaceID requires at least one face reference image.";
+    }
     return undefined;
   }, [form]);
 
@@ -168,13 +192,30 @@ export function useImageGenerationFeature(
         cfg: Number(form.cfg), denoise: Number(form.denoise),
         sampler: form.sampler.trim() || "dpmpp_2m", scheduler: form.scheduler.trim() || "karras",
       };
-      const seed = parseSeed(form.seed); if (seed !== undefined) payload.seed = seed;
+      const seed = parseSeed(form.seed); payload.seed = seed ?? randomSeed();
       if (selectedModelRecordId.trim()) payload.model = selectedModelRecordId.trim();
       else if (form.model.trim()) payload.model = form.model.trim();
       if (form.negativePrompt.trim()) payload.negativePrompt = form.negativePrompt.trim();
       if (form.latentSourceArtifactId.trim()) payload.latentSource = { kind: "artifact", artifactId: form.latentSourceArtifactId.trim() };
       else payload.latentSource = { kind: "empty" };
       payload.engineHints = { ...(payload.engineHints ?? {}), runtimeDeviceMode: runtimeMode };
+      if (form.faceIdEnabled) {
+        const references = [form.faceIdArtifactId1, form.faceIdArtifactId2, form.faceIdArtifactId3]
+          .map((value) => value.trim())
+          .filter((value) => value.length > 0)
+          .slice(0, 3)
+          .map((artifactId) => ({ artifactId }));
+        if (references.length > 0) {
+          payload.faceId = {
+            enabled: true,
+            references,
+            identityStrength: Number(form.faceIdIdentityStrength),
+            structureStrength: Number(form.faceIdStructureStrength),
+            noise: Number(form.faceIdNoise),
+          };
+          console.info("[thin-client][image-generation] FaceID enabled for request.", { referenceCount: references.length, hasLatentSource: payload.latentSource?.kind === "artifact" });
+        }
+      }
 
       const started = await client.startImageGeneration(payload);
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;
@@ -183,22 +224,24 @@ export function useImageGenerationFeature(
       const finalTask = await pollUntilTerminal(started.requestId, runId);
       if (!finalTask || !mountedRef.current || pollRunIdRef.current !== runId) return;
       if (finalTask.status !== "succeeded") return;
-
-      if (finalizedByRequestRef.current.has(started.requestId)) { setStatus("finalized"); return; }
       setStatus("finalizing");
       const finalized = await client.finalizeImageGenerationIfCompleted({ requestId: started.requestId });
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;
-
-      if (finalized.finalized) {
-        finalizedByRequestRef.current.add(started.requestId);
-        const assets = finalized.assets ?? [];
-        setResults(assets);
-        setStatus("finalized");
-        onGenerated?.(assets);
-      } else {
+      if (!finalized.finalized) {
         setStatus("failed");
         setError(finalized.reason ?? "Finalization did not complete.");
+        return;
       }
+      finalizedByRequestRef.current.add(started.requestId);
+      const assets = finalized.assets ?? [];
+      if (!hasFinalizedAssets(assets)) {
+        setStatus("failed");
+        setError("Image generation finalized but did not register any generated image artifacts.");
+        return;
+      }
+      setResults(assets);
+      setStatus("finalized");
+      onGenerated?.(assets);
     } catch (cause) {
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;
       setStatus("failed");
@@ -214,6 +257,8 @@ export function useImageGenerationFeature(
     if (!id) return;
     try { await client.cancelImageGeneration({ requestId: id }); } catch { }
   }, [client, requestId]);
+
+
 
   const unloadModel = useCallback(async () => {
     setUnloadModelState({ status: "loading", message: "Unloading image generation model..." });
@@ -238,6 +283,52 @@ export function useImageGenerationFeature(
     setError(validationError);
   }, [form, hasAttemptedGeneration, validationError]);
 
+
+  useEffect(() => {
+    persistedState = { form, runtimeMode, status, requestId, error, results };
+  }, [form, runtimeMode, status, requestId, error, results]);
+
+  useEffect(() => {
+    if (!requestId || !["starting", "queued", "running", "finalizing"].includes(status)) return;
+    if (activeRequestRef.current === requestId) return;
+    pollRunIdRef.current += 1;
+    const runId = pollRunIdRef.current;
+    activeRequestRef.current = requestId;
+    void pollUntilTerminal(requestId, runId).then(async (task) => {
+      if (!task || !mountedRef.current || pollRunIdRef.current !== runId) return;
+      if (task.status !== "succeeded") {
+        setStatus(toUiStatus(task.status));
+        return;
+      }
+      if (finalizedByRequestRef.current.has(requestId)) {
+        setStatus("finalized");
+        return;
+      }
+      setStatus("finalizing");
+      const finalized = await client.finalizeImageGenerationIfCompleted({ requestId });
+      if (!mountedRef.current || pollRunIdRef.current !== runId) return;
+      if (!finalized.finalized) {
+        setStatus("failed");
+        setError(finalized.reason ?? "Finalization did not complete.");
+        return;
+      }
+      finalizedByRequestRef.current.add(requestId);
+      const assets = finalized.assets ?? [];
+      if (!hasFinalizedAssets(assets)) {
+        setStatus("failed");
+        setError("Image generation finalized but did not register any generated image artifacts.");
+        return;
+      }
+      setResults(assets);
+      setStatus("finalized");
+      onGenerated?.(assets);
+    }).catch((cause) => {
+      if (!mountedRef.current || pollRunIdRef.current !== runId) return;
+      setStatus("failed");
+      setError(cause instanceof Error ? cause.message : "Image generation failed.");
+    });
+  }, [client, onGenerated, pollUntilTerminal, requestId, status]);
+
   const qualityNote = useMemo(() => {
     const width = Number(form.width); const height = Number(form.height); const steps = Number(form.steps);
     if (width <= 256 || height <= 256 || steps < 15) return "Quality warning: very small resolution or low steps can reduce detail; SDXL-style models generally perform better with larger sizes and 15+ steps.";
@@ -249,5 +340,5 @@ export function useImageGenerationFeature(
   const referenceOnlyImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => !isImageGenerationModelReady(m)), [imageGenerationModels]);
   const imageGenerationModelOptions = useMemo(() => imageGenerationModels.map(toImageGenerationModelDropdownOption).filter((option): option is NonNullable<typeof option> => Boolean(option)), [imageGenerationModels]);
 
-  return { form, setForm, runtimeMode, setRuntimeMode, status, error, requestId, results, start, cancel, unloadModel, unloadModelState, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), isUnloadModelDisabled: ACTIVE_STATUSES.includes(status) || unloadModelState.status === "loading", createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions, imageArtifacts, imageArtifactsLoading, imageArtifactsError, refreshImageArtifacts };
+  return { form, setForm, runtimeMode, setRuntimeMode, status, error, requestId, results, start, cancel, unloadModel, unloadModelState, runtimeResources, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), isUnloadModelDisabled: ACTIVE_STATUSES.includes(status) || unloadModelState.status === "loading", createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions, imageArtifacts, imageArtifactsLoading, imageArtifactsError, refreshImageArtifacts };
 }

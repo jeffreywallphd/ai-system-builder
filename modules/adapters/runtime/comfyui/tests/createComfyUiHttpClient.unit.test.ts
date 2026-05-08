@@ -46,6 +46,13 @@ describe("createComfyUiHttpClient", () => {
     expect(result).toEqual({ unloadedModels: true, freedMemory: true });
   });
 
+  it("accepts successful /free responses even when response JSON is invalid", async () => {
+    const fetcher = testDouble.fn().mockResolvedValue({ ok: true, status: 200, json: async () => { throw new Error("invalid json"); } });
+    const client = createComfyUiHttpClient({ baseUrl: "http://127.0.0.1:8188", fetchImplementation: fetcher as never });
+
+    await expect(client.unloadModels()).resolves.toEqual({ unloadedModels: true, freedMemory: true });
+  });
+
   it("surfaces endpoint failures", async () => {
     const fetcher = testDouble.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ error: "boom" }) });
     const client = createComfyUiHttpClient({ baseUrl: "http://127.0.0.1:8188", fetchImplementation: fetcher as never });

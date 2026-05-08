@@ -1,5 +1,9 @@
 # Host Model
 
+## Asset Kernel relationship
+
+Assets may declare host and permission requirements, but hosts remain responsible for composition and concrete runtime/readiness provider wiring. Asset metadata should stay declarative and transport/UI-neutral; desktop IPC, server API, and renderer models must not redefine asset semantics. Permission requirements can be validated structurally first, with enforcement added later through application and host policy seams.
+
 ## What a host means in this repository
 
 A **host** is the runtime environment composition layer that starts and operates the system in a specific deployment mode.
@@ -25,12 +29,14 @@ Hosts are implemented under `modules/hosts/` and surfaced through `apps/*` entry
   - renderer: React UI composition only (no filesystem or IPC internals),
   - host composition (`modules/hosts/desktop`): adapter/use-case wiring.
 - Desktop artifact publish/verification uses the same shared application use case path as server/thin-client (`PublishArtifactToRepoUseCase`, `VerifyPublishedArtifactBackingUseCase`) and is exposed through preload+IPC transport wiring rather than renderer-side orchestration.
+- Desktop host composition may use focused helper modules for runtime readiness, storage, model management, image generation, and transport registration, but those helpers remain composition-only wiring seams and must not absorb business policy, runtime protocol logic, or IPC payload shaping. Phase 1 extracted runtime readiness helpers plus small runtime-task-registry wiring helpers; broader storage/model/image-generation decomposition remains future cleanup unless completed in a later change.
 
 ## Server host
 
 - Owns server process lifecycle and composition.
 - Uses transport adapters (default: Express) for API exposure.
 - Keeps route/controller logic thin and delegates use-case behavior inward.
+- Server host composition may use focused helper modules for runtime readiness, storage, model management, image generation, and API registration, but those helpers remain composition-only wiring seams and must not absorb business policy, runtime protocol logic, or Express payload shaping. Phase 1 extracted runtime readiness helpers plus small runtime-task-registry wiring helpers; broader storage/model/image-generation decomposition remains future cleanup unless completed in a later change.
 
 ## Why hosts are separate from transport adapters
 
@@ -145,6 +151,18 @@ See ADR-0013 for canonical cross-host runtime ownership and placement guidance.
 
 If host code starts accumulating business logic, move that logic inward before it becomes entrenched.
 
+
+### Private Asset Kernel composition
+
+`modules/hosts/shared/composition/composeLocalAssetKernel.ts` is the shared internal helper for local Asset Kernel composition. It initializes and validates the adapter-owned `<storageRootDirectory>/asset-kernel/` record store and returns repository ports plus existing application registry use cases for host-internal consumers. `modules/hosts/shared/composition/composeInternalAssetRegistry.ts` builds on that helper by composing the application `AssetRegistryReadFacade` as an internal host-owned service with an injected aggregate resource-backed view provider. Desktop `registerArtifactUploadIpc` and server `registerApi` now compose this internal registry from their storage roots and wire `composeResourceBackedViewProviders` from already-composed safe descriptor/read seams. Missing families remain unsupported/not wired with sanitized diagnostics. No startup seeding, new IPC channels, new API routes, preload methods, renderer UI, thin-client UI, resource-backed scans, provider/network calls, byte reads, or runtime behavior are added, and runtime roots remain separate from Asset Kernel persistence and provider reads.
+
+Phase 2C desktop composition passes only the internal registry read facade/read port into Electron IPC registration for definition list/read/version reads. It does not pass the full internal registry composition, repositories, mutation use cases, seed services, storage adapters, runtime adapters, or provider clients to asset IPC handlers. The desktop renderer Asset Library consumes only the preload-backed read client and shared UI read models; it does not import host composition, application services, persistence/storage adapters, transport handlers, runtime adapters, or provider clients.
+
+Phase 2C server composition follows the same boundary: it may hold the full internal Asset Registry privately, but it passes only the read facade/read port to Express Asset Registry route registration. The thin-client Asset Library consumes only the GET-only server API client and shared UI read models. The public API/IPC/preload scope is read-only definition list/read/version-read plus read-only resource-backed view list/detail; no host transport may seed built-ins, mutate assets, scan resources, call runtime readiness/task registries, call providers, read bytes, or expose instances/compositions for this phase.
+
+Asset Library validation diagnostics are explicit read-side details only: normal list and detail reads do not request validation, and the UI may request validation only through the existing read operation with `includeValidation: true`. Advanced technical sections stay collapsed by default, built-in seeding remains explicit/internal, and resource-backed views are visible as computed read models without public scan, provider-call, runtime-call, mutation, or byte-read behavior.
+
+Phase 3 Prompt 8 plus scope reconciliation stabilizes this state for final provider review. Resource-backed provider wiring stays internal to desktop/server host composition and the application Asset Registry read facade; public API routes, IPC channels, preload methods, and desktop/thin-client controls expose only read-only resource-backed list/detail views through that facade. Hosts must not own provider business logic or add automatic seeding, registration/import/finalization/localization/publishing workflows, scans, provider/network calls, runtime/task-registry calls, or byte/content reads for resource-backed views.
 
 ### Current host parity for repo-backed artifact workflows
 

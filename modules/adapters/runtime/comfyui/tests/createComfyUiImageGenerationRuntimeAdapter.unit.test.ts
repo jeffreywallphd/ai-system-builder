@@ -40,6 +40,32 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
     expect(result.metadata).toMatchObject({ requestedRuntimeDeviceMode: "cuda", runtimeDeviceMode: "cuda" });
   });
 
+  it("prepares FaceID artifact references before submitting the ComfyUI prompt", async () => {
+    const supervisor = { ...baseSupervisor, start: testDouble.fn(async () => {}) };
+    const client = { submitPrompt: testDouble.fn(async () => ({ prompt_id: "p1", number: 1 })), getQueue: testDouble.fn(), getHistory: testDouble.fn() };
+    const prepareFaceReferenceImage = testDouble.fn(async () => ({ imageName: "prepared-face.png" }));
+    const adapter = createComfyUiImageGenerationRuntimeAdapter({
+      supervisor,
+      client,
+      prepareFaceReferenceImage,
+      mapperOptions: { defaultCheckpoint: "sdxl" },
+    });
+
+    await adapter.startTask({
+      taskType: TaskType.IMAGE_GENERATION,
+      payload: { prompt: "portrait", faceId: { enabled: true, references: [{ artifactId: "uploads/face.png" }] } },
+      requestId: "r-face",
+    });
+
+    expect(prepareFaceReferenceImage.mock.calls[0]?.[0]).toMatchObject({
+      artifactId: "uploads/face.png",
+      imageRequest: { prompt: "portrait" },
+    });
+    const submittedPrompt = client.submitPrompt.mock.calls[0]?.[0]?.prompt;
+    expect(submittedPrompt["17"]).toEqual({ class_type: "LoadImage", inputs: { image: "prepared-face.png" } });
+    expect(Object.values(submittedPrompt).map((node: any) => node.class_type)).not.toContain("InstantIDModelLoader");
+  });
+
   it("read maps running state", async () => {
     const adapter = createComfyUiImageGenerationRuntimeAdapter({
       supervisor: baseSupervisor,
@@ -129,7 +155,7 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
       mapperOptions: { defaultCheckpoint: "sdxl" },
     });
     const result = await adapter.cancelTask("r1");
-    expect(result).toEqual({ requestId: "r1", cancelled: false, status: "unknown", message: "ComfyUI image generation cancellation is not implemented yet." });
+    expect(result).toEqual({ requestId: "r1", cancelled: false, status: "unknown", message: "Runtime task was not found in this task registry delegate." });
   });
 
   it("returns unknown with clear error when prompt disappears from queue and history", async () => {
@@ -153,6 +179,77 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
       client: { submitPrompt: testDouble.fn(async () => ({ prompt_id: "p1" })), getQueue: testDouble.fn(), getHistory: testDouble.fn() },
       mapperOptions: { defaultCheckpoint: "sdxl" },
     });
-    await expect(adapter.startTask({ taskType: TaskType.TRAIN_MODEL, payload: {} })).rejects.toThrow("only supports image-generation tasks");
+    await expect(adapter.startTask({ taskType: TaskType.MODEL_TRAINING, payload: {} })).rejects.toThrow("only supports image-generation tasks");
   });
+
+  it("started tasks appear in listTasks without probing ComfyUI status endpoints", async () => {
+    const supervisor = { ...baseSupervisor, start: testDouble.fn(async () => {}) };
+    const client = {
+      submitPrompt: testDouble.fn(async () => ({ prompt_id: "p-list", number: 1 })),
+      getQueue: testDouble.fn(async () => ({ queue_running: [], queue_pending: [] })),
+      getHistory: testDouble.fn(async () => ({})),
+    };
+    const adapter = createComfyUiImageGenerationRuntimeAdapter({ supervisor, client, mapperOptions: { defaultCheckpoint: "sdxl" }, now: () => "2026-05-06T00:00:00.000Z" });
+
+    await adapter.startTask({ taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r-list" });
+    const result = await adapter.listTasks({ taskTypes: [TaskType.IMAGE_GENERATION] });
+
+    expect(result.tasks.length).toBe(1);
+    expect(result.tasks[0]).toMatchObject({ requestId: "r-list", taskType: TaskType.IMAGE_GENERATION, status: "queued", metadata: { comfyUiPromptId: "p-list" } });
+    expect(client.getQueue).not.toHaveBeenCalled();
+    expect(client.getHistory).not.toHaveBeenCalled();
+  });
+
+  it("terminal tasks remain listable after status resolves final result", async () => {
+    const adapter = createComfyUiImageGenerationRuntimeAdapter({
+      supervisor: baseSupervisor,
+      client: {
+        submitPrompt: testDouble.fn(async () => ({ prompt_id: "p-final" })),
+        getQueue: testDouble.fn(async () => ({ queue_running: [], queue_pending: [] })),
+        getHistory: testDouble.fn(async () => ({ p_final: { outputs: {} }, "p-final": { outputs: { "7": { images: [{ filename: "x.png" }] } } } })),
+      },
+      mapperOptions: { defaultCheckpoint: "sdxl" },
+      now: () => "2026-05-06T00:00:00.000Z",
+    });
+
+    await adapter.startTask({ taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r-final" });
+    await adapter.getTaskStatus("r-final");
+    const withoutCompleted = await adapter.listTasks({});
+    const withCompleted = await adapter.listTasks({ includeCompleted: true });
+
+    expect(withoutCompleted.tasks).toEqual([]);
+    expect(withCompleted.tasks.length).toBe(1);
+    expect(withCompleted.tasks[0]).toMatchObject({ requestId: "r-final", status: "succeeded" });
+  });
+
+  it("unknown task status and cancel responses are explicit and structured", async () => {
+    const adapter = createComfyUiImageGenerationRuntimeAdapter({
+      supervisor: baseSupervisor,
+      client: { submitPrompt: testDouble.fn(), getQueue: testDouble.fn(), getHistory: testDouble.fn() },
+      mapperOptions: { defaultCheckpoint: "sdxl" },
+    });
+
+    const status = await adapter.getTaskStatus("missing");
+    const cancel = await adapter.cancelTask("missing");
+
+    expect(status).toMatchObject({ status: "unknown", error: { code: "comfyui_task_not_found" }, metadata: { reason: "request-id-not-tracked" } });
+    expect(status).toMatchObject({ taskType: TaskType.IMAGE_GENERATION });
+    expect(cancel).toMatchObject({ requestId: "missing", cancelled: false, status: "unknown" });
+  });
+
+  it("status list and cancel for unknown task do not start or probe ComfyUI", async () => {
+    const supervisor = { ...baseSupervisor, start: testDouble.fn(async () => {}) };
+    const client = { submitPrompt: testDouble.fn(), getQueue: testDouble.fn(), getHistory: testDouble.fn() };
+    const adapter = createComfyUiImageGenerationRuntimeAdapter({ supervisor, client, mapperOptions: { defaultCheckpoint: "sdxl" } });
+
+    await adapter.getTaskStatus("missing");
+    await adapter.listTasks({});
+    await adapter.cancelTask("missing");
+
+    expect(supervisor.start).not.toHaveBeenCalled();
+    expect(client.submitPrompt).not.toHaveBeenCalled();
+    expect(client.getQueue).not.toHaveBeenCalled();
+    expect(client.getHistory).not.toHaveBeenCalled();
+  });
+
 });

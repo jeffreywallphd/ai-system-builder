@@ -1,0 +1,198 @@
+import type { AssetRegistryDefinitionReadPort } from "../../../../application/ports/asset";
+import { sanitizeAssetViewValue } from "../../../../application/services/asset/asset-safe-metadata";
+import {
+  createApiAssetDefinitionReadFailureResponse,
+  createApiAssetDefinitionReadSuccessResponse,
+  createApiAssetDefinitionVersionReadFailureResponse,
+  createApiAssetDefinitionVersionReadSuccessResponse,
+  createApiAssetDefinitionsListFailureResponse,
+  createApiAssetDefinitionsListSuccessResponse,
+  createApiAssetResourceBackedViewReadFailureResponse,
+  createApiAssetResourceBackedViewReadSuccessResponse,
+  createApiAssetResourceBackedViewsListFailureResponse,
+  createApiAssetResourceBackedViewsListSuccessResponse,
+} from "../../../../contracts/api";
+import {
+  parseAssetRegistryDefinitionListInput,
+  parseAssetRegistryDefinitionReadInput,
+  parseAssetRegistryResourceBackedViewListInput,
+  parseAssetRegistryResourceBackedViewReadInput,
+  toAssetRegistryDefinitionReference,
+  toAssetRegistryFacadeListQuery,
+  toAssetRegistryResourceBackedViewListQuery,
+  toAssetRegistryResourceBackedViewReadOptions,
+  toAssetRegistryReadOptions,
+} from "../../asset-registry/assetRegistryReadInputMapper";
+
+interface ExpressRequestLike {
+  headers?: Record<string, string | string[] | undefined>;
+  params?: Record<string, string | undefined>;
+  query?: Record<string, unknown>;
+}
+
+interface ExpressResponseLike {
+  status: (code: number) => ExpressResponseLike;
+  json: (body: unknown) => void;
+}
+
+export interface ExpressAssetRegistryRoutePort {
+  get: (path: string, handler: (request: ExpressRequestLike, response: ExpressResponseLike) => Promise<void>) => void;
+}
+
+export interface RegisterAssetRegistryApiRoutesDependencies {
+  app: ExpressAssetRegistryRoutePort;
+  assetRegistryRead: AssetRegistryDefinitionReadPort;
+}
+
+const getHeader = (headers: ExpressRequestLike["headers"], key: string) => {
+  const value = headers?.[key];
+  return Array.isArray(value) ? value[0] : value;
+};
+
+const contextFrom = (request: ExpressRequestLike) => ({
+  requestId: getHeader(request.headers, "x-request-id"),
+  correlationId: getHeader(request.headers, "x-correlation-id"),
+});
+
+export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegistryApiRoutesDependencies): void {
+  dependencies.app.get("/api/assets/definitions", async (request, response) => {
+    const context = contextFrom(request);
+    let query: Parameters<AssetRegistryDefinitionReadPort["listDefinitionCards"]>[0];
+    try {
+      query = toAssetRegistryFacadeListQuery(parseAssetRegistryDefinitionListInput(request.query ?? {}, "api-query"));
+    } catch {
+      response.status(400).json(createApiAssetDefinitionsListFailureResponse("validation", "Invalid asset definitions query.", context));
+      return;
+    }
+
+    try {
+      const result = await dependencies.assetRegistryRead.listDefinitionCards(query);
+      response.status(200).json(createApiAssetDefinitionsListSuccessResponse(sanitizeAssetViewValue(result), context));
+    } catch {
+      response.status(500).json(createApiAssetDefinitionsListFailureResponse("internal", "Unable to read asset definitions.", context));
+    }
+  });
+
+  dependencies.app.get("/api/assets/resource-backed-views", async (request, response) => {
+    const context = contextFrom(request);
+    let query: Parameters<NonNullable<AssetRegistryDefinitionReadPort["listResourceBackedViewCards"]>>[0];
+    try {
+      query = toAssetRegistryResourceBackedViewListQuery(parseAssetRegistryResourceBackedViewListInput(request.query ?? {}, "api-query"));
+    } catch {
+      response.status(400).json(createApiAssetResourceBackedViewsListFailureResponse("validation", "Invalid asset resource-backed views query.", context));
+      return;
+    }
+
+    if (!dependencies.assetRegistryRead.listResourceBackedViewCards) {
+      response.status(503).json(createApiAssetResourceBackedViewsListFailureResponse("unavailable", "Asset resource-backed views are unavailable.", context));
+      return;
+    }
+
+    try {
+      const result = await dependencies.assetRegistryRead.listResourceBackedViewCards(query);
+      response.status(200).json(createApiAssetResourceBackedViewsListSuccessResponse(sanitizeAssetViewValue(result), context));
+    } catch {
+      response.status(500).json(createApiAssetResourceBackedViewsListFailureResponse("internal", "Unable to read asset resource-backed views.", context));
+    }
+  });
+
+  dependencies.app.get("/api/assets/resource-backed-views/:viewId", async (request, response) => {
+    const context = contextFrom(request);
+    let payload;
+    try {
+      payload = parseAssetRegistryResourceBackedViewReadInput(
+        {
+          viewId: request.params?.viewId,
+          ...(request.query?.expand !== undefined ? { expand: request.query.expand } : {}),
+          ...(request.query?.includeValidation !== undefined ? { includeValidation: request.query.includeValidation } : {}),
+        },
+        "api-query",
+      );
+    } catch {
+      response.status(400).json(createApiAssetResourceBackedViewReadFailureResponse("validation", "Invalid asset resource-backed view read request.", context));
+      return;
+    }
+
+    if (!dependencies.assetRegistryRead.readResourceBackedViewDetail) {
+      response.status(503).json(createApiAssetResourceBackedViewReadFailureResponse("unavailable", "Asset resource-backed views are unavailable.", context));
+      return;
+    }
+
+    try {
+      const detail = await dependencies.assetRegistryRead.readResourceBackedViewDetail(
+        payload.viewId,
+        toAssetRegistryResourceBackedViewReadOptions(payload),
+      );
+      if (!detail) {
+        response.status(404).json(createApiAssetResourceBackedViewReadFailureResponse("not-found", "Asset resource-backed view was not found.", context));
+        return;
+      }
+      response.status(200).json(createApiAssetResourceBackedViewReadSuccessResponse(sanitizeAssetViewValue(detail), context));
+    } catch {
+      response.status(500).json(createApiAssetResourceBackedViewReadFailureResponse("internal", "Unable to read asset resource-backed view.", context));
+    }
+  });
+
+  dependencies.app.get("/api/assets/definitions/:definitionId", async (request, response) => {
+    const context = contextFrom(request);
+    let payload;
+    try {
+      payload = parseDefinitionReadRequest(request, request.query?.version, false);
+    } catch {
+      response.status(400).json(createApiAssetDefinitionReadFailureResponse("validation", "Invalid asset definition read request.", context));
+      return;
+    }
+
+    try {
+      const detail = await dependencies.assetRegistryRead.readDefinitionDetail(
+        toAssetRegistryDefinitionReference(payload),
+        toAssetRegistryReadOptions(payload),
+      );
+      if (!detail) {
+        response.status(404).json(createApiAssetDefinitionReadFailureResponse("not-found", "Asset definition was not found.", context));
+        return;
+      }
+      response.status(200).json(createApiAssetDefinitionReadSuccessResponse(sanitizeAssetViewValue(detail), context));
+    } catch {
+      response.status(500).json(createApiAssetDefinitionReadFailureResponse("internal", "Unable to read asset definition.", context));
+    }
+  });
+
+  dependencies.app.get("/api/assets/definitions/:definitionId/versions/:version", async (request, response) => {
+    const context = contextFrom(request);
+    let payload;
+    try {
+      payload = parseDefinitionReadRequest(request, request.params?.version, true);
+    } catch {
+      response.status(400).json(createApiAssetDefinitionVersionReadFailureResponse("validation", "Invalid asset definition version read request.", context));
+      return;
+    }
+
+    try {
+      const detail = await dependencies.assetRegistryRead.readDefinitionDetail(
+        toAssetRegistryDefinitionReference(payload),
+        toAssetRegistryReadOptions(payload),
+      );
+      if (!detail) {
+        response.status(404).json(createApiAssetDefinitionVersionReadFailureResponse("not-found", "Asset definition version was not found.", context));
+        return;
+      }
+      response.status(200).json(createApiAssetDefinitionVersionReadSuccessResponse(sanitizeAssetViewValue(detail), context));
+    } catch {
+      response.status(500).json(createApiAssetDefinitionVersionReadFailureResponse("internal", "Unable to read asset definition version.", context));
+    }
+  });
+}
+
+function parseDefinitionReadRequest(request: ExpressRequestLike, versionValue: unknown, requireVersion: boolean) {
+  return parseAssetRegistryDefinitionReadInput(
+    {
+      definitionId: request.params?.definitionId,
+      ...(versionValue !== undefined ? { version: versionValue } : {}),
+      ...(request.query?.expand !== undefined ? { expand: request.query.expand } : {}),
+      ...(request.query?.includeValidation !== undefined ? { includeValidation: request.query.includeValidation } : {}),
+    },
+    "api-query",
+    { requireVersion },
+  );
+}

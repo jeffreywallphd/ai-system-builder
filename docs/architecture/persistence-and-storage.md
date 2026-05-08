@@ -1,5 +1,11 @@
 # Persistence and Storage
 
+## Asset Kernel relationship
+
+The Asset Kernel is the semantic composition model for reusable building blocks. Persistence and storage remain separate lower-level architecture concerns. Asset metadata may be persisted as structured records for asset definitions, instances, bindings, compositions, lifecycle, and provenance; binary/content payloads remain storage concerns. Phase 2A Prompt 9 adds a minimal local JSON Asset Kernel record adapter with schema-version manifest metadata, and Prompt 10 adds resource-backed mapping contracts/helpers only; neither prompt adds a migration framework, durable resource-backed mapping repository, or version-history service.
+
+Resource-backed assets should reference artifact/resource storage identities instead of embedding raw file paths or bytes in asset metadata. Generated outputs produced by runtime tasks become reusable only after finalization/registration as artifacts or resource-backed assets. Hugging Face repository objects remain external repository objects until registered/imported as resource-backed assets. Existing artifact, model, dataset, and image concepts should not be renamed during Phase 2A.
+
 ## Core distinction
 
 `ai-system-builder` treats **persistence** and **storage** as separate architecture concerns.
@@ -57,6 +63,13 @@ Persistence family invariants:
 - application persistence ports should stay record-oriented and operation-aware (not generic CRUD bags) and should depend on persistence contracts, not adapter-native query APIs.
 
 This keeps Postgres as the default adapter direction without coupling application/domain boundaries to Postgres-specific APIs.
+
+
+### Asset Kernel local record adapter checkpoint
+
+`modules/adapters/persistence/asset` provides the current minimal local Asset Kernel persistence adapter. It stores JSON-compatible `AssetDefinition`, `AssetInstance`, `AssetComposition`, and `AssetBinding` records under a host-supplied root in `asset-kernel/manifest.json`, `definitions.json`, `instances.json`, `compositions.json`, and `bindings.json`; the manifest currently uses `schemaVersion: 1` and `storeKind: "asset-kernel-local-store"`. The adapter implements application repository ports and remains infrastructure-only: it does not own Asset Kernel validation, business rules, host composition, API/IPC/UI exposure, resource-backed mapping helpers, artifact/object storage, workflow execution, graph execution, runtime readiness, prompt assembly, embeddings, or AI-generated context.
+
+The local adapter persists records and references only. It must not embed raw file/blob bytes, generated model/image/dataset payload bytes, secrets, environment values, local filesystem handles, or adapter-native paths in asset records or public errors. Durable resource-backed asset mapping persistence and explicit persistence-to-storage linkage remain deferred beyond this checkpoint.
 
 ## What belongs in persistence
 
@@ -136,6 +149,15 @@ Storage family invariants:
 5. Storage family barrels export storage-only surfaces so family boundaries remain explicit and mechanically discoverable.
 
 This keeps storage responsibilities explicit and separate from persistence-record modeling.
+
+
+## Asset Kernel local persistence and resource-backed mapping boundary
+
+- Phase 2A local Asset Kernel persistence is record storage for definitions, instances, compositions, and bindings only. Its text filtering is simple deterministic substring matching over selected saved record values.
+- The local store manifest validates the current schema version, store kind, and basic timestamp shape on read; no migration framework or schema upgrade behavior is implemented.
+- Asset persistence is a JSON-compatible durable boundary. Non-JSON record values such as functions, symbols, undefined values, non-finite numbers, Dates, buffers/streams, class instances, and circular references are rejected before write.
+- Resource-backed mapping remains a pure application-layer contract mapper. External repository `objectPath` values stay provider metadata on `AssetExternalRepositoryObjectReference` and must not be promoted into canonical asset ids. Internal backing ids and `asset-resource-backing` references are sanitized mapping identifiers, not local paths, URLs, or provider-native object paths.
+- This checkpoint adds no API/IPC/UI wiring, resource-byte storage, runtime/workflow/graph execution, prompt assembly, embeddings, AI-generated context, or automatic composition behavior.
 
 ## Repo-backed storage direction (current + next)
 
@@ -270,6 +292,14 @@ The Hugging Face adapter remains one provider behind the generic artifact-repo p
 - Hugging Face artifact-repo storage adapter resolves token dynamically from this config seam for publish/register/localize/verify workflows.
 
 
+
+## Asset Kernel local record persistence
+
+Local Asset Kernel persistence is structured record persistence, not artifact/blob storage. `composeLocalAssetKernel` composes it from a durable storage root, and the adapter owns the `<storageRoot>/asset-kernel/` layout for `manifest.json`, definitions, instances, compositions, and bindings. The helper returns path-safe diagnostics (`storeKind`, `schemaVersion`, and initialized state) rather than local filesystem paths, and it does not store artifact/resource bytes, generated image/model/dataset payloads, secrets, tokens, runtime installs, or provider-native file handles.
+
+Desktop and server host registration now initialize this store for internal host composition under `storageRootDirectory` only; runtime roots must not be used for Asset Kernel records or resource-backed provider reads. Phase 2B Prompt 3 adds only an application-owned built-in asset definition seeding service that uses repository/use-case seams to validate before save, create missing valid definitions, mark built-in seed metadata, treat `seedId` + `seedVersion` + fingerprint as the idempotency key, and skip user/custom, fingerprint-mismatched, or seed-version-mismatched conflicts without overwrite; seed-version conflicts use the explicit `skipped-seed-version-mismatch` status. Phase 2B Prompt 6 adds the registry read facade as an application-layer service only; it reads through repository ports and an optional computed resource-backed view provider, never scans storage, never executes seeding, and validates only when explicitly requested. Shared host-level `composeInternalAssetRegistry` wiring composes the local store, read facade, and Phase 3 safe resource-backed provider aggregate for private consumers while retaining path-safe diagnostics and no automatic seeding. Phase 2C and the final Phase 3 cleanup add read-only Asset Registry API/IPC/preload wrappers and desktop/thin-client Asset Library pages over persisted definitions and computed resource-backed view list/detail reads. This does not change the persistence/storage boundary: Asset Library UI and transport code must not access local persistence adapters, storage adapters, filesystem paths, resource bytes, provider clients, runtime roots, or resource scans directly. Built-ins appear only when already persisted/seeded through internal seeding, and resource-backed views remain computed descriptor-only read models that do not read bytes or turn generated outputs/external repository objects into registered assets.
+
+Phase 3 Prompt 8 confirms that resource-backed mappings are still not persisted. Artifact/document, image/generated-output, dataset/model, and external-repository object views are computed from safe descriptor/read seams only. Asset Kernel persistence continues to store records only, not resource bytes, generated outputs, source files, thumbnails, model files, dataset files, provider payloads, or durable resource-backed view mappings.
 
 ## Runtime roots are not artifact storage roots
 

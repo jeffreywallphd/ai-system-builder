@@ -2,6 +2,7 @@ import { TaskType, type RuntimeTaskRecord } from "../../../contracts/runtime";
 import { type ValidateModelRequest, type ValidateModelResult } from "../../../contracts/model";
 import type { ModelRegistryPort } from "../../ports/model";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
+import type { RuntimeCapabilityGuardService } from "../../services/runtime";
 
 export class ValidateModelUseCase {
   private readonly requestContext = new Map<string, { request: ValidateModelRequest; modelRecordId: string }>();
@@ -11,6 +12,7 @@ export class ValidateModelUseCase {
     private readonly dependencies: {
       runtimeTaskRegistry: RuntimeTaskRegistryPort;
       modelRegistry: ModelRegistryPort;
+      runtimeCapabilityGuard?: Pick<RuntimeCapabilityGuardService, "requireCapabilityReady">;
     },
   ) {}
 
@@ -19,6 +21,7 @@ export class ValidateModelUseCase {
     if (!model) {
       throw new Error(`Model record '${request.modelRecordId}' was not found.`);
     }
+    await this.dependencies.runtimeCapabilityGuard?.requireCapabilityReady("model-validation");
 
     const started = await this.dependencies.runtimeTaskRegistry.startTask({
       taskType: TaskType.MODEL_VALIDATION,

@@ -11,31 +11,53 @@ export interface UseFileArtifactUploadResult {
   onUploadSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }
 
+interface PersistedFileUploadState {
+  selectedFile: File | null;
+  viewState: UploadViewState;
+}
+
+let persistedFileUploadState: PersistedFileUploadState = {
+  selectedFile: null,
+  viewState: { status: "idle" },
+};
+
 export function useFileArtifactUpload(
   uploadClient: ArtifactUploadClient,
   onUploadComplete?: () => void,
+  options: { persistState?: boolean } = {},
 ): UseFileArtifactUploadResult {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [viewState, setViewState] = useState<UploadViewState>({ status: "idle" });
+  const shouldPersistState = options.persistState ?? true;
+  const [selectedFile, setSelectedFile] = useState<File | null>(shouldPersistState ? persistedFileUploadState.selectedFile : null);
+  const [viewState, setViewState] = useState<UploadViewState>(shouldPersistState ? persistedFileUploadState.viewState : { status: "idle" });
+
+  function persist(nextSelectedFile: File | null, nextViewState: UploadViewState): void {
+    if (!shouldPersistState) return;
+    persistedFileUploadState = { selectedFile: nextSelectedFile, viewState: nextViewState };
+  }
 
   function onFileChange(event: FormEvent<HTMLInputElement>): void {
     const file = event.currentTarget.files?.[0] ?? null;
+    const nextViewState = file
+      ? { status: "idle" as const, message: `Selected ${file.name}.` }
+      : { status: "idle" as const, message: undefined };
     setSelectedFile(file);
-
-    setViewState(file
-      ? { status: "idle", message: `Selected ${file.name}.` }
-      : { status: "idle", message: undefined });
+    setViewState(nextViewState);
+    persist(file, nextViewState);
   }
 
   async function onUploadSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
 
     if (!selectedFile) {
-      setViewState({ status: "error", message: "Select one artifact file before uploading." });
+      const nextViewState = { status: "error" as const, message: "Select one artifact file before uploading." };
+      setViewState(nextViewState);
+      persist(selectedFile, nextViewState);
       return;
     }
 
-    setViewState({ status: "uploading", message: `Uploading ${selectedFile.name}...` });
+    const uploadingState = { status: "uploading" as const, message: `Uploading ${selectedFile.name}...` };
+    setViewState(uploadingState);
+    persist(selectedFile, uploadingState);
 
     try {
       const response = await uploadClient.uploadArtifact({
@@ -48,23 +70,29 @@ export function useFileArtifactUpload(
       });
 
       if (!response.ok) {
-        setViewState({ status: "error", message: response.error.message });
+        const nextViewState = { status: "error" as const, message: response.error.message };
+        setViewState(nextViewState);
+        persist(selectedFile, nextViewState);
         return;
       }
 
-      setViewState({
+      const nextViewState = {
         status: "success",
         message: `Stored ${selectedFile.name}.`,
         key: response.value.descriptor.key,
         mediaType: response.value.descriptor.mediaType,
         sizeBytes: response.value.descriptor.sizeBytes,
-      });
+      } as const;
+      setViewState(nextViewState);
+      persist(selectedFile, nextViewState);
       onUploadComplete?.();
     } catch (error) {
-      setViewState({
+      const nextViewState = {
         status: "error",
         message: error instanceof Error ? error.message : "Artifact upload failed.",
-      });
+      } as const;
+      setViewState(nextViewState);
+      persist(selectedFile, nextViewState);
     }
   }
 

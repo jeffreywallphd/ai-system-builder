@@ -13,12 +13,14 @@ Use this guide to select **minimum-sufficient** context packs for prompts.
 | --- | --- |
 | repo layout, module placement, dependency direction at a repo level | `docs/context/packs/repository-overview.pack.md` |
 | cross-layer architecture or boundary decisions | `docs/context/packs/architecture.pack.md` |
+| assets, asset definitions/instances/bindings/compositions, systems/subsystems/features as composable assets, UI components/pages as assets, workflows/tools as assets, resource-backed assets, generated outputs as assets, Hugging Face objects as asset/resource backings, AI-readable asset context, asset validation, asset configuration, asset ports/composition rules, Asset Registry read-facade transport wrappers, or Asset Library UI | `docs/context/packs/asset-kernel.pack.md` |
 | authn/authz, credential handling, transport encryption, storage security, audit, runtime/process security policy | `docs/context/packs/security.pack.md` |
 | runtime adapters, runtime contract shape, runtime execution flow | `docs/context/packs/runtime.pack.md` |
 | runtime task registry lifecycle for long-running runtime tasks (start/read/cancel, shared lifecycle/progress/retention semantics) | `docs/context/packs/runtime-task-registry.pack.md` |
 | image generation feature architecture/contracts, ComfyUI runtime-sidecar concerns, image asset modeling | `docs/context/packs/image-generation.pack.md` |
 | runtime installer architecture, installer contracts/ports, install-state modeling | `docs/context/packs/runtime-installer.pack.md` |
 | Electron/desktop host lifecycle, IPC/preload boundaries, desktop composition | `docs/context/packs/desktop-host.pack.md` |
+| Electron IPC contracts, operation-derived channels, handler registration, preload invoke boundaries | `docs/context/packs/ipc-electron.pack.md` |
 | desktop renderer structure, page/feature/component boundaries, renderer API-client usage | `docs/context/packs/desktop-implementation.pack.md` |
 | desktop renderer CSS/style architecture, shared style layering, token-first styling decisions | `docs/context/packs/desktop-styling.pack.md` |
 | server host lifecycle, Express transport boundaries, thin web client coupling | `docs/context/packs/server-host.pack.md` |
@@ -96,3 +98,42 @@ For security tasks, keep context minimum-sufficient:
 - Include `runtime.pack.md` only when runtime security/process concerns are directly in scope.
 
 If a task changes route policy, security status semantics, token handling, or security API error behavior, read ADR-0015 directly.
+## Phase 2C Prompt 2: read-only Asset Registry server API foundation
+
+Phase 2C begins by exposing only a narrow, read-only server API foundation for Asset Registry definition reads. The server routes wrap an application-owned Asset Registry definition read port/read facade and must not receive persistence adapters, host composition helpers, mutation use cases, built-in seeding services, or local repositories.
+
+The `/api/assets` surface is GET-only for asset definition list/detail/version reads and resource-backed view list/detail reads. It must not scan resources, read bytes, call runtimes, call providers, seed built-ins, import/finalize/register assets, or execute workflows. Desktop IPC/preload and desktop/thin-client Asset Library clients/pages should stay in parity with this read-only facade-backed surface.
+
+## Phase 2C Prompt 3: read-only Asset Registry desktop IPC/preload foundation
+
+Desktop IPC/preload Asset Registry work should include `asset-kernel`, `desktop-host`, `ipc-electron`, `security`, and `testing`. Scope is definition list/read/version-read wrappers around the application read facade/read port only. Renderer UI, thin-client UI/client code, mutations, seeding, import/finalize/register, resource scans, runtime execution, provider calls, and direct persistence access remain out of scope.
+
+## Phase 2C cleanup: read-only Asset Registry transport parity
+
+For API/IPC/preload cleanup prompts, include `asset-kernel`, `server-host`, `desktop-host`, `ipc-electron`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Keep the operation scope explicit: definition list, definition read, definition-version read, resource-backed view list, and resource-backed view read only unless a later prompt has already added more. Shared transport-adapter input normalization is appropriate; mutation, seeding, import/finalize/register, scan, runtime execution, provider calls, and persistence access remain out of scope.
+
+## Phase 2C Prompt 4: shared Asset Library read client and UI read models
+
+For shared Asset Library UI-client/read-model prompts, include `asset-kernel`, `desktop-host`, `server-host`, `ipc-electron`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Scope is read-only definition and resource-backed view UI-facing read models, safe mappers, shared query/detail option types, desktop renderer preload-backed read client, and thin-client GET-only API read client. Mutations, seeding, import/finalize/register, scans, runtime/provider execution, byte reads, application service imports, host composition imports, persistence imports, server route-handler imports, and IPC-handler imports remain out of scope.
+
+## Phase 2C Prompt 5: desktop read-only Asset Library page
+
+For desktop Asset Library page prompts, include `asset-kernel`, `desktop-host`, `ipc-electron`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Scope is the desktop-only definitions list/detail page, top-level `Assets` navigation, supported read-only query filters, accessible loading/empty/error states, and collapsed advanced read-only detail sections backed by the desktop Asset Library client. Thin-client UI, API/IPC/preload contract changes, mutations, seeding, import/finalize/register, resource scans, runtime/provider execution, byte reads, application service imports, host composition imports, persistence imports, server route handlers, and IPC handler imports remain out of scope.
+
+## Phase 2C Prompt 6: thin-client read-only Asset Library page
+
+For thin-client Asset Library page prompts, include `asset-kernel`, `server-host`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Scope is the thin-client read-only definition and resource-backed view list/detail page, `/assets` route/navigation, supported read-only query filters, accessible loading/empty/error states, and collapsed advanced read-only detail sections backed by the thin-client server API Asset Library client. Desktop UI, mutation contract changes, seeding, import/finalize/register, resource scans, runtime/provider execution, byte reads, application service imports, host composition imports, persistence imports, server route handlers, desktop preload/IPC imports, and speculative instances/compositions remain out of scope.
+
+## Phase 2C Prompt 7: Asset Library advanced read-only detail panels
+
+For Asset Library advanced detail panel prompts, include `asset-kernel`, `desktop-host`, `server-host`, `ipc-electron`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Scope is shared read-only UI helpers/components for AI context, configuration summaries, ports, requirements, source/provenance, validation summaries only when already present or explicitly requested, and safe metadata. Desktop and thin-client page/client wiring remains host-specific. Normal selection must not request validation, technical panels stay collapsed by default, and shared UI helpers/components must not import application services, host composition, persistence adapters, transport handlers, runtime/storage adapters, desktop preload internals, or thin-client API clients.
+
+## Phase 2C Prompt 8: final Asset Library read-only stabilization
+
+For final Phase 2C stabilization prompts, include `asset-kernel`, `desktop-host`, `server-host`, `ipc-electron`, `security`, `testing`, and `persistence-storage`, plus canonical Asset Kernel/host/dependency/persistence docs. Scope is regression hardening only: read-only API/IPC/preload audits, UI boundary audits, explicit validation behavior, safe metadata/rendering, resource-backed computed-view safety, non-exposure tests, and docs/context alignment. Do not add mutation/execution/import/finalization/seeding, automatic validation, resource scans, runtime/provider calls, byte reads, or new product features.
+
+## Phase 3 resource-backed provider stabilization
+
+For resource-backed provider work, include `asset-kernel`, `persistence-storage`, `security`, `runtime`, `runtime-task-registry`, `desktop-host`, `server-host`, and `testing` as relevant, plus canonical Asset Kernel, host, persistence/storage, runtime, and module-dependency docs. Provider implementations belong in application ports/services; host wiring belongs in host composition; UI must stay behind transport/preload/client layers.
+
+For API/IPC/UI Asset Library work that touches resource-backed Asset Registry reads, also include `ipc-electron`, `desktop-host`, `server-host`, and `security`. Keep public surfaces read-only and do not add registration, import, finalization, localization, publishing, seeding, scans, provider calls, runtime calls, workflow execution, or byte/content reads unless a later phase explicitly scopes controlled mutation behavior.

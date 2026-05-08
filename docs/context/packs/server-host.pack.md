@@ -74,6 +74,8 @@
 
 
 
+- Server `registerApi` composes the internal Asset Registry through `composeInternalAssetRegistry` using `storageRootDirectory`, which initializes `<storageRootDirectory>/asset-kernel/` and exposes only a host-internal getter for private composition/tests. It also passes the Phase 3 safe resource-backed provider aggregate built from already-composed artifact metadata, finalized image descriptor, and persisted model read seams. It must not use `runtimeRootDirectory` for Asset Kernel records or provider reads and must not add asset API routes, thin-client clients, automatic built-in seeding, resource scans, provider/network calls, resource-byte reads, or runtime start/probe/install behavior for the Asset Kernel.
+
 ## Current implementation checkpoint (server host)
 
 - `composeServerHost` now wires artifact-repo use cases and route registration for `POST /api/artifact-repo/has`, `POST /api/artifact-repo/store`, `POST /api/artifact/publish`, and `POST /api/artifact/publish/verify`.
@@ -98,3 +100,34 @@
 - Unknown `/api/*` routes should be denied by centralized route policy (`security.route-policy-missing`).
 - Server app bootstraps HTTP/HTTPS listener; host/transport layers own route/middleware behavior.
 - Do not place business logic or token verification directly in feature routes.
+
+## Runtime readiness API
+
+- Server host composition owns the server `RuntimeReadinessService` and passes an explicit capability scope for Python runtime, ComfyUI runtime, image generation, dataset preparation, model training, model validation, and model publishing; model publishing is intentionally unavailable/not implemented until runtime task support is added.
+- Focused server composition helper modules are allowed for concrete adapter/use-case wiring and API registration; keep them role-specific and composition-only so they do not become dumping grounds for business rules, runtime protocol details, or Express payload mapping. Phase 1 currently extracted runtime readiness composition and a small image-generation runtime-task-registry helper only; broader server storage/model/image-generation decomposition remains future cleanup unless done explicitly.
+- Server readiness providers should read bounded supervisor/installer status only and must not start/stop/install/repair runtimes; provider failures are returned as sanitized failed readiness statuses. Runtime-backed API starts should reuse the composed `RuntimeReadinessPort` through the application guard and map not-ready capabilities to HTTP 503/unavailable envelopes with safe details.  Thin-client UI consumption is deferred to later prompts.
+
+## Asset Kernel Notes
+
+- Include `asset-kernel.pack.md` when server work exposes or composes assets, resource-backed assets, generated outputs, Hugging Face-backed material, or asset validation/registry flows.
+- Server API routes must wrap shared asset contracts; they must not define server-specific asset semantics.
+- Server host composition wires concrete runtime/readiness/storage/security providers for asset requirements; assets remain declarative.
+## Phase 2C Prompt 2: read-only Asset Registry server API foundation
+
+Phase 2C begins by exposing only a narrow, read-only server API foundation for Asset Registry definition reads. The server routes wrap an application-owned Asset Registry definition read port/read facade and must not receive persistence adapters, host composition helpers, mutation use cases, built-in seeding services, or local repositories.
+
+The current `/api/assets` surface is GET-only for asset definition list/detail/version reads. It must not scan resources, read bytes, call runtimes, call providers, seed built-ins, import/finalize/register assets, mutate assets, or execute workflows. Server host composition may keep the full internal registry private, but `registerExpressApi` and the asset route registration receive only the narrow read facade/read port. The thin-client Asset Library uses this GET-only client surface; renderer UI remains host-specific and must not bypass API/preload clients.
+
+## Phase 2C Prompt 4: thin-client Asset Library read client
+
+The thin-client may now include a read-only Asset Library API client that calls only GET `/api/assets/definitions`, `/api/assets/definitions/:definitionId`, and `/api/assets/definitions/:definitionId/versions/:version`. The client maps server envelopes into shared UI-facing Asset Library read models/results and must not import server route handlers, application services, host composition, persistence adapters, runtime adapters, or mutation/seeding/import/finalize/scan/execute operations.
+
+## Phase 2C Prompt 6: thin-client Asset Library page
+
+Thin-client now registers an `Assets` page at `/assets`. The page uses the read-only server API Asset Library client wrappers for definition and resource-backed view list/detail reads; normal definition selection must not request validation, and validation details may be loaded only by an explicit read-only user action through `includeValidation: true`. Resource-backed views are displayed read-only as computed descriptor projections with safe diagnostics. It must not call application services, host composition, persistence adapters, route handlers, desktop IPC/preload modules, runtime/provider clients, seeding, mutation, import/finalize/register, scans, or execution behavior. Advanced detail sections are read-only and collapsed by default.
+
+Phase 2C Prompt 7 thin-client Asset Library detail panels reuse shared read-only UI helpers/components for AI context, configuration, ports, requirements, source/provenance, available-only validation, and safe metadata while keeping server API client wiring local to the thin-client feature. Normal selection must not request validation, and safe metadata must omit sensitive/path/blob/base64/raw/command/stack/env/secret values.
+
+Phase 2C Prompt 8 finalizes the server/thin-client Asset Library definition baseline as read-only; the final Phase 3 cleanup adds GET-only resource-backed view list/detail routes and thin-client visibility. Thin-client code uses the server API client and shared UI helpers, validation is explicit through `includeValidation`, built-in seeding stays internal, and no server/thin-client Asset Library code may scan resources, read bytes, call providers/runtimes, or expose mutation/import/finalization/execution controls.
+
+Phase 3 Prompt 8 keeps server resource-backed provider wiring internal to host composition and the Asset Registry read facade. The public server/thin-client surface may list/read resource-backed views only through that facade; do not add automatic seeding, registration/import/finalization/localization/publishing flows, storage scans, provider/network calls, runtime/task-registry calls, or byte/content reads for resource-backed views.

@@ -27,3 +27,15 @@ Current artifact-repo provider registration is Hugging Face only.
 - If that option is omitted, the adapter falls back to `HF_TOKEN`, then `HUGGING_FACE_TOKEN`.
 - Thin-client artifact-repo operations run through this server host path, so thin-client access to private/gated Hugging Face repos depends on server-side token configuration.
 - Public Hugging Face repos may work without a token; private/gated repos may return explicit auth-required (`unavailable`) errors for register/localize/publish/verify flows.
+
+## Image generation FaceID behavior (thin-client/server)
+
+- Thin-client image generation supports optional FaceID input with up to 3 face reference artifact IDs.
+- The server/runtime adapter chooses the ComfyUI workflow shape from request inputs:
+  - prompt + negative prompt only,
+  - latent reference + prompts,
+  - FaceID + prompts,
+  - latent reference + FaceID + prompts.
+- FaceID requests are prepared as host-owned artifact image references before ComfyUI execution.
+- The default server workflow avoids custom InstantID/InsightFace nodes so the feature remains usable with the managed ComfyUI install.
+- When no explicit latent reference is provided, the first FaceID reference is used as the image-to-image latent source for facial retention.

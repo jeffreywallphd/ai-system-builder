@@ -15,3 +15,9 @@ Current composition includes:
 - If that option is omitted, the adapter falls back to `HF_TOKEN`, then `HUGGING_FACE_TOKEN` in the desktop host environment.
 - Desktop renderer artifact-repo operations (`register`, `localize`, `publish`, `verify`) use this host path via preload/IPC and therefore depend on desktop host token configuration for private/gated repositories.
 - Public Hugging Face repos may work without a token; private/gated repos surface explicit auth-required (`unavailable`) errors.
+
+## FaceID behavior (Image Generation)
+
+FaceID is optional in the image generation feature. When enabled in the desktop UI, users can select 1-3 uploaded image artifacts as face references and pass FaceID tuning parameters (identity/structure/noise) with the generation request payload.
+
+The managed ComfyUI workflow prepares selected image artifacts into the runtime input directory and uses the first FaceID reference as an image-to-image latent source when no explicit latent reference is selected. This keeps facial retention usable without requiring custom InstantID/InsightFace nodes in the local runtime install.

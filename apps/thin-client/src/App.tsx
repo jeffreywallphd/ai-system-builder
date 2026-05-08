@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { AppShell } from "./components/layout/AppShell";
+import { AssetLibraryPage } from "./pages/AssetLibraryPage";
 import { ArtifactsPage } from "./pages/ArtifactsPage";
 import { HomePage } from "./pages/HomePage";
 import { ImageGenerationPage } from "./pages/ImageGenerationPage";
@@ -14,32 +15,28 @@ import {
 } from "./routes/thinClientPages";
 
 function navigateToPage(page: ThinClientPageKey): void {
-  const path = page === "artifacts" ? "/artifacts" : page === "image-generation" ? "/image-generation" : page === "models" ? "/models" : page === "security" ? "/security" : page === "settings" ? "/settings" : "/";
+  const path = page === "artifacts" ? "/artifacts" : page === "assets" ? "/assets" : page === "image-generation" ? "/image-generation" : page === "models" ? "/models" : page === "security" ? "/security" : page === "settings" ? "/settings" : "/";
   window.history.pushState({}, "", path);
 }
 
 export function App() {
   const [activePage, setActivePage] = useState<ThinClientPageKey>(resolveThinClientPage(window.location.pathname));
-  const [artifactRefreshToken, setArtifactRefreshToken] = useState(0);
-
   const content = useMemo(() => {
     if (activePage === "artifacts") {
-      return (
-        <ArtifactsPage
-          refreshToken={artifactRefreshToken}
-          onUploaded={() => setArtifactRefreshToken((current) => current + 1)}
-        />
-      );
+      return <ArtifactsPage />;
     }
 
     if (activePage === "image-generation") {
       return (
         <ImageGenerationPage
-          onGenerated={() => setArtifactRefreshToken((current) => current + 1)}
           onNavigateToArtifacts={() => { navigateToPage("artifacts"); setActivePage("artifacts"); }}
           onNavigateToModels={() => { navigateToPage("models"); setActivePage("models"); }}
         />
       );
+    }
+
+    if (activePage === "assets") {
+      return <AssetLibraryPage />;
     }
 
     if (activePage === "models") {
@@ -58,7 +55,7 @@ export function App() {
       navigateToPage("artifacts");
       setActivePage("artifacts");
     }} />;
-  }, [activePage, artifactRefreshToken]);
+  }, [activePage]);
 
   return (
     <AppShell
