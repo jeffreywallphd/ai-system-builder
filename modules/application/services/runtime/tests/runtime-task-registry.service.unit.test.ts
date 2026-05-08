@@ -1,6 +1,6 @@
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 
-import { TaskType, type RuntimeTaskRecord } from "../../../../contracts/runtime";
+import { TaskType, type RuntimeTaskRecord, type RuntimeTaskStatusRecord } from "../../../../contracts/runtime";
 import type { RuntimeTaskRegistryPort } from "../../../ports/runtime";
 import type { TaskPowerLifecyclePort } from "../task-power-lifecycle.service";
 import { RuntimeTaskRegistryService } from "../runtime-task-registry.service";
@@ -99,5 +99,29 @@ describe("RuntimeTaskRegistryService", () => {
       requestId: "r-1",
       status: "succeeded",
     });
+  });
+
+  it("returns not-found status records without calling terminal task hooks", async () => {
+    const registry = createRegistryPortMock();
+    registry.getTaskStatus = testDouble.fn(async (): Promise<RuntimeTaskStatusRecord> => ({
+      recordType: "not-found",
+      requestId: "missing-request",
+      status: "unknown",
+      concurrencyClass: "unknown",
+      error: {
+        code: "not-found",
+        message: "Runtime task was not found.",
+        retryable: false,
+      },
+    }));
+    const lifecycle = createLifecycleMock();
+    const onTerminal = testDouble.fn(async () => undefined);
+    const service = new RuntimeTaskRegistryService(registry, lifecycle);
+
+    const result = await service.readTaskAndCompleteLifecycleIfTerminal("missing-request", { onTerminal });
+
+    expect(result).toMatchObject({ recordType: "not-found", requestId: "missing-request", status: "unknown" });
+    expect(lifecycle.completeTask).toHaveBeenCalledWith("missing-request", "unknown");
+    expect(onTerminal).toHaveBeenCalledTimes(0);
   });
 });

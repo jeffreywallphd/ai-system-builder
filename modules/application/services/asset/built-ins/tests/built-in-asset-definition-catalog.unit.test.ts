@@ -256,6 +256,7 @@ function assertRuntimePorts(definitionId: string): void {
   const ports = definitionById(definitionId).ports ?? [];
   assert.ok(ports.some((port) => port.direction === "input"), `${definitionId} has input port`);
   assert.ok(ports.some((port) => port.direction === "output"), `${definitionId} has output port`);
+  assert.ok(ports.every((port) => typeof port.contract?.contractKind === "string"), `${definitionId} has explicit port contracts`);
 }
 
 function hasAiContextField(context: Record<string, unknown> | undefined, field: (typeof REQUIRED_AI_CONTEXT_FIELDS)[number]): boolean {

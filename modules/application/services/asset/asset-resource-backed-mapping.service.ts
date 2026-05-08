@@ -21,6 +21,24 @@ import type {
   AssetType,
 } from "../../../contracts/asset";
 
+interface PreviewInput {
+  readonly previewId: string;
+  readonly previewKind: AssetResourcePreviewKind;
+  readonly assetRef?: AssetReference;
+  readonly resourceBackingRef?: AssetReference;
+  readonly contentType?: string;
+  readonly summary?: string;
+  readonly metadata?: Record<string, unknown>;
+}
+
+interface ResourceBackedAssetLinkInput {
+  readonly assetRef: AssetReference;
+  readonly backings: readonly AssetResourceBacking[];
+  readonly primaryBackingRef?: AssetResourceBackingReference;
+  readonly previewRefs?: readonly AssetReference[];
+  readonly generatedFrom?: AssetGeneratedOutputReference;
+  readonly metadata?: Record<string, unknown>;
+}
 
 function trimText(value: string | undefined): string | undefined {
   if (typeof value !== "string") {

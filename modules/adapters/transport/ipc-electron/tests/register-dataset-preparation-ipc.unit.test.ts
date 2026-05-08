@@ -1,6 +1,6 @@
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 import { DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL, DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL, DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_REQUEST_CHANNEL, createDesktopPrepareTrainingDatasetStartRequest, createDesktopPrepareTrainingDatasetTaskReadRequest, createDesktopPrepareTrainingDatasetTaskCancelRequest } from "../../../../contracts/ipc";
-import type { RuntimeTaskRecord } from "../../../../contracts/runtime";
+import type { RuntimeTaskRecord, RuntimeTaskStatusRecord } from "../../../../contracts/runtime";
 import { TaskType } from "../../../../contracts/runtime";
 import { createDesktopPrepareTrainingDatasetStartIpcHandler, createDesktopPrepareTrainingDatasetTaskReadIpcHandler, createDesktopPrepareTrainingDatasetTaskCancelIpcHandler, registerDatasetPreparationIpc } from "../dataset-preparation/registerDatasetPreparationIpc";
 
@@ -38,6 +38,35 @@ describe("registerDatasetPreparationIpc", () => {
     const failed = await handler({}, createDesktopPrepareTrainingDatasetTaskReadRequest({ requestId: "r1", boundary: { host: "desktop", source: "x" } }));
     const unknown = await handler({}, createDesktopPrepareTrainingDatasetTaskReadRequest({ requestId: "r1", boundary: { host: "desktop", source: "x" } }));
     expect((failed as any).value.error.message).toBe("boom"); expect((unknown as any).value.status).toBe("unknown");
+  });
+
+  it("maps not-found runtime task reads without assuming full task fields", async () => {
+    const notFoundRecord: RuntimeTaskStatusRecord = {
+      recordType: "not-found",
+      requestId: "missing-request",
+      status: "unknown",
+      concurrencyClass: "unknown",
+      error: {
+        code: "not-found",
+        message: "Runtime task was not found.",
+        retryable: false,
+      },
+      updatedAt: "2026-05-08T12:00:00.000Z",
+    };
+    const readPrepareTrainingDataset = testDouble.fn().mockResolvedValue({ ok: true, value: notFoundRecord });
+    const handler = createDesktopPrepareTrainingDatasetTaskReadIpcHandler({ startPrepareTrainingDataset: testDouble.fn(), readPrepareTrainingDataset });
+
+    const response = await handler({}, createDesktopPrepareTrainingDatasetTaskReadRequest({ requestId: "missing-request", boundary: { host: "desktop", source: "x" } }));
+
+    expect((response as any).value).toMatchObject({
+      requestId: "missing-request",
+      status: "unknown",
+      message: "Runtime task was not found.",
+      updatedAt: "2026-05-08T12:00:00.000Z",
+    });
+    expect((response as any).value.taskType).toBeUndefined();
+    expect((response as any).value.progress).toBeUndefined();
+    expect((response as any).value.completedAt).toBeUndefined();
   });
 
   it("maps runtime task failures without assuming optional error/message fields exist", async () => {

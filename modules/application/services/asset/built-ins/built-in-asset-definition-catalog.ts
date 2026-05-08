@@ -3,6 +3,7 @@ import type {
   AssetConfigurationField,
   AssetDefinition,
   AssetPort,
+  AssetPortContractKind,
   AssetRequirement,
   AssetType,
 } from "../../../../contracts/asset";
@@ -260,11 +261,11 @@ function field(fieldId: string, valueKind: AssetConfigurationField["valueKind"],
   return { fieldId, valueKind, required, label };
 }
 
-function inputPort(portId: string, displayName: string, contractKind: AssetPort["contract"]["contractKind"], description: string, assetType?: AssetType): AssetPort {
+function inputPort(portId: string, displayName: string, contractKind: AssetPortContractKind, description: string, assetType?: AssetType): AssetPort {
   return { portId, direction: "input", displayName, description, contract: { contractKind, ...(assetType ? { assetType } : {}), description }, cardinality: { preset: "optional" } };
 }
 
-function outputPort(portId: string, displayName: string, contractKind: AssetPort["contract"]["contractKind"], description: string, assetType?: AssetType): AssetPort {
+function outputPort(portId: string, displayName: string, contractKind: AssetPortContractKind, description: string, assetType?: AssetType): AssetPort {
   return { portId, direction: "output", displayName, description, contract: { contractKind, ...(assetType ? { assetType } : {}), description }, cardinality: { preset: "optional" } };
 }
 
