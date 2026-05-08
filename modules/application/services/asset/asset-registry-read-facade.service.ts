@@ -16,9 +16,12 @@ import type {
   AssetDefinitionRepositoryPort,
   AssetInstanceListQuery,
   AssetInstanceRepositoryPort,
+  AssetResourceBackedViewListQuery,
+  AssetResourceBackedViewProvider,
+  AssetResourceBackedViewProviderDiagnostic,
 } from "../../ports/asset";
 import { BUILT_IN_ASSET_DEFINITION_CATALOG } from "./built-ins";
-import { sanitizeAssetJsonValue, sanitizeAssetMetadata, sanitizeAssetViewValue } from "./asset-safe-metadata";
+import { sanitizeAssetJsonValue, sanitizeAssetMetadata, sanitizeAssetStringValue, sanitizeAssetViewValue } from "./asset-safe-metadata";
 import { validateAssetComposition } from "./validate-asset-composition.service";
 import { validateAssetDefinition } from "./validate-asset-definition.service";
 import { validateAssetInstance } from "./validate-asset-instance.service";
@@ -37,8 +40,6 @@ import type {
   AssetRegistryReadOptions,
   AssetRegistryResourceBackedViewCard,
   AssetRegistryResourceBackedViewDetail,
-  AssetResourceBackedViewProvider,
-  AssetResourceBackedViewQuery,
 } from "./asset-registry-read-facade.types";
 import type { AssetValidationContext } from "./asset-validation-helpers";
 
@@ -155,20 +156,22 @@ export class AssetRegistryReadFacade {
       return diagnostics?.length ? { items: [], diagnostics } : { items: [] };
     }
     const limit = this.safeLimit(query.limit);
-    const providerQuery: AssetResourceBackedViewQuery = {
+    const providerQuery: AssetResourceBackedViewListQuery = {
       searchText: query.searchText,
       assetTypes: query.assetTypes,
       assetFamilies: query.assetFamilies,
       lifecycleStatuses: query.lifecycleStatuses,
+      viewKinds: query.viewKinds,
       limit,
       cursor: query.cursor,
     };
-    const views = await this.readRepository(
+    const result = await this.readRepository(
       () => this.dependencies.resourceBackedViewProvider!.listResourceBackedViews(providerQuery),
       "resource-backed-view-provider-failed",
     );
+    const views = result.items;
     const cards = views.map((view) => this.toResourceBackedViewCard(view, query)).filter((card) => this.matchesResourceBackedViewQuery(card, query));
-    return this.toListResult(cards, limit, undefined, this.cursorDiagnostics(query));
+    return this.toListResult(cards, limit, result.nextCursor, this.resourceBackedListDiagnostics(query, result.diagnostics));
   }
 
   public async readResourceBackedViewDetail(viewId: string, options: AssetRegistryReadOptions = {}): Promise<AssetRegistryResourceBackedViewDetail | undefined> {
@@ -259,7 +262,7 @@ export class AssetRegistryReadFacade {
   }
 
   private matchesResourceBackedViewQuery(card: AssetRegistryResourceBackedViewCard, query: AssetRegistryListQuery): boolean {
-    return matchesCommon(card, query, [card.displayName, card.viewId, card.summary, card.assetType, card.assetFamily, card.viewKind]);
+    return matchesCommon(card, query, [card.displayName, card.viewId, card.summary, card.assetType, card.assetFamily, card.viewKind]) && matchesViewKind(card.viewKind, query);
   }
 
   private async validationContextForInstance(instance: AssetInstance): Promise<AssetValidationContext> {
@@ -358,6 +361,17 @@ export class AssetRegistryReadFacade {
     return this.listDiagnostics(query, false);
   }
 
+  private resourceBackedListDiagnostics(
+    query: AssetRegistryListQuery,
+    providerDiagnostics: readonly AssetResourceBackedViewProviderDiagnostic[] | undefined,
+  ): readonly AssetRegistryListDiagnostic[] | undefined {
+    const diagnostics = [
+      ...(this.cursorDiagnostics(query) ?? []),
+      ...(providerDiagnostics ?? []).map(toRegistryDiagnostic),
+    ];
+    return diagnostics.length ? diagnostics : undefined;
+  }
+
   private async readRepository<T>(operation: () => Promise<T>, code: AssetRegistryReadFacadeError["code"]): Promise<T> {
     try {
       return await operation();
@@ -385,6 +399,10 @@ function matchesAssetFamilies(assetFamily: string | undefined, query: AssetRegis
 
 function matchesLifecycle(lifecycleStatus: string | undefined, query: AssetRegistryListQuery): boolean {
   return !query.lifecycleStatuses?.length || (lifecycleStatus !== undefined && query.lifecycleStatuses.includes(lifecycleStatus as never));
+}
+
+function matchesViewKind(viewKind: string | undefined, query: AssetRegistryListQuery): boolean {
+  return !query.viewKinds?.length || (viewKind !== undefined && query.viewKinds.includes(viewKind as never));
 }
 
 function matchesSearch(searchText: string | undefined, values: readonly (string | undefined)[]): boolean {
@@ -450,6 +468,23 @@ function toBindingSummary(binding: AssetBinding): AssetBindingSummary {
     targetRef: binding.targetRef,
     lifecycleStatus: binding.lifecycleStatus,
   }) as AssetBindingSummary;
+}
+
+function toRegistryDiagnostic(diagnostic: AssetResourceBackedViewProviderDiagnostic): AssetRegistryListDiagnostic {
+  return {
+    severity: diagnostic.severity === "error" || diagnostic.severity === "warning" ? diagnostic.severity : "info",
+    code: sanitizeDiagnosticText(diagnostic.code) ?? "resource-backed-view-provider-diagnostic",
+    message: sanitizeAssetStringValue(diagnostic.message) ?? "Resource-backed view provider diagnostic was sanitized.",
+    ...(sanitizeDiagnosticText(diagnostic.providerId) ? { providerId: sanitizeDiagnosticText(diagnostic.providerId) } : {}),
+    ...(sanitizeDiagnosticText(diagnostic.sourceKind) ? { sourceKind: sanitizeDiagnosticText(diagnostic.sourceKind) } : {}),
+    ...(sanitizeAssetMetadata(diagnostic.metadata) ? { metadata: sanitizeAssetMetadata(diagnostic.metadata) } : {}),
+  };
+}
+
+function sanitizeDiagnosticText(value: string | undefined): string | undefined {
+  const sanitized = sanitizeAssetStringValue(value);
+  if (!sanitized || !/^[a-z0-9_.:-]+$/i.test(sanitized)) return undefined;
+  return sanitized;
 }
 
 function summarizeConfiguration(values: unknown): AssetConfigurationSummary | undefined {

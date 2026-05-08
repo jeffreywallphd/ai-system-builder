@@ -6,9 +6,9 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import type { AssetDefinition, AssetReference, AssetResourceBackedView } from "../../../../contracts/asset";
+import type { AssetResourceBackedViewListQuery, AssetResourceBackedViewListResult, AssetResourceBackedViewProvider } from "../../../../application/ports/asset";
 import { BuiltInAssetDefinitionSeedingService } from "../../../../application/services/asset/built-in-asset-definition-seeding.service";
 import { AssetRegistryReadFacade, AssetRegistryReadFacadeError } from "../../../../application/services/asset/asset-registry-read-facade.service";
-import type { AssetResourceBackedViewProvider, AssetResourceBackedViewQuery } from "../../../../application/services/asset/asset-registry-read-facade.types";
 import { BUILT_IN_ASSET_DEFINITION_CATALOG } from "../../../../application/services/asset/built-ins";
 import { composeInternalAssetRegistry } from "../composeInternalAssetRegistry";
 
@@ -49,16 +49,17 @@ function validResourceBackedView(overrides: Partial<AssetResourceBackedView> = {
 }
 
 class TestResourceBackedViewProvider implements AssetResourceBackedViewProvider {
-  public readonly queries: AssetResourceBackedViewQuery[] = [];
+  public readonly providerId = "test-resource-backed-provider";
+  public readonly queries: AssetResourceBackedViewListQuery[] = [];
   public listCalls = 0;
   public readCalls = 0;
 
   public constructor(private readonly views: readonly AssetResourceBackedView[]) {}
 
-  public async listResourceBackedViews(query: AssetResourceBackedViewQuery = {}): Promise<readonly AssetResourceBackedView[]> {
+  public async listResourceBackedViews(query: AssetResourceBackedViewListQuery = {}) {
     this.listCalls += 1;
     this.queries.push(query);
-    return this.views;
+    return { items: this.views, diagnostics: [{ severity: "info" as const, code: "test-provider-read", message: "Provider returned test views.", providerId: this.providerId }] };
   }
 
   public async readResourceBackedView(viewId: string): Promise<AssetResourceBackedView | undefined> {
@@ -68,7 +69,7 @@ class TestResourceBackedViewProvider implements AssetResourceBackedViewProvider 
 }
 
 class ThrowingResourceBackedViewProvider implements AssetResourceBackedViewProvider {
-  public async listResourceBackedViews(): Promise<readonly AssetResourceBackedView[]> {
+  public async listResourceBackedViews(): Promise<AssetResourceBackedViewListResult> {
     throw new Error("/tmp/raw-provider-path token stack should not leak");
   }
 
@@ -159,10 +160,23 @@ describe("composeInternalAssetRegistry", () => {
     assert.equal(composition.diagnostics.resourceBackedViewsEnabled, true);
     assert.equal(provider.listCalls, 1);
     assert.equal(provider.readCalls, 1);
-    assert.deepEqual(provider.queries, [{ searchText: "resource", assetTypes: undefined, assetFamilies: undefined, lifecycleStatuses: undefined, limit: 10, cursor: undefined }]);
+    assert.deepEqual(provider.queries, [{ searchText: "resource", assetTypes: undefined, assetFamilies: undefined, lifecycleStatuses: undefined, viewKinds: undefined, limit: 10, cursor: undefined }]);
     assert.deepEqual(cards.items.map((card) => card.viewId), ["view.internal.resource"]);
+    assert.equal(cards.diagnostics?.some((diagnostic) => diagnostic.code === "test-provider-read"), true);
     assert.equal(detail?.view.viewId, "view.internal.resource");
     assert.deepEqual(cards.items[0]?.metadata, { safe: true });
+  });
+
+  it("can wrap a deterministic list of resource-backed providers with the aggregate foundation", async () => {
+    const first = new TestResourceBackedViewProvider([validResourceBackedView({ viewId: "view.first", displayName: "First View" })]);
+    const second = new TestResourceBackedViewProvider([validResourceBackedView({ viewId: "view.second", displayName: "Second View" })]);
+    const composition = composeInternalAssetRegistry({ rootDirectory: await tempRoot(), resourceBackedViewProviders: [first, second] });
+
+    const cards = await composition.readFacade.listResourceBackedViewCards({ limit: 10 });
+
+    assert.notEqual(composition.resourceBackedViewProvider, first);
+    assert.deepEqual(cards.items.map((card) => card.viewId), ["view.first", "view.second"]);
+    assert.equal(composition.diagnostics.resourceBackedViewsEnabled, true);
   });
 
   it("surfaces provider failures through sanitized facade errors", async () => {

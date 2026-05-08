@@ -51,6 +51,10 @@
 - Canonical rules remain in ADR, architecture, and standards docs.
 - This pack is never sufficient by itself for architecture-, standards-, structure-, or boundary-changing work.
 - If pack summaries conflict with ADRs/architecture/standards docs, canonical docs win.
+
+## Asset Kernel Phase 3 Provider Note
+
+- Phase 3 Prompt 2 places the canonical resource-backed view provider seam under `modules/application/ports/asset`, with structured provider list results, safe diagnostics, and a read-only aggregate provider foundation. Concrete artifact, image, model, dataset, and external repository providers remain deferred; do not add scans, byte reads, runtime calls, host wiring, or public API/IPC/UI exposure when working on the seam.
 - Prompt builders must add only targeted companion packs (not all packs by default).
 
 ## Canonical Source Docs
