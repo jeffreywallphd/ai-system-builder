@@ -72,8 +72,8 @@ describe("desktop asset library client", () => {
     const detail = await client.readAssetDefinition({ definitionId: "builtin.document" }, { expand: ["aiContext"] });
     const version = await client.readAssetDefinitionVersion({ definitionId: "builtin.document", version: "1.0.0" }, { includeValidation: true });
 
-    expect(api.readAssetDefinition).toHaveBeenCalledWith({ definitionId: "builtin.document", expand: ["aiContext"], includeValidation: undefined });
-    expect(api.readAssetDefinitionVersion).toHaveBeenCalledWith({ definitionId: "builtin.document", version: "1.0.0", expand: undefined, includeValidation: true });
+    expect(api.readAssetDefinition).toHaveBeenCalledWith({ definitionId: "builtin.document", expand: ["aiContext"] });
+    expect(api.readAssetDefinitionVersion).toHaveBeenCalledWith({ definitionId: "builtin.document", version: "1.0.0", includeValidation: true });
     expect(detail).toMatchObject({ ok: true, value: { definitionId: "builtin.document" } });
     expect(version).toMatchObject({ ok: true, value: { version: "1.0.0" } });
   });

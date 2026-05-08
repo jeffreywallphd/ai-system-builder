@@ -6,6 +6,11 @@ import type {
   AssetReference,
   AssetType,
 } from "../../../contracts/asset";
+import {
+  isAssetFamily,
+  isAssetLifecycleStatus,
+  isAssetType,
+} from "../../../contracts/asset";
 import type {
   AssetLibraryClientError,
   AssetLibraryDefinitionCard,
@@ -119,18 +124,40 @@ function buildCardId(definitionId: string, version: string): string {
   return `${definitionId}@${version}`;
 }
 
+function formatKnownLabel(value: string): string {
+  return value
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function safeAssetType(value: unknown): AssetType | undefined {
+  const candidate = safeString(value);
+  return candidate && isAssetType(candidate) ? candidate : undefined;
+}
+
+function safeAssetFamily(value: unknown): AssetFamily | undefined {
+  const candidate = safeString(value);
+  return candidate && isAssetFamily(candidate) ? candidate : undefined;
+}
+
+function safeAssetLifecycleStatus(value: unknown): AssetLifecycleStatus | undefined {
+  const candidate = safeString(value);
+  return candidate && isAssetLifecycleStatus(candidate) ? candidate : undefined;
+}
+
 export function mapAssetDefinitionCard(payload: unknown): AssetLibraryDefinitionCard {
   const card = isRecord(payload) ? payload : {};
   const definitionId = safeString(card.definitionId) ?? "unknown-definition";
   const version = safeString(card.version) ?? "unknown-version";
   const displayName = safeString(card.displayName) ?? definitionId;
-  const assetType = safeString(card.assetType) as AssetType | undefined;
-  const assetFamily = safeString(card.assetFamily) as AssetFamily | undefined;
-  const lifecycleStatus = safeString(card.lifecycleStatus) as AssetLifecycleStatus | undefined;
+  const assetType = safeAssetType(card.assetType);
+  const assetFamily = safeAssetFamily(card.assetFamily);
+  const lifecycleStatus = safeAssetLifecycleStatus(card.lifecycleStatus);
   const updatedAt = safeString(card.updatedAt) ?? (isRecord(card.provenance) ? safeString(card.provenance.updatedAt) : undefined);
   const badges = [
     card.builtIn === true ? "Built-in" : undefined,
-    lifecycleStatus,
+    lifecycleStatus ? formatKnownLabel(lifecycleStatus) : undefined,
   ].filter((entry): entry is string => Boolean(entry));
 
   return {
@@ -140,9 +167,11 @@ export function mapAssetDefinitionCard(payload: unknown): AssetLibraryDefinition
     version,
     displayName,
     summary: safeString(card.summary),
-    assetType: assetType ?? "tool",
-    assetFamily: assetFamily ?? "behavioral",
-    lifecycleStatus: lifecycleStatus ?? "draft",
+    ...(assetType ? { assetType, assetTypeLabel: formatKnownLabel(assetType) } : { assetTypeLabel: "Unknown type" }),
+    ...(assetFamily ? { assetFamily, assetFamilyLabel: formatKnownLabel(assetFamily) } : { assetFamilyLabel: "Unknown family" }),
+    ...(lifecycleStatus
+      ? { lifecycleStatus, lifecycleStatusLabel: formatKnownLabel(lifecycleStatus) }
+      : { lifecycleStatusLabel: "Unknown status" }),
     builtIn: card.builtIn === true,
     updatedAt,
     ...(badges.length > 0 ? { badges } : {}),

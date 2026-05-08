@@ -46,6 +46,7 @@ function HookHarness({ client, onState }: { readonly client: AssetLibraryClient;
     createElement("button", { type: "button", onClick: () => state.setLifecycleStatus("published") }, "status"),
     createElement("button", { type: "button", onClick: () => state.setBuiltIn("built-in") }, "source"),
     createElement("button", { type: "button", onClick: () => void state.selectDefinition(card) }, "select"),
+    createElement("button", { type: "button", onClick: () => void state.loadValidationDetails() }, "validation"),
     createElement("button", { type: "button", onClick: () => void state.refresh() }, "refresh"),
   );
 }
@@ -132,7 +133,7 @@ describe("useAssetLibraryFeature", () => {
     });
   });
 
-  it("selecting a versioned definition reads detail through the read-only version method", async () => {
+  it("selecting a versioned definition reads detail without requesting validation", async () => {
     const client = createClient();
     const { container, states } = await render(client);
 
@@ -144,10 +145,32 @@ describe("useAssetLibraryFeature", () => {
       { definitionId: "builtin.document", version: "1.0.0" },
       {
         expand: ["aiContext", "configurationSchema", "ports", "requirements", "provenance", "metadata"],
-        includeValidation: true,
       },
     );
-    expect(states.at(-1)?.selectedDetail?.definitionId).toBe("builtin.document");
+    expect((client.readAssetDefinitionVersion as ReturnType<typeof testDouble.fn>).mock.calls
+      .some((call) => call[1]?.includeValidation === true)).toBe(false);
+    expect(states[states.length - 1]?.selectedDetail?.definitionId).toBe("builtin.document");
+  });
+
+  it("loads validation only through the explicit validation action", async () => {
+    const client = createClient();
+    const { container, states } = await render(client);
+    const buttons = Array.from(container.querySelectorAll("button"));
+
+    await act(async () => buttons.find((button) => button.textContent === "select")?.click());
+    await flush();
+    await act(async () => buttons.find((button) => button.textContent === "validation")?.click());
+    await flush();
+
+    const calls = (client.readAssetDefinitionVersion as ReturnType<typeof testDouble.fn>).mock.calls;
+    expect(calls[calls.length - 1]).toEqual([
+      { definitionId: "builtin.document", version: "1.0.0" },
+      {
+        expand: ["aiContext", "configurationSchema", "ports", "requirements", "provenance", "metadata"],
+        includeValidation: true,
+      },
+    ]);
+    expect(states[states.length - 1]?.validationError).toBeUndefined();
   });
 
   it("exposes safe load errors from the client", async () => {
@@ -159,7 +182,7 @@ describe("useAssetLibraryFeature", () => {
     });
     const { states } = await render(client);
 
-    expect(states.at(-1)?.listError).toBe("Unable to read Asset Library data.");
-    expect(states.at(-1)?.definitions).toEqual([]);
+    expect(states[states.length - 1]?.listError).toBe("Unable to read Asset Library data.");
+    expect(states[states.length - 1]?.definitions).toEqual([]);
   });
 });

@@ -139,6 +139,8 @@ Phase 2C public Asset Registry transports also sanitize preload/API/IPC-visible 
 
 Shared Asset Library UI mappers and desktop/thin-client read clients must defensively re-sanitize transport/preload payloads before exposing UI-facing card/detail models. UI-client errors preserve safe codes, request IDs, correlation IDs, and HTTP status when available, but internal failures stay generic and must not surface filesystem paths, tokens/secrets/API keys, stack traces, command lines, raw provider payloads, blobs, base64 data, or raw exception messages.
 
+Shared Asset Library UI mappers must also avoid silently turning invalid or missing canonical asset type, family, or lifecycle status payloads into valid-looking Asset Kernel values. Render unknown/not-specified display labels instead, while continuing to sanitize unsafe metadata, diagnostics, validation errors, paths, tokens, commands, stack traces, and encoded content.
+
 ## Phase 2C Prompt 5: desktop Asset Library page sanitization
 
 The desktop read-only Asset Library page renders only shared UI-facing read models from the preload-backed client. List cards avoid raw metadata, detail advanced sections are collapsed by default, safe metadata is rendered only after shared mapper sanitization, and user-visible errors remain generic/safe. The page must not expose asset seeding, mutation, import, finalization, registration, resource scanning, runtime/provider execution, raw payloads, local paths, secrets, command lines, bytes, blobs, base64 content, or stack traces.
