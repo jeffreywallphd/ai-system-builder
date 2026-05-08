@@ -3,12 +3,16 @@ import type {
   AssetLifecycleStatus,
   AssetMetadata,
   AssetReference,
+  AssetResourceBackedViewKind,
   AssetType,
 } from "../../../contracts/asset";
 import type {
   AssetLibraryDefinitionExpansion,
   AssetLibraryDetailOptions,
   AssetLibraryQuery,
+  AssetLibraryResourceBackedViewDetailOptions,
+  AssetLibraryResourceBackedViewExpansion,
+  AssetLibraryResourceBackedViewQuery,
 } from "./assetLibraryQueries";
 
 export interface AssetLibraryDefinitionCard {
@@ -95,6 +99,38 @@ export interface AssetLibraryDefinitionDetail extends AssetLibraryDefinitionCard
   readonly metadata?: AssetMetadata;
 }
 
+export interface AssetLibraryResourceBackedViewCard {
+  readonly id: string;
+  readonly viewId: string;
+  readonly displayName: string;
+  readonly summary?: string;
+  readonly viewKind?: AssetResourceBackedViewKind;
+  readonly viewKindLabel?: string;
+  readonly assetType?: AssetType;
+  readonly assetTypeLabel?: string;
+  readonly assetFamily?: AssetFamily;
+  readonly assetFamilyLabel?: string;
+  readonly lifecycleStatus?: AssetLifecycleStatus;
+  readonly lifecycleStatusLabel?: string;
+  readonly sourceKind?: string;
+  readonly registrationStatusLabel: string;
+  readonly badges?: readonly string[];
+  readonly diagnostics?: readonly string[];
+}
+
+export interface AssetLibraryResourceBackedViewDetail extends AssetLibraryResourceBackedViewCard {
+  readonly metadata?: AssetMetadata;
+  readonly resourceBackingSummary?: {
+    readonly resourceKind?: string;
+    readonly role?: string;
+    readonly displayName?: string;
+    readonly contentType?: string;
+    readonly format?: string;
+    readonly sizeBytes?: number;
+  };
+  readonly validationSummary?: AssetLibraryValidationSummary;
+}
+
 export interface AssetLibraryListResult<T> {
   readonly items: readonly T[];
   readonly nextCursor?: string;
@@ -133,10 +169,20 @@ export interface AssetLibraryClient {
     input: { readonly definitionId: string; readonly version: string },
     options?: AssetLibraryDetailOptions,
   ) => Promise<AssetLibraryClientResult<AssetLibraryDefinitionDetail>>;
+  readonly listAssetResourceBackedViews: (
+    query?: AssetLibraryResourceBackedViewQuery,
+  ) => Promise<AssetLibraryClientResult<AssetLibraryListResult<AssetLibraryResourceBackedViewCard>>>;
+  readonly readAssetResourceBackedView: (
+    input: { readonly viewId: string },
+    options?: AssetLibraryResourceBackedViewDetailOptions,
+  ) => Promise<AssetLibraryClientResult<AssetLibraryResourceBackedViewDetail>>;
 }
 
 export type {
   AssetLibraryDefinitionExpansion,
   AssetLibraryDetailOptions,
   AssetLibraryQuery,
+  AssetLibraryResourceBackedViewDetailOptions,
+  AssetLibraryResourceBackedViewExpansion,
+  AssetLibraryResourceBackedViewQuery,
 };

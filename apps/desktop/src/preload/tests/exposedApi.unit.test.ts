@@ -41,6 +41,8 @@ import {
   DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
   createDesktopRuntimeReadinessReadSuccessResponse,
@@ -48,6 +50,8 @@ import {
   createDesktopAssetDefinitionsListSuccessResponse,
   createDesktopAssetDefinitionReadSuccessResponse,
   createDesktopAssetDefinitionVersionReadSuccessResponse,
+  createDesktopAssetResourceBackedViewReadSuccessResponse,
+  createDesktopAssetResourceBackedViewsListSuccessResponse,
   createDesktopPythonRuntimeStatusReadSuccessResponse,
   createDesktopPythonRuntimeControlSuccessResponse,
   DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
@@ -207,6 +211,44 @@ describe("desktop preload exposedApi bridge", () => {
     });
   });
 
+  it("maps resource-backed view list and detail reads to read-only asset registry channels", async () => {
+    const responses = [
+      createDesktopAssetResourceBackedViewsListSuccessResponse({
+        items: [{ viewId: "asset-view.generated-output.internal.1", viewKind: "generated-output", displayName: "Generated output" }],
+      }),
+      createDesktopAssetResourceBackedViewReadSuccessResponse({
+        view: { viewId: "asset-view.generated-output.internal.1", viewKind: "generated-output", displayName: "Generated output" },
+      }),
+    ];
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => responses.shift());
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+    const list = await api.listAssetResourceBackedViews({ searchText: "generated", viewKinds: ["generated-output"], limit: 5 });
+    const detail = await api.readAssetResourceBackedView({ viewId: "asset-view.generated-output.internal.1", expand: ["metadata"] });
+
+    expect(list.ok).toBe(true);
+    expect(detail.ok).toBe(true);
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL.value);
+    expect(invoke.mock.calls[0]?.[1]).toMatchObject({
+      operation: "asset.resource-backed-views-list",
+      payload: {
+        searchText: "generated",
+        viewKinds: ["generated-output"],
+        limit: 5,
+        boundary: { host: "desktop", source: "desktop.renderer.asset-registry" },
+      },
+    });
+    expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL.value);
+    expect(invoke.mock.calls[1]?.[1]).toMatchObject({
+      operation: "asset.resource-backed-view-read",
+      payload: {
+        viewId: "asset-view.generated-output.internal.1",
+        expand: ["metadata"],
+        boundary: { host: "desktop", source: "desktop.renderer.asset-registry" },
+      },
+    });
+  });
+
   it("does not expose asset mutation or seeding methods", () => {
     const api = createDesktopPreloadApi({ ipcRenderer: { invoke: testDouble.fn() } });
     const methodNames = Object.keys(api);
@@ -234,6 +276,8 @@ describe("desktop preload exposedApi bridge", () => {
     expect(methodNames).toContain("listAssetDefinitions");
     expect(methodNames).toContain("readAssetDefinition");
     expect(methodNames).toContain("readAssetDefinitionVersion");
+    expect(methodNames).toContain("listAssetResourceBackedViews");
+    expect(methodNames).toContain("readAssetResourceBackedView");
     for (const method of forbiddenAssetMethods) {
       expect(methodNames).not.toContain(method);
     }

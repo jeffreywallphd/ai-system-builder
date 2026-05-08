@@ -7,9 +7,15 @@ import {
   DESKTOP_ASSET_DEFINITION_READ_RESPONSE_CHANNEL,
   DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_VERSION_READ_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_RESPONSE_CHANNEL,
   createDesktopAssetDefinitionReadSuccessResponse,
   createDesktopAssetDefinitionVersionReadSuccessResponse,
   createDesktopAssetDefinitionsListSuccessResponse,
+  createDesktopAssetResourceBackedViewReadSuccessResponse,
+  createDesktopAssetResourceBackedViewsListSuccessResponse,
   createIpcError,
   createIpcFailureResponse,
   type DesktopAssetDefinitionReadRequest,
@@ -20,12 +26,22 @@ import {
   type DesktopAssetDefinitionsListRequest,
   type DesktopAssetDefinitionsListRequestPayload,
   type DesktopAssetDefinitionsListResponse,
+  type DesktopAssetResourceBackedViewReadRequest,
+  type DesktopAssetResourceBackedViewReadRequestPayload,
+  type DesktopAssetResourceBackedViewReadResponse,
+  type DesktopAssetResourceBackedViewsListRequest,
+  type DesktopAssetResourceBackedViewsListRequestPayload,
+  type DesktopAssetResourceBackedViewsListResponse,
 } from "../../../../contracts/ipc";
 import {
   parseAssetRegistryDefinitionListInput,
   parseAssetRegistryDefinitionReadInput,
+  parseAssetRegistryResourceBackedViewListInput,
+  parseAssetRegistryResourceBackedViewReadInput,
   toAssetRegistryDefinitionReference,
   toAssetRegistryFacadeListQuery,
+  toAssetRegistryResourceBackedViewListQuery,
+  toAssetRegistryResourceBackedViewReadOptions,
   toAssetRegistryReadOptions,
 } from "../../asset-registry/assetRegistryReadInputMapper";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
@@ -33,6 +49,66 @@ import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 export interface RegisterAssetRegistryIpcDependencies {
   readonly ipcMain: IpcMainHandlePort;
   readonly assetRegistryRead: AssetRegistryDefinitionReadPort;
+}
+
+export function createDesktopAssetResourceBackedViewsListIpcHandler(
+  dependencies: Pick<RegisterAssetRegistryIpcDependencies, "assetRegistryRead">,
+) {
+  return async (
+    _event: unknown,
+    request: DesktopAssetResourceBackedViewsListRequest,
+  ): Promise<DesktopAssetResourceBackedViewsListResponse> => {
+    const context = requestContext(request);
+    let query;
+    try {
+      query = toAssetRegistryResourceBackedViewListQuery(parseResourceBackedViewsListPayload(request.payload));
+    } catch {
+      return failure(DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_RESPONSE_CHANNEL, "validation", "Invalid asset resource-backed views query.", context);
+    }
+    if (!dependencies.assetRegistryRead.listResourceBackedViewCards) {
+      return failure(DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_RESPONSE_CHANNEL, "unavailable", "Asset resource-backed views are unavailable.", context);
+    }
+
+    try {
+      const result = await dependencies.assetRegistryRead.listResourceBackedViewCards(query);
+      return createDesktopAssetResourceBackedViewsListSuccessResponse(sanitizeAssetViewValue(result), context);
+    } catch {
+      return failure(DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_RESPONSE_CHANNEL, "internal", "Unable to read asset resource-backed views.", context);
+    }
+  };
+}
+
+export function createDesktopAssetResourceBackedViewReadIpcHandler(
+  dependencies: Pick<RegisterAssetRegistryIpcDependencies, "assetRegistryRead">,
+) {
+  return async (
+    _event: unknown,
+    request: DesktopAssetResourceBackedViewReadRequest,
+  ): Promise<DesktopAssetResourceBackedViewReadResponse> => {
+    const context = requestContext(request);
+    let payload;
+    try {
+      payload = parseResourceBackedViewReadPayload(request.payload);
+    } catch {
+      return failure(DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL, "validation", "Invalid asset resource-backed view read request.", context);
+    }
+    if (!dependencies.assetRegistryRead.readResourceBackedViewDetail) {
+      return failure(DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL, "unavailable", "Asset resource-backed views are unavailable.", context);
+    }
+
+    try {
+      const detail = await dependencies.assetRegistryRead.readResourceBackedViewDetail(
+        payload.viewId,
+        toAssetRegistryResourceBackedViewReadOptions(payload),
+      );
+      if (!detail) {
+        return failure(DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL, "not-found", "Asset resource-backed view was not found.", context);
+      }
+      return createDesktopAssetResourceBackedViewReadSuccessResponse(sanitizeAssetViewValue(detail), context);
+    } catch {
+      return failure(DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL, "internal", "Unable to read asset resource-backed view.", context);
+    }
+  };
 }
 
 export function createDesktopAssetDefinitionsListIpcHandler(
@@ -132,6 +208,14 @@ export function registerAssetRegistryIpc(dependencies: RegisterAssetRegistryIpcD
     DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL.value,
     createDesktopAssetDefinitionVersionReadIpcHandler({ assetRegistryRead: dependencies.assetRegistryRead }),
   );
+  dependencies.ipcMain.handle(
+    DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL.value,
+    createDesktopAssetResourceBackedViewsListIpcHandler({ assetRegistryRead: dependencies.assetRegistryRead }),
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL.value,
+    createDesktopAssetResourceBackedViewReadIpcHandler({ assetRegistryRead: dependencies.assetRegistryRead }),
+  );
 }
 
 function requestContext(request: { requestId?: string; correlationId?: string }) {
@@ -141,7 +225,7 @@ function requestContext(request: { requestId?: string; correlationId?: string })
   };
 }
 
-function failure<TResponseChannel extends typeof DESKTOP_ASSET_DEFINITIONS_LIST_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_DEFINITION_READ_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_DEFINITION_VERSION_READ_RESPONSE_CHANNEL>(
+function failure<TResponseChannel extends typeof DESKTOP_ASSET_DEFINITIONS_LIST_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_DEFINITION_READ_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_DEFINITION_VERSION_READ_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL>(
   channel: TResponseChannel,
   code: "validation" | "internal" | "not-found" | "unavailable",
   message: string,
@@ -167,6 +251,22 @@ function parseDefinitionReadPayload(payload: unknown, requireVersion: boolean): 
   const record = requireRecord(payload);
   return {
     ...parseAssetRegistryDefinitionReadInput(record, "ipc-payload", { requireVersion }),
+    boundary: parseBoundary(record.boundary),
+  };
+}
+
+function parseResourceBackedViewsListPayload(payload: unknown): DesktopAssetResourceBackedViewsListRequestPayload {
+  const record = requireRecord(payload);
+  return {
+    ...parseAssetRegistryResourceBackedViewListInput(record, "ipc-payload"),
+    boundary: parseBoundary(record.boundary),
+  };
+}
+
+function parseResourceBackedViewReadPayload(payload: unknown): DesktopAssetResourceBackedViewReadRequestPayload {
+  const record = requireRecord(payload);
+  return {
+    ...parseAssetRegistryResourceBackedViewReadInput(record, "ipc-payload"),
     boundary: parseBoundary(record.boundary),
   };
 }

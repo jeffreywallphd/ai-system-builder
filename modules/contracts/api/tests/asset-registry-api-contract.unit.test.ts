@@ -4,10 +4,15 @@ import {
   API_ASSET_DEFINITION_READ_OPERATION,
   API_ASSET_DEFINITION_VERSION_READ_OPERATION,
   API_ASSET_DEFINITIONS_LIST_OPERATION,
+  API_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION,
+  API_ASSET_RESOURCE_BACKED_VIEWS_LIST_OPERATION,
   createApiAssetDefinitionReadFailureResponse,
   createApiAssetDefinitionReadRequest,
   createApiAssetDefinitionReadSuccessResponse,
   createApiAssetDefinitionVersionReadRequest,
+  createApiAssetResourceBackedViewReadRequest,
+  createApiAssetResourceBackedViewsListRequest,
+  createApiAssetResourceBackedViewsListSuccessResponse,
   createApiAssetDefinitionsListRequest,
   createApiAssetDefinitionsListSuccessResponse,
   type ApiAssetDefinitionReadResponse,
@@ -19,6 +24,8 @@ describe("asset registry API contract", () => {
     expect(API_ASSET_DEFINITIONS_LIST_OPERATION).toBe("asset.definitions-list");
     expect(API_ASSET_DEFINITION_READ_OPERATION).toBe("asset.definition-read");
     expect(API_ASSET_DEFINITION_VERSION_READ_OPERATION).toBe("asset.definition-version-read");
+    expect(API_ASSET_RESOURCE_BACKED_VIEWS_LIST_OPERATION).toBe("asset.resource-backed-views-list");
+    expect(API_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION).toBe("asset.resource-backed-view-read");
   });
 
   it("uses the shared API envelope conventions with request metadata", () => {
@@ -44,6 +51,18 @@ describe("asset registry API contract", () => {
       } as any,
     };
     expect(createApiAssetDefinitionReadSuccessResponse(detail)).toMatchObject({ ok: true, value: detail });
+  });
+
+  it("wraps resource-backed view reads in the shared API envelope", () => {
+    const request = createApiAssetResourceBackedViewsListRequest({ q: "generated", viewKind: ["generated-output"] }, { requestId: "rv1" });
+    const read = createApiAssetResourceBackedViewReadRequest({ viewId: " asset-view.generated-output.internal.1 ", expand: ["metadata"] });
+    const response = createApiAssetResourceBackedViewsListSuccessResponse({
+      items: [{ viewId: "asset-view.generated-output.internal.1", viewKind: "generated-output", displayName: "Generated output" }],
+    });
+
+    expect(request).toMatchObject({ operation: "asset.resource-backed-views-list", requestId: "rv1", payload: { q: "generated" } });
+    expect(read).toMatchObject({ operation: "asset.resource-backed-view-read", payload: { viewId: "asset-view.generated-output.internal.1" } });
+    expect(response).toMatchObject({ ok: true, operation: "asset.resource-backed-views-list" });
   });
 
   it("does not export mutation operation identities", async () => {

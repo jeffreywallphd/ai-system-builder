@@ -15,7 +15,11 @@ import type {
   AssetLibraryClient,
   AssetLibraryDefinitionCard,
   AssetLibraryDefinitionDetail,
+  AssetLibraryResourceBackedViewCard,
+  AssetLibraryResourceBackedViewDetail,
 } from "./assetLibraryReadModels";
+
+export type AssetLibraryBrowserTab = "definitions" | "resource-views";
 
 export type AssetLibraryFilterValue = "all" | string;
 
@@ -28,10 +32,14 @@ export interface AssetLibraryFiltersState {
 }
 
 export interface AssetLibraryFeatureState {
+  readonly activeTab: AssetLibraryBrowserTab;
   readonly filters: AssetLibraryFiltersState;
   readonly definitions: readonly AssetLibraryDefinitionCard[];
+  readonly resourceBackedViews: readonly AssetLibraryResourceBackedViewCard[];
   readonly selectedDefinitionId?: string;
+  readonly selectedResourceBackedViewId?: string;
   readonly selectedDetail?: AssetLibraryDefinitionDetail;
+  readonly selectedResourceBackedViewDetail?: AssetLibraryResourceBackedViewDetail;
   readonly isLoadingList: boolean;
   readonly isLoadingDetail: boolean;
   readonly isLoadingValidation: boolean;
@@ -45,7 +53,9 @@ export interface AssetLibraryFeatureState {
   readonly setAssetFamily: (value: AssetLibraryFilterValue) => void;
   readonly setLifecycleStatus: (value: AssetLibraryFilterValue) => void;
   readonly setBuiltIn: (value: AssetLibraryBuiltInFilter) => void;
+  readonly setActiveTab: (value: AssetLibraryBrowserTab) => void;
   readonly selectDefinition: (definition: AssetLibraryDefinitionCard) => Promise<void>;
+  readonly selectResourceBackedView: (view: AssetLibraryResourceBackedViewCard) => Promise<void>;
   readonly loadValidationDetails: () => Promise<void>;
   readonly refresh: () => Promise<void>;
 }
@@ -95,9 +105,13 @@ export function assetLibraryFiltersAreActive(filters: AssetLibraryFiltersState):
 
 export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): AssetLibraryFeatureState {
   const [filters, setFilters] = useState<AssetLibraryFiltersState>(ASSET_LIBRARY_DEFAULT_FILTERS);
+  const [activeTab, setActiveTab] = useState<AssetLibraryBrowserTab>("definitions");
   const [definitions, setDefinitions] = useState<readonly AssetLibraryDefinitionCard[]>([]);
+  const [resourceBackedViews, setResourceBackedViews] = useState<readonly AssetLibraryResourceBackedViewCard[]>([]);
   const [selectedDefinition, setSelectedDefinition] = useState<AssetLibraryDefinitionCard | undefined>();
+  const [selectedResourceBackedView, setSelectedResourceBackedView] = useState<AssetLibraryResourceBackedViewCard | undefined>();
   const [selectedDetail, setSelectedDetail] = useState<AssetLibraryDefinitionDetail | undefined>();
+  const [selectedResourceBackedViewDetail, setSelectedResourceBackedViewDetail] = useState<AssetLibraryResourceBackedViewDetail | undefined>();
   const [isLoadingList, setIsLoadingList] = useState(true);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isLoadingValidation, setIsLoadingValidation] = useState(false);
@@ -113,8 +127,17 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
     setIsLoadingList(true);
     setListError(undefined);
     const result = await client.listAssetDefinitions(query);
+    const resourceResult = await client.listAssetResourceBackedViews({
+      searchText: query.searchText,
+      assetTypes: query.assetTypes,
+      assetFamilies: query.assetFamilies,
+      lifecycleStatuses: query.lifecycleStatuses,
+      limit: query.limit,
+      cursor: query.cursor,
+    });
     if (result.ok === false) {
       setDefinitions([]);
+      setResourceBackedViews(resourceResult.ok === true ? resourceResult.value.items : []);
       setDiagnostics([]);
       setListError(result.error.message || "Unable to load Asset Library.");
       setSelectedDefinition(undefined);
@@ -124,7 +147,17 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
     }
 
     setDefinitions(result.value.items);
-    setDiagnostics((result.value.diagnostics ?? []).map((diagnostic) => diagnostic.message));
+    if (resourceResult.ok === true) {
+      setResourceBackedViews(resourceResult.value.items);
+    } else {
+      setResourceBackedViews([]);
+    }
+    setDiagnostics([
+      ...(result.value.diagnostics ?? []).map((diagnostic) => diagnostic.message),
+      ...(resourceResult.ok === true
+        ? (resourceResult.value.diagnostics ?? []).map((diagnostic) => diagnostic.message)
+        : [resourceResult.error.message || "Unable to load resource-backed views."]),
+    ]);
     setIsLoadingList(false);
 
     if (selectedDefinition && !result.value.items.some((item) => item.id === selectedDefinition.id)) {
@@ -133,7 +166,13 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
       setDetailError(undefined);
       setValidationError(undefined);
     }
-  }, [client, query, selectedDefinition]);
+    if (selectedResourceBackedView && resourceResult.ok === true && !resourceResult.value.items.some((item) => item.id === selectedResourceBackedView.id)) {
+      setSelectedResourceBackedView(undefined);
+      setSelectedResourceBackedViewDetail(undefined);
+      setDetailError(undefined);
+      setValidationError(undefined);
+    }
+  }, [client, query, selectedDefinition, selectedResourceBackedView]);
 
   useEffect(() => {
     void loadList();
@@ -155,7 +194,10 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
   }, [client]);
 
   const selectDefinition = useCallback(async (definition: AssetLibraryDefinitionCard) => {
+    setActiveTab("definitions");
     setSelectedDefinition(definition);
+    setSelectedResourceBackedView(undefined);
+    setSelectedResourceBackedViewDetail(undefined);
     setSelectedDetail(undefined);
     setDetailError(undefined);
     setValidationError(undefined);
@@ -170,6 +212,28 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
     }
     setIsLoadingDetail(false);
   }, [readDetail]);
+
+  const selectResourceBackedView = useCallback(async (view: AssetLibraryResourceBackedViewCard) => {
+    setActiveTab("resource-views");
+    setSelectedResourceBackedView(view);
+    setSelectedDefinition(undefined);
+    setSelectedDetail(undefined);
+    setDetailError(undefined);
+    setValidationError(undefined);
+    setIsLoadingDetail(true);
+
+    const result = await client.readAssetResourceBackedView(
+      { viewId: view.viewId },
+      { expand: ["metadata", "resourceBackings"] },
+    );
+
+    if (result.ok === true) {
+      setSelectedResourceBackedViewDetail(result.value);
+    } else {
+      setDetailError(result.error.message || "Unable to load this resource-backed view.");
+    }
+    setIsLoadingDetail(false);
+  }, [client]);
 
   const loadValidationDetails = useCallback(async () => {
     if (!selectedDefinition) return;
@@ -187,9 +251,13 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
 
   return {
     filters,
+    activeTab,
     definitions,
+    resourceBackedViews,
     selectedDefinitionId: selectedDefinition?.id,
+    selectedResourceBackedViewId: selectedResourceBackedView?.id,
     selectedDetail,
+    selectedResourceBackedViewDetail,
     isLoadingList,
     isLoadingDetail,
     isLoadingValidation,
@@ -203,7 +271,9 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
     setAssetFamily: (value) => setFilters((current) => ({ ...current, assetFamily: value })),
     setLifecycleStatus: (value) => setFilters((current) => ({ ...current, lifecycleStatus: value })),
     setBuiltIn: (value) => setFilters((current) => ({ ...current, builtIn: value })),
+    setActiveTab,
     selectDefinition,
+    selectResourceBackedView,
     loadValidationDetails,
     refresh: loadList,
   };

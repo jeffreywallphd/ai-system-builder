@@ -3,7 +3,7 @@ import { act, createElement, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 import { afterEach, describe, expect, it, testDouble } from "../../../../../../modules/testing/node-test";
-import type { AssetLibraryClient, AssetLibraryDefinitionCard } from "../../../../../../modules/ui/shared/asset-library";
+import type { AssetLibraryClient, AssetLibraryDefinitionCard, AssetLibraryResourceBackedViewCard } from "../../../../../../modules/ui/shared/asset-library";
 import { useAssetLibraryFeature, type AssetLibraryFeatureState } from "../hooks/useAssetLibraryFeature";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>");
@@ -24,11 +24,27 @@ const card: AssetLibraryDefinitionCard = {
   updatedAt: "2026-05-02T00:00:00.000Z",
 };
 
+const resourceViewCard: AssetLibraryResourceBackedViewCard = {
+  id: "asset-view.generated-output.internal.1",
+  viewId: "asset-view.generated-output.internal.1",
+  displayName: "Generated output",
+  viewKind: "generated-output",
+  viewKindLabel: "Generated Output",
+  assetType: "image",
+  assetTypeLabel: "Image",
+  assetFamily: "resource-backed",
+  assetFamilyLabel: "Resource Backed",
+  lifecycleStatusLabel: "Not registered",
+  registrationStatusLabel: "Not finalized or registered",
+};
+
 function createClient(overrides: Partial<AssetLibraryClient> = {}): AssetLibraryClient {
   return {
     listAssetDefinitions: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [card] } }),
     readAssetDefinition: testDouble.fn().mockResolvedValue({ ok: true, value: { ...card } }),
     readAssetDefinitionVersion: testDouble.fn().mockResolvedValue({ ok: true, value: { ...card, overview: { description: "Reusable document descriptor" } } }),
+    listAssetResourceBackedViews: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [resourceViewCard] } }),
+    readAssetResourceBackedView: testDouble.fn().mockResolvedValue({ ok: true, value: { ...resourceViewCard } }),
     ...overrides,
   };
 }
@@ -46,6 +62,7 @@ function HookHarness({ client, onState }: { readonly client: AssetLibraryClient;
     createElement("button", { type: "button", onClick: () => state.setLifecycleStatus("published") }, "status"),
     createElement("button", { type: "button", onClick: () => state.setBuiltIn("built-in") }, "source"),
     createElement("button", { type: "button", onClick: () => void state.selectDefinition(card) }, "select"),
+    createElement("button", { type: "button", onClick: () => void state.selectResourceBackedView(resourceViewCard) }, "select-resource-view"),
     createElement("button", { type: "button", onClick: () => void state.loadValidationDetails() }, "validation"),
     createElement("button", { type: "button", onClick: () => void state.refresh() }, "refresh"),
   );
@@ -90,7 +107,9 @@ describe("thin-client useAssetLibraryFeature", () => {
     await render(client);
 
     expect(client.listAssetDefinitions).toHaveBeenCalledTimes(1);
+    expect(client.listAssetResourceBackedViews).toHaveBeenCalledTimes(1);
     expect(client.listAssetDefinitions).toHaveBeenCalledWith({ limit: 50 });
+    expect(client.listAssetResourceBackedViews).toHaveBeenCalledWith({ limit: 50 });
   });
 
   it("sends supported query fields when filters change and refreshes the current query", async () => {
@@ -165,6 +184,21 @@ describe("thin-client useAssetLibraryFeature", () => {
       },
     ]);
     expect(states[states.length - 1]?.validationError).toBeUndefined();
+  });
+
+  it("selects resource-backed views through read-only detail reads", async () => {
+    const client = createClient();
+    const { container, states } = await render(client);
+    const buttons = Array.from(container.querySelectorAll("button"));
+
+    await act(async () => buttons.find((button) => button.textContent === "select-resource-view")?.click());
+    await flush();
+
+    expect(client.readAssetResourceBackedView).toHaveBeenCalledWith(
+      { viewId: "asset-view.generated-output.internal.1" },
+      { expand: ["metadata", "resourceBackings"] },
+    );
+    expect(states[states.length - 1]?.selectedResourceBackedViewDetail?.registrationStatusLabel).toBe("Not finalized or registered");
   });
 
   it("exposes safe load errors from the client", async () => {

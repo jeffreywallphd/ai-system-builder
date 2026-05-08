@@ -1,11 +1,13 @@
 import type { AssetRegistryDefinitionReadPort } from "../../../application/ports/asset";
-import type { AssetRegistryReadOptions } from "../../../application/services/asset/asset-registry-read-facade.types";
+import type { AssetRegistryListQuery, AssetRegistryReadOptions } from "../../../application/services/asset/asset-registry-read-facade.types";
 import {
   ASSET_FAMILIES,
   ASSET_LIFECYCLE_STATUSES,
+  ASSET_RESOURCE_BACKED_VIEW_KINDS,
   ASSET_TYPES,
   isAssetFamily,
   isAssetLifecycleStatus,
+  type AssetResourceBackedViewKind,
   isAssetType,
   normalizeAssetId,
   normalizeAssetVersion,
@@ -24,6 +26,10 @@ export type AssetRegistryDefinitionExpansion =
   | "requirements"
   | "provenance"
   | "metadata";
+export type AssetRegistryResourceBackedViewExpansion =
+  | "metadata"
+  | "resourceBackings"
+  | "validation";
 
 export interface AssetRegistryDefinitionListInput {
   readonly searchText?: string;
@@ -43,6 +49,23 @@ export interface AssetRegistryDefinitionReadInput {
   readonly includeValidation?: boolean;
 }
 
+export interface AssetRegistryResourceBackedViewListInput {
+  readonly searchText?: string;
+  readonly assetTypes?: readonly AssetType[];
+  readonly assetFamilies?: readonly AssetFamily[];
+  readonly lifecycleStatuses?: readonly AssetLifecycleStatus[];
+  readonly viewKinds?: readonly AssetResourceBackedViewKind[];
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly includeMetadata?: boolean;
+}
+
+export interface AssetRegistryResourceBackedViewReadInput {
+  readonly viewId: string;
+  readonly expand?: readonly AssetRegistryResourceBackedViewExpansion[];
+  readonly includeValidation?: boolean;
+}
+
 const MAX_PUBLIC_LIMIT = 100;
 const EXPANSIONS = new Set<AssetRegistryDefinitionExpansion>([
   "aiContext",
@@ -51,6 +74,11 @@ const EXPANSIONS = new Set<AssetRegistryDefinitionExpansion>([
   "requirements",
   "provenance",
   "metadata",
+]);
+const RESOURCE_BACKED_VIEW_EXPANSIONS = new Set<AssetRegistryResourceBackedViewExpansion>([
+  "metadata",
+  "resourceBackings",
+  "validation",
 ]);
 
 export function parseAssetRegistryDefinitionListInput(
@@ -91,6 +119,52 @@ export function toAssetRegistryFacadeListQuery(
     lifecycleStatuses: input.lifecycleStatuses,
     includeBuiltIns: input.builtIn === "custom" ? false : undefined,
     includeCustom: input.builtIn === "built-in" ? false : undefined,
+    includeMetadata: input.includeMetadata,
+    limit: input.limit,
+    cursor: input.cursor,
+  };
+}
+
+export function parseAssetRegistryResourceBackedViewListInput(
+  input: unknown,
+  shape: AssetRegistryReadInputShape,
+): AssetRegistryResourceBackedViewListInput {
+  const record = requireRecord(input);
+  const searchTextValue = shape === "api-query" ? record.q : record.searchText;
+  const assetTypesValue = shape === "api-query" ? record.assetType : record.assetTypes;
+  const assetFamiliesValue = shape === "api-query" ? record.assetFamily : record.assetFamilies;
+  const lifecycleStatusesValue = shape === "api-query" ? record.lifecycleStatus : record.lifecycleStatuses;
+  const viewKindsValue = shape === "api-query" ? record.viewKind : record.viewKinds;
+
+  return {
+    ...(searchTextValue !== undefined ? { searchText: optionalString(searchTextValue, "searchText", shape) } : {}),
+    ...(assetTypesValue !== undefined
+      ? { assetTypes: parseStringList(assetTypesValue, "assetTypes", shape).map((value) => assertKnown(value, isAssetType, ASSET_TYPES, "assetTypes")) as AssetType[] }
+      : {}),
+    ...(assetFamiliesValue !== undefined
+      ? { assetFamilies: parseStringList(assetFamiliesValue, "assetFamilies", shape).map((value) => assertKnown(value, isAssetFamily, ASSET_FAMILIES, "assetFamilies")) as AssetFamily[] }
+      : {}),
+    ...(lifecycleStatusesValue !== undefined
+      ? { lifecycleStatuses: parseStringList(lifecycleStatusesValue, "lifecycleStatuses", shape).map((value) => assertKnown(value, isAssetLifecycleStatus, ASSET_LIFECYCLE_STATUSES, "lifecycleStatuses")) as AssetLifecycleStatus[] }
+      : {}),
+    ...(viewKindsValue !== undefined
+      ? { viewKinds: parseStringList(viewKindsValue, "viewKinds", shape).map((value) => assertKnown(value, isAssetResourceBackedViewKind, ASSET_RESOURCE_BACKED_VIEW_KINDS, "viewKinds")) as AssetResourceBackedViewKind[] }
+      : {}),
+    ...(record.limit !== undefined ? { limit: parseLimit(record.limit, shape) } : {}),
+    ...(record.cursor !== undefined ? { cursor: parseCursor(record.cursor, shape) } : {}),
+    ...(record.includeMetadata !== undefined ? { includeMetadata: parseBoolean(record.includeMetadata, "includeMetadata", shape) } : {}),
+  };
+}
+
+export function toAssetRegistryResourceBackedViewListQuery(
+  input: AssetRegistryResourceBackedViewListInput,
+): AssetRegistryListQuery {
+  return {
+    searchText: input.searchText,
+    assetTypes: input.assetTypes,
+    assetFamilies: input.assetFamilies,
+    lifecycleStatuses: input.lifecycleStatuses,
+    viewKinds: input.viewKinds,
     includeMetadata: input.includeMetadata,
     limit: input.limit,
     cursor: input.cursor,
@@ -150,6 +224,43 @@ export function toAssetRegistryReadOptions(
     includeRequirements: expand.has("requirements"),
     includeMetadata: expand.has("metadata"),
   };
+}
+
+export function parseAssetRegistryResourceBackedViewReadInput(
+  input: unknown,
+  shape: AssetRegistryReadInputShape,
+): AssetRegistryResourceBackedViewReadInput {
+  const record = requireRecord(input);
+  const viewId = requiredString(record.viewId, "viewId", shape);
+  const expand = record.expand === undefined
+    ? undefined
+    : parseStringList(record.expand, "expand", shape).map((value) => {
+      if (!RESOURCE_BACKED_VIEW_EXPANSIONS.has(value as AssetRegistryResourceBackedViewExpansion)) {
+        throw new Error("invalid expand");
+      }
+      return value as AssetRegistryResourceBackedViewExpansion;
+    });
+
+  return {
+    viewId,
+    ...(expand ? { expand } : {}),
+    ...(record.includeValidation !== undefined ? { includeValidation: parseBoolean(record.includeValidation, "includeValidation", shape) } : {}),
+  };
+}
+
+export function toAssetRegistryResourceBackedViewReadOptions(
+  input: Pick<AssetRegistryResourceBackedViewReadInput, "expand" | "includeValidation">,
+): AssetRegistryReadOptions {
+  const expand = new Set(input.expand ?? []);
+  return {
+    includeValidation: input.includeValidation || expand.has("validation"),
+    includeMetadata: expand.has("metadata"),
+    includeResourceBackings: expand.has("resourceBackings"),
+  };
+}
+
+function isAssetResourceBackedViewKind(value: string): value is AssetResourceBackedViewKind {
+  return ASSET_RESOURCE_BACKED_VIEW_KINDS.includes(value as AssetResourceBackedViewKind);
 }
 
 function requireRecord(value: unknown): Record<string, unknown> {

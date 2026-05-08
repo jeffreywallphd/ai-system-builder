@@ -4,6 +4,8 @@ import { describe, expect, it } from "../../../../testing/node-test";
 import {
   mapAssetDefinitionDetail,
   mapAssetDefinitionListResult,
+  mapAssetResourceBackedViewDetail,
+  mapAssetResourceBackedViewListResult,
   mapTransportEnvelopeError,
 } from "../index";
 import * as assetLibraryExports from "../index";
@@ -255,6 +257,76 @@ describe("asset library mappers", () => {
       lifecycleStatus: undefined,
       lifecycleStatusLabel: "Unknown status",
     });
+  });
+
+  it("maps resource-backed cards safely and labels generated/external objects as unregistered", () => {
+    const result = mapAssetResourceBackedViewListResult({
+      items: [
+        {
+          viewId: "asset-view.generated-output.internal.1",
+          viewKind: "generated-output",
+          assetType: "image",
+          assetFamily: "resource-backed",
+          displayName: "Generated output",
+          metadata: {
+            finalized: false,
+            registered: false,
+            localPath: "/tmp/private/file",
+            prompt: "raw provider payloads",
+          },
+          diagnostics: [{ severity: "info", code: "generated-output-not-registered", message: "Generated output is not finalized or registered." }],
+        },
+        {
+          viewId: "asset-view.external-repository-object.internal.1",
+          viewKind: "external-repository-object",
+          assetType: "data-source",
+          assetFamily: "resource-backed",
+          displayName: "External object",
+          metadata: { imported: false, registered: false, token: "Bearer abc123" },
+        },
+      ],
+    });
+
+    expect(result.items[0]).toMatchObject({
+      viewId: "asset-view.generated-output.internal.1",
+      registrationStatusLabel: "Not finalized or registered",
+      diagnostics: ["Generated output is not finalized or registered."],
+    });
+    expect(result.items[1]).toMatchObject({
+      viewId: "asset-view.external-repository-object.internal.1",
+      registrationStatusLabel: "Not imported or registered",
+    });
+    expect(JSON.stringify(result)).not.toContain("/tmp/private/file");
+    expect(JSON.stringify(result)).not.toContain("Bearer abc123");
+  });
+
+  it("maps resource-backed detail without unsafe metadata, paths, bytes, or prompts", () => {
+    const detail = mapAssetResourceBackedViewDetail({
+      view: {
+        viewId: "asset-view.generated-output.internal.1",
+        viewKind: "generated-output",
+        displayName: "Generated output",
+        metadata: {
+          safe: "visible",
+          prompt: "raw provider payloads",
+          storageRootDirectory: "/tmp/private/file",
+          bytes: "bytes",
+        },
+        resourceBacking: {
+          resourceKind: "generated-output",
+          role: "primary",
+          displayName: "Generated output",
+          contentType: "image/png",
+          localPath: "/tmp/private/file",
+        },
+      },
+    });
+
+    expect(detail.metadata).toEqual({ safe: "visible" });
+    expect(detail.resourceBackingSummary).toMatchObject({ resourceKind: "generated-output", contentType: "image/png" });
+    expect(JSON.stringify(detail)).not.toContain("/tmp/private/file");
+    expect(JSON.stringify(detail)).not.toContain("raw provider payloads");
+    expect(JSON.stringify(detail)).not.toContain("bytes");
   });
 
   it("normalizes safe client errors without exposing internal detail", () => {

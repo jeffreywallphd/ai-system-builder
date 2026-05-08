@@ -102,7 +102,7 @@ If a task changes route policy, security status semantics, token handling, or se
 
 Phase 2C begins by exposing only a narrow, read-only server API foundation for Asset Registry definition reads. The server routes wrap an application-owned Asset Registry definition read port/read facade and must not receive persistence adapters, host composition helpers, mutation use cases, built-in seeding services, or local repositories.
 
-The initial `/api/assets` surface is GET-only for asset definition list/detail/version reads. It must not scan resources, read bytes, call runtimes, call providers, seed built-ins, import/finalize/register assets, or execute workflows. Later Phase 2C prompts add matching read-only desktop IPC/preload and desktop/thin-client Asset Library clients/pages over the same definitions-only read surface.
+The `/api/assets` surface is GET-only for asset definition list/detail/version reads and resource-backed view list/detail reads. It must not scan resources, read bytes, call runtimes, call providers, seed built-ins, import/finalize/register assets, or execute workflows. Desktop IPC/preload and desktop/thin-client Asset Library clients/pages should stay in parity with this read-only facade-backed surface.
 
 ## Phase 2C Prompt 3: read-only Asset Registry desktop IPC/preload foundation
 
@@ -110,11 +110,11 @@ Desktop IPC/preload Asset Registry work should include `asset-kernel`, `desktop-
 
 ## Phase 2C cleanup: read-only Asset Registry transport parity
 
-For API/IPC/preload cleanup prompts, include `asset-kernel`, `server-host`, `desktop-host`, `ipc-electron`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Keep the operation scope explicit: definition list, definition read, and definition-version read only unless a later prompt has already added more. Shared transport-adapter input normalization is appropriate; renderer UI, thin-client UI, mutation, seeding, import/finalize/register, scan, runtime execution, provider calls, and persistence access remain out of scope.
+For API/IPC/preload cleanup prompts, include `asset-kernel`, `server-host`, `desktop-host`, `ipc-electron`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Keep the operation scope explicit: definition list, definition read, definition-version read, resource-backed view list, and resource-backed view read only unless a later prompt has already added more. Shared transport-adapter input normalization is appropriate; mutation, seeding, import/finalize/register, scan, runtime execution, provider calls, and persistence access remain out of scope.
 
 ## Phase 2C Prompt 4: shared Asset Library read client and UI read models
 
-For shared Asset Library UI-client/read-model prompts, include `asset-kernel`, `desktop-host`, `server-host`, `ipc-electron`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Scope is definitions-only UI-facing read models, safe mappers, shared query/detail option types, desktop renderer preload-backed read client, and thin-client GET-only API read client. Asset Library pages/routes/navigation, mutations, seeding, import/finalize/register, scans, runtime/provider execution, byte reads, application service imports, host composition imports, persistence imports, server route-handler imports, and IPC-handler imports remain out of scope.
+For shared Asset Library UI-client/read-model prompts, include `asset-kernel`, `desktop-host`, `server-host`, `ipc-electron`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Scope is read-only definition and resource-backed view UI-facing read models, safe mappers, shared query/detail option types, desktop renderer preload-backed read client, and thin-client GET-only API read client. Mutations, seeding, import/finalize/register, scans, runtime/provider execution, byte reads, application service imports, host composition imports, persistence imports, server route-handler imports, and IPC-handler imports remain out of scope.
 
 ## Phase 2C Prompt 5: desktop read-only Asset Library page
 
@@ -122,7 +122,7 @@ For desktop Asset Library page prompts, include `asset-kernel`, `desktop-host`, 
 
 ## Phase 2C Prompt 6: thin-client read-only Asset Library page
 
-For thin-client Asset Library page prompts, include `asset-kernel`, `server-host`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Scope is the thin-client definitions-only list/detail page, `/assets` route/navigation, supported read-only query filters, accessible loading/empty/error states, and collapsed advanced read-only detail sections backed by the thin-client server API Asset Library client. Desktop UI, API/IPC/preload contract changes, mutations, seeding, import/finalize/register, resource scans, runtime/provider execution, byte reads, application service imports, host composition imports, persistence imports, server route handlers, desktop preload/IPC imports, and speculative instances/compositions/resource-backed views remain out of scope.
+For thin-client Asset Library page prompts, include `asset-kernel`, `server-host`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Scope is the thin-client read-only definition and resource-backed view list/detail page, `/assets` route/navigation, supported read-only query filters, accessible loading/empty/error states, and collapsed advanced read-only detail sections backed by the thin-client server API Asset Library client. Desktop UI, mutation contract changes, seeding, import/finalize/register, resource scans, runtime/provider execution, byte reads, application service imports, host composition imports, persistence imports, server route handlers, desktop preload/IPC imports, and speculative instances/compositions remain out of scope.
 
 ## Phase 2C Prompt 7: Asset Library advanced read-only detail panels
 
