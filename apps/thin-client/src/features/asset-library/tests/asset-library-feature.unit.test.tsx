@@ -171,7 +171,7 @@ describe("thin-client AssetLibraryFeature", () => {
     });
     const { container } = await render(client);
 
-    expect(container.textContent).toContain("No asset definitions are registered yet.");
+    expect(container.textContent).toContain("No reusable building blocks are registered yet.");
     expect(container.textContent).toContain("Built-in assets appear here after they are registered for this workspace.");
 
     setInputValue(container.querySelector("input[type='search']") as HTMLInputElement, "missing");
@@ -292,7 +292,7 @@ describe("thin-client AssetLibraryFeature", () => {
     await act(async () => cardButton.click());
     await flush();
 
-    for (const label of ["Configuration summary", "Ports", "Requirements", "Source", "Details"]) {
+    for (const label of ["Configuration", "Inputs and outputs", "Requirements", "Source", "Details"]) {
       expect(container.textContent).toContain(label);
     }
 

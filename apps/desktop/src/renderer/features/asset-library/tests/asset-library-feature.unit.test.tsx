@@ -151,7 +151,7 @@ describe("AssetLibraryFeature", () => {
     });
     const { container } = await render(client);
 
-    expect(container.textContent).toContain("No asset definitions are registered yet.");
+    expect(container.textContent).toContain("No reusable building blocks are registered yet.");
     expect(container.textContent).toContain("Built-in assets appear here after they are registered for this workspace.");
 
     setInputValue(container.querySelector("input[type='search']") as HTMLInputElement, "missing");
@@ -271,7 +271,7 @@ describe("AssetLibraryFeature", () => {
     await flush();
 
     expect(container.textContent).toContain("Configuration");
-    expect(container.textContent).toContain("Ports");
+    expect(container.textContent).toContain("Inputs and outputs");
     expect(container.textContent).toContain("Requirements");
     expect(container.textContent).toContain("Source");
     expect(container.textContent).toContain("Details");

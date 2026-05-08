@@ -23,9 +23,9 @@ const UNSAFE_KEY_PATTERN =
 const LOCAL_PATH_VALUE_PATTERN =
   /(^~\/|^\.\.?\/|^\/(?:tmp|var|home|users|etc|private|opt|usr|mnt|volumes)(?:\/|$)|^[a-z]:[\\/]|\\(?:Users|Temp)\\|\/(?:tmp|temp)\/)/i;
 const SECRET_VALUE_PATTERN =
-  /(bearer\s+[a-z0-9._~+/=-]+|\bapi[_-]?key\b|\bapikey\b|\btoken\b|\bpassword\b|\bsecret\b|authorization\s*:)/i;
+  /(bearer\s+[a-z0-9._~+/=-]+|\bapi[_-]?key\b|\bapikey\b|\btoken\b|\bpassword\b|\bsecret\b|\bauth\b|authorization\s*:)/i;
 const UNSAFE_DIAGNOSTIC_VALUE_PATTERN =
-  /\b(stack|command|base64|blob|raw provider payload|provider payload|raw exception|exception message)\b/i;
+  /\b(stack trace|stack|command|base64|blob|raw provider payload|provider payload|raw exception|exception message|process\.env)\b/i;
 const DATA_BASE64_VALUE_PATTERN = /^data:[^,;]+;base64,/i;
 const LONG_BASE64_VALUE_PATTERN = /^[A-Za-z0-9+/]{80,}={0,2}$/;
 

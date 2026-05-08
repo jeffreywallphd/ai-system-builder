@@ -44,10 +44,10 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.match(source, /["'`]\/api\/assets\/definitions["'`]/i);
     assert.match(source, /["'`]\/api\/assets\/definitions\/:definitionId["'`]/i);
     assert.match(source, /["'`]\/api\/assets\/definitions\/:definitionId\/versions\/:version["'`]/i);
-    assert.doesNotMatch(source, /["'`]\/api\/assets\/(?:instances|compositions|resources|registry-summary|seed|register|import|finalize|scan|execute)(?:\/|["'`?])/i);
+    assert.doesNotMatch(source, /["'`]\/api\/assets\/(?:instances|compositions|resources|registry-summary|create|update|delete|seed|register|import|finalize|publish|execute|run|scan|sync|repair|install|start|train|validate)(?:\/|["'`?])/i);
     assert.doesNotMatch(source, /\.(?:post|put|patch|delete)\(["'`]\/api\/assets/i);
     assert.doesNotMatch(source, /\basset(?:Kernel|Registry|Library)?(?:Router|Controller)\b/i);
-    assert.doesNotMatch(source, /\b(?:seedBuiltIns|registerBuiltIns|importAsset|finalizeAsset|scanResources|startRuntime|probeRuntime)\b/i);
+    assert.doesNotMatch(source, /\b(?:seedBuiltIns|registerBuiltIns|importAsset|finalizeAsset|publishAsset|executeAsset|runAsset|scanResources|syncAssets|startRuntime|probeRuntime|installRuntime|repairRuntime|trainAsset|validateAsset)\b/i);
   });
 
   it("allows only read-only asset definition IPC/preload methods", () => {
@@ -63,11 +63,11 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.match(publicIpcAndPreloadSource, /DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL/);
     assert.match(publicIpcAndPreloadSource, /\blistAssetDefinitions\b/);
     assert.match(publicIpcAndPreloadSource, /\breadAssetDefinition\b/);
-    assert.doesNotMatch(publicIpcAndPreloadSource, /ipc\.asset\.(?:instance|composition|resource|registry-summary|create|update|delete|register|seed|import|finalize|scan|execute)/i);
-    assert.doesNotMatch(publicIpcAndPreloadSource, /\b(?:createAsset|updateAsset|deleteAsset|registerAsset|seedAsset|importAsset|finalizeAsset|listAssetInstances|readAssetInstance)\b/i);
+    assert.doesNotMatch(publicIpcAndPreloadSource, /ipc\.asset\.(?:instance|composition|resource|registry-summary|create|update|delete|register|seed|import|finalize|publish|execute|run|scan|sync|repair|install|start|train|validate)/i);
+    assert.doesNotMatch(publicIpcAndPreloadSource, /\b(?:createAsset|updateAsset|deleteAsset|registerAsset|seedAsset|importAsset|finalizeAsset|publishAsset|executeAsset|runAsset|scanAssets|syncAssets|repairAsset|installAsset|startAsset|trainAsset|validateAsset|listAssetInstances|readAssetInstance)\b/i);
     assert.match(desktopHostCompositionSource, /assetRegistryRead:\s*internalAssetRegistry\.readFacade/);
     assert.doesNotMatch(desktopHostCompositionSource, /assetRegistryRead:\s*internalAssetRegistry[,}]/);
-    assert.doesNotMatch(desktopHostCompositionSource, /ipc\.asset\.(?:instance|composition|resource|registry-summary|create|update|delete|register|seed|import|finalize|scan|execute)/i);
+    assert.doesNotMatch(desktopHostCompositionSource, /ipc\.asset\.(?:instance|composition|resource|registry-summary|create|update|delete|register|seed|import|finalize|publish|execute|run|scan|sync|repair|install|start|train|validate)/i);
   });
 
   it("allows read-only desktop and thin-client Asset Library pages with no mutation helpers", () => {
@@ -94,7 +94,7 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.match(combinedSource("apps/thin-client/src/routes"), /label:\s*["'`]Assets["'`]/);
     assert.match(source, /\blistAssetDefinitions\b/);
     assert.match(source, /\breadAssetDefinition\b/);
-    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|scanResources|executeAsset)\b/i);
+    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|publishAsset|scanResources|executeAsset|runAsset|syncAssets|repairAsset|installAsset|startAsset|trainAsset)\b/i);
     assert.doesNotMatch(source, /\b(?:listAssetInstances|readAssetInstance|listAssetCompositions|readAssetComposition|readAssetRegistrySummary)\b/i);
   });
 
@@ -106,7 +106,7 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     ].join("\n");
 
     assert.doesNotMatch(source, /from\s+["'][^"']*(?:apps\/|adapters\/transport|api-express|ipc-electron|electron|express|preload|renderer|thin-client|runtime\/.*adapter|provider-client|huggingface|openai)[^"']*["']/i);
-    assert.doesNotMatch(source, /\b(?:readdir|opendir|glob|walkDir|scanResources|scanArtifacts|scanModels|scanDatasets|fetch\(|createRuntime|startRuntime|probeRuntime|installRuntime|repairRuntime)\b/i);
+    assert.doesNotMatch(source, /\b(?:readdir|opendir|glob|walkDir|scanResources|scanArtifacts|scanModels|scanDatasets|readBytes|readResourceBytes|fetch\(|createRuntime|startRuntime|probeRuntime|installRuntime|repairRuntime)\b/i);
   });
 
   it("keeps public asset transports on the read port instead of local persistence or seeding seams", () => {
@@ -135,7 +135,7 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.doesNotMatch(source, /from\s+["'][^"']*modules\/hosts[^"']*["']/i);
     assert.doesNotMatch(source, /from\s+["'][^"']*adapters\/persistence[^"']*["']/i);
     assert.doesNotMatch(source, /from\s+["'][^"']*ipc-electron[^"']*["']/i);
-    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|scanResources|executeAsset)\b/i);
+    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|publishAsset|scanResources|executeAsset|runAsset|syncAssets|repairAsset|installAsset|startAsset|trainAsset)\b/i);
   });
 
   it("keeps thin-client Asset Library files on the server API read-only client boundary", () => {
@@ -149,6 +149,6 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.doesNotMatch(source, /from\s+["'][^"']*adapters\/persistence[^"']*["']/i);
     assert.doesNotMatch(source, /from\s+["'][^"']*api-express[^"']*["']/i);
     assert.doesNotMatch(source, /from\s+["'][^"']*(?:preload|ipc-electron|electron|desktop)[^"']*["']/i);
-    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|scanResources|executeAsset)\b/i);
+    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|publishAsset|scanResources|executeAsset|runAsset|syncAssets|repairAsset|installAsset|startAsset|trainAsset)\b/i);
   });
 });

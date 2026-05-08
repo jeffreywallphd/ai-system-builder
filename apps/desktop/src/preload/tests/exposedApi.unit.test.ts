@@ -210,11 +210,33 @@ describe("desktop preload exposedApi bridge", () => {
   it("does not expose asset mutation or seeding methods", () => {
     const api = createDesktopPreloadApi({ ipcRenderer: { invoke: testDouble.fn() } });
     const methodNames = Object.keys(api);
+    const forbiddenAssetMethods = [
+      "createAsset",
+      "updateAsset",
+      "deleteAsset",
+      "registerAsset",
+      "seedAsset",
+      "seedBuiltInAssetDefinitions",
+      "importAsset",
+      "finalizeAsset",
+      "publishAsset",
+      "executeAsset",
+      "runAsset",
+      "scanAssets",
+      "syncAssets",
+      "repairAsset",
+      "installAsset",
+      "startAsset",
+      "trainAsset",
+      "validateAsset",
+    ];
 
     expect(methodNames).toContain("listAssetDefinitions");
     expect(methodNames).toContain("readAssetDefinition");
     expect(methodNames).toContain("readAssetDefinitionVersion");
-    expect(/\b(?:createAsset|updateAsset|deleteAsset|registerAsset|seedAsset|importAsset|finalizeAsset)/i.test(methodNames.join(" "))).toBe(false);
+    for (const method of forbiddenAssetMethods) {
+      expect(methodNames).not.toContain(method);
+    }
   });
 
   it("maps hugging face token status bridge calls to dedicated request channel", async () => {

@@ -102,7 +102,7 @@ If a task changes route policy, security status semantics, token handling, or se
 
 Phase 2C begins by exposing only a narrow, read-only server API foundation for Asset Registry definition reads. The server routes wrap an application-owned Asset Registry definition read port/read facade and must not receive persistence adapters, host composition helpers, mutation use cases, built-in seeding services, or local repositories.
 
-The initial `/api/assets` surface is GET-only for asset definition list/detail/version reads. It must not scan resources, read bytes, call runtimes, call providers, seed built-ins, import/finalize/register assets, or execute workflows. Desktop IPC/preload/renderer UI and thin-client UI/client exposure remain deferred.
+The initial `/api/assets` surface is GET-only for asset definition list/detail/version reads. It must not scan resources, read bytes, call runtimes, call providers, seed built-ins, import/finalize/register assets, or execute workflows. Later Phase 2C prompts add matching read-only desktop IPC/preload and desktop/thin-client Asset Library clients/pages over the same definitions-only read surface.
 
 ## Phase 2C Prompt 3: read-only Asset Registry desktop IPC/preload foundation
 
@@ -127,3 +127,7 @@ For thin-client Asset Library page prompts, include `asset-kernel`, `server-host
 ## Phase 2C Prompt 7: Asset Library advanced read-only detail panels
 
 For Asset Library advanced detail panel prompts, include `asset-kernel`, `desktop-host`, `server-host`, `ipc-electron`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Scope is shared read-only UI helpers/components for AI context, configuration summaries, ports, requirements, source/provenance, validation summaries only when already present or explicitly requested, and safe metadata. Desktop and thin-client page/client wiring remains host-specific. Normal selection must not request validation, technical panels stay collapsed by default, and shared UI helpers/components must not import application services, host composition, persistence adapters, transport handlers, runtime/storage adapters, desktop preload internals, or thin-client API clients.
+
+## Phase 2C Prompt 8: final Asset Library read-only stabilization
+
+For final Phase 2C stabilization prompts, include `asset-kernel`, `desktop-host`, `server-host`, `ipc-electron`, `security`, `testing`, and `persistence-storage`, plus canonical Asset Kernel/host/dependency/persistence docs. Scope is regression hardening only: read-only API/IPC/preload audits, UI boundary audits, explicit validation behavior, safe metadata/rendering, resource-backed computed-view safety, non-exposure tests, and docs/context alignment. Do not add mutation/execution/import/finalization/seeding, automatic validation, resource scans, runtime/provider calls, byte reads, or new product features.

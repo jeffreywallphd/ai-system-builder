@@ -3,10 +3,10 @@ import type { AssetJsonObject, AssetJsonValue, AssetMetadata } from "../../../co
 const FORBIDDEN_ASSET_METADATA_KEY_PATTERN =
   /(token|secret|password|credential|authorization|auth|storagerootdirectory|runtimerootdirectory|localpath|filesystempath|filepath|path|cache|bytes|blob|contentbase64|base64|raw|payload|command|stack|env)/i;
 const LOCAL_FILESYSTEM_PATH_VALUE_PATTERN = /(^~\/|^\.\.?\/|^\/(?:tmp|var|home|users|etc|private|opt|usr|mnt|volumes)(?:\/|$)|^[a-z]:[\\/]|\\(?:Users|Temp)\\|\/(?:tmp|temp)\/)/i;
-const AUTH_BEARING_VALUE_PATTERN = /(bearer\s+[a-z0-9._~+/=-]+|(?:api[_-]?key|api\s+key|apikey)\s*[=:]|(?:token|password|secret)\s*[=:]|authorization\s*:)/i;
+const AUTH_BEARING_VALUE_PATTERN = /(bearer\s+[a-z0-9._~+/=-]+|(?:api[_-]?key|api\s+key|apikey)\s*[=:]|\bapi[_-]?key\b|\bapikey\b|(?:token|password|secret)\s*[=:]|\b(?:token|password|secret|auth)\b|authorization\s*:)/i;
 const DATA_BASE64_VALUE_PATTERN = /^data:[^,;]+;base64,/i;
 const LONG_BASE64_VALUE_PATTERN = /^[A-Za-z0-9+/]{80,}={0,2}$/;
-const RAW_PROVIDER_OR_EXCEPTION_VALUE_PATTERN = /\b(?:raw\s+)?(?:provider\s+payload|exception\s+message|raw\s+exception)\b/i;
+const RAW_PROVIDER_OR_EXCEPTION_VALUE_PATTERN = /\b(?:raw\s+)?(?:provider\s+payload|exception\s+message|raw\s+exception|stack\s+trace|stack|command|base64|blob|process\.env)\b/i;
 
 export function isUnsafeAssetMetadataKey(key: string): boolean {
   return FORBIDDEN_ASSET_METADATA_KEY_PATTERN.test(key);
