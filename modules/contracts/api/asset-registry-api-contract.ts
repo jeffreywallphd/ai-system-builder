@@ -2,6 +2,7 @@ import type {
   AssetFamily,
   AssetLifecycleStatus,
   AssetReference,
+  AssetResourceBackedViewKind,
   AssetType,
 } from "../asset";
 import { normalizeAssetId, normalizeAssetVersion } from "../asset";
@@ -11,6 +12,8 @@ import type {
   AssetDefinitionDetail,
   AssetRegistryListResult,
   AssetRegistryReadOptions,
+  AssetRegistryResourceBackedViewCard,
+  AssetRegistryResourceBackedViewDetail,
 } from "../../application/services/asset/asset-registry-read-facade.types";
 import { createApiError } from "./api-error";
 import { createApiRequest, type ApiRequest } from "./api-request";
@@ -23,6 +26,8 @@ import {
 export const API_ASSET_DEFINITIONS_LIST_OPERATION = createTransportOperation("asset", "definitions-list");
 export const API_ASSET_DEFINITION_READ_OPERATION = createTransportOperation("asset", "definition-read");
 export const API_ASSET_DEFINITION_VERSION_READ_OPERATION = createTransportOperation("asset", "definition-version-read");
+export const API_ASSET_RESOURCE_BACKED_VIEWS_LIST_OPERATION = createTransportOperation("asset", "resource-backed-views-list");
+export const API_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION = createTransportOperation("asset", "resource-backed-view-read");
 
 export type ApiAssetBuiltInFilter = "all" | "built-in" | "custom";
 
@@ -52,6 +57,28 @@ export type ApiAssetDefinitionExpansion =
   | "provenance"
   | "metadata";
 
+export interface ApiAssetResourceBackedViewsListRequestPayload {
+  readonly q?: string;
+  readonly assetType?: readonly AssetType[];
+  readonly assetFamily?: readonly AssetFamily[];
+  readonly lifecycleStatus?: readonly AssetLifecycleStatus[];
+  readonly viewKind?: readonly AssetResourceBackedViewKind[];
+  readonly limit?: number;
+  readonly cursor?: string;
+  readonly includeMetadata?: boolean;
+}
+
+export type ApiAssetResourceBackedViewExpansion =
+  | "metadata"
+  | "resourceBackings"
+  | "validation";
+
+export interface ApiAssetResourceBackedViewReadRequestPayload {
+  readonly viewId: string;
+  readonly expand?: readonly ApiAssetResourceBackedViewExpansion[];
+  readonly includeValidation?: boolean;
+}
+
 export type ApiAssetDefinitionsListRequest = ApiRequest<
   ApiAssetDefinitionsListRequestPayload,
   typeof API_ASSET_DEFINITIONS_LIST_OPERATION,
@@ -67,6 +94,18 @@ export type ApiAssetDefinitionReadRequest = ApiRequest<
 export type ApiAssetDefinitionVersionReadRequest = ApiRequest<
   Required<Pick<ApiAssetDefinitionReadRequestPayload, "definitionId" | "version">> & Omit<ApiAssetDefinitionReadRequestPayload, "definitionId" | "version">,
   typeof API_ASSET_DEFINITION_VERSION_READ_OPERATION,
+  Record<string, never>
+>;
+
+export type ApiAssetResourceBackedViewsListRequest = ApiRequest<
+  ApiAssetResourceBackedViewsListRequestPayload,
+  typeof API_ASSET_RESOURCE_BACKED_VIEWS_LIST_OPERATION,
+  Record<string, never>
+>;
+
+export type ApiAssetResourceBackedViewReadRequest = ApiRequest<
+  ApiAssetResourceBackedViewReadRequestPayload,
+  typeof API_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION,
   Record<string, never>
 >;
 
@@ -91,6 +130,20 @@ export type ApiAssetDefinitionVersionReadResponse = ApiResponse<
   Record<string, never>
 >;
 
+export type ApiAssetResourceBackedViewsListResponse = ApiResponse<
+  AssetRegistryListResult<AssetRegistryResourceBackedViewCard>,
+  Record<string, unknown>,
+  typeof API_ASSET_RESOURCE_BACKED_VIEWS_LIST_OPERATION,
+  Record<string, never>
+>;
+
+export type ApiAssetResourceBackedViewReadResponse = ApiResponse<
+  AssetRegistryResourceBackedViewDetail,
+  Record<string, unknown>,
+  typeof API_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION,
+  Record<string, never>
+>;
+
 export function createApiAssetDefinitionsListRequest(
   payload: ApiAssetDefinitionsListRequestPayload = {},
   options?: { requestId?: string; correlationId?: string },
@@ -112,6 +165,20 @@ export function createApiAssetDefinitionVersionReadRequest(
   return createApiRequest(API_ASSET_DEFINITION_VERSION_READ_OPERATION, normalizeDefinitionReadPayload(payload) as ApiAssetDefinitionVersionReadRequest["payload"], options);
 }
 
+export function createApiAssetResourceBackedViewsListRequest(
+  payload: ApiAssetResourceBackedViewsListRequestPayload = {},
+  options?: { requestId?: string; correlationId?: string },
+): ApiAssetResourceBackedViewsListRequest {
+  return createApiRequest(API_ASSET_RESOURCE_BACKED_VIEWS_LIST_OPERATION, payload, options);
+}
+
+export function createApiAssetResourceBackedViewReadRequest(
+  payload: ApiAssetResourceBackedViewReadRequestPayload,
+  options?: { requestId?: string; correlationId?: string },
+): ApiAssetResourceBackedViewReadRequest {
+  return createApiRequest(API_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION, { ...payload, viewId: payload.viewId.trim() }, options);
+}
+
 export function createApiAssetDefinitionsListSuccessResponse(
   value: AssetRegistryListResult<AssetDefinitionCard>,
   options?: { requestId?: string; correlationId?: string },
@@ -131,6 +198,20 @@ export function createApiAssetDefinitionVersionReadSuccessResponse(
   options?: { requestId?: string; correlationId?: string },
 ): ApiAssetDefinitionVersionReadResponse {
   return createApiSuccessResponse(API_ASSET_DEFINITION_VERSION_READ_OPERATION, value, options);
+}
+
+export function createApiAssetResourceBackedViewsListSuccessResponse(
+  value: AssetRegistryListResult<AssetRegistryResourceBackedViewCard>,
+  options?: { requestId?: string; correlationId?: string },
+): ApiAssetResourceBackedViewsListResponse {
+  return createApiSuccessResponse(API_ASSET_RESOURCE_BACKED_VIEWS_LIST_OPERATION, value, options);
+}
+
+export function createApiAssetResourceBackedViewReadSuccessResponse(
+  value: AssetRegistryResourceBackedViewDetail,
+  options?: { requestId?: string; correlationId?: string },
+): ApiAssetResourceBackedViewReadResponse {
+  return createApiSuccessResponse(API_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION, value, options);
 }
 
 export function createApiAssetDefinitionsListFailureResponse(
@@ -157,6 +238,22 @@ export function createApiAssetDefinitionVersionReadFailureResponse(
   return createApiFailureResponse(createApiError(API_ASSET_DEFINITION_VERSION_READ_OPERATION, code, message, options), options);
 }
 
+export function createApiAssetResourceBackedViewsListFailureResponse(
+  code: "validation" | "internal" | "not-found" | "unavailable",
+  message: string,
+  options?: { details?: Record<string, unknown>; requestId?: string; correlationId?: string },
+): ApiAssetResourceBackedViewsListResponse {
+  return createApiFailureResponse(createApiError(API_ASSET_RESOURCE_BACKED_VIEWS_LIST_OPERATION, code, message, options), options);
+}
+
+export function createApiAssetResourceBackedViewReadFailureResponse(
+  code: "validation" | "internal" | "not-found" | "unavailable",
+  message: string,
+  options?: { details?: Record<string, unknown>; requestId?: string; correlationId?: string },
+): ApiAssetResourceBackedViewReadResponse {
+  return createApiFailureResponse(createApiError(API_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION, code, message, options), options);
+}
+
 export function apiAssetDefinitionReference(payload: Pick<ApiAssetDefinitionReadRequestPayload, "definitionId" | "version">): AssetReference {
   return {
     kind: "asset-definition",
@@ -174,6 +271,15 @@ export function apiAssetDefinitionReadOptions(payload: Pick<ApiAssetDefinitionRe
     includePorts: expand.has("ports"),
     includeRequirements: expand.has("requirements"),
     includeMetadata: expand.has("metadata"),
+  };
+}
+
+export function apiAssetResourceBackedViewReadOptions(payload: Pick<ApiAssetResourceBackedViewReadRequestPayload, "expand" | "includeValidation">): AssetRegistryReadOptions {
+  const expand = new Set(payload.expand ?? []);
+  return {
+    includeValidation: payload.includeValidation || expand.has("validation"),
+    includeMetadata: expand.has("metadata"),
+    includeResourceBackings: expand.has("resourceBackings"),
   };
 }
 

@@ -1,6 +1,8 @@
 import {
   mapAssetDefinitionDetail,
   mapAssetDefinitionListResult,
+  mapAssetResourceBackedViewDetail,
+  mapAssetResourceBackedViewListResult,
   mapTransportEnvelopeError,
   mapTransportEnvelopeSuccess,
   type AssetLibraryClient,
@@ -11,6 +13,11 @@ import {
   type AssetLibraryDetailOptions,
   type AssetLibraryListResult,
   type AssetLibraryQuery,
+  type AssetLibraryResourceBackedViewCard,
+  type AssetLibraryResourceBackedViewDetail,
+  type AssetLibraryResourceBackedViewDetailOptions,
+  type AssetLibraryResourceBackedViewExpansion,
+  type AssetLibraryResourceBackedViewQuery,
 } from "../../../../../../modules/ui/shared/asset-library";
 import { parseApiEnvelope } from "../../../security/apiErrorEnvelope";
 import { secureFetch } from "../../../security/secureFetch";
@@ -44,9 +51,30 @@ function queryStringForList(query: AssetLibraryQuery): string {
   return serialized ? `?${serialized}` : "";
 }
 
+function queryStringForResourceBackedList(query: AssetLibraryResourceBackedViewQuery): string {
+  const params = new URLSearchParams();
+  if (query.searchText) params.set("q", query.searchText);
+  appendCsv(params, "assetType", query.assetTypes);
+  appendCsv(params, "assetFamily", query.assetFamilies);
+  appendCsv(params, "lifecycleStatus", query.lifecycleStatuses);
+  appendCsv(params, "viewKind", query.viewKinds);
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  if (query.cursor) params.set("cursor", query.cursor);
+  const serialized = params.toString();
+  return serialized ? `?${serialized}` : "";
+}
+
 function queryStringForDetail(options: AssetLibraryDetailOptions): string {
   const params = new URLSearchParams();
   appendCsv(params, "expand", options.expand as readonly AssetLibraryDefinitionExpansion[] | undefined);
+  appendBoolean(params, "includeValidation", options.includeValidation);
+  const serialized = params.toString();
+  return serialized ? `?${serialized}` : "";
+}
+
+function queryStringForResourceBackedDetail(options: AssetLibraryResourceBackedViewDetailOptions): string {
+  const params = new URLSearchParams();
+  appendCsv(params, "expand", options.expand as readonly AssetLibraryResourceBackedViewExpansion[] | undefined);
   appendBoolean(params, "includeValidation", options.includeValidation);
   const serialized = params.toString();
   return serialized ? `?${serialized}` : "";
@@ -114,6 +142,25 @@ export function createApiAssetLibraryClient(
         ),
         mapAssetDefinitionDetail,
         "Unable to read asset definition version.",
+      );
+    },
+
+    async listAssetResourceBackedViews(query = {}) {
+      return toClientResult<AssetLibraryListResult<AssetLibraryResourceBackedViewCard>>(
+        createApiUrl(apiBaseUrl, `/assets/resource-backed-views${queryStringForResourceBackedList(query)}`),
+        mapAssetResourceBackedViewListResult,
+        "Unable to read asset resource-backed views.",
+      );
+    },
+
+    async readAssetResourceBackedView(input, detailOptions = {}) {
+      return toClientResult<AssetLibraryResourceBackedViewDetail>(
+        createApiUrl(
+          apiBaseUrl,
+          `/assets/resource-backed-views/${encodeURIComponent(input.viewId)}${queryStringForResourceBackedDetail(detailOptions)}`,
+        ),
+        mapAssetResourceBackedViewDetail,
+        "Unable to read asset resource-backed view.",
       );
     },
   };

@@ -43,6 +43,20 @@ function detailValue() {
   };
 }
 
+function resourceViewValue() {
+  return {
+    view: {
+      viewId: "asset-view.external-repository-object.internal.1",
+      viewKind: "external-repository-object",
+      assetType: "data-source",
+      assetFamily: "resource-backed",
+      displayName: "External object",
+      summary: "External repository object view; not imported or registered.",
+      metadata: { imported: false, registered: false },
+    },
+  };
+}
+
 describe("api asset library client", () => {
   it("calls GET-only asset definition routes and serializes query params", async () => {
     const fetchMock = testDouble.fn().mockResolvedValue(response(200, { ok: true, value: { items: [] } }));
@@ -113,6 +127,26 @@ describe("api asset library client", () => {
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/assets/definitions/builtin.document");
     expect(fetchMock.mock.calls[1][0]).toBe("/api/assets/definitions/builtin.document/versions/1.0.0");
+  });
+
+  it("calls GET-only resource-backed view routes and maps unregistered status labels", async () => {
+    const fetchMock = queuedFetch([
+      response(200, { ok: true, value: { items: [resourceViewValue().view] } }),
+      response(200, { ok: true, value: resourceViewValue() }),
+    ]);
+    installBrowserStubs(fetchMock);
+
+    const client = createApiAssetLibraryClient({ apiBaseUrl: "/api" });
+    const list = await client.listAssetResourceBackedViews({ searchText: "external", viewKinds: ["external-repository-object"], limit: 10 });
+    const detail = await client.readAssetResourceBackedView({ viewId: "asset-view.external-repository-object.internal.1" }, { expand: ["metadata", "resourceBackings"] });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/assets/resource-backed-views?q=external&viewKind=external-repository-object&limit=10");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/assets/resource-backed-views/asset-view.external-repository-object.internal.1?expand=metadata%2CresourceBackings");
+    for (const call of fetchMock.mock.calls) {
+      expect((call[1] as RequestInit).method).toBe("GET");
+    }
+    expect(list).toMatchObject({ ok: true, value: { items: [{ registrationStatusLabel: "Not imported or registered" }] } });
+    expect(detail).toMatchObject({ ok: true, value: { registrationStatusLabel: "Not imported or registered" } });
   });
 
   it("maps validation, not-found, and internal failures safely", async () => {

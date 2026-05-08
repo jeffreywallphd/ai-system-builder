@@ -44,6 +44,7 @@ import type {
 import type {
   AssetFamily,
   AssetLifecycleStatus,
+  AssetResourceBackedViewKind,
   AssetType,
 } from "../../../../../modules/contracts/asset";
 
@@ -322,10 +323,32 @@ export interface DesktopAssetDefinitionsListInput {
   includeMetadata?: boolean;
 }
 
+export interface DesktopAssetResourceBackedViewsListInput {
+  searchText?: string;
+  assetTypes?: readonly AssetType[];
+  assetFamilies?: readonly AssetFamily[];
+  lifecycleStatuses?: readonly AssetLifecycleStatus[];
+  viewKinds?: readonly AssetResourceBackedViewKind[];
+  limit?: number;
+  cursor?: string;
+  includeMetadata?: boolean;
+}
+
 export interface DesktopAssetDefinitionReadInput {
   definitionId: string;
   version?: string;
   expand?: readonly DesktopAssetDefinitionExpansion[];
+  includeValidation?: boolean;
+}
+
+export type DesktopAssetResourceBackedViewExpansion =
+  | "metadata"
+  | "resourceBackings"
+  | "validation";
+
+export interface DesktopAssetResourceBackedViewReadInput {
+  viewId: string;
+  expand?: readonly DesktopAssetResourceBackedViewExpansion[];
   includeValidation?: boolean;
 }
 
@@ -385,6 +408,8 @@ interface DesktopApiBridge {
   listAssetDefinitions?: (input?: DesktopAssetDefinitionsListInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readAssetDefinition?: (input: DesktopAssetDefinitionReadInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readAssetDefinitionVersion?: (input: DesktopAssetDefinitionVersionReadInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  listAssetResourceBackedViews?: (input?: DesktopAssetResourceBackedViewsListInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readAssetResourceBackedView?: (input: DesktopAssetResourceBackedViewReadInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readPythonRuntimeStatus?: () => Promise<unknown>;
   controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
   startImageGeneration?: (input: ImageGenerationRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;

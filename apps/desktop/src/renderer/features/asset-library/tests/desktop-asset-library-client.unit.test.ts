@@ -31,9 +31,34 @@ function detailValue() {
   };
 }
 
+function resourceViewValue() {
+  return {
+    view: {
+      viewId: "asset-view.generated-output.internal.1",
+      viewKind: "generated-output",
+      assetType: "image",
+      assetFamily: "resource-backed",
+      displayName: "Generated output",
+      summary: "Generated output view; not finalized or registered.",
+      metadata: { finalized: false, registered: false },
+    },
+  };
+}
+
+function api(overrides: Record<string, unknown> = {}) {
+  return {
+    listAssetDefinitions: testDouble.fn().mockResolvedValue(success({ items: [] })),
+    readAssetDefinition: testDouble.fn().mockResolvedValue(success(detailValue())),
+    readAssetDefinitionVersion: testDouble.fn().mockResolvedValue(success(detailValue())),
+    listAssetResourceBackedViews: testDouble.fn().mockResolvedValue(success({ items: [] })),
+    readAssetResourceBackedView: testDouble.fn().mockResolvedValue(success(resourceViewValue())),
+    ...overrides,
+  };
+}
+
 describe("desktop asset library client", () => {
   it("calls read-only desktopApi methods and maps successful list responses", async () => {
-    const api = {
+    const apiBridge = api({
       listAssetDefinitions: testDouble.fn().mockResolvedValue(success({
         items: [{
           definitionId: "builtin.document",
@@ -45,15 +70,13 @@ describe("desktop asset library client", () => {
           builtIn: true,
         }],
       })),
-      readAssetDefinition: testDouble.fn().mockResolvedValue(success(detailValue())),
-      readAssetDefinitionVersion: testDouble.fn().mockResolvedValue(success(detailValue())),
-    };
-    setDesktopApi(api);
+    });
+    setDesktopApi(apiBridge);
 
     const client = createDesktopAssetLibraryClient();
     const result = await client.listAssetDefinitions({ searchText: "doc", builtIn: "built-in", limit: 10 });
 
-    expect(api.listAssetDefinitions).toHaveBeenCalledWith({ searchText: "doc", builtIn: "built-in", limit: 10 });
+    expect(apiBridge.listAssetDefinitions).toHaveBeenCalledWith({ searchText: "doc", builtIn: "built-in", limit: 10 });
     expect(result).toMatchObject({
       ok: true,
       value: { items: [{ id: "builtin.document@1.0.0", builtIn: true }] },
@@ -61,48 +84,57 @@ describe("desktop asset library client", () => {
   });
 
   it("maps successful detail and version responses", async () => {
-    const api = {
-      listAssetDefinitions: testDouble.fn().mockResolvedValue(success({ items: [] })),
-      readAssetDefinition: testDouble.fn().mockResolvedValue(success(detailValue())),
-      readAssetDefinitionVersion: testDouble.fn().mockResolvedValue(success(detailValue())),
-    };
-    setDesktopApi(api);
+    const apiBridge = api();
+    setDesktopApi(apiBridge);
 
     const client = createDesktopAssetLibraryClient();
     const detail = await client.readAssetDefinition({ definitionId: "builtin.document" }, { expand: ["aiContext"] });
     const version = await client.readAssetDefinitionVersion({ definitionId: "builtin.document", version: "1.0.0" }, { includeValidation: true });
 
-    expect(api.readAssetDefinition).toHaveBeenCalledWith({ definitionId: "builtin.document", expand: ["aiContext"] });
-    expect(api.readAssetDefinitionVersion).toHaveBeenCalledWith({ definitionId: "builtin.document", version: "1.0.0", includeValidation: true });
+    expect(apiBridge.readAssetDefinition).toHaveBeenCalledWith({ definitionId: "builtin.document", expand: ["aiContext"] });
+    expect(apiBridge.readAssetDefinitionVersion).toHaveBeenCalledWith({ definitionId: "builtin.document", version: "1.0.0", includeValidation: true });
     expect(detail).toMatchObject({ ok: true, value: { definitionId: "builtin.document" } });
     expect(version).toMatchObject({ ok: true, value: { version: "1.0.0" } });
   });
 
   it("omits validation flags from default detail requests", async () => {
-    const api = {
-      listAssetDefinitions: testDouble.fn().mockResolvedValue(success({ items: [] })),
-      readAssetDefinition: testDouble.fn().mockResolvedValue(success(detailValue())),
-      readAssetDefinitionVersion: testDouble.fn().mockResolvedValue(success(detailValue())),
-    };
-    setDesktopApi(api);
+    const apiBridge = api();
+    setDesktopApi(apiBridge);
 
     const client = createDesktopAssetLibraryClient();
     await client.readAssetDefinition({ definitionId: "builtin.document" });
     await client.readAssetDefinitionVersion({ definitionId: "builtin.document", version: "1.0.0" });
 
-    expect(api.readAssetDefinition).toHaveBeenCalledWith({ definitionId: "builtin.document" });
-    expect(api.readAssetDefinitionVersion).toHaveBeenCalledWith({ definitionId: "builtin.document", version: "1.0.0" });
+    expect(apiBridge.readAssetDefinition).toHaveBeenCalledWith({ definitionId: "builtin.document" });
+    expect(apiBridge.readAssetDefinitionVersion).toHaveBeenCalledWith({ definitionId: "builtin.document", version: "1.0.0" });
+  });
+
+  it("calls read-only resource-backed view preload methods", async () => {
+    const apiBridge = api({
+      listAssetResourceBackedViews: testDouble.fn().mockResolvedValue(success({ items: [resourceViewValue().view] })),
+      readAssetResourceBackedView: testDouble.fn().mockResolvedValue(success(resourceViewValue())),
+    });
+    setDesktopApi(apiBridge);
+
+    const client = createDesktopAssetLibraryClient();
+    const list = await client.listAssetResourceBackedViews({ searchText: "generated", limit: 10 });
+    const detail = await client.readAssetResourceBackedView({ viewId: "asset-view.generated-output.internal.1" }, { expand: ["metadata"] });
+
+    expect(apiBridge.listAssetResourceBackedViews).toHaveBeenCalledWith({ searchText: "generated", limit: 10 });
+    expect(apiBridge.readAssetResourceBackedView).toHaveBeenCalledWith({ viewId: "asset-view.generated-output.internal.1", expand: ["metadata"] });
+    expect(list).toMatchObject({ ok: true, value: { items: [{ registrationStatusLabel: "Not finalized or registered" }] } });
+    expect(detail).toMatchObject({ ok: true, value: { registrationStatusLabel: "Not finalized or registered" } });
   });
 
   it("maps validation, not-found, and internal failures safely", async () => {
-    const api = {
+    const apiBridge = api({
       listAssetDefinitions: testDouble.fn().mockResolvedValue(failure("validation", "Invalid query.", {
         fieldIssues: [{ field: "limit", message: "Must be under 100." }],
       })),
       readAssetDefinition: testDouble.fn().mockResolvedValue(failure("not-found", "missing /tmp/secret")),
       readAssetDefinitionVersion: testDouble.fn().mockResolvedValue(failure("internal", "stack at C:\\Users\\name\\secret")),
-    };
-    setDesktopApi(api);
+    });
+    setDesktopApi(apiBridge);
 
     const client = createDesktopAssetLibraryClient();
     const validation = await client.listAssetDefinitions({ limit: 999 });
@@ -120,9 +152,7 @@ describe("desktop asset library client", () => {
 
   it("does not expose mutation or execution methods", () => {
     setDesktopApi({
-      listAssetDefinitions: testDouble.fn().mockResolvedValue(success({ items: [] })),
-      readAssetDefinition: testDouble.fn().mockResolvedValue(success(detailValue())),
-      readAssetDefinitionVersion: testDouble.fn().mockResolvedValue(success(detailValue())),
+      ...api(),
     });
     const client = createDesktopAssetLibraryClient() as unknown as Record<string, unknown>;
 

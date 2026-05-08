@@ -6,6 +6,8 @@ import type {
   AssetLibraryClient,
   AssetLibraryDefinitionCard,
   AssetLibraryDefinitionDetail,
+  AssetLibraryResourceBackedViewCard,
+  AssetLibraryResourceBackedViewDetail,
 } from "../../../../../../../modules/ui/shared/asset-library";
 import { AssetLibraryFeature } from "../components/AssetLibraryFeature";
 
@@ -78,11 +80,32 @@ const detailWithValidation: AssetLibraryDefinitionDetail = {
   },
 };
 
+const resourceViewCard: AssetLibraryResourceBackedViewCard = {
+  id: "asset-view.generated-output.internal.1",
+  viewId: "asset-view.generated-output.internal.1",
+  displayName: "Generated output",
+  viewKind: "generated-output",
+  viewKindLabel: "Generated Output",
+  assetType: "image",
+  assetTypeLabel: "Image",
+  assetFamily: "resource-backed",
+  assetFamilyLabel: "Resource Backed",
+  lifecycleStatusLabel: "Not registered",
+  registrationStatusLabel: "Not finalized or registered",
+};
+
+const resourceViewDetail: AssetLibraryResourceBackedViewDetail = {
+  ...resourceViewCard,
+  summary: "Generated output view; not finalized or registered.",
+};
+
 function createClient(overrides: Partial<AssetLibraryClient> = {}): AssetLibraryClient {
   return {
     listAssetDefinitions: vi.fn().mockResolvedValue({ ok: true, value: { items: [card] } }),
     readAssetDefinition: vi.fn().mockResolvedValue({ ok: true, value: detailWithoutValidation }),
     readAssetDefinitionVersion: vi.fn().mockResolvedValue({ ok: true, value: detailWithoutValidation }),
+    listAssetResourceBackedViews: vi.fn().mockResolvedValue({ ok: true, value: { items: [resourceViewCard] } }),
+    readAssetResourceBackedView: vi.fn().mockResolvedValue({ ok: true, value: resourceViewDetail }),
     ...overrides,
   };
 }
@@ -141,6 +164,26 @@ describe("AssetLibraryFeature", () => {
     expect(container.textContent).toContain("Resource Backed");
     expect(container.textContent).toContain("Published");
     expect(container.textContent).toContain("v1.0.0");
+  });
+
+  it("renders resource-backed views in a read-only Resource views tab", async () => {
+    const { container, client } = await render();
+    const resourceTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Resource views") as HTMLButtonElement;
+
+    await act(async () => resourceTab.click());
+    await flush();
+
+    expect(container.textContent).toContain("Generated output");
+    expect(container.textContent).toContain("Not finalized or registered");
+    const cardButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Generated output")) as HTMLButtonElement;
+    await act(async () => cardButton.click());
+    await flush();
+
+    expect(client.readAssetResourceBackedView).toHaveBeenCalledWith(
+      { viewId: "asset-view.generated-output.internal.1" },
+      { expand: ["metadata", "resourceBackings"] },
+    );
+    expect(container.textContent).not.toMatch(/Register asset|Import asset|Finalize asset|Scan resources/i);
   });
 
   it("renders empty states for no registered definitions and filtered misses", async () => {

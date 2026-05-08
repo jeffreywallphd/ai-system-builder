@@ -4,9 +4,11 @@ import type {
   AssetLifecycleStatus,
   AssetMetadata,
   AssetReference,
+  AssetResourceBackedViewKind,
   AssetType,
 } from "../../../contracts/asset";
 import {
+  ASSET_RESOURCE_BACKED_VIEW_KINDS,
   isAssetFamily,
   isAssetLifecycleStatus,
   isAssetType,
@@ -16,6 +18,8 @@ import type {
   AssetLibraryDefinitionCard,
   AssetLibraryDefinitionDetail,
   AssetLibraryListResult,
+  AssetLibraryResourceBackedViewCard,
+  AssetLibraryResourceBackedViewDetail,
 } from "./assetLibraryReadModels";
 
 const UNSAFE_KEY_PATTERN =
@@ -144,6 +148,13 @@ function safeAssetFamily(value: unknown): AssetFamily | undefined {
 function safeAssetLifecycleStatus(value: unknown): AssetLifecycleStatus | undefined {
   const candidate = safeString(value);
   return candidate && isAssetLifecycleStatus(candidate) ? candidate : undefined;
+}
+
+function safeResourceBackedViewKind(value: unknown): AssetResourceBackedViewKind | undefined {
+  const candidate = safeString(value);
+  return candidate && ASSET_RESOURCE_BACKED_VIEW_KINDS.includes(candidate as AssetResourceBackedViewKind)
+    ? candidate as AssetResourceBackedViewKind
+    : undefined;
 }
 
 export function mapAssetDefinitionCard(payload: unknown): AssetLibraryDefinitionCard {
@@ -283,6 +294,128 @@ export function mapAssetDefinitionDetail(payload: unknown): AssetLibraryDefiniti
     } : {}),
     ...(metadata ? { metadata } : {}),
   };
+}
+
+export function mapAssetResourceBackedViewCard(payload: unknown): AssetLibraryResourceBackedViewCard {
+  const card = isRecord(payload) ? payload : {};
+  const viewId = safeString(card.viewId) ?? "unknown-resource-backed-view";
+  const viewKind = safeResourceBackedViewKind(card.viewKind);
+  const assetType = safeAssetType(card.assetType);
+  const assetFamily = safeAssetFamily(card.assetFamily);
+  const lifecycleStatus = safeAssetLifecycleStatus(card.lifecycleStatus);
+  const metadata = isRecord(card.metadata) ? card.metadata : undefined;
+  const diagnostics = diagnosticsFrom(card.diagnostics);
+  const sourceKind = safeString(card.sourceKind) ?? safeString(metadata?.sourceDescriptorKind) ?? diagnostics[0]?.sourceKind;
+  const registrationStatusLabel = resourceBackedRegistrationStatusLabel(viewKind, metadata);
+  const badges = [
+    viewKind ? formatKnownLabel(viewKind) : undefined,
+    registrationStatusLabel,
+    sourceKind ? formatKnownLabel(sourceKind) : undefined,
+  ].filter((entry): entry is string => Boolean(entry));
+
+  return {
+    id: viewId,
+    viewId,
+    displayName: safeString(card.displayName) ?? viewId,
+    summary: safeString(card.summary),
+    ...(viewKind ? { viewKind, viewKindLabel: formatKnownLabel(viewKind) } : { viewKindLabel: "Unknown view" }),
+    ...(assetType ? { assetType, assetTypeLabel: formatKnownLabel(assetType) } : { assetTypeLabel: "Unknown type" }),
+    ...(assetFamily ? { assetFamily, assetFamilyLabel: formatKnownLabel(assetFamily) } : { assetFamilyLabel: "Unknown family" }),
+    ...(lifecycleStatus
+      ? { lifecycleStatus, lifecycleStatusLabel: formatKnownLabel(lifecycleStatus) }
+      : { lifecycleStatusLabel: "Not registered" }),
+    sourceKind,
+    registrationStatusLabel,
+    ...(badges.length > 0 ? { badges } : {}),
+    ...(diagnostics.length > 0 ? { diagnostics: diagnostics.map((diagnostic) => diagnostic.message) } : {}),
+  };
+}
+
+export function mapAssetResourceBackedViewListResult(payload: unknown): AssetLibraryListResult<AssetLibraryResourceBackedViewCard> {
+  const result = isRecord(payload) ? payload : {};
+  return {
+    items: safeArray(result.items).map(mapAssetResourceBackedViewCard),
+    ...(safeString(result.nextCursor) ? { nextCursor: safeString(result.nextCursor) } : {}),
+    diagnostics: diagnosticsFrom(result.diagnostics).map(({ severity, code, message }) => ({ severity, code, message })),
+  };
+}
+
+export function mapAssetResourceBackedViewDetail(payload: unknown): AssetLibraryResourceBackedViewDetail {
+  const detail = isRecord(payload) ? payload : {};
+  const view = isRecord(detail.view) ? detail.view : detail;
+  const card = mapAssetResourceBackedViewCard(view);
+  const metadata = sanitizeAssetLibraryMetadata(view.metadata ?? detail.metadata);
+  const backing = isRecord(view.resourceBacking) ? view.resourceBacking : undefined;
+  const rawValidationSummary = detail.validationSummary ?? view.validationSummary;
+  const validationSummary = isRecord(rawValidationSummary)
+    ? rawValidationSummary
+    : undefined;
+  const issueCounts = countIssues(validationSummary);
+
+  return {
+    ...card,
+    ...(metadata ? { metadata } : {}),
+    ...(backing ? {
+      resourceBackingSummary: {
+        resourceKind: safeString(backing.resourceKind),
+        role: safeString(backing.role),
+        displayName: safeString(backing.displayName),
+        contentType: safeString(backing.contentType),
+        format: safeString(backing.format),
+        sizeBytes: typeof backing.sizeBytes === "number" && Number.isFinite(backing.sizeBytes) ? backing.sizeBytes : undefined,
+      },
+    } : {}),
+    ...(validationSummary ? {
+      validationSummary: {
+        status: safeString(validationSummary.status),
+        ...issueCounts,
+        validatedAt: safeString(validationSummary.validatedAt),
+      },
+    } : {}),
+  };
+}
+
+function diagnosticsFrom(value: unknown): readonly { severity: "info" | "warning" | "error"; code: string; message: string; sourceKind?: string }[] {
+  return safeArray(value)
+    .map((diagnostic) => {
+      if (!isRecord(diagnostic)) return undefined;
+      const severity = safeString(diagnostic.severity);
+      const code = safeString(diagnostic.code);
+      const message = safeString(diagnostic.message);
+      if (!severity || !code || !message) return undefined;
+      if (severity !== "info" && severity !== "warning" && severity !== "error") return undefined;
+      return {
+        severity,
+        code,
+        message,
+        ...(safeString(diagnostic.sourceKind) ? { sourceKind: safeString(diagnostic.sourceKind) } : {}),
+      };
+    })
+    .filter((diagnostic): diagnostic is { severity: "info" | "warning" | "error"; code: string; message: string; sourceKind?: string } => Boolean(diagnostic));
+}
+
+function metadataBoolean(metadata: Record<string, unknown> | undefined, key: string): boolean | undefined {
+  return typeof metadata?.[key] === "boolean" ? metadata[key] : undefined;
+}
+
+function resourceBackedRegistrationStatusLabel(
+  viewKind: AssetResourceBackedViewKind | undefined,
+  metadata: Record<string, unknown> | undefined,
+): string {
+  if (viewKind === "generated-output") {
+    const finalized = metadataBoolean(metadata, "finalized");
+    const registered = metadataBoolean(metadata, "registered");
+    if (finalized === true || registered === true) return "Finalized or registered";
+    return "Not finalized or registered";
+  }
+  if (viewKind === "external-repository-object") {
+    const imported = metadataBoolean(metadata, "imported");
+    const registered = metadataBoolean(metadata, "registered");
+    if (imported === true || registered === true) return "Imported or registered";
+    return "Not imported or registered";
+  }
+  if (metadataBoolean(metadata, "registered") === true) return "Registered";
+  return "Read-only view";
 }
 
 export function mapTransportEnvelopeSuccess<T>(

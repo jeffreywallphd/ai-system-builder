@@ -1,6 +1,8 @@
 import {
   mapAssetDefinitionDetail,
   mapAssetDefinitionListResult,
+  mapAssetResourceBackedViewDetail,
+  mapAssetResourceBackedViewListResult,
   mapTransportEnvelopeError,
   mapTransportEnvelopeSuccess,
   type AssetLibraryClient,
@@ -10,6 +12,10 @@ import {
   type AssetLibraryDetailOptions,
   type AssetLibraryListResult,
   type AssetLibraryQuery,
+  type AssetLibraryResourceBackedViewCard,
+  type AssetLibraryResourceBackedViewDetail,
+  type AssetLibraryResourceBackedViewDetailOptions,
+  type AssetLibraryResourceBackedViewQuery,
 } from "../../../../../../../modules/ui/shared/asset-library";
 
 interface DesktopAssetLibraryApiBridge {
@@ -22,6 +28,11 @@ interface DesktopAssetLibraryApiBridge {
     input: { definitionId: string; version: string; expand?: AssetLibraryDetailOptions["expand"]; includeValidation?: boolean },
     context?: { requestId?: string; correlationId?: string },
   ) => Promise<unknown>;
+  listAssetResourceBackedViews?: (input?: AssetLibraryResourceBackedViewQuery, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
+  readAssetResourceBackedView?: (
+    input: { viewId: string; expand?: AssetLibraryResourceBackedViewDetailOptions["expand"]; includeValidation?: boolean },
+    context?: { requestId?: string; correlationId?: string },
+  ) => Promise<unknown>;
 }
 
 function getDesktopAssetLibraryApi(): Required<DesktopAssetLibraryApiBridge> {
@@ -30,7 +41,9 @@ function getDesktopAssetLibraryApi(): Required<DesktopAssetLibraryApiBridge> {
     !desktopApi ||
     typeof desktopApi.listAssetDefinitions !== "function" ||
     typeof desktopApi.readAssetDefinition !== "function" ||
-    typeof desktopApi.readAssetDefinitionVersion !== "function"
+    typeof desktopApi.readAssetDefinitionVersion !== "function" ||
+    typeof desktopApi.listAssetResourceBackedViews !== "function" ||
+    typeof desktopApi.readAssetResourceBackedView !== "function"
   ) {
     throw new Error("Desktop Asset Library preload API is unavailable.");
   }
@@ -92,6 +105,26 @@ export function createDesktopAssetLibraryClient(): AssetLibraryClient {
         }),
         mapAssetDefinitionDetail,
         "Unable to read asset definition version.",
+      );
+    },
+
+    async listAssetResourceBackedViews(query = {}) {
+      return toClientResult<AssetLibraryListResult<AssetLibraryResourceBackedViewCard>>(
+        () => desktopApi.listAssetResourceBackedViews(query),
+        mapAssetResourceBackedViewListResult,
+        "Unable to read asset resource-backed views.",
+      );
+    },
+
+    async readAssetResourceBackedView(input, options = {}) {
+      return toClientResult<AssetLibraryResourceBackedViewDetail>(
+        () => desktopApi.readAssetResourceBackedView({
+          viewId: input.viewId,
+          ...(options.expand ? { expand: options.expand } : {}),
+          ...(options.includeValidation !== undefined ? { includeValidation: options.includeValidation } : {}),
+        }),
+        mapAssetResourceBackedViewDetail,
+        "Unable to read asset resource-backed view.",
       );
     },
   };

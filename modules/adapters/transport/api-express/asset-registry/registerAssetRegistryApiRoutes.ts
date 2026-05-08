@@ -7,12 +7,20 @@ import {
   createApiAssetDefinitionVersionReadSuccessResponse,
   createApiAssetDefinitionsListFailureResponse,
   createApiAssetDefinitionsListSuccessResponse,
+  createApiAssetResourceBackedViewReadFailureResponse,
+  createApiAssetResourceBackedViewReadSuccessResponse,
+  createApiAssetResourceBackedViewsListFailureResponse,
+  createApiAssetResourceBackedViewsListSuccessResponse,
 } from "../../../../contracts/api";
 import {
   parseAssetRegistryDefinitionListInput,
   parseAssetRegistryDefinitionReadInput,
+  parseAssetRegistryResourceBackedViewListInput,
+  parseAssetRegistryResourceBackedViewReadInput,
   toAssetRegistryDefinitionReference,
   toAssetRegistryFacadeListQuery,
+  toAssetRegistryResourceBackedViewListQuery,
+  toAssetRegistryResourceBackedViewReadOptions,
   toAssetRegistryReadOptions,
 } from "../../asset-registry/assetRegistryReadInputMapper";
 
@@ -62,6 +70,66 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
       response.status(200).json(createApiAssetDefinitionsListSuccessResponse(sanitizeAssetViewValue(result), context));
     } catch {
       response.status(500).json(createApiAssetDefinitionsListFailureResponse("internal", "Unable to read asset definitions.", context));
+    }
+  });
+
+  dependencies.app.get("/api/assets/resource-backed-views", async (request, response) => {
+    const context = contextFrom(request);
+    let query: Parameters<NonNullable<AssetRegistryDefinitionReadPort["listResourceBackedViewCards"]>>[0];
+    try {
+      query = toAssetRegistryResourceBackedViewListQuery(parseAssetRegistryResourceBackedViewListInput(request.query ?? {}, "api-query"));
+    } catch {
+      response.status(400).json(createApiAssetResourceBackedViewsListFailureResponse("validation", "Invalid asset resource-backed views query.", context));
+      return;
+    }
+
+    if (!dependencies.assetRegistryRead.listResourceBackedViewCards) {
+      response.status(503).json(createApiAssetResourceBackedViewsListFailureResponse("unavailable", "Asset resource-backed views are unavailable.", context));
+      return;
+    }
+
+    try {
+      const result = await dependencies.assetRegistryRead.listResourceBackedViewCards(query);
+      response.status(200).json(createApiAssetResourceBackedViewsListSuccessResponse(sanitizeAssetViewValue(result), context));
+    } catch {
+      response.status(500).json(createApiAssetResourceBackedViewsListFailureResponse("internal", "Unable to read asset resource-backed views.", context));
+    }
+  });
+
+  dependencies.app.get("/api/assets/resource-backed-views/:viewId", async (request, response) => {
+    const context = contextFrom(request);
+    let payload;
+    try {
+      payload = parseAssetRegistryResourceBackedViewReadInput(
+        {
+          viewId: request.params?.viewId,
+          ...(request.query?.expand !== undefined ? { expand: request.query.expand } : {}),
+          ...(request.query?.includeValidation !== undefined ? { includeValidation: request.query.includeValidation } : {}),
+        },
+        "api-query",
+      );
+    } catch {
+      response.status(400).json(createApiAssetResourceBackedViewReadFailureResponse("validation", "Invalid asset resource-backed view read request.", context));
+      return;
+    }
+
+    if (!dependencies.assetRegistryRead.readResourceBackedViewDetail) {
+      response.status(503).json(createApiAssetResourceBackedViewReadFailureResponse("unavailable", "Asset resource-backed views are unavailable.", context));
+      return;
+    }
+
+    try {
+      const detail = await dependencies.assetRegistryRead.readResourceBackedViewDetail(
+        payload.viewId,
+        toAssetRegistryResourceBackedViewReadOptions(payload),
+      );
+      if (!detail) {
+        response.status(404).json(createApiAssetResourceBackedViewReadFailureResponse("not-found", "Asset resource-backed view was not found.", context));
+        return;
+      }
+      response.status(200).json(createApiAssetResourceBackedViewReadSuccessResponse(sanitizeAssetViewValue(detail), context));
+    } catch {
+      response.status(500).json(createApiAssetResourceBackedViewReadFailureResponse("internal", "Unable to read asset resource-backed view.", context));
     }
   });
 

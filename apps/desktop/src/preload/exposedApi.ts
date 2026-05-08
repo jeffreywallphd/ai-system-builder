@@ -145,6 +145,12 @@ import {
   DESKTOP_ASSET_DEFINITION_VERSION_READ_OPERATION,
   DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_VERSION_READ_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_OPERATION,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_RESPONSE_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_OPERATION,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL,
@@ -175,6 +181,8 @@ import {
   createDesktopAssetDefinitionsListRequest,
   createDesktopAssetDefinitionReadRequest,
   createDesktopAssetDefinitionVersionReadRequest,
+  createDesktopAssetResourceBackedViewReadRequest,
+  createDesktopAssetResourceBackedViewsListRequest,
   createDesktopPythonRuntimeControlRequest,
   createDesktopPythonRuntimeStatusReadRequest,
   createDesktopImageGenerationStartRequest,
@@ -193,6 +201,10 @@ import {
   type DesktopAssetDefinitionReadResponse,
   type DesktopAssetDefinitionVersionReadRequest,
   type DesktopAssetDefinitionVersionReadResponse,
+  type DesktopAssetResourceBackedViewReadRequest,
+  type DesktopAssetResourceBackedViewReadResponse,
+  type DesktopAssetResourceBackedViewsListRequest,
+  type DesktopAssetResourceBackedViewsListResponse,
   type DesktopPythonRuntimeControlResponse,
   type DesktopPythonRuntimeStatusReadResponse,
   type DesktopImageGenerationStartRequest,
@@ -319,6 +331,8 @@ export interface DesktopArtifactUploadBridgeContext {
 export type DesktopAssetDefinitionsListBridgeInput = Omit<DesktopAssetDefinitionsListRequest["payload"], "boundary">;
 export type DesktopAssetDefinitionReadBridgeInput = Omit<DesktopAssetDefinitionReadRequest["payload"], "boundary">;
 export type DesktopAssetDefinitionVersionReadBridgeInput = Omit<DesktopAssetDefinitionVersionReadRequest["payload"], "boundary">;
+export type DesktopAssetResourceBackedViewsListBridgeInput = Omit<DesktopAssetResourceBackedViewsListRequest["payload"], "boundary">;
+export type DesktopAssetResourceBackedViewReadBridgeInput = Omit<DesktopAssetResourceBackedViewReadRequest["payload"], "boundary">;
 
 export interface DesktopPreloadApi {
   getHuggingFaceTokenStatus: (
@@ -393,6 +407,14 @@ export interface DesktopPreloadApi {
     input: DesktopAssetDefinitionVersionReadBridgeInput,
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopAssetDefinitionVersionReadResponse>;
+  listAssetResourceBackedViews: (
+    input?: DesktopAssetResourceBackedViewsListBridgeInput,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopAssetResourceBackedViewsListResponse>;
+  readAssetResourceBackedView: (
+    input: DesktopAssetResourceBackedViewReadBridgeInput,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopAssetResourceBackedViewReadResponse>;
   readPythonRuntimeStatus: (
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopPythonRuntimeStatusReadResponse>;
@@ -945,6 +967,52 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_ASSET_DEFINITION_VERSION_READ_OPERATION,
         channel: DESKTOP_ASSET_DEFINITION_VERSION_READ_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop asset definition version read IPC response envelope.",
+      });
+    },
+
+    async listAssetResourceBackedViews(input = {}, context = {}) {
+      const request = createDesktopAssetResourceBackedViewsListRequest(
+        {
+          ...input,
+          boundary: {
+            host: "desktop",
+            source: DEFAULT_ASSET_REGISTRY_SOURCE,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopAssetResourceBackedViewsListResponse>(response, {
+        operation: DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_OPERATION,
+        channel: DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop asset resource-backed views list IPC response envelope.",
+      });
+    },
+
+    async readAssetResourceBackedView(input, context = {}) {
+      const request = createDesktopAssetResourceBackedViewReadRequest(
+        {
+          ...input,
+          boundary: {
+            host: "desktop",
+            source: DEFAULT_ASSET_REGISTRY_SOURCE,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopAssetResourceBackedViewReadResponse>(response, {
+        operation: DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION,
+        channel: DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop asset resource-backed view read IPC response envelope.",
       });
     },
 

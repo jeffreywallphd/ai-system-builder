@@ -33,8 +33,8 @@ function combinedSource(relativeDir: string): string {
   return sourceFilesUnder(relativeDir).map((file) => `\n// ${file.path}\n${file.source}`).join("\n");
 }
 
-describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
-  it("allows only the narrow read-only asset definitions server API surface", () => {
+describe("Asset Kernel read-only non-exposure boundaries", () => {
+  it("allows only the narrow read-only asset definitions and resource-backed views server API surface", () => {
     const source = [
       combinedSource("modules/contracts/api"),
       combinedSource("modules/adapters/transport/api-express"),
@@ -44,13 +44,15 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.match(source, /["'`]\/api\/assets\/definitions["'`]/i);
     assert.match(source, /["'`]\/api\/assets\/definitions\/:definitionId["'`]/i);
     assert.match(source, /["'`]\/api\/assets\/definitions\/:definitionId\/versions\/:version["'`]/i);
+    assert.match(source, /["'`]\/api\/assets\/resource-backed-views["'`]/i);
+    assert.match(source, /["'`]\/api\/assets\/resource-backed-views\/:viewId["'`]/i);
     assert.doesNotMatch(source, /["'`]\/api\/assets\/(?:instances|compositions|resources|registry-summary|create|update|delete|seed|register|import|finalize|publish|execute|run|scan|sync|repair|install|start|train|validate)(?:\/|["'`?])/i);
     assert.doesNotMatch(source, /\.(?:post|put|patch|delete)\(["'`]\/api\/assets/i);
     assert.doesNotMatch(source, /\basset(?:Kernel|Registry|Library)?(?:Router|Controller)\b/i);
     assert.doesNotMatch(source, /\b(?:seedBuiltIns|registerBuiltIns|importAsset|finalizeAsset|publishAsset|executeAsset|runAsset|scanResources|syncAssets|startRuntime|probeRuntime|installRuntime|repairRuntime|trainAsset|validateAsset)\b/i);
   });
 
-  it("allows only read-only asset definition IPC/preload methods", () => {
+  it("allows only read-only asset definition and resource-backed view IPC/preload methods", () => {
     const publicIpcAndPreloadSource = [
       combinedSource("modules/contracts/ipc"),
       combinedSource("modules/adapters/transport/ipc-electron"),
@@ -61,9 +63,13 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.match(publicIpcAndPreloadSource, /DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL/);
     assert.match(publicIpcAndPreloadSource, /DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL/);
     assert.match(publicIpcAndPreloadSource, /DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL/);
+    assert.match(publicIpcAndPreloadSource, /DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL/);
+    assert.match(publicIpcAndPreloadSource, /DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL/);
     assert.match(publicIpcAndPreloadSource, /\blistAssetDefinitions\b/);
     assert.match(publicIpcAndPreloadSource, /\breadAssetDefinition\b/);
-    assert.doesNotMatch(publicIpcAndPreloadSource, /ipc\.asset\.(?:instance|composition|resource|registry-summary|create|update|delete|register|seed|import|finalize|publish|execute|run|scan|sync|repair|install|start|train|validate)/i);
+    assert.match(publicIpcAndPreloadSource, /\blistAssetResourceBackedViews\b/);
+    assert.match(publicIpcAndPreloadSource, /\breadAssetResourceBackedView\b/);
+    assert.doesNotMatch(publicIpcAndPreloadSource, /ipc\.asset\.(?:instance|composition|registry-summary|create|update|delete|register|seed|import|finalize|publish|execute|run|scan|sync|repair|install|start|train|validate)/i);
     assert.doesNotMatch(publicIpcAndPreloadSource, /\b(?:createAsset|updateAsset|deleteAsset|registerAsset|seedAsset|importAsset|finalizeAsset|publishAsset|executeAsset|runAsset|scanAssets|syncAssets|repairAsset|installAsset|startAsset|trainAsset|validateAsset|listAssetInstances|readAssetInstance)\b/i);
     assert.match(desktopHostCompositionSource, /assetRegistryRead:\s*internalAssetRegistry\.readFacade/);
     assert.doesNotMatch(desktopHostCompositionSource, /assetRegistryRead:\s*internalAssetRegistry[,}]/);
@@ -94,6 +100,8 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.match(combinedSource("apps/thin-client/src/routes"), /label:\s*["'`]Assets["'`]/);
     assert.match(source, /\blistAssetDefinitions\b/);
     assert.match(source, /\breadAssetDefinition\b/);
+    assert.match(source, /\blistAssetResourceBackedViews\b/);
+    assert.match(source, /\breadAssetResourceBackedView\b/);
     assert.match(sharedAssetLibrarySource, /readDetail\(definition,\s*\{\s*\}\)/);
     assert.match(sharedAssetLibrarySource, /readDetail\(selectedDefinition,\s*\{\s*includeValidation:\s*true\s*\}\)/);
     assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|publishAsset|scanResources|executeAsset|runAsset|syncAssets|repairAsset|installAsset|startAsset|trainAsset)\b/i);

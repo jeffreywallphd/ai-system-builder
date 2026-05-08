@@ -4,13 +4,19 @@ import {
   DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL,
   createDesktopAssetDefinitionReadRequest,
   createDesktopAssetDefinitionVersionReadRequest,
+  createDesktopAssetResourceBackedViewReadRequest,
+  createDesktopAssetResourceBackedViewsListRequest,
   createDesktopAssetDefinitionsListRequest,
 } from "../../../../contracts/ipc";
 import {
   createDesktopAssetDefinitionReadIpcHandler,
   createDesktopAssetDefinitionVersionReadIpcHandler,
+  createDesktopAssetResourceBackedViewReadIpcHandler,
+  createDesktopAssetResourceBackedViewsListIpcHandler,
   createDesktopAssetDefinitionsListIpcHandler,
   registerAssetRegistryIpc,
 } from "../asset-registry/registerAssetRegistryIpc";
@@ -36,6 +42,8 @@ function readPort(overrides: Record<string, any> = {}): AssetRegistryDefinitionR
   return {
     listDefinitionCards: testDouble.fn(async () => ({ items: [{ definitionId: "builtin.workflow", displayName: "Workflow" }] as any[] })),
     readDefinitionDetail: testDouble.fn(async () => definitionDetail() as any),
+    listResourceBackedViewCards: testDouble.fn(async () => ({ items: [] })),
+    readResourceBackedViewDetail: testDouble.fn(async () => undefined),
     ...overrides,
   };
 }
@@ -158,6 +166,62 @@ describe("registerAssetRegistryIpc", () => {
       { kind: "asset-definition", id: "builtin.workflow" },
       { includeValidation: undefined, includeAiContext: true, includeConfigurationSchema: false, includePorts: false, includeRequirements: false, includeMetadata: true },
     );
+  });
+
+  it("lists resource-backed view cards through the read facade only", async () => {
+    const listResourceBackedViewCards = testDouble.fn(async () => ({
+      items: [{ viewId: "asset-view.generated-output.internal.1", viewKind: "generated-output", displayName: "Generated output" }],
+    }));
+    const handler = createDesktopAssetResourceBackedViewsListIpcHandler({ assetRegistryRead: readPort({ listResourceBackedViewCards }) });
+    const request = createDesktopAssetResourceBackedViewsListRequest(
+      {
+        searchText: "generated",
+        viewKinds: ["generated-output"],
+        limit: 10,
+        boundary: { host: "desktop", source: "desktop.renderer.asset-registry" },
+      },
+      { requestId: "rv1", correlationId: "cv1" },
+    );
+
+    const response = await handler({}, request);
+
+    expect(listResourceBackedViewCards).toHaveBeenCalledWith({
+      searchText: "generated",
+      assetTypes: undefined,
+      assetFamilies: undefined,
+      lifecycleStatuses: undefined,
+      viewKinds: ["generated-output"],
+      includeMetadata: undefined,
+      limit: 10,
+      cursor: undefined,
+    });
+    expect(response).toMatchObject({ ok: true, operation: "asset.resource-backed-views-list", requestId: "rv1", correlationId: "cv1" });
+  });
+
+  it("reads resource-backed view detail and sanitizes unsafe metadata", async () => {
+    const readResourceBackedViewDetail = testDouble.fn(async () => ({
+      view: {
+        viewId: "asset-view.external-repository-object.internal.1",
+        viewKind: "external-repository-object",
+        displayName: "External object",
+        metadata: { imported: false, registered: false, token: "Bearer abc" },
+      },
+    }));
+    const handler = createDesktopAssetResourceBackedViewReadIpcHandler({ assetRegistryRead: readPort({ readResourceBackedViewDetail }) });
+    const request = createDesktopAssetResourceBackedViewReadRequest({
+      viewId: "asset-view.external-repository-object.internal.1",
+      expand: ["metadata", "resourceBackings"],
+      boundary: { host: "desktop", source: "desktop.renderer.asset-registry" },
+    });
+
+    const response = await handler({}, request);
+
+    expect(readResourceBackedViewDetail).toHaveBeenCalledWith(
+      "asset-view.external-repository-object.internal.1",
+      { includeValidation: false, includeMetadata: true, includeResourceBackings: true },
+    );
+    expect(response).toMatchObject({ ok: true, operation: "asset.resource-backed-view-read" });
+    expectNoUnsafePayloadValues(response);
   });
 
   it("maps missing definitions to not-found failures", async () => {
@@ -310,6 +374,8 @@ describe("registerAssetRegistryIpc", () => {
       DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL.value,
       DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL.value,
       DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL.value,
     ]);
     expect(/create|update|delete|register|seed|import|finalize|scan|execute/i.test(channels.join(" "))).toBe(false);
   });

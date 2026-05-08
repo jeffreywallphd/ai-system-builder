@@ -65,6 +65,8 @@ describe("registerAssetRegistryApiRoutes", () => {
     registerAssetRegistryApiRoutes({ app, assetRegistryRead: { listDefinitionCards: testDouble.fn(), readDefinitionDetail: testDouble.fn() } });
     expect(app.get.mock.calls.map((call: any) => call[0])).toEqual([
       "/api/assets/definitions",
+      "/api/assets/resource-backed-views",
+      "/api/assets/resource-backed-views/:viewId",
       "/api/assets/definitions/:definitionId",
       "/api/assets/definitions/:definitionId/versions/:version",
     ]);
@@ -123,6 +125,95 @@ describe("registerAssetRegistryApiRoutes", () => {
     expect(readDefinitionDetail).toHaveBeenCalledWith({ kind: "asset-definition", id: "builtin.workflow", version: "2.0.0" }, expect.any(Object));
     expect(status).toHaveBeenCalledWith(200);
     expect(json.mock.calls[0]?.[0]).toMatchObject({ ok: true, operation: "asset.definition-version-read" });
+  });
+
+  it("lists resource-backed view cards from the injected read facade", async () => {
+    const { app, handlers } = appAndHandlers();
+    const listResourceBackedViewCards = testDouble.fn(async () => ({
+      items: [{
+        viewId: "asset-view.generated-output.internal.1",
+        viewKind: "generated-output",
+        displayName: "Generated output",
+        metadata: { finalized: false, registered: false, localPath: "/tmp/private" },
+      }],
+      diagnostics: [{ severity: "info", code: "generated-output-not-registered", message: "Generated output is not finalized or registered." }],
+    }));
+    registerAssetRegistryApiRoutes({
+      app,
+      assetRegistryRead: { listDefinitionCards: testDouble.fn(), readDefinitionDetail: testDouble.fn(), listResourceBackedViewCards } as any,
+    });
+    const { res, status, json } = response();
+
+    await handlers.get("/api/assets/resource-backed-views")({
+      headers: { "x-request-id": "r-view", "x-correlation-id": "c-view" },
+      query: { q: "generated", viewKind: "generated-output", limit: "10", includeMetadata: "true" },
+    }, res);
+
+    expect(listResourceBackedViewCards).toHaveBeenCalledWith({
+      searchText: "generated",
+      assetTypes: undefined,
+      assetFamilies: undefined,
+      lifecycleStatuses: undefined,
+      viewKinds: ["generated-output"],
+      includeMetadata: true,
+      limit: 10,
+      cursor: undefined,
+    });
+    expect(status).toHaveBeenCalledWith(200);
+    expect(json.mock.calls[0]?.[0]).toMatchObject({
+      ok: true,
+      operation: "asset.resource-backed-views-list",
+      requestId: "r-view",
+      correlationId: "c-view",
+    });
+    expectNoUnsafePayloadValues(json.mock.calls[0]?.[0]);
+  });
+
+  it("reads resource-backed view detail and maps missing views to not found", async () => {
+    const { app, handlers } = appAndHandlers();
+    const readResults = [
+      {
+        view: {
+          viewId: "asset-view.external-repository-object.internal.1",
+          viewKind: "external-repository-object",
+          displayName: "External object",
+          metadata: { imported: false, registered: false, token: "Bearer abc" },
+        },
+      },
+      undefined,
+    ];
+    const readResourceBackedViewDetail = testDouble.fn(async () => readResults.shift());
+    registerAssetRegistryApiRoutes({
+      app,
+      assetRegistryRead: {
+        listDefinitionCards: testDouble.fn(),
+        readDefinitionDetail: testDouble.fn(),
+        listResourceBackedViewCards: testDouble.fn(),
+        readResourceBackedViewDetail,
+      } as any,
+    });
+
+    const first = response();
+    await handlers.get("/api/assets/resource-backed-views/:viewId")({
+      params: { viewId: "asset-view.external-repository-object.internal.1" },
+      query: { expand: "metadata,resourceBackings" },
+      headers: {},
+    }, first.res);
+    expect(readResourceBackedViewDetail).toHaveBeenCalledWith(
+      "asset-view.external-repository-object.internal.1",
+      { includeValidation: false, includeMetadata: true, includeResourceBackings: true },
+    );
+    expect(first.status).toHaveBeenCalledWith(200);
+    expectNoUnsafePayloadValues(first.json.mock.calls[0]?.[0]);
+
+    const second = response();
+    await handlers.get("/api/assets/resource-backed-views/:viewId")({
+      params: { viewId: "missing-view" },
+      query: {},
+      headers: {},
+    }, second.res);
+    expect(second.status).toHaveBeenCalledWith(404);
+    expect(second.json.mock.calls[0]?.[0]).toMatchObject({ ok: false, error: { code: "not-found" } });
   });
 
   it("does not request validation on default detail reads", async () => {
