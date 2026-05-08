@@ -10,7 +10,7 @@ function response() {
 
 function appAndHandlers() {
   const handlers = new Map<string, any>();
-  const app: ExpressAssetRegistryRoutePort = { get: testDouble.fn((path, handler) => handlers.set(path, handler)) };
+  const app = { get: testDouble.fn((path, handler) => handlers.set(path, handler)) } as any as ExpressAssetRegistryRoutePort & { get: ReturnType<typeof testDouble.fn> };
   return { app, handlers };
 }
 
@@ -27,6 +27,32 @@ function definitionDetail(extra: Record<string, unknown> = {}) {
     },
     builtIn: true,
   };
+}
+
+const UNSAFE_PAYLOAD_PATTERNS = [
+  /\/tmp/i,
+  /\/home\//i,
+  /C:\\/i,
+  /storageRootDirectory/i,
+  /runtimeRootDirectory/i,
+  /Bearer/i,
+  /token/i,
+  /secret/i,
+  /apiKey/i,
+  /password/i,
+  /stack/i,
+  /command/i,
+  /base64/i,
+  /blob/i,
+  /provider payload/i,
+  /raw exception/i,
+] as const;
+
+function expectNoUnsafePayloadValues(payload: unknown) {
+  const serialized = JSON.stringify(payload);
+  for (const pattern of UNSAFE_PAYLOAD_PATTERNS) {
+    expect(pattern.test(serialized)).toBe(false);
+  }
 }
 
 describe("registerAssetRegistryApiRoutes", () => {
@@ -144,17 +170,14 @@ describe("registerAssetRegistryApiRoutes", () => {
 
   it("keeps unexpected facade failures sanitized", async () => {
     const { app, handlers } = appAndHandlers();
-    registerAssetRegistryApiRoutes({ app, assetRegistryRead: { listDefinitionCards: testDouble.fn(async () => { throw new Error("/tmp/root TOKEN=abc stack"); }), readDefinitionDetail: testDouble.fn() } as any });
+    registerAssetRegistryApiRoutes({ app, assetRegistryRead: { listDefinitionCards: testDouble.fn(async () => { throw new Error("raw exception /tmp/root Bearer token secret apiKey password stack command base64 blob provider payload"); }), readDefinitionDetail: testDouble.fn() } as any });
     const { res, status, json } = response();
 
     await handlers.get("/api/assets/definitions")({ query: {}, headers: { "x-request-id": "r-fail" } }, res);
 
     expect(status).toHaveBeenCalledWith(500);
-    const payload = JSON.stringify(json.mock.calls[0]?.[0]);
-    expect(payload).toContain("Unable to read asset definitions.");
-    expect(payload).not.toContain("/tmp/root");
-    expect(payload).not.toContain("TOKEN=abc");
-    expect(payload).not.toContain("stack");
+    expect(JSON.stringify(json.mock.calls[0]?.[0])).toContain("Unable to read asset definitions.");
+    expectNoUnsafePayloadValues(json.mock.calls[0]?.[0]);
   });
 
   it("does not validate every list item or call resource/runtime/provider scans", async () => {
@@ -170,16 +193,36 @@ describe("registerAssetRegistryApiRoutes", () => {
     expect(noScan).not.toHaveBeenCalled();
   });
 
-  it("relies on facade-safe payloads and does not add unsafe error details", async () => {
+  it("sanitizes unsafe facade result metadata at the public API boundary", async () => {
     const { app, handlers } = appAndHandlers();
-    registerAssetRegistryApiRoutes({ app, assetRegistryRead: { listDefinitionCards: testDouble.fn(), readDefinitionDetail: testDouble.fn(async () => definitionDetail({ metadata: { safe: "yes" } })) } as any });
+    registerAssetRegistryApiRoutes({
+      app,
+      assetRegistryRead: {
+        listDefinitionCards: testDouble.fn(),
+        readDefinitionDetail: testDouble.fn(async () => definitionDetail({
+          metadata: {
+            safe: "yes",
+            storageRootDirectory: "safe-looking-storage-root",
+            runtimeRootDirectory: "safe-looking-runtime-root",
+            providerNote: "raw provider payload",
+            exceptionNote: "raw exception message",
+            token: "Bearer abc",
+            secret: "secret=value",
+            apiKey: "apiKey=value",
+            password: "password=value",
+            stack: "Error stack",
+            command: "rm -rf /",
+            base64: "data:text/plain;base64,AAAA",
+            blob: "raw provider payload",
+          },
+        })),
+      } as any,
+    });
     const { res, json } = response();
 
     await handlers.get("/api/assets/definitions/:definitionId")({ params: { definitionId: "builtin.workflow" }, query: { expand: "metadata" }, headers: {} }, res);
 
-    const payload = JSON.stringify(json.mock.calls[0]?.[0]);
-    expect(payload).toContain("safe");
-    expect(payload).not.toContain("/tmp");
-    expect(payload).not.toContain("TOKEN=");
+    expect(JSON.stringify(json.mock.calls[0]?.[0])).toContain("safe");
+    expectNoUnsafePayloadValues(json.mock.calls[0]?.[0]);
   });
 });

@@ -132,3 +132,5 @@ The initial `/api/assets` surface is GET-only for asset definition list/detail/v
 ## Phase 2C Prompt 3: read-only Asset Registry desktop IPC/preload foundation
 
 Desktop Asset Registry IPC/preload errors must remain sanitized and generic for unexpected failures. The read-only definition list/read/version-read wrappers trust application facade payload sanitization but must not add raw exception messages, stack traces, filesystem/temp/runtime/storage paths, secrets/tokens/auth headers/env values, command lines, provider payloads, bytes, or resource content to IPC/preload responses.
+
+Phase 2C public Asset Registry transports also sanitize preload/API/IPC-visible payloads at the boundary. Unsafe local paths, storage/runtime root names, bearer tokens, tokens, secrets, API keys, passwords, stack traces, commands, base64/blob content, raw provider payloads, and raw exception messages must not appear in validation, not-found, internal, or successful read responses.

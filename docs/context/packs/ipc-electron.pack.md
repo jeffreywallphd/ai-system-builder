@@ -22,6 +22,7 @@
 - Python-specific runtime IPC remains a detailed control/diagnostic surface and is not the generic runtime readiness model.
 - Server API readiness routes are out of scope for desktop IPC work.
 - Asset Registry desktop IPC is definitions-only and read-only in Phase 2C: list definitions, read definition detail, and read definition version. Handlers wrap `AssetRegistryDefinitionReadPort`/the read facade only and must not receive persistence adapters, host composition helpers, mutation use cases, seeding services, runtime/storage adapters, provider clients, resource scans, or bytes.
+- Asset Registry IPC input parsing should stay in parity with the server API through shared transport-adapter normalization. Malformed asset type/family/status, built-in, boolean, expansion, limit, cursor, or definition/version input returns validation failure before the read facade is called. Unexpected facade failures return sanitized internal failures while preserving request/correlation ids.
 
 ## Canonical Source Docs
 

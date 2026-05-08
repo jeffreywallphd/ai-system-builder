@@ -279,16 +279,16 @@ describe("composeServerHost", () => {
     const previous = process.env.COMFYUI_RUNTIME_DEVICE_MODE;
     process.env.COMFYUI_RUNTIME_DEVICE_MODE = "vulkan";
     const host = composeServerHost();
-    expect(() => host.registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: "/tmp/server-invalid-runtime" })).toThrow("Unsupported COMFYUI runtime mode");
+    expect(() => host.registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: join(tmpdir(), "server-invalid-runtime") })).toThrow("Unsupported COMFYUI runtime mode");
     process.env.COMFYUI_RUNTIME_DEVICE_MODE = previous;
   });
 
   it("accepts cpu and directml COMFYUI runtime modes", () => {
     const previous = process.env.COMFYUI_RUNTIME_DEVICE_MODE;
     process.env.COMFYUI_RUNTIME_DEVICE_MODE = "cpu";
-    expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: "/tmp/server-runtime-cpu" })).not.toThrow();
+    expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: join(tmpdir(), "server-runtime-cpu") })).not.toThrow();
     process.env.COMFYUI_RUNTIME_DEVICE_MODE = "directml";
-    expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: "/tmp/server-runtime-directml" })).not.toThrow();
+    expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: join(tmpdir(), "server-runtime-directml") })).not.toThrow();
     process.env.COMFYUI_RUNTIME_DEVICE_MODE = previous;
   });
 
@@ -448,17 +448,19 @@ describe("server ComfyUI python/runtime resolution", () => {
   it("logs structured ComfyUI python/runtime diagnostics", () => {
     const sink = testDouble.fn();
     const host = composeServerHost({ logSink: sink });
+    const storageRootDirectory = join(tmpdir(), "server-storage");
+    const runtimeRootDirectory = join(tmpdir(), "server-runtime");
     host.registerApi({
       app: { post: testDouble.fn(), get: testDouble.fn() },
-      storageRootDirectory: "/tmp/server-storage",
-      runtimeRootDirectory: "/tmp/server-runtime",
+      storageRootDirectory,
+      runtimeRootDirectory,
     });
     const comfyLog = sink.mock.calls
       .map((call) => call[1] as StructuredLogEvent)
       .find((event) => event.event === "runtime.comfyui.server.configuration");
     expect(comfyLog?.data).toMatchObject({
       pythonEnvironmentMode: "managed-venv",
-      basePythonCommand: "python3",
+      basePythonCommand: "python",
       launchPythonExecutableSource: "managed-venv",
       skipPythonSetup: false,
       skipPythonValidation: false,
@@ -470,20 +472,22 @@ describe("server ComfyUI python/runtime resolution", () => {
   it("logs server-owned Python worker-sidecar diagnostics without desktop/runtime-root leakage", () => {
     const sink = testDouble.fn();
     const host = composeServerHost({ logSink: sink });
+    const storageRootDirectory = join(tmpdir(), "server-storage");
+    const runtimeRootDirectory = join(tmpdir(), "server-runtime");
     host.registerApi({
       app: { post: testDouble.fn(), get: testDouble.fn() },
-      storageRootDirectory: "/tmp/server-storage",
-      runtimeRootDirectory: "/tmp/server-runtime",
+      storageRootDirectory,
+      runtimeRootDirectory,
     });
     const pythonLog = sink.mock.calls
       .map((call) => call[1] as StructuredLogEvent)
       .find((event) => event.event === "runtime.python.server.configuration");
     expect(pythonLog?.data).toMatchObject({
       host: "server",
-      serverStorageRootDirectory: "/tmp/server-storage",
-      serverRuntimeRootDirectory: "/tmp/server-runtime",
+      serverStorageRootDirectory: storageRootDirectory,
+      serverRuntimeRootDirectory: runtimeRootDirectory,
       pythonRuntimeMode: "worker-sidecar",
-      pythonRuntimeRootDirectory: "/tmp/server-runtime/models/huggingface",
+      pythonRuntimeRootDirectory: join(runtimeRootDirectory, "models", "huggingface"),
       pythonRuntimeRootSource: "default-server-runtime-root",
       pythonRuntimeBaseUrl: "http://127.0.0.1:43111",
       pythonRuntimeWorkerDirectory: expect.stringMatching(/modules[\\/]adapters[\\/]runtime[\\/]python[\\/]worker$/),

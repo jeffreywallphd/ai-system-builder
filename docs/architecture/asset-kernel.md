@@ -428,3 +428,9 @@ The initial `/api/assets` surface is GET-only for asset definition list/detail/v
 Desktop now exposes the same definitions-only Asset Registry read foundation through Electron IPC and the preload bridge. The IPC handlers depend only on the application `AssetRegistryDefinitionReadPort`/read facade and expose definition list, definition read, and definition-version read operations.
 
 This desktop surface is read-only. It must not receive persistence adapters, host composition helpers, mutation use cases, built-in seeding services, storage adapters, runtime adapters, provider clients, or resource scan seams. It must not scan resources, read bytes, call runtimes, call providers, seed built-ins, import/finalize/register assets, execute workflows, or add renderer/thin-client UI.
+
+## Phase 2C cleanup checkpoint
+
+The public Phase 2C Asset Registry surface is currently definitions-only: server API, desktop IPC, and desktop preload expose definition list, definition read, and definition-version read. These wrappers normalize public inputs before calling the read facade and preserve the narrow `AssetRegistryDefinitionReadPort` dependency; they do not access local persistence adapters, host composition helpers, mutation use cases, built-in seeding services, resource scanners, runtime adapters, providers, or byte readers.
+
+Asset instances, compositions, registry summaries, resource-backed views, renderer Asset Library UI, and thin-client Asset Library UI remain deferred. Mutation, seeding, import, finalize, register, scan, publish, and execute operations remain forbidden through Asset Registry API/IPC/preload surfaces.

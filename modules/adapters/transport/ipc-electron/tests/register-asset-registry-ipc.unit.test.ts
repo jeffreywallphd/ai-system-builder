@@ -40,6 +40,32 @@ function readPort(overrides: Record<string, any> = {}): AssetRegistryDefinitionR
   };
 }
 
+const UNSAFE_PAYLOAD_PATTERNS = [
+  /\/tmp/i,
+  /\/home\//i,
+  /C:\\/i,
+  /storageRootDirectory/i,
+  /runtimeRootDirectory/i,
+  /Bearer/i,
+  /token/i,
+  /secret/i,
+  /apiKey/i,
+  /password/i,
+  /stack/i,
+  /command/i,
+  /base64/i,
+  /blob/i,
+  /provider payload/i,
+  /raw exception/i,
+] as const;
+
+function expectNoUnsafePayloadValues(payload: unknown) {
+  const serialized = JSON.stringify(payload);
+  for (const pattern of UNSAFE_PAYLOAD_PATTERNS) {
+    expect(pattern.test(serialized)).toBe(false);
+  }
+}
+
 describe("registerAssetRegistryIpc", () => {
   it("lists definition cards with validated query mapping and request metadata", async () => {
     const listDefinitionCards = testDouble.fn(async () => ({ items: [] }));
@@ -176,7 +202,7 @@ describe("registerAssetRegistryIpc", () => {
     const handler = createDesktopAssetDefinitionsListIpcHandler({
       assetRegistryRead: readPort({
         listDefinitionCards: testDouble.fn(async () => {
-          throw new Error("C:/Users/name/AppData/Local TOKEN=abc\n at Adapter.read");
+          throw new Error("raw exception C:\\Users\\name\\AppData\\Local Bearer token secret apiKey password stack command base64 blob provider payload");
         }),
       }),
     });
@@ -186,7 +212,6 @@ describe("registerAssetRegistryIpc", () => {
     );
 
     const response = await handler({}, request);
-    const payload = JSON.stringify(response);
 
     expect(response).toMatchObject({
       ok: false,
@@ -194,14 +219,30 @@ describe("registerAssetRegistryIpc", () => {
       correlationId: "c-fail",
       error: { code: "internal", message: "Unable to read asset definitions." },
     });
-    expect(payload).not.toContain("C:/Users/name");
-    expect(payload).not.toContain("TOKEN=abc");
-    expect(payload).not.toContain("Adapter.read");
+    expectNoUnsafePayloadValues(response);
   });
 
-  it("relies on facade-safe payloads and does not add unsafe error details", async () => {
+  it("sanitizes unsafe facade result metadata at the public IPC boundary", async () => {
     const handler = createDesktopAssetDefinitionReadIpcHandler({
-      assetRegistryRead: readPort({ readDefinitionDetail: testDouble.fn(async () => definitionDetail({ metadata: { safe: "yes" } })) }),
+      assetRegistryRead: readPort({
+        readDefinitionDetail: testDouble.fn(async () => definitionDetail({
+          metadata: {
+            safe: "yes",
+            storageRootDirectory: "safe-looking-storage-root",
+            runtimeRootDirectory: "safe-looking-runtime-root",
+            providerNote: "raw provider payload",
+            exceptionNote: "raw exception message",
+            token: "Bearer abc",
+            secret: "secret=value",
+            apiKey: "apiKey=value",
+            password: "password=value",
+            stack: "Error stack",
+            command: "rm -rf /",
+            base64: "data:text/plain;base64,AAAA",
+            blob: "raw provider payload",
+          },
+        })),
+      }),
     });
     const response = await handler({}, createDesktopAssetDefinitionReadRequest({
       definitionId: "builtin.workflow",
@@ -211,8 +252,7 @@ describe("registerAssetRegistryIpc", () => {
     const payload = JSON.stringify(response);
 
     expect(payload).toContain("safe");
-    expect(payload).not.toContain("/tmp");
-    expect(payload).not.toContain("TOKEN=");
+    expectNoUnsafePayloadValues(response);
   });
 
   it("does not validate every list item or call runtime/resource/provider scanning seams", async () => {

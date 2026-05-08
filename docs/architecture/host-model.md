@@ -158,6 +158,8 @@ If host code starts accumulating business logic, move that logic inward before i
 
 Phase 2C desktop composition passes only the internal registry read facade/read port into Electron IPC registration for definition list/read/version reads. It does not pass the full internal registry composition, repositories, mutation use cases, seed services, storage adapters, runtime adapters, or provider clients to asset IPC handlers. Renderer UI and thin-client UI remain deferred.
 
+Phase 2C server composition follows the same boundary: it may hold the full internal Asset Registry privately, but it passes only the definition read facade/read port to Express Asset Registry route registration. The public API/IPC/preload scope is definition list/read/version-read only; no host transport may seed built-ins, mutate assets, scan resources, call runtime readiness/task registries, call providers, read bytes, or expose instances/compositions/resource-backed views for this phase.
+
 ### Current host parity for repo-backed artifact workflows
 
 - Server API and desktop IPC/preload both expose shared publish, published-verify, source-verify, register-from-repo, and localize-from-repo use cases.

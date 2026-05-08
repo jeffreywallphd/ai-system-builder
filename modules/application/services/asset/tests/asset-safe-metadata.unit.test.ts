@@ -18,6 +18,8 @@ test("central Asset Kernel sanitizer removes required unsafe keys and string val
     "credential",
     "authorization",
     "auth",
+    "storageRootDirectory",
+    "runtimeRootDirectory",
     "localPath",
     "filesystemPath",
     "filePath",
@@ -52,6 +54,8 @@ test("central Asset Kernel sanitizer removes required unsafe keys and string val
     "authorization: hidden",
     "data:application/octet-stream;base64,AAAA",
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ=",
+    "raw provider payload",
+    "raw exception message",
   ]) {
     assert.equal(isUnsafeAssetMetadataString(value), true, value);
     assert.equal(sanitizeAssetStringValue(value), undefined, value);
@@ -65,7 +69,7 @@ test("central Asset Kernel sanitizer preserves safe JSON-compatible metadata and
   const sanitized = sanitizeAssetMetadata({
     safe: "visible",
     count: 2,
-    nested: { label: "kept", token: "token=hidden", location: "/tmp/private" },
+    nested: { label: "kept", token: "token=hidden", location: "/tmp/private", storageRootDirectory: "safe-looking-root" },
     values: ["ok", "Bearer hidden", { note: "kept", command: "run" }],
     cyclic,
   });
@@ -73,7 +77,7 @@ test("central Asset Kernel sanitizer preserves safe JSON-compatible metadata and
 
   assert.equal(sanitized?.safe, "visible");
   assert.equal(json.includes("kept"), true);
-  for (const unsafe of ["token=hidden", "/tmp/private", "bearer", "command", "self"]) {
+  for (const unsafe of ["token=hidden", "/tmp/private", "bearer", "command", "storageRootDirectory", "safe-looking-root", "self"]) {
     assert.equal(json.includes(unsafe), false, unsafe);
   }
 });

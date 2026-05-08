@@ -96,4 +96,20 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.doesNotMatch(source, /from\s+["'][^"']*(?:apps\/|adapters\/transport|api-express|ipc-electron|electron|express|preload|renderer|thin-client|runtime\/.*adapter|provider-client|huggingface|openai)[^"']*["']/i);
     assert.doesNotMatch(source, /\b(?:readdir|opendir|glob|walkDir|scanResources|scanArtifacts|scanModels|scanDatasets|fetch\(|createRuntime|startRuntime|probeRuntime|installRuntime|repairRuntime)\b/i);
   });
+
+  it("keeps public asset transports on the read port instead of local persistence or seeding seams", () => {
+    const source = [
+      combinedSource("modules/adapters/transport/api-express"),
+      combinedSource("modules/adapters/transport/ipc-electron"),
+      combinedSource("modules/adapters/transport/asset-registry"),
+    ].join("\n");
+
+    assert.match(source, /\bAssetRegistryDefinitionReadPort\b/);
+    assert.doesNotMatch(source, /\bInternalAssetRegistryComposition\b/);
+    assert.doesNotMatch(source, /\bcomposeInternalAssetRegistry\b/);
+    assert.doesNotMatch(source, /from\s+["'][^"']*adapters\/persistence\/asset[^"']*["']/i);
+    assert.doesNotMatch(source, /from\s+["'][^"']*built-in-asset-definition-seeding\.service[^"']*["']/i);
+    assert.doesNotMatch(source, /\b(?:AssetDefinitionRepositoryPort|AssetInstanceRepositoryPort|AssetCompositionRepositoryPort|AssetBindingRepositoryPort)\b/);
+    assert.doesNotMatch(source, /\b(?:RegisterAssetDefinitionUseCase|UpdateAssetDefinitionUseCase|CreateAssetInstanceUseCase|CreateAssetCompositionUseCase|BuiltInAssetDefinitionSeedingService)\b/);
+  });
 });
