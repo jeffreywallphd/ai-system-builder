@@ -162,6 +162,8 @@ Phase 2C server composition follows the same boundary: it may hold the full inte
 
 Asset Library validation diagnostics are explicit read-side details only: normal list and detail reads do not request validation, and the UI may request validation only through the existing read operation with `includeValidation: true`. Advanced technical sections stay collapsed by default, built-in seeding remains explicit/internal, and resource-backed views remain computed read models without public scan or byte-read behavior.
 
+Phase 3 Prompt 8 stabilizes this state for final provider review. Resource-backed provider wiring stays internal to desktop/server host composition and the application Asset Registry read facade; hosts must not own provider business logic or add public API routes, IPC channels, preload methods, renderer/thin-client controls, automatic seeding, registration/import/finalization/localization/publishing workflows, scans, provider/network calls, runtime/task-registry calls, or byte/content reads for resource-backed views.
+
 ### Current host parity for repo-backed artifact workflows
 
 - Server API and desktop IPC/preload both expose shared publish, published-verify, source-verify, register-from-repo, and localize-from-repo use cases.
