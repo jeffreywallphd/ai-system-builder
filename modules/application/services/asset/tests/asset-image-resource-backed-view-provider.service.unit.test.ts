@@ -21,13 +21,15 @@ class FakeImageAssetDescriptorRead implements ImageAssetDescriptorReadPort {
   public registerImageAssetCalls = 0;
   public finalizeCalls = 0;
   public throws = false;
+  public lastListQuery: Parameters<ImageAssetDescriptorReadPort["listImageAssetDescriptors"]>[0];
 
   public constructor(private readonly items: readonly ImageAsset[]) {}
 
-  public async listImageAssetDescriptors() {
+  public async listImageAssetDescriptors(query?: Parameters<ImageAssetDescriptorReadPort["listImageAssetDescriptors"]>[0]) {
     this.listCalls += 1;
+    this.lastListQuery = query;
     if (this.throws) throw new Error("C:\\Users\\name\\secret token stack raw provider payload command bytes blob base64 prompt");
-    return { items: [...this.items] };
+    return { items: [...this.items].slice(0, query?.limit), nextCursor: query?.cursor ? "next-image" : undefined };
   }
 
   public async readImageAssetDescriptor(assetId: string) {
@@ -48,13 +50,15 @@ class FakeGeneratedOutputDescriptorSource implements GeneratedImageOutputDescrip
   public persistMappingCalls = 0;
   public finalizeCalls = 0;
   public throws = false;
+  public lastListQuery: Parameters<GeneratedImageOutputDescriptorSource["listGeneratedImageOutputDescriptors"]>[0];
 
   public constructor(private readonly items: readonly GeneratedImageOutputDescriptor[]) {}
 
-  public async listGeneratedImageOutputDescriptors() {
+  public async listGeneratedImageOutputDescriptors(query?: Parameters<GeneratedImageOutputDescriptorSource["listGeneratedImageOutputDescriptors"]>[0]) {
     this.listCalls += 1;
+    this.lastListQuery = query;
     if (this.throws) throw new Error("/tmp/secret token stack raw provider payload command bytes blob base64 prompt");
-    return { items: [...this.items] };
+    return { items: [...this.items].slice(0, query?.limit), nextCursor: query?.cursor ? "next-generated" : undefined };
   }
 
   public async readGeneratedImageOutputDescriptor(outputId: string) {
@@ -126,6 +130,7 @@ function assertSafe(value: unknown): void {
     "hidden negative prompt",
     "prompt-hidden",
     "request-hidden",
+    "task-hidden",
     "workflow",
   ]) {
     assert.equal(outputText.includes(unsafe), false, `serialized output included ${unsafe}: ${outputText}`);
@@ -218,6 +223,7 @@ describe("AssetImageResourceBackedViewProvider", () => {
           height: 512,
           createdAt: "2026-01-01T00:00:00.000Z",
           requestId: "request-hidden",
+          taskId: "task-hidden",
           safe: "kept",
         } as never,
       }),
@@ -237,6 +243,8 @@ describe("AssetImageResourceBackedViewProvider", () => {
           commandLine: "python run.py --token x",
           stackTrace: "Error: stack",
           rawPayload: { value: "raw provider payload" },
+          requestId: "request-hidden",
+          taskId: "task-hidden",
           blobBytes: "bytes",
           dataUrl: "data:image/png;base64,AAAA",
         },
@@ -278,11 +286,23 @@ describe("AssetImageResourceBackedViewProvider", () => {
   });
 
   it("safely reports unsupported cursor behavior and sanitized source failures", async () => {
+    const generatedCursorSource = new FakeGeneratedOutputDescriptorSource([{ outputId: "output-1", output: output() }]);
     const cursorResult = await new AssetImageResourceBackedViewProvider({
-      generatedImageOutputDescriptorSource: new FakeGeneratedOutputDescriptorSource([{ outputId: "output-1", output: output() }]),
+      generatedImageOutputDescriptorSource: generatedCursorSource,
     }).listResourceBackedViews({ cursor: "cursor-1", viewKinds: ["generated-output"] });
-    assert.equal(cursorResult.nextCursor, undefined);
-    assert.equal(cursorResult.diagnostics?.some((diagnostic) => diagnostic.code === "image-resource-backed-view-cursor-unsupported"), true);
+    assert.equal(generatedCursorSource.lastListQuery?.cursor, "cursor-1");
+    assert.equal(cursorResult.nextCursor, "next-generated");
+
+    const combinedImageSource = new FakeImageAssetDescriptorRead([imageAsset()]);
+    const combinedGeneratedSource = new FakeGeneratedOutputDescriptorSource([{ outputId: "output-1", output: output() }]);
+    const combinedCursorResult = await new AssetImageResourceBackedViewProvider({
+      imageAssetDescriptorRead: combinedImageSource,
+      generatedImageOutputDescriptorSource: combinedGeneratedSource,
+    }).listResourceBackedViews({ cursor: "cursor-1", limit: 10 });
+    assert.equal(combinedImageSource.lastListQuery?.cursor, undefined);
+    assert.equal(combinedGeneratedSource.lastListQuery?.cursor, undefined);
+    assert.equal(combinedCursorResult.nextCursor, undefined);
+    assert.equal(combinedCursorResult.diagnostics?.some((diagnostic) => diagnostic.code === "image-resource-backed-view-combined-cursor-unsupported"), true);
 
     const imageSource = new FakeImageAssetDescriptorRead([]);
     imageSource.throws = true;
@@ -295,22 +315,44 @@ describe("AssetImageResourceBackedViewProvider", () => {
 
     assert.equal(failed.diagnostics?.some((diagnostic) => diagnostic.code === "image-resource-backed-view-image-source-failed"), true);
     assert.equal(failed.diagnostics?.some((diagnostic) => diagnostic.code === "image-resource-backed-view-generated-output-source-failed"), true);
-    assertSafe([cursorResult, failed]);
+    assertSafe([cursorResult, combinedCursorResult, failed]);
   });
 
-  it("reads details by computed view id without validation or byte reads", async () => {
-    const imageSource = new FakeImageAssetDescriptorRead([imageAsset({ assetId: "image-read" })]);
-    const generatedSource = new FakeGeneratedOutputDescriptorSource([{ outputId: "output-read", output: output() }]);
+  it("uses direct image and generated-output descriptor read seams for detail reads beyond the first page", async () => {
+    const imageSource = new FakeImageAssetDescriptorRead([imageAsset({ assetId: "image-first" }), imageAsset({ assetId: "image-read" })]);
+    const generatedSource = new FakeGeneratedOutputDescriptorSource([
+      { outputId: "output-first", output: output() },
+      { outputId: "output-read", output: output() },
+    ]);
     const provider = new AssetImageResourceBackedViewProvider({
       imageAssetDescriptorRead: imageSource,
       generatedImageOutputDescriptorSource: generatedSource,
+      maxListLimit: 1,
     });
-    const listed = await provider.listResourceBackedViews({ limit: 10 });
 
-    assert.equal((await provider.readResourceBackedView(listed.items[0]!.viewId))?.viewKind, "image-asset");
-    assert.equal((await provider.readResourceBackedView(listed.items[1]!.viewId))?.viewKind, "generated-output");
+    assert.equal((await provider.readResourceBackedView("asset-view.image.internal.image-read"))?.viewKind, "image-asset");
+    assert.equal((await provider.readResourceBackedView("asset-view.generated-output.internal.output-read"))?.viewKind, "generated-output");
     assert.equal(await provider.readResourceBackedView("missing"), undefined);
+    assert.equal(imageSource.readCalls, 1);
+    assert.equal(generatedSource.readCalls, 1);
+    assert.equal(imageSource.listCalls + generatedSource.listCalls, 1);
     assert.equal(imageSource.byteReadCalls + generatedSource.byteReadCalls, 0);
+  });
+
+  it("keeps bounded list fallback explicit when direct detail lookup is unavailable", async () => {
+    const imageSource = {
+      listCalls: 0,
+      async listImageAssetDescriptors(query?: { readonly limit?: number }) {
+        this.listCalls += 1;
+        return { items: [imageAsset({ assetId: "image-list-only" })].slice(0, query?.limit) };
+      },
+    };
+    const provider = new AssetImageResourceBackedViewProvider({ imageAssetDescriptorRead: imageSource, maxListLimit: 1 });
+    const detail = await provider.readResourceBackedView("asset-view.image.internal.image-list-only");
+
+    assert.equal(detail?.viewKind, "image-asset");
+    assert.equal(detail?.diagnostics?.some((diagnostic) => diagnostic.code === "image-resource-backed-view-detail-list-fallback-limited"), true);
+    assert.equal(await provider.readResourceBackedView("asset-view.image.internal.image-beyond-first-page"), undefined);
   });
 
   it("imports no forbidden outer layers, storage adapters, byte readers, filesystem, network, runtime, or execution seams", () => {

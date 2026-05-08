@@ -95,6 +95,7 @@
 - Asset requirements should reference shared `RuntimeCapabilityId` values and must not duplicate runtime readiness or task-registry contracts.
 - Asset validation may structurally check declared requirements, but it must not execute runtimes or probe heavy sidecars.
 - Phase 3 image/generated-output resource-backed views are read-side descriptor projections only. They must not query runtime readiness, task status/list delegates, ComfyUI, or image-generation execution paths to discover outputs; already-known generated-output descriptors must be supplied through a safe descriptor source.
+- Detail reads for generated-output views should use the injected generated-output descriptor read seam when available and must not fall back to Runtime Task Registry discovery. Generated outputs remain unfinalized/unregistered until a separate finalization/registration path runs elsewhere.
 
 ## Asset Kernel built-in catalog note
 

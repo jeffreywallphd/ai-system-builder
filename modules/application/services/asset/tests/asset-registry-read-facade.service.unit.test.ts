@@ -123,12 +123,30 @@ class FakeBindingRepository implements AssetBindingRepositoryPort {
 class FakeArtifactBrowserMetadataRead implements Pick<ArtifactBrowserMetadataReadPort, "browseArtifacts"> {
   public browseCalls = 0;
   public readContentCalls = 0;
+  public readDetailCalls = 0;
 
   public constructor(private readonly items: readonly ArtifactBrowseItem[]) {}
 
   public async browseArtifacts(): Promise<ContractResult<ArtifactBrowseSuccessValue>> {
     this.browseCalls += 1;
     return createSuccessResult({ items: [...this.items] });
+  }
+
+  public async readArtifactDetail(request: Parameters<ArtifactBrowserMetadataReadPort["readArtifactDetail"]>[0]) {
+    this.readDetailCalls += 1;
+    const item = this.items.find((candidate) => candidate.storageKey === request.locator.storageKey) ?? this.items[0]!;
+    return createSuccessResult({
+      artifact: {
+        locator: request.locator,
+        artifactFamily: item.artifactFamily,
+        mediaType: item.mediaType,
+        sizeBytes: item.sizeBytes,
+        sourceKind: item.sourceKind,
+        originalName: item.originalName,
+        createdAt: item.createdAt,
+        metadata: item.metadata,
+      },
+    });
   }
 }
 
@@ -294,6 +312,8 @@ function unsafeMetadata() {
     commandLine: "curl secret",
     stackTrace: "Error: boom\n at stack",
     rawPayload: { nestedSecret: "secret=hidden" },
+    requestId: "request-hidden",
+    taskId: "task-hidden",
     blobBytes: "AAAA",
     contentBase64: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ=",
     env: { SECRET_ENV: "hidden" },
@@ -306,7 +326,7 @@ function serialized(value: unknown): string {
 
 function assertSafe(value: unknown) {
   const output = serialized(value);
-  for (const forbidden of ["/tmp/", "token", "secret", "password", "apikey", "api_key", "commandline", "stacktrace", "rawpayload", "blobbytes", "contentbase64", "secret_env", "bearer", "hidden prompt", "hidden negative prompt", "prompt-hidden"]) {
+  for (const forbidden of ["/tmp/", "token", "secret", "password", "apikey", "api_key", "commandline", "stacktrace", "rawpayload", "blobbytes", "contentbase64", "secret_env", "bearer", "hidden prompt", "hidden negative prompt", "prompt-hidden", "request-hidden", "task-hidden"]) {
     assert.equal(output.includes(forbidden), false, `serialized output included ${forbidden}: ${output}`);
   }
 }

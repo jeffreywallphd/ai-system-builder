@@ -62,6 +62,19 @@ class FakeArtifactBrowserMetadataRead implements Pick<ArtifactBrowserMetadataRea
   public async browseArtifacts(): Promise<ContractResult<ArtifactBrowseSuccessValue>> {
     return createSuccessResult({ items: [...this.items] });
   }
+
+  public async readArtifactDetail(request: Parameters<ArtifactBrowserMetadataReadPort["readArtifactDetail"]>[0]) {
+    const item = this.items.find((candidate) => candidate.storageKey === request.locator.storageKey) ?? this.items[0]!;
+    return createSuccessResult({
+      artifact: {
+        locator: request.locator,
+        artifactFamily: item.artifactFamily,
+        mediaType: item.mediaType,
+        sourceKind: item.sourceKind,
+        originalName: item.originalName,
+      },
+    });
+  }
 }
 
 class FakeGeneratedOutputDescriptorSource implements GeneratedImageOutputDescriptorSource {
@@ -260,6 +273,17 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
     assert.equal((await aggregate.readResourceBackedView("shared"))?.displayName, "First");
     assert.equal((await aggregate.readResourceBackedView("second-provider::only-second"))?.displayName, "Only Second");
     assert.equal(first.readCalls, 1);
+    assert.equal(second.readCalls, 1);
+  });
+
+  it("routes detail reads to the known owning provider after list without changing public view ids", async () => {
+    const first = new TestProvider("first-provider", [view("view.1", "One")]);
+    const second = new TestProvider("second-provider", [view("view.2", "Two")]);
+    const aggregate = new AssetResourceBackedViewAggregateProvider({ providers: [first, second] });
+
+    await aggregate.listResourceBackedViews();
+    assert.equal((await aggregate.readResourceBackedView("view.2"))?.displayName, "Two");
+    assert.equal(first.readCalls, 0);
     assert.equal(second.readCalls, 1);
   });
 
