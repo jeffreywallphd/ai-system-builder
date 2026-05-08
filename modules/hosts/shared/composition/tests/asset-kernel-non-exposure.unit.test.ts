@@ -21,7 +21,7 @@ function sourceFilesUnder(relativeDir: string): readonly { path: string; source:
         stack.push(absolutePath);
         continue;
       }
-      if (!/\.(?:ts|tsx|js|jsx|mjs|cjs)$/.test(entry) || entry.endsWith(".unit.test.ts")) continue;
+      if (!/\.(?:ts|tsx|js|jsx|mjs|cjs)$/.test(entry) || /\.unit\.test\.(?:ts|tsx|js|jsx)$/.test(entry)) continue;
       files.push({ path: relative(REPO_ROOT, absolutePath), source: readFileSync(absolutePath, "utf8") });
     }
   }
@@ -70,7 +70,7 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.doesNotMatch(desktopHostCompositionSource, /ipc\.asset\.(?:instance|composition|resource|registry-summary|create|update|delete|register|seed|import|finalize|scan|execute)/i);
   });
 
-  it("allows read-only Asset Library clients but no pages, routes, navigation, or mutation helpers", () => {
+  it("allows the read-only desktop Asset Library page but no thin-client page or mutation helpers", () => {
     const rendererSourceWithoutDesktopApi = sourceFilesUnder("apps/desktop/src/renderer")
       .filter((file) => !file.path.replace(/\\/g, "/").endsWith("src/renderer/lib/desktopApi.ts"))
       .map((file) => `\n// ${file.path}\n${file.source}`)
@@ -85,11 +85,13 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.match(source, /\bcreateDesktopAssetLibraryClient\b/);
     assert.match(source, /\bcreateApiAssetLibraryClient\b/);
     assert.match(source, /\bAssetLibraryDefinitionCard\b/);
+    assert.match(rendererSourceWithoutDesktopApi, /\bAssetLibraryPage\b/);
+    assert.match(rendererSourceWithoutDesktopApi, /\bAssetLibraryFeature\b/);
+    assert.match(rendererSourceWithoutDesktopApi, /key:\s*["'`]assets["'`]/);
     assert.match(source, /\blistAssetDefinitions\b/);
     assert.match(source, /\breadAssetDefinition\b/);
-    assert.doesNotMatch(source, /\b(?:AssetLibraryPage|AssetLibraryRoute|AssetLibraryNav|useAssetLibrary|useAssetRegistry)\b/i);
-    assert.doesNotMatch(source, /(?:createBrowserRouter|Route|NavLink|Link)\([^)]*asset-library/i);
-    assert.doesNotMatch(source, /["'`]\/(?:asset-library|assets\/library)(?:["'`/?#])/i);
+    assert.doesNotMatch(combinedSource("apps/thin-client/src"), /\b(?:AssetLibraryPage|AssetLibraryFeature|useAssetLibraryFeature)\b/i);
+    assert.doesNotMatch(combinedSource("apps/thin-client/src/routes"), /key:\s*["'`]assets["'`]|label:\s*["'`]Assets["'`]/i);
     assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|scanResources|executeAsset)\b/i);
     assert.doesNotMatch(source, /\b(?:listAssetInstances|readAssetInstance|listAssetCompositions|readAssetComposition|readAssetRegistrySummary)\b/i);
   });
@@ -119,5 +121,18 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.doesNotMatch(source, /from\s+["'][^"']*built-in-asset-definition-seeding\.service[^"']*["']/i);
     assert.doesNotMatch(source, /\b(?:AssetDefinitionRepositoryPort|AssetInstanceRepositoryPort|AssetCompositionRepositoryPort|AssetBindingRepositoryPort)\b/);
     assert.doesNotMatch(source, /\b(?:RegisterAssetDefinitionUseCase|UpdateAssetDefinitionUseCase|CreateAssetInstanceUseCase|CreateAssetCompositionUseCase|BuiltInAssetDefinitionSeedingService)\b/);
+  });
+
+  it("keeps desktop renderer Asset Library files on the read-only client boundary", () => {
+    const source = combinedSource("apps/desktop/src/renderer/features/asset-library");
+
+    assert.match(source, /\bcreateDesktopAssetLibraryClient\b/);
+    assert.match(source, /\blistAssetDefinitions\b/);
+    assert.match(source, /\breadAssetDefinition\b/);
+    assert.doesNotMatch(source, /from\s+["'][^"']*modules\/application[^"']*["']/i);
+    assert.doesNotMatch(source, /from\s+["'][^"']*modules\/hosts[^"']*["']/i);
+    assert.doesNotMatch(source, /from\s+["'][^"']*adapters\/persistence[^"']*["']/i);
+    assert.doesNotMatch(source, /from\s+["'][^"']*ipc-electron[^"']*["']/i);
+    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|scanResources|executeAsset)\b/i);
   });
 });

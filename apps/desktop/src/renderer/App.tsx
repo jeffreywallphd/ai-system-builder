@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 
 import { AppShell } from "./components/layout/AppShell";
 import { useDesktopPage } from "./hooks/useDesktopPage";
+import { AssetLibraryPage } from "./pages/AssetLibraryPage";
 import { ArtifactsPage } from "./pages/ArtifactsPage";
 import { HomePage } from "./pages/HomePage";
 import { ModelsPage } from "./pages/ModelsPage";
@@ -24,6 +25,7 @@ export function App() {
         }}
       />
     ),
+    assets: <AssetLibraryPage />,
     models: <ModelsPage />,
     "image-generation": <ImageGenerationPage />,
     settings: <SettingsPage />,
