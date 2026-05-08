@@ -24,8 +24,10 @@ import type {
   AssetInstanceRepositoryPort,
   AssetResourceBackedViewProvider,
 } from "../../../ports/asset";
+import type { ModelRegistryPort } from "../../../ports/model";
 import { BUILT_IN_ASSET_DEFINITION_CATALOG } from "../built-ins";
 import { ArtifactResourceBackedViewProvider } from "../asset-artifact-resource-backed-view-provider.service";
+import { AssetDatasetModelResourceBackedViewProvider, type SafeDatasetDescriptorSource } from "../asset-dataset-model-resource-backed-view-provider.service";
 import { AssetImageResourceBackedViewProvider, type GeneratedImageOutputDescriptorSource } from "../asset-image-resource-backed-view-provider.service";
 import { AssetRegistryReadFacade, AssetRegistryReadFacadeError } from "../asset-registry-read-facade.service";
 
@@ -200,6 +202,66 @@ class FakeImageAssetDescriptorRead {
         },
       ],
     };
+  }
+}
+
+class FakeDatasetDescriptorSource implements SafeDatasetDescriptorSource {
+  public prepareCalls = 0;
+  public fileReadCalls = 0;
+  public storageScanCalls = 0;
+
+  public async listDatasetDescriptors() {
+    return {
+      items: [
+        {
+          id: "dataset-facade",
+          name: "Facade Dataset",
+          schema: { fieldCount: 1, fields: [{ name: "text", type: "string" }] },
+          sourceArtifacts: [{ key: "artifact-dataset" }],
+          materializations: [{ artifactKey: "datasets/private/facade.parquet", format: "parquet", rowCount: 5 }],
+          metadata: unsafeMetadata(),
+        },
+      ],
+    };
+  }
+
+  public async readDatasetDescriptor(datasetId: string) {
+    const result = await this.listDatasetDescriptors();
+    return result.items.find((item) => item.id === datasetId);
+  }
+}
+
+class FakeModelRegistry implements Pick<ModelRegistryPort, "listModels" | "getModelRecord"> {
+  public discoveryCalls = 0;
+  public validationCalls = 0;
+  public trainingCalls = 0;
+  public publishingCalls = 0;
+  public localModelScanCalls = 0;
+
+  private readonly records = [
+    {
+      modelRecordId: "model-facade",
+      displayName: "Facade Model",
+      source: "generated" as const,
+      lifecycleStatus: "validated" as const,
+      artifactForm: "adapter" as const,
+      provider: "unknown" as const,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      validationStatus: "valid" as const,
+      backingArtifactIds: ["artifact-model"],
+      localPath: "C:\\Users\\name\\.cache\\huggingface\\model",
+      validationReportPath: "/tmp/model-report.json",
+      metadata: unsafeMetadata(),
+    },
+  ];
+
+  public async listModels(request: Parameters<ModelRegistryPort["listModels"]>[0]) {
+    if (request.includeDiscovered !== false) this.discoveryCalls += 1;
+    return { models: this.records.slice(0, request.limit) };
+  }
+
+  public async getModelRecord(modelRecordId: string) {
+    return this.records.find((record) => record.modelRecordId === modelRecordId);
   }
 }
 
@@ -560,6 +622,47 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     assert.equal(imageSource.byteReadCalls + outputSource.byteReadCalls, 0);
     assert.equal(outputSource.statusReadCalls + outputSource.generationCalls, 0);
     assert.equal(imageSource.storageScanCalls + imageSource.createAssetInstanceCalls + imageSource.persistMappingCalls, 0);
+  });
+
+  it("lists and reads dataset/model provider cards and details without unsafe metadata, discovery, validation, or file/runtime calls", async () => {
+    const datasetSource = new FakeDatasetDescriptorSource();
+    const modelRegistry = new FakeModelRegistry();
+    const provider = new AssetDatasetModelResourceBackedViewProvider({
+      datasetDescriptorSource: datasetSource,
+      modelRegistry,
+    });
+    const facade = createFacade({ resourceBackedViewProvider: provider });
+
+    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10 });
+    assert.deepEqual(list.items.map((item) => item.viewKind), ["dataset", "model"]);
+    assert.equal(list.items[0]?.assetDefinitionRef?.id, "builtin.dataset");
+    assert.equal(list.items[1]?.assetDefinitionRef?.id, "builtin.model");
+    assertSafe(list);
+
+    const datasetDetail = await facade.readResourceBackedViewDetail(list.items[0]!.viewId, {
+      includeMetadata: true,
+      includeResourceBackings: true,
+    });
+    assert.equal(datasetDetail?.view.viewKind, "dataset");
+    assert.equal(datasetDetail?.validationSummary, undefined);
+    assertSafe(datasetDetail);
+
+    const modelDetail = await facade.readResourceBackedViewDetail(list.items[1]!.viewId, {
+      includeMetadata: true,
+      includeResourceBackings: true,
+      includeValidation: true,
+    });
+    assert.equal(modelDetail?.view.viewKind, "model");
+    assert.equal(modelDetail?.validationSummary?.status, "valid");
+    assertSafe(modelDetail);
+
+    assert.equal(await facade.readResourceBackedViewDetail("missing-dataset-model-view"), undefined);
+    assert.equal(modelRegistry.discoveryCalls, 0);
+    assert.equal(modelRegistry.validationCalls, 0);
+    assert.equal(modelRegistry.trainingCalls, 0);
+    assert.equal(modelRegistry.publishingCalls, 0);
+    assert.equal(modelRegistry.localModelScanCalls, 0);
+    assert.equal(datasetSource.prepareCalls + datasetSource.fileReadCalls + datasetSource.storageScanCalls, 0);
   });
 });
 

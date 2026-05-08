@@ -96,6 +96,7 @@
 - Asset validation may structurally check declared requirements, but it must not execute runtimes or probe heavy sidecars.
 - Phase 3 image/generated-output resource-backed views are read-side descriptor projections only. They must not query runtime readiness, task status/list delegates, ComfyUI, or image-generation execution paths to discover outputs; already-known generated-output descriptors must be supplied through a safe descriptor source.
 - Detail reads for generated-output views should use the injected generated-output descriptor read seam when available and must not fall back to Runtime Task Registry discovery. Generated outputs remain unfinalized/unregistered until a separate finalization/registration path runs elsewhere.
+- Dataset/model resource-backed views must not use runtime readiness, Runtime Task Registry, dataset preparation, model training, model validation, model publishing, or runtime/provider clients to discover or enrich records. Dataset views are descriptor-only, and model views read persisted inventory only with model discovery disabled.
 
 ## Asset Kernel built-in catalog note
 

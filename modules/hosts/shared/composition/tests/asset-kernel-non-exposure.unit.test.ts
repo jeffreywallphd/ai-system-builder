@@ -109,6 +109,7 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
 
     assert.doesNotMatch(source, /from\s+["'][^"']*(?:apps\/|adapters\/transport|api-express|ipc-electron|electron|express|preload|renderer|thin-client|runtime\/.*adapter|provider-client|huggingface|openai)[^"']*["']/i);
     assert.doesNotMatch(source, /\b(?:readdir|opendir|glob|walkDir|scanResources|scanArtifacts|scanModels|scanDatasets|readBytes|readResourceBytes|fetch\(|createRuntime|startRuntime|probeRuntime|installRuntime|repairRuntime)\b/i);
+    assert.doesNotMatch(source, /\b(?:PrepareTrainingDataset|DatasetPreparationUseCase|ModelTrainingPort|ModelValidationPort|ModelPublisherPort|TrainModelUseCase|ValidateModelUseCase|PublishModelUseCase|discoverModels|includeDiscovered:\s*true)\b/i);
   });
 
   it("keeps public asset transports on the read port instead of local persistence or seeding seams", () => {

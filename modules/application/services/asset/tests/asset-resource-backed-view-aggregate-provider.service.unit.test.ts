@@ -4,11 +4,14 @@ import { describe, it } from "node:test";
 
 import type { AssetResourceBackedView } from "../../../../contracts/asset";
 import type { ArtifactBrowseItem, ArtifactBrowseSuccessValue } from "../../../../contracts/artifact-browser";
+import type { ModelInventoryRecord } from "../../../../contracts/model";
 import { createSuccessResult, type ContractResult } from "../../../../contracts/shared";
 import type { ArtifactBrowserMetadataReadPort } from "../../../ports/artifact-browser";
 import type { AssetResourceBackedViewListQuery, AssetResourceBackedViewListResult, AssetResourceBackedViewProvider } from "../../../ports/asset";
 import { createUnsupportedAssetResourceBackedViewProvider } from "../../../ports/asset";
+import type { ModelRegistryPort } from "../../../ports/model";
 import { ArtifactResourceBackedViewProvider } from "../asset-artifact-resource-backed-view-provider.service";
+import { AssetDatasetModelResourceBackedViewProvider } from "../asset-dataset-model-resource-backed-view-provider.service";
 import { AssetImageResourceBackedViewProvider, type GeneratedImageOutputDescriptorSource } from "../asset-image-resource-backed-view-provider.service";
 import { AssetResourceBackedViewAggregateProvider } from "../asset-resource-backed-view-aggregate-provider.service";
 
@@ -97,6 +100,23 @@ class FakeGeneratedOutputDescriptorSource implements GeneratedImageOutputDescrip
   }
 }
 
+class FakeModelRegistry {
+  public listCalls = 0;
+  public discoveryCalls = 0;
+
+  public constructor(private readonly records: readonly ModelInventoryRecord[]) {}
+
+  public async listModels(request: Parameters<ModelRegistryPort["listModels"]>[0]) {
+    this.listCalls += 1;
+    if (request.includeDiscovered !== false) this.discoveryCalls += 1;
+    return { models: [...this.records].slice(0, request.limit) };
+  }
+
+  public async getModelRecord(modelRecordId: string) {
+    return this.records.find((record) => record.modelRecordId === modelRecordId);
+  }
+}
+
 function artifactItem(artifactId: string, originalName: string, mediaType: string): ArtifactBrowseItem {
   return {
     artifactId,
@@ -105,6 +125,20 @@ function artifactItem(artifactId: string, originalName: string, mediaType: strin
     mediaType,
     originalName,
     sourceKind: "upload",
+  };
+}
+
+function modelRecord(): ModelInventoryRecord {
+  return {
+    modelRecordId: "model-aggregate",
+    displayName: "Aggregate Model",
+    source: "generated",
+    lifecycleStatus: "validated",
+    artifactForm: "adapter",
+    provider: "unknown",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    validationStatus: "valid",
+    localPath: "C:\\Users\\name\\.cache\\huggingface\\model",
   };
 }
 
@@ -217,11 +251,15 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
     assertSafe(result);
   });
 
-  it("combines image/generated-output provider results with artifact/document and unsupported providers deterministically", async () => {
+  it("combines dataset/model provider results with artifact/document, image/generated-output, and unsupported providers deterministically", async () => {
     const artifactProvider = new ArtifactResourceBackedViewProvider({
       artifactBrowserMetadataRead: new FakeArtifactBrowserMetadataRead([
         artifactItem("artifact-report", "Report.pdf", "application/pdf"),
       ]),
+    });
+    const modelRegistry = new FakeModelRegistry([modelRecord()]);
+    const datasetModelProvider = new AssetDatasetModelResourceBackedViewProvider({
+      modelRegistry,
     });
     const imageProvider = new AssetImageResourceBackedViewProvider({
       generatedImageOutputDescriptorSource: new FakeGeneratedOutputDescriptorSource("generated-output-1"),
@@ -229,14 +267,17 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
     const unsupported = createUnsupportedAssetResourceBackedViewProvider({ providerId: "dataset-provider", sourceKind: "dataset" });
 
     const result = await new AssetResourceBackedViewAggregateProvider({
-      providers: [unsupported, artifactProvider, imageProvider],
+      providers: [unsupported, artifactProvider, datasetModelProvider, imageProvider],
       maxListLimit: 10,
     }).listResourceBackedViews({ limit: 10 });
 
-    assert.deepEqual(result.items.map((item) => item.viewKind), ["document", "generated-output"]);
-    assert.equal(result.items[1]?.assetDefinitionRef, undefined);
+    assert.deepEqual(result.items.map((item) => item.viewKind), ["document", "model", "generated-output"]);
+    assert.equal(result.items[1]?.assetDefinitionRef?.id, "builtin.model");
+    assert.equal(result.items[2]?.assetDefinitionRef, undefined);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "resource-backed-view-provider-unsupported"), true);
+    assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "dataset-resource-backed-view-source-unavailable"), true);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "image-resource-backed-view-image-source-unavailable"), true);
+    assert.equal(modelRegistry.discoveryCalls, 0);
     assertSafe(result);
   });
 
