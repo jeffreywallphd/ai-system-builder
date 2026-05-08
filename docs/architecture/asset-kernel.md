@@ -35,6 +35,8 @@ Phase 3 deliberately does not implement asset registration workflows, generated-
 
 A safe next phase candidate is **Phase 4 - Asset Registration and Controlled Mutation Workflows**. Candidate goals are explicit registration of selected resource-backed views as asset instances, finalization of generated outputs into registered image assets, import/localization of external repository objects through controlled workflows, guarded mutation contracts/use cases, review/approval and provenance tracking, and keeping those mutations separate from read-only Asset Library browsing.
 
+Phase 4 Prompt 2 adds only the contract foundation for controlled asset mutations in `modules/contracts/asset`: narrow operation names, command base shapes, approval/actor/request context, source identity and deduplication keys, provenance summaries, typed failure/result envelopes, and command-specific contracts for registering resource-backed views, finalizing generated outputs, importing external repository objects, and localizing external repository objects. It does not implement mutation use cases, persistence writes, provider/storage/runtime behavior, API routes, IPC handlers, preload methods, UI actions, host wiring, migrations, general asset editor operations, or arbitrary create/update/delete/patch/edit contracts.
+
 
 ## Local persistence checkpoint (Prompt 9)
 
