@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "../../../../testing/node-test";
 import {
-  ASSET_LIBRARY_DEFERRED_QUERY_FIELDS,
   mapAssetDefinitionDetail,
   mapAssetDefinitionListResult,
   mapTransportEnvelopeError,
@@ -296,10 +295,10 @@ describe("asset library mappers", () => {
     for (const exportName of forbiddenExports) {
       expect((assetLibraryExports as Record<string, unknown>)[exportName]).toBeUndefined();
     }
-    expect([...ASSET_LIBRARY_DEFERRED_QUERY_FIELDS]).toContain("execute");
 
     const source = readFileSync(join(process.cwd(), "modules/ui/shared/asset-library/assetLibraryReadModels.ts"), "utf8");
     expect(source).not.toContain("createAssetDefinition");
     expect(source).not.toContain("seedBuiltInAssetDefinitions");
+    expect(source).not.toMatch(/\b(?:importAsset|finalizeAsset|registerAsset|scanResources|executeAsset)\b/);
   });
 });
