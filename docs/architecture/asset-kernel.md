@@ -417,3 +417,8 @@ Non-goals preserved after Phase 2B:
 - no artifact/model/dataset/image renames,
 - no transport/UI-specific asset models,
 - no file-only, UI-only, workflow-only, image-generation-only, or Hugging-Face-only asset model.
+## Phase 2C Prompt 2: read-only Asset Registry server API foundation
+
+Phase 2C begins by exposing only a narrow, read-only server API foundation for Asset Registry definition reads. The server routes wrap an application-owned Asset Registry definition read port/read facade and must not receive persistence adapters, host composition helpers, mutation use cases, built-in seeding services, or local repositories.
+
+The initial `/api/assets` surface is GET-only for asset definition list/detail/version reads. It must not scan resources, read bytes, call runtimes, call providers, seed built-ins, import/finalize/register assets, or execute workflows. Desktop IPC/preload/renderer UI and thin-client UI/client exposure remain deferred.

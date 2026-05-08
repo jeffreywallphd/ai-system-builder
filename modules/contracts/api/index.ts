@@ -19,3 +19,4 @@ export * from "./artifact-localize-from-repo-api-contract";
 export * from "./huggingface-namespace-datasets-api-contract";
 export * from "./huggingface-dataset-parquet-files-api-contract";
 export * from "./runtime-readiness-api-contract";
+export * from "./asset-registry-api-contract";
