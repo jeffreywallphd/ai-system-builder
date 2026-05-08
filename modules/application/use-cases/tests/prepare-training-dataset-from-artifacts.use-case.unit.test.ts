@@ -75,3 +75,27 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
   });
 
 });
+
+it("rejects dataset preparation start when runtime capability is not ready", async () => {
+  const startTask = testDouble.fn();
+  const unavailable = new Error("Runtime capability 'dataset-preparation' is not-installed.") as Error & { code: "unavailable"; details: Record<string, unknown> };
+  unavailable.code = "unavailable";
+  unavailable.details = { capabilityId: "dataset-preparation", status: "not-installed", recommendedActions: ["install"] };
+  const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({
+    runtimeTaskRegistry: createRegistry({ startTask }),
+    storageBindings: { readArtifactStorageBindings: testDouble.fn(), upsertArtifactStorageBinding: testDouble.fn(), deleteArtifactStorageBindings: testDouble.fn() },
+    storage: { retrieveArtifact: testDouble.fn(), storeArtifact: testDouble.fn(), hasArtifact: testDouble.fn(), deleteArtifact: testDouble.fn() },
+    taskPowerLifecycle: createLifecycleFake(),
+    runtimeCapabilityGuard: { requireCapabilityReady: testDouble.fn(async () => { throw unavailable; }) },
+  });
+
+  const result = await useCase.startPrepareTrainingDataset(command, { requestId: "req-dataset", correlationId: "corr-dataset" });
+
+  expect(result).toMatchObject({
+    ok: false,
+    requestId: "req-dataset",
+    correlationId: "corr-dataset",
+    error: { code: "unavailable", details: { capabilityId: "dataset-preparation", status: "not-installed" } },
+  });
+  expect(startTask).not.toHaveBeenCalled();
+});

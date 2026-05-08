@@ -27,10 +27,10 @@ describe("useImageGenerationFeature", () => {
     const client = makeClient(); client.startImageGeneration.mockResolvedValue({ ok: true, value: { requestId: "r1" } }); client.readImageGeneration.mockResolvedValue({ ok: true, value: { status: "cancelled", requestId: "r1", taskType: "image-generation", concurrencyClass: "image-generation" } });
     let hook!: ReturnType<typeof useImageGenerationFeature>; const c = document.createElement("div"); const root = createRoot(c);
     await act(async () => root.render(<Harness client={client} onReady={(h) => { hook = h; }} />));
-    await act(async () => { hook.setForm({ prompt:"cat", negativePrompt:"", seed:"", width:"1024", height:"1024", steps:"30", sampler:"", scheduler:"", model:"", numImages:"1" }); });
+    await act(async () => { hook.setForm({ prompt:"cat", negativePrompt:"", seed:"", width:"1024", height:"1024", steps:"30", cfg:"8", denoise:"1", sampler:"", scheduler:"", model:"", numImages:"1", latentSourceArtifactId:"", faceIdEnabled: false, faceIdArtifactId1: "", faceIdArtifactId2: "", faceIdArtifactId3: "", faceIdIdentityStrength: "0.85", faceIdStructureStrength: "0.75", faceIdNoise: "0.35" }); });
     await act(async () => { await hook.start(); });
     expect(client.startImageGeneration.mock.calls[0][0].seed).toBeUndefined();
-    await act(async () => { hook.setForm({ prompt:"cat", negativePrompt:"", seed:"42", width:"1024", height:"1024", steps:"30", sampler:"", scheduler:"", model:"", numImages:"1" }); });
+    await act(async () => { hook.setForm({ prompt:"cat", negativePrompt:"", seed:"42", width:"1024", height:"1024", steps:"30", cfg:"8", denoise:"1", sampler:"", scheduler:"", model:"", numImages:"1", latentSourceArtifactId:"", faceIdEnabled: false, faceIdArtifactId1: "", faceIdArtifactId2: "", faceIdArtifactId3: "", faceIdIdentityStrength: "0.85", faceIdStructureStrength: "0.75", faceIdNoise: "0.35" }); });
     await act(async () => { await hook.start(); });
     expect(client.startImageGeneration.mock.calls[1][0].seed).toBe(42);
     await act(async () => root.unmount());
@@ -221,7 +221,7 @@ describe("useImageGenerationFeature", () => {
 
     await act(async () => root.render(<Harness client={client} onReady={(h) => { hook = h; }} />));
     await act(async () => {
-      hook.setForm({ prompt: "cat", negativePrompt: "", seed: "", width: "1024", height: "1024", steps: "30", sampler: "", scheduler: "", model: "stabilityai/stable-diffusion-xl-base-1.0", numImages: "1" });
+      hook.setForm({ prompt: "cat", negativePrompt: "", seed: "", width: "1024", height: "1024", steps: "30", cfg: "8", denoise: "1", sampler: "", scheduler: "", model: "stabilityai/stable-diffusion-xl-base-1.0", numImages: "1", latentSourceArtifactId: "" });
     });
     await act(async () => { await hook.start(); });
 
@@ -233,7 +233,7 @@ describe("useImageGenerationFeature", () => {
     const client = makeClient();
     client.startImageGeneration.mockResolvedValue({ ok: true, value: { requestId: "r3" } });
     client.readImageGeneration.mockResolvedValue({ ok: true, value: { status: "succeeded", requestId: "r3", taskType: "image-generation", concurrencyClass: "image-generation", data: { outputs: [{ fileName: "temp.png", subfolder: "output" }] } } });
-    client.finalizeImageGenerationIfCompleted.mockResolvedValue({ ok: true, value: { assets: [{ assetId: "asset-1", artifactId: "generated/images/asset-1/out.png" }] } });
+    client.finalizeImageGenerationIfCompleted.mockResolvedValue({ ok: true, value: { assets: [{ assetId: "asset-1", artifactId: "artifact-1", storageKey: "generated/images/asset-1/out.png" }] } });
     const artifactClient = { createArtifactMediaViewUrl: vi.fn(async () => "blob:preview-1") };
     let hook!: ReturnType<typeof useImageGenerationFeature>;
     const c = document.createElement("div");
@@ -241,10 +241,23 @@ describe("useImageGenerationFeature", () => {
     await act(async () => root.render(<Harness client={client} artifactClient={artifactClient} onReady={(h) => { hook = h; }} />));
     await act(async () => { hook.setForm({ ...hook.form, prompt: "cat" }); await hook.start(); });
     await act(async () => Promise.resolve());
-    expect(hook.finalizedAssets[0]?.artifactId).toBe("generated/images/asset-1/out.png");
+    expect(hook.finalizedAssets[0]?.artifactId).toBe("artifact-1");
+    expect(hook.finalizedAssets[0]?.storageKey).toBe("generated/images/asset-1/out.png");
     expect(hook.finalizedAssets[0]?.previewUrl).toBe("blob:preview-1");
     expect(artifactClient.createArtifactMediaViewUrl).toHaveBeenCalledWith({ storageKey: "generated/images/asset-1/out.png" });
     await act(async () => root.unmount());
   });
 
+
+
+  it("includes faceId payload when enabled with up to three references", async () => {
+    const client = makeClient();
+    client.startImageGeneration.mockResolvedValue({ ok: true, value: { requestId: "r-face" } });
+    client.readImageGeneration.mockResolvedValue({ ok: true, value: { status: "cancelled", requestId: "r-face", taskType: "image-generation", concurrencyClass: "image-generation" } });
+    let hook!: ReturnType<typeof useImageGenerationFeature>; const c = document.createElement("div"); const root = createRoot(c);
+    await act(async () => { root.render(<Harness client={client} artifactClient={{ browseArtifacts: async () => [], createArtifactMediaViewUrl: async () => "" } as any} onReady={(h) => (hook = h)} />); });
+    await act(async () => { hook.setForm({ ...hook.form, prompt: "face", faceIdEnabled: true, faceIdArtifactId1: "a1", faceIdArtifactId2: "a2", faceIdArtifactId3: "a3" }); });
+    await act(async () => { await hook.start(); });
+    expect(client.startImageGeneration.mock.calls[0][0].faceId).toMatchObject({ enabled: true, references: [{ artifactId: "a1" }, { artifactId: "a2" }, { artifactId: "a3" }] });
+  });
 });

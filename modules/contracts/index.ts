@@ -5,6 +5,7 @@ export * as api from "./api";
 export * as ipc from "./ipc";
 export * as runtime from "./runtime";
 export * as storage from "./storage";
+export * as asset from "./asset";
 export * as artifact from "./artifact";
 export * as artifactBrowser from "./artifact-browser";
 export * as transform from "./transform";
@@ -20,3 +21,5 @@ export * as settings from "./settings";
 export * as model from "./model";
 
 export * as runtimeInstaller from "./runtime-installer";
+
+export * as security from "./security";

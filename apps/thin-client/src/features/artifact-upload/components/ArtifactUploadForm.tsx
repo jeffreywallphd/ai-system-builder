@@ -43,6 +43,7 @@ export function ArtifactUploadForm({
         <button className="ui-button artifact-ingestion-mobile-button" type="submit" disabled={viewState.status === "uploading"}>
           {viewState.status === "uploading" ? "Uploading..." : "Upload"}
         </button>
+        <p className="ui-text-muted">Upload starts automatically after file selection. Use Upload to retry if needed.</p>
 
         {viewState.message ? (
           <p

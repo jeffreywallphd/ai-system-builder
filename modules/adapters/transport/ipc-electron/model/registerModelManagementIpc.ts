@@ -73,6 +73,7 @@ import {
   type DesktopModelPublishResponse,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
+import { isRuntimeCapabilityUnavailableError } from "../../../../application/services/runtime";
 
 export interface RegisterModelManagementIpcDependencies {
   ipcMain: IpcMainHandlePort;
@@ -97,12 +98,13 @@ function toFailureResponse<
   error: unknown,
   request: { requestId?: string; correlationId?: string },
 ): TResponse {
+  const unavailable = isRuntimeCapabilityUnavailableError(error);
   return createIpcFailureResponse(
     createIpcError(
       channel,
-      "internal",
-      error instanceof Error ? error.message : "Unexpected IPC model handler failure.",
-      { requestId: request.requestId, correlationId: request.correlationId },
+      unavailable ? "unavailable" : "internal",
+      unavailable ? "Required runtime capability is not ready." : "Model management request failed.",
+      { details: unavailable ? error.details : undefined, requestId: request.requestId, correlationId: request.correlationId },
     ),
   ) as TResponse;
 }

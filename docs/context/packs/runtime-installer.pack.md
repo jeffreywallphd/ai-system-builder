@@ -21,6 +21,7 @@ Include this pack when prompts involve:
 ## Runtime Installer vs Runtime Supervisor Boundary
 
 - **Runtime installer**: installation/discovery/repair/update status and metadata.
+- **Runtime readiness contracts**: transport-neutral host capability availability snapshots composed later from host-scoped installer/supervisor/task state.
 - **Runtime supervisor**: process lifecycle (start/stop/restart/health) after runtime is install-ready.
 - Supervisor may call installer before startup when configured, but installer remains a separate concern.
 
@@ -66,12 +67,14 @@ Include this pack when prompts involve:
 - ComfyUI installer is a thin adapter that composes the generic Git runtime installer.
 - Python dependency installation is best-effort and non-destructive.
 - ComfyUI Python dependencies are installed into a managed `.venv` by default to avoid ambient user-site package contamination.
-- GPU/Torch installation is not implemented yet.
+- CUDA torch installation can use the configured `runtime.torch.cudaWheelIndexUrl` setting to install `torch` and `torchvision` from the user-selected PyTorch CUDA wheel index.
+- When the CUDA wheel index setting is configured and no explicit runtime override wins, ComfyUI startup defaults to CUDA rather than CPU.
 - DirectML mode installs the DirectML dependency through the same managed Python environment.
 - DirectML mode installs `torch-directml` first, then probes the final installed `torch` base version and reconciles `torchaudio`/`torchvision` to match.
 - DirectML reconciliation is required for Intel/AMD GPU paths and does not assume NVIDIA/CUDA availability.
 - `COMFYUI_DIRECTML_TORCH_VERSION`, `COMFYUI_DIRECTML_TORCHAUDIO_VERSION`, and `COMFYUI_DIRECTML_TORCHVISION_VERSION` are advanced overrides; misuse can still create incompatible binary combinations.
 - DirectML/Intel GPU setups can hit native extension mismatches (for example `torchaudio` + `WinError 127`) after upstream package drift.
+- ComfyUI runtime device defaults must be conservative: use CPU unless an accelerator is explicitly configured or clearly detected, and avoid implicit NVIDIA/CUDA autodetection.
 - ComfyUI supervisor detects dependency mismatch startup signatures, triggers a single non-destructive managed dependency repair, and retries startup once.
 - Dependency repair does not update git checkout refs by default and never deletes model files or ComfyUI repository files.
 - If repair or retry fails, the runtime returns actionable startup errors that include recent runtime output context.
@@ -82,3 +85,12 @@ Include this pack when prompts involve:
 - Entrypoint existence (`main.py`) remains a lightweight validation check even when Python validation is skipped.
 - ComfyUI `repairInstall` runs the same post-install dependency + validation checks as `ensureInstalled` when Git repair reports installed.
 - `COMFYUI_PYTHON_ENVIRONMENT_MODE=ambient` opts out of the default managed `.venv` behavior for local troubleshooting.
+
+## Readiness Boundary
+
+- Installer status values remain installer-owned and are not replaced by runtime readiness status values.
+- The application runtime readiness service can map installer states such as `not-installed`, `installing`, `checking`, `installed`, `update-available`, `failed`, and `unknown` into shared readiness snapshots when host composition provides installer status readers.
+- Host composition may combine installer status and supervisor health into one same-capability readiness status; the readiness service only maps/composes those signals and does not perform install, repair, probe, start, or stop operations.
+- Installer contracts may include install roots and metadata where appropriate; shared readiness contracts must not require filesystem paths or installer implementation details.
+- `installed` is not automatically runtime `ready`; process readiness still comes from runtime supervisors.
+- `update-available` plus a ready supervisor is reported as `degraded`, and `unknown` installer status plus a ready supervisor is also reported as `degraded` so availability remains visible while unresolved install state is not hidden.

@@ -2,10 +2,11 @@ import type { ImageGenerationRequest } from "../../../contracts/image-generation
 import {
   TaskType,
   type CancelRuntimeTaskResult,
-  type RuntimeTaskRecord,
+  type RuntimeTaskStatusRecord,
   type StartRuntimeTaskResult,
 } from "../../../contracts/runtime";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
+import type { RuntimeCapabilityGuardService } from "../../services/runtime";
 import type { ModelCheckpointResolverPort } from "../../ports/model";
 
 import type { ApplicationRequestContext } from "../../ports";
@@ -14,6 +15,15 @@ function assertValidPrompt(request: ImageGenerationRequest): void {
   if (typeof request.prompt !== "string" || request.prompt.trim().length === 0) {
     throw new Error("Image generation requires a non-empty prompt.");
   }
+  if (request.cfg !== undefined && (!Number.isFinite(request.cfg) || request.cfg <= 0)) {
+    throw new Error("Image generation CFG must be a positive finite number.");
+  }
+  if (request.denoise !== undefined && (!Number.isFinite(request.denoise) || request.denoise < 0 || request.denoise > 1)) {
+    throw new Error("Image generation denoise must be between 0 and 1.");
+  }
+  if (request.latentSource?.kind === "artifact" && request.latentSource.artifactId.trim().length === 0) {
+    throw new Error("Image generation latent artifact id is required when using an artifact latent source.");
+  }
 }
 
 export class GenerateImageUseCase {
@@ -21,6 +31,7 @@ export class GenerateImageUseCase {
     private readonly dependencies: {
       runtimeTaskRegistry: RuntimeTaskRegistryPort;
       modelCheckpointResolver?: ModelCheckpointResolverPort;
+      runtimeCapabilityGuard?: Pick<RuntimeCapabilityGuardService, "requireCapabilityReady">;
     },
   ) {}
 
@@ -29,6 +40,7 @@ export class GenerateImageUseCase {
     context?: ApplicationRequestContext,
   ): Promise<StartRuntimeTaskResult> {
     assertValidPrompt(request);
+    await this.dependencies.runtimeCapabilityGuard?.requireCapabilityReady("image-generation");
 
     const resolvedModel = await this.dependencies.modelCheckpointResolver?.resolveCheckpoint({
       selectedModel: request.model,
@@ -47,7 +59,7 @@ export class GenerateImageUseCase {
     return result;
   }
 
-  public async readImageGeneration(requestId: string, _context?: ApplicationRequestContext): Promise<RuntimeTaskRecord> {
+  public async readImageGeneration(requestId: string, _context?: ApplicationRequestContext): Promise<RuntimeTaskStatusRecord> {
     return this.dependencies.runtimeTaskRegistry.getTaskStatus(requestId);
   }
 

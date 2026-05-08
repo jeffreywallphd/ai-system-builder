@@ -15,9 +15,13 @@ export class FinalizeImageGenerationService {
     if (task.status !== "succeeded") throw new Error("Image generation finalization requires a succeeded runtime task.");
 
     const outputs = this.getOutputs(task.data);
+    if (outputs.length === 0) throw new Error("Image generation finalization requires at least one generated image output.");
     const assets: FinalizedAssetRef[] = [];
     for (const output of outputs) {
-      const persisted = await this.dependencies.generatedImagePersistence.persistGeneratedImage({ output, requestId: task.requestId });
+      const persisted = await this.dependencies.generatedImagePersistence.persistGeneratedImage({
+        output,
+        requestId: task.requestId,
+      });
       const requestedAssetId = this.dependencies.createAssetId?.() ?? `img-${task.requestId}-${assets.length + 1}`;
       const registered = await this.dependencies.imageAssetRegistry.registerImageAsset({
         assetId: requestedAssetId,
@@ -41,7 +45,6 @@ export class FinalizeImageGenerationService {
   private readMetadata(task: RuntimeTaskRecord): { request?: Record<string, unknown> } | undefined {
     return typeof task.metadata === "object" && task.metadata !== null ? (task.metadata as { request?: Record<string, unknown> }) : undefined;
   }
-
   private getOutputs(data: unknown): ImageGenerationOutput[] {
     if (typeof data !== "object" || data === null || !Array.isArray((data as { outputs?: unknown[] }).outputs)) throw new Error("Image generation finalization requires task outputs.");
     return (data as { outputs: unknown[] }).outputs.map((output) => this.asOutput(output));
@@ -51,6 +54,16 @@ export class FinalizeImageGenerationService {
     if (typeof value !== "object" || value === null) throw new Error("Image generation output must be an object.");
     const r = value as Record<string, unknown>;
     if (r.type !== "image" || typeof r.engine !== "string" || typeof r.fileName !== "string") throw new Error("Image generation output contract violation.");
-    return { type: "image", engine: r.engine, fileName: r.fileName, subfolder: typeof r.subfolder === "string" ? r.subfolder : undefined, promptId: typeof r.promptId === "string" ? r.promptId : undefined, width: typeof r.width === "number" ? r.width : undefined, height: typeof r.height === "number" ? r.height : undefined };
+    return {
+      type: "image",
+      engine: r.engine,
+      fileName: r.fileName,
+      subfolder: typeof r.subfolder === "string" ? r.subfolder : undefined,
+      contentBase64: typeof r.contentBase64 === "string" ? r.contentBase64 : undefined,
+      mediaType: typeof r.mediaType === "string" ? r.mediaType : undefined,
+      promptId: typeof r.promptId === "string" ? r.promptId : undefined,
+      width: typeof r.width === "number" ? r.width : undefined,
+      height: typeof r.height === "number" ? r.height : undefined,
+    };
   }
 }

@@ -22,6 +22,7 @@ describe("settings contracts", () => {
     expect(keys.has(createTaskModelDefaultSettingKey("qaGeneration"))).toBe(true);
     expect(keys.has(createFeatureModelDefaultSettingKey("datasetPreparation", "qaGeneration"))).toBe(true);
     expect(keys.has("runtime.imageGeneration.gpuType")).toBe(true);
+    expect(keys.has("runtime.torch.cudaWheelIndexUrl")).toBe(true);
     expect(keys.has("runtime.python.defaultDevice")).toBe(true);
     expect(keys.has("runtime.python.defaultTorchDtype")).toBe(true);
   });
@@ -148,6 +149,7 @@ describe("settings contracts", () => {
       "runtime.imageGeneration.gpuType",
       "runtime.python.defaultDevice",
       "runtime.python.defaultTorchDtype",
+      "runtime.torch.cudaWheelIndexUrl",
     ]);
   });
 });

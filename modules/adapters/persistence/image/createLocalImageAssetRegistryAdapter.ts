@@ -3,7 +3,13 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import type { ImageAsset } from "../../../contracts/image";
-import type { ImageAssetRegistryPort, RegisterImageAssetInput } from "../../../application/ports/image";
+import type {
+  ImageAssetDescriptorListQuery,
+  ImageAssetDescriptorListResult,
+  ImageAssetDescriptorReadPort,
+  ImageAssetRegistryPort,
+  RegisterImageAssetInput,
+} from "../../../application/ports/image";
 
 interface ImageAssetRegistryDocument {
   assets?: Record<string, ImageAsset>;
@@ -14,6 +20,8 @@ export interface LocalImageAssetRegistryAdapterOptions {
   now?: () => string;
   createAssetId?: () => string;
 }
+
+export type LocalImageAssetRegistryAdapter = ImageAssetRegistryPort & ImageAssetDescriptorReadPort;
 
 async function readDocument(filePath: string): Promise<ImageAssetRegistryDocument> {
   try {
@@ -36,7 +44,7 @@ async function writeDocument(filePath: string, document: ImageAssetRegistryDocum
 
 export function createLocalImageAssetRegistryAdapter(
   options: LocalImageAssetRegistryAdapterOptions,
-): ImageAssetRegistryPort {
+): LocalImageAssetRegistryAdapter {
   const now = options.now ?? (() => new Date().toISOString());
   const createAssetId = options.createAssetId ?? (() => randomUUID());
 
@@ -71,6 +79,40 @@ export function createLocalImageAssetRegistryAdapter(
       return { assetId: asset.assetId };
     },
     async getImageAsset(assetId) {
+      const document = await readDocument(options.filePath);
+      return document.assets?.[assetId] ?? null;
+    },
+    async listImageAssetDescriptors(query: ImageAssetDescriptorListQuery = {}): Promise<ImageAssetDescriptorListResult> {
+      const document = await readDocument(options.filePath);
+      const limit = typeof query.limit === "number" && Number.isFinite(query.limit) && query.limit > 0
+        ? Math.floor(query.limit)
+        : 50;
+      const searchText = query.searchText?.trim().toLowerCase();
+      const sorted = Object.values(document.assets ?? {})
+        .sort((left, right) => left.assetId.localeCompare(right.assetId))
+        .filter((asset) => {
+          if (!searchText) return true;
+          const haystack = [
+            asset.assetId,
+            asset.artifactId,
+            asset.source,
+            asset.metadata.originalFileName,
+            asset.metadata.engine,
+            asset.metadata.model,
+          ].filter(Boolean).join(" ").toLowerCase();
+          return haystack.includes(searchText);
+        });
+      const startIndex = query.cursor
+        ? Math.max(0, sorted.findIndex((asset) => asset.assetId === query.cursor) + 1)
+        : 0;
+      const items = sorted.slice(startIndex, startIndex + limit);
+      const next = sorted[startIndex + limit];
+      return {
+        items,
+        ...(next ? { nextCursor: next.assetId } : {}),
+      };
+    },
+    async readImageAssetDescriptor(assetId) {
       const document = await readDocument(options.filePath);
       return document.assets?.[assetId] ?? null;
     },

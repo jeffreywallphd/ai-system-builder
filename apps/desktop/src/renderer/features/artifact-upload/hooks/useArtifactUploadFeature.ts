@@ -46,7 +46,7 @@ export function useArtifactUploadFeature(
   const uploadClient = useArtifactUploadClient(client);
   const [acceptedFileTypes, setAcceptedFileTypes] = useState<string>("*");
 
-  const fileUpload = useFileArtifactUpload(uploadClient, onUploadComplete);
+  const fileUpload = useFileArtifactUpload(uploadClient, onUploadComplete, { persistState: client === undefined });
   const websiteIngestion = useWebsiteArtifactIngestion(uploadClient, onUploadComplete);
 
   useEffect(() => {

@@ -1,11 +1,15 @@
 import { cpus, totalmem, freemem } from "node:os";
 import { execFile as nodeExecFile, spawnSync } from "node:child_process";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { LoggingPort } from "../../../application/ports/logging";
 import { FinalizeImageGenerationService } from "../../../application/services/image/finalize-image-generation.service";
 import { ImageGenerationFinalizationOrchestratorService } from "../../../application/services/image/image-generation-finalization-orchestrator.service";
-import { TaskPowerLifecycleService } from "../../../application/services/runtime";
+import {
+  TaskPowerLifecycleService,
+  RuntimeCapabilityGuardService,
+} from "../../../application/services/runtime";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
   BrowseArtifactsUseCase,
@@ -47,6 +51,7 @@ import { createLogger, type StructuredLogSink } from "../../../adapters/observab
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
 import { DefaultModelDefaultResolver } from "../../../application/services/settings";
 import type { ApplicationSecretsPort, ApplicationSettingsPort, ModelDefaultResolverPort } from "../../../application/ports/settings";
+import type { ArtifactObjectStoragePort } from "../../../application/ports/storage";
 import { createWebsiteHtmlAcquisitionPort } from "../../../adapters/ingestion";
 import {
   createArtifactRepoStorageAdapter,
@@ -66,7 +71,6 @@ import {
 } from "../../../adapters/runtime/comfyui";
 import { createComfyUiRuntimeInstaller } from "../../../adapters/runtime/installer/comfyui/createComfyUiRuntimeInstaller";
 import { createGitRuntimeInstallerAdapter } from "../../../adapters/runtime/installer/git/createGitRuntimeInstallerAdapter";
-import { createRuntimeTaskRegistryRouter } from "../../../adapters/runtime/createRuntimeTaskRegistryRouter";
 import { createElectronPowerSuspensionBlocker } from "../../../adapters/runtime/electron";
 import {
   createFilesystemArtifactBrowserReadAdapter,
@@ -87,16 +91,30 @@ import {
   createHuggingFaceTokenConfigStore,
   type HuggingFaceTokenStatus,
 } from "../../shared/huggingFaceTokenConfigStore";
+import { createRuntimePreparedModelCheckpointResolver } from "../../shared/createRuntimePreparedModelCheckpointResolver";
+import {
+  composeInternalAssetRegistry,
+  type InternalAssetRegistryComposition,
+} from "../../shared/composition/composeInternalAssetRegistry";
+import { composeResourceBackedViewProviders } from "../../shared/composition/composeResourceBackedViewProviders";
 import {
   registerElectronIpc,
 } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
-import { PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES } from "../../../contracts/runtime";
+import {
+  PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES,
+} from "../../../contracts/runtime";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 import type { PowerSuspensionBlockerPort } from "../../../application/ports/desktop";
+import { createDesktopRuntimeReadinessService } from "./composeDesktopRuntimeReadiness";
+import { createDesktopRuntimeTaskRegistry } from "./composeDesktopRuntimeTaskRegistry";
+import type { RuntimeInstallerPort } from "../../../application/ports/runtime-installer";
 import type { DesktopPythonRuntimeLogEntry, DesktopPythonRuntimeStatusPayload } from "../../../contracts/ipc";
-import { IMAGE_GENERATION_GPU_TYPE_SETTING_KEY } from "../../../contracts/settings";
+import {
+  IMAGE_GENERATION_GPU_TYPE_SETTING_KEY,
+  RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY,
+} from "../../../contracts/settings";
 
 const HUGGING_FACE_TOKEN_SETTING_KEY = "huggingface.token" as const;
 const execFile = promisify(nodeExecFile);
@@ -230,6 +248,7 @@ export interface DesktopHostComposition {
   getPythonRuntimeDiagnostics: () => Promise<{ status: string; healthy: boolean; capabilities: string[] }>;
   powerSuspensionBlocker: PowerSuspensionBlockerPort;
   registerArtifactUploadIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
+  getInternalAssetRegistry: () => InternalAssetRegistryComposition | undefined;
 }
 
 export function classifyPythonRuntimeStdioLogLevel(
@@ -269,6 +288,15 @@ const PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT = 60_000;
 const COMFYUI_INSTALL_COMMAND_TIMEOUT_MS_DEFAULT = 30 * 60 * 1000;
 const DATASET_PREPARATION_TASK_TIMEOUT_MS = 12 * 60 * 60 * 1000;
 const DATASET_PREPARATION_INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000;
+
+function extensionForImageReference(mediaType: string | undefined, artifactId: string): string {
+  const media = mediaType?.trim().toLowerCase();
+  if (media === "image/jpeg" || media === "image/jpg") return ".jpg";
+  if (media === "image/webp") return ".webp";
+  if (media === "image/png") return ".png";
+  const match = artifactId.match(/\.(png|jpe?g|webp)$/i);
+  return match ? `.${match[1].toLowerCase().replace("jpeg", "jpg")}` : ".png";
+}
 
 export function resolveComfyUiInstallRoot(env: NodeJS.ProcessEnv = process.env, runtimeRootDirectory?: string): string {
   const configured = env.COMFYUI_INSTALL_ROOT?.trim();
@@ -336,6 +364,7 @@ export function resolveComfyUiRuntimeDeviceMode(input: {
   platform?: NodeJS.Platform;
   hasNvidiaGpu?: boolean;
   gpuType?: string | undefined;
+  cudaTorchWheelIndexUrl?: string | undefined;
 } = {}): ComfyUiRuntimeDeviceMode {
   const configured = readComfyUiEnvOverride(input.env);
   if (configured) {
@@ -352,12 +381,15 @@ export function resolveComfyUiRuntimeDeviceMode(input: {
   if (configuredGpuType === "cpu") {
     return "cpu";
   }
-
-  if ((input.platform ?? process.platform) === "win32" && input.hasNvidiaGpu === false) {
-    return "directml";
+  if ((!configuredGpuType || configuredGpuType === "auto") && input.cudaTorchWheelIndexUrl?.trim()) {
+    return "cuda";
   }
 
-  return "auto";
+  if (input.hasNvidiaGpu === true) {
+    return "cuda";
+  }
+
+  return "cpu";
 }
 
 export function detectNvidiaGpu(): boolean | undefined {
@@ -400,6 +432,9 @@ function resolvePythonRuntimeHostAndPort(env: NodeJS.ProcessEnv = process.env): 
     port: env.PYTHON_RUNTIME_PORT?.trim() || resolveDefaultManagedPythonRuntimePort(),
   };
 }
+
+
+export { createDesktopRuntimeReadinessService, type CreateDesktopRuntimeReadinessServiceOptions } from "./composeDesktopRuntimeReadiness";
 
 export function composeDesktopHost(
   options: ComposeDesktopHostOptions = {},
@@ -464,7 +499,7 @@ export function composeDesktopHost(
     ...process.env,
     PYTHON_RUNTIME_HOST: pythonRuntimeEndpoint.host,
     PYTHON_RUNTIME_PORT: pythonRuntimeEndpoint.port,
-    HF_HUB_DISABLE_XET: process.env.HF_HUB_DISABLE_XET ?? "1",
+    ...(process.env.HF_HUB_DISABLE_XET ? { HF_HUB_DISABLE_XET: process.env.HF_HUB_DISABLE_XET } : {}),
     HF_HUB_DISABLE_SYMLINKS_WARNING: process.env.HF_HUB_DISABLE_SYMLINKS_WARNING ?? "1",
   };
   const pythonRuntimeFoundation = createPythonRuntimeAdapterFoundation({
@@ -616,6 +651,10 @@ export function composeDesktopHost(
   const modelDefaultResolver = new DefaultModelDefaultResolver({
     settings: applicationSettings,
   });
+  const readRuntimeSettingString = async (key: string): Promise<string | undefined> => {
+    const value = (await applicationSettings.readValues({ keys: [key] }))[0]?.value;
+    return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+  };
 
   const powerSuspensionBlocker = createElectronPowerSuspensionBlocker();
   const taskPowerLifecycle = new TaskPowerLifecycleService(powerSuspensionBlocker);
@@ -623,6 +662,8 @@ export function composeDesktopHost(
     ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
   });
   const comfyUiBaseUrl = process.env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
+
+  let internalAssetRegistry: InternalAssetRegistryComposition | undefined;
 
   return {
     loggingPort,
@@ -690,6 +731,9 @@ export function composeDesktopHost(
         capabilities: status.capabilities,
       };
     },
+    getInternalAssetRegistry() {
+      return internalAssetRegistry;
+    },
     registerArtifactUploadIpc(registerOptions) {
       const comfyUiInstallRoot = resolveComfyUiInstallRoot(process.env, registerOptions.runtimeRootDirectory);
       const comfyUiBasePythonCommand = process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3");
@@ -707,35 +751,54 @@ export function composeDesktopHost(
           ? configuredComfyUiInstallCommandTimeoutMs
           : COMFYUI_INSTALL_COMMAND_TIMEOUT_MS_DEFAULT;
       const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort });
-      const comfyUiInstaller = createComfyUiRuntimeInstaller({
-        gitInstaller: gitRuntimeInstaller,
-        pythonCommand: comfyUiBasePythonCommand,
-        pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
-        runtimeDeviceMode: resolveComfyUiRuntimeDeviceMode({
-          env: process.env,
-          hasNvidiaGpu: detectNvidiaGpu(),
-          gpuType: process.env.COMFYUI_GPU_TYPE,
-        }),
-        execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true }),
-        skipPythonSetup: comfyUiSkipPythonSetup,
-        skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
-        directMlTorchVersion: process.env.COMFYUI_DIRECTML_TORCH_VERSION,
-        directMlTorchAudioVersion: process.env.COMFYUI_DIRECTML_TORCHAUDIO_VERSION,
-        directMlTorchVisionVersion: process.env.COMFYUI_DIRECTML_TORCHVISION_VERSION,
-        directMlPackageName: process.env.COMFYUI_DIRECTML_PACKAGE,
-        logging: loggingPort,
-      });
+      const createConfiguredComfyUiInstaller = async (runtimeDeviceMode?: ComfyUiRuntimeDeviceMode) => {
+        const comfyUiInstaller = createComfyUiRuntimeInstaller({
+          gitInstaller: gitRuntimeInstaller,
+          pythonCommand: comfyUiBasePythonCommand,
+          pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
+          runtimeDeviceMode: runtimeDeviceMode ?? resolveComfyUiRuntimeDeviceMode({
+            env: process.env,
+            hasNvidiaGpu: detectNvidiaGpu(),
+            gpuType: process.env.COMFYUI_GPU_TYPE,
+            cudaTorchWheelIndexUrl: await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY),
+          }),
+          cudaTorchWheelIndexUrl: await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY),
+          execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true }),
+          skipPythonSetup: comfyUiSkipPythonSetup,
+          skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
+          directMlTorchVersion: process.env.COMFYUI_DIRECTML_TORCH_VERSION,
+          directMlTorchAudioVersion: process.env.COMFYUI_DIRECTML_TORCHAUDIO_VERSION,
+          directMlTorchVisionVersion: process.env.COMFYUI_DIRECTML_TORCHVISION_VERSION,
+          directMlPackageName: process.env.COMFYUI_DIRECTML_PACKAGE,
+          logging: loggingPort,
+        });
+        return comfyUiInstaller;
+      };
+      const comfyUiInstaller = {
+        async ensureInstalled(request) {
+          return (await createConfiguredComfyUiInstaller()).ensureInstalled(request);
+        },
+        async getInstallStatus(request) {
+          return (await createConfiguredComfyUiInstaller()).getInstallStatus(request);
+        },
+        async repairInstall(request) {
+          const installer = await createConfiguredComfyUiInstaller();
+          return installer.repairInstall?.(request) ?? installer.ensureInstalled({ ...request, allowUpdate: true });
+        },
+      } satisfies RuntimeInstallerPort;
       let comfyUiSupervisor: ReturnType<typeof createComfyUiRuntimeSupervisor> | undefined;
       let activeRuntimeDeviceMode: ComfyUiRuntimeDeviceMode | undefined;
       const comfyUiSupervisorPort = {
         async start() {
           const persistedValue = (await applicationSettings.readValues({ keys: [IMAGE_GENERATION_GPU_TYPE_SETTING_KEY] }))[0]?.value;
           const persistedGpuType = typeof persistedValue === "string" ? persistedValue : undefined;
+          const cudaTorchWheelIndexUrl = await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY);
           const envOverride = readComfyUiEnvOverride(process.env);
           const resolvedRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode({
             env: process.env,
             hasNvidiaGpu: detectNvidiaGpu(),
             gpuType: persistedGpuType,
+            cudaTorchWheelIndexUrl,
           });
           const modeChanged = activeRuntimeDeviceMode !== undefined && activeRuntimeDeviceMode !== resolvedRuntimeDeviceMode;
           if (modeChanged && comfyUiSupervisor) {
@@ -743,20 +806,7 @@ export function composeDesktopHost(
             comfyUiSupervisor = undefined;
           }
           if (!comfyUiSupervisor) {
-            const comfyUiInstaller = createComfyUiRuntimeInstaller({
-              gitInstaller: gitRuntimeInstaller,
-              pythonCommand: comfyUiBasePythonCommand,
-              pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
-              runtimeDeviceMode: resolvedRuntimeDeviceMode,
-              execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true }),
-              skipPythonSetup: comfyUiSkipPythonSetup,
-              skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
-              directMlTorchVersion: process.env.COMFYUI_DIRECTML_TORCH_VERSION,
-              directMlTorchAudioVersion: process.env.COMFYUI_DIRECTML_TORCHAUDIO_VERSION,
-              directMlTorchVisionVersion: process.env.COMFYUI_DIRECTML_TORCHVISION_VERSION,
-              directMlPackageName: process.env.COMFYUI_DIRECTML_PACKAGE,
-              logging: loggingPort,
-            });
+            const comfyUiInstaller = await createConfiguredComfyUiInstaller(resolvedRuntimeDeviceMode);
             comfyUiSupervisor = createComfyUiRuntimeSupervisor({
               workingDirectory: comfyUiInstallRoot,
               pythonExecutable: comfyUiPythonCommand,
@@ -779,6 +829,7 @@ export function composeDesktopHost(
             subsystem: "runtime",
             data: {
               persistedGpuType,
+              cudaTorchWheelIndexConfigured: Boolean(cudaTorchWheelIndexUrl),
               envOverride,
               envOverrideWon: Boolean(envOverride),
               runtimeDeviceMode: resolvedRuntimeDeviceMode,
@@ -791,15 +842,52 @@ export function composeDesktopHost(
           return comfyUiSupervisor?.getRecentRuntimeOutput() ?? [];
         },
         getRuntimeDeviceMode() {
-          return activeRuntimeDeviceMode ?? "auto";
+          return activeRuntimeDeviceMode ?? "cpu";
         },
       };
+      const runtimeReadiness = createDesktopRuntimeReadinessService({
+        readPythonSupervisorState: () => pythonRuntimeFoundation.supervisor.getStatus(),
+        async readComfyUiLifecycleState() {
+          if (!comfyUiSupervisor) {
+            return "uninitialized";
+          }
+          return comfyUiSupervisor.getStatus();
+        },
+        async readComfyUiInstallStatus() {
+          const status = await comfyUiInstaller.getInstallStatus({
+            targetId: "comfyui",
+            installRoot: comfyUiInstallRoot,
+          });
+          return status.status;
+        },
+        now,
+      });
+      const runtimeCapabilityGuard = new RuntimeCapabilityGuardService(runtimeReadiness);
+      let latentReferenceStorage: Pick<ArtifactObjectStoragePort, "retrieveArtifact"> | undefined;
       const comfyUiRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
         client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }),
         supervisor: comfyUiSupervisorPort,
+        prepareLatentReferenceImage: async ({ artifactId }) => {
+          if (!latentReferenceStorage) {
+            throw new Error("Artifact storage is unavailable for latent reference image preparation.");
+          }
+          const result = await latentReferenceStorage.retrieveArtifact({ key: artifactId });
+          if (!result.ok) {
+            throw new Error(`Unable to read latent reference image artifact '${artifactId}': ${result.error.message}`);
+          }
+          const content = result.value.content instanceof Uint8Array
+            ? result.value.content
+            : new Uint8Array(result.value.content as ArrayBufferLike);
+          const extension = extensionForImageReference(result.value.descriptor.mediaType, artifactId);
+          const imageName = `ai-system-builder-latent-${Date.now()}-${Math.random().toString(36).slice(2)}${extension}`;
+          const inputDirectory = join(comfyUiInstallRoot, "input");
+          await mkdir(inputDirectory, { recursive: true });
+          await writeFile(join(inputDirectory, imageName), content);
+          return { imageName };
+        },
         mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT },
       });
-      const runtimeTaskRegistry = createRuntimeTaskRegistryRouter({ python: pythonRuntimeTaskRegistry, image: comfyUiRuntimeTaskRegistry });
+      const runtimeTaskRegistry = createDesktopRuntimeTaskRegistry({ pythonRuntimeTaskRegistry, imageRuntimeTaskRegistry: comfyUiRuntimeTaskRegistry });
 
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
@@ -826,6 +914,7 @@ export function composeDesktopHost(
         now: options.now,
         artifactCatalogAppend: artifactCatalog,
       });
+      latentReferenceStorage = storage;
       const artifactBrowserRead = createFilesystemArtifactBrowserReadAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
         artifactCatalogRead: artifactCatalog,
@@ -925,6 +1014,7 @@ export function composeDesktopHost(
         artifactCatalog,
         now: options.now,
         taskPowerLifecycle,
+        runtimeCapabilityGuard,
       });
       const listSettingsDefinitions = new ListSettingsDefinitionsUseCase({
         settings: applicationSettings,
@@ -947,6 +1037,20 @@ export function composeDesktopHost(
       const modelRegistry = createLocalModelRegistryAdapter({
         filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`,
         now,
+      });
+      const imageAssetRegistry = createLocalImageAssetRegistryAdapter({
+        filePath: join(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
+        now,
+      });
+      internalAssetRegistry = composeInternalAssetRegistry({
+        rootDirectory: registerOptions.storageRootDirectory,
+        now,
+        resourceBackedViewProvider: composeResourceBackedViewProviders({
+          artifactBrowserMetadataRead: artifactBrowserRead,
+          imageAssetDescriptorRead: imageAssetRegistry,
+          modelRegistry,
+          publishedModelRegistry: modelRegistry,
+        }),
       });
       const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({
         accessTokenProvider: () => tokenConfigStore.getToken(),
@@ -1010,31 +1114,36 @@ export function composeDesktopHost(
         }),
         modelPublisher,
         taskPowerLifecycle,
+        runtimeCapabilityGuard,
       });
       const validateModel = new ValidateModelUseCase({
         runtimeTaskRegistry,
         modelRegistry,
+        runtimeCapabilityGuard,
       });
       // TODO(prompt-7): remove legacy modelPublisher/modelValidationPort wiring after executeTask deprecation cleanup.
       const publishModel = new PublishModelUseCase({
         modelRegistry,
         runtimeTaskRegistry,
+        runtimeCapabilityGuard,
+      });
+      const localModelCheckpointResolver = createLocalModelCheckpointResolverAdapter({
+        modelRegistry,
+        comfyUiCheckpointDirectory: join(comfyUiInstallRoot, "models", "checkpoints"),
+        log: (entry) => recordRuntimeLog({ level: "info", message: `Image generation model checkpoint resolution: ${JSON.stringify(entry)}` }),
       });
       const generateImageUseCase = new GenerateImageUseCase({
         runtimeTaskRegistry,
-        modelCheckpointResolver: createLocalModelCheckpointResolverAdapter({
-          modelRegistry,
-          comfyUiCheckpointDirectory: join(comfyUiInstallRoot, "models", "checkpoints"),
-          log: (entry) => recordRuntimeLog({ level: "info", message: `Image generation model checkpoint resolution: ${JSON.stringify(entry)}` }),
+        modelCheckpointResolver: createRuntimePreparedModelCheckpointResolver({
+          runtime: comfyUiSupervisorPort,
+          modelCheckpointResolver: localModelCheckpointResolver,
         }),
+        runtimeCapabilityGuard,
       });
       const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({
         runtimeTaskRegistry,
         finalizeImageGenerationService: new FinalizeImageGenerationService({
-          imageAssetRegistry: createLocalImageAssetRegistryAdapter({
-            filePath: join(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
-            now,
-          }),
+          imageAssetRegistry,
           generatedImagePersistence: createFilesystemGeneratedImagePersistenceAdapter({
             comfyUiOutputRoot: join(comfyUiInstallRoot, "output"),
             artifactStorageRoot: registerOptions.storageRootDirectory,
@@ -1073,6 +1182,8 @@ export function composeDesktopHost(
           },
           readPythonRuntimeStatus,
         },
+        runtimeReadiness,
+        assetRegistryRead: internalAssetRegistry.readFacade,
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
         setHuggingFaceToken: (token) => tokenConfigStore.setToken(token),
         clearHuggingFaceToken: () => tokenConfigStore.clearToken(),

@@ -1,4 +1,6 @@
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
+import { RuntimeCapabilityUnavailableError } from "../../../../application/services/runtime";
+import { createRuntimeCapabilityStatus } from "../../../../contracts/runtime";
 
 import {
   DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
@@ -10,17 +12,21 @@ import {
   DESKTOP_MODEL_DOWNLOAD_REQUEST_CHANNEL,
   DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL,
   DESKTOP_MODEL_TRAIN_REQUEST_CHANNEL,
+  DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL,
   DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL,
   DESKTOP_MODEL_VALIDATE_REQUEST_CHANNEL,
   DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL,
+  DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL,
   createDesktopModelBrowseRequest,
   createDesktopModelTrainRequest,
   createDesktopModelTrainStatusRequest,
+  createDesktopModelPublishRequest,
 } from "../../../../contracts/ipc";
 import {
   createBrowseModelsIpcHandler,
   createReadModelTrainingStatusIpcHandler,
   createTrainModelIpcHandler,
+  createPublishModelIpcHandler,
   registerModelManagementIpc,
 } from "../model/registerModelManagementIpc";
 
@@ -65,10 +71,10 @@ describe("registerModelManagementIpc", () => {
     expect(response.ok).toBe(true);
   });
 
-  it("maps handler errors to failure envelope", async () => {
+  it("sanitizes handler internal errors in failure envelopes", async () => {
     const handler = createBrowseModelsIpcHandler({
       execute: testDouble.fn(async () => {
-        throw new Error("browse failed");
+        throw new Error("browse failed at /tmp/secret\nstack trace");
       }),
     });
 
@@ -82,13 +88,13 @@ describe("registerModelManagementIpc", () => {
       channel: DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL.value,
       requestId: "req-model-browse",
       correlationId: "corr-model-browse",
-      error: { code: "internal", message: "browse failed" },
+      error: { code: "internal", message: "Model management request failed." },
     });
+    expect(JSON.stringify(response)).not.toContain("/tmp/secret");
+    expect(JSON.stringify(response)).not.toContain("stack trace");
   });
-});
 
-
-it("maps train handler to use case", async () => {
+  it("maps train handler to use case", async () => {
   const execute = testDouble.fn().mockResolvedValue({ runId: "run-1", status: "succeeded" });
   const handler = createTrainModelIpcHandler({ execute });
   const response = await handler({}, createDesktopModelTrainRequest({
@@ -114,4 +120,98 @@ it("maps train status handler to use case read", async () => {
 
   expect(read).toHaveBeenCalledWith("run-1");
   expect(response.ok).toBe(true);
+});
+
+it("maps model runtime capability unavailable errors to sanitized IPC unavailable responses", async () => {
+  const unavailable = new RuntimeCapabilityUnavailableError(createRuntimeCapabilityStatus({
+    capabilityId: "model-training",
+    status: "failed",
+    summary: "Model training runtime failed readiness checks.",
+    reason: { code: "runtime.python.failed", message: "trace /tmp/secret", category: "startup", retryable: true },
+    recommendedActions: ["retry", "view-logs"],
+  }));
+  const handler = createTrainModelIpcHandler({ execute: testDouble.fn(async () => { throw unavailable; }) });
+  const response = await handler({}, createDesktopModelTrainRequest({
+    baseModel: { modelRecordId: "base-1" },
+    datasets: [{ artifactId: "dataset-1", splitRole: "train" }],
+    method: "lora",
+    commonParameters: {},
+    output: { outputModelName: "demo-adapter", destination: { local: { enabled: true } } },
+  }, { requestId: "req-train", correlationId: "corr-train" }));
+
+  expect(response).toMatchObject({
+    ok: false,
+    channel: DESKTOP_MODEL_TRAIN_RESPONSE_CHANNEL.value,
+    requestId: "req-train",
+    correlationId: "corr-train",
+    error: { code: "unavailable", message: "Required runtime capability is not ready.", details: { capabilityId: "model-training", status: "failed" } },
+  });
+  expect(JSON.stringify(response)).not.toContain("/tmp/secret");
+});
+
+
+it("maps publish handler runtime unavailable failures to sanitized IPC unavailable responses", async () => {
+  const unavailable = new RuntimeCapabilityUnavailableError(createRuntimeCapabilityStatus({
+    capabilityId: "model-publishing",
+    status: "unavailable",
+    summary: "Model publishing runtime execution is not implemented on this host.",
+    reason: {
+      code: "runtime.model-publishing.not-implemented",
+      message: "internal detail /tmp/secret TOKEN=abc",
+      category: "unavailable",
+      retryable: false,
+    },
+    recommendedActions: ["configure"],
+  }));
+  const handler = createPublishModelIpcHandler({ execute: testDouble.fn(async () => { throw unavailable; }) });
+
+  const response = await handler({}, createDesktopModelPublishRequest(
+    { modelRecordId: "m1", repository: "owner/repo" },
+    { requestId: "req-publish", correlationId: "corr-publish" },
+  ));
+
+  expect(response).toMatchObject({
+    ok: false,
+    channel: DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL.value,
+    requestId: "req-publish",
+    correlationId: "corr-publish",
+    error: {
+      code: "unavailable",
+      message: "Required runtime capability is not ready.",
+      details: {
+        capabilityId: "model-publishing",
+        status: "unavailable",
+        reason: { code: "runtime.model-publishing.not-implemented", category: "unavailable" },
+      },
+    },
+  });
+  const payload = JSON.stringify(response);
+  expect(payload).not.toContain("/tmp/secret");
+  expect(payload).not.toContain("TOKEN=abc");
+});
+
+it("maps publish handler internal implementation failures to sanitized IPC internal responses", async () => {
+  const handler = createPublishModelIpcHandler({
+    execute: testDouble.fn(async () => {
+      throw new Error("model publishing runtime task is not implemented at /tmp/runtime TOKEN=abc");
+    }),
+  });
+
+  const response = await handler({}, createDesktopModelPublishRequest(
+    { modelRecordId: "m1", repository: "owner/repo" },
+    { requestId: "req-publish-internal", correlationId: "corr-publish-internal" },
+  ));
+
+  expect(response).toMatchObject({
+    ok: false,
+    channel: DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL.value,
+    requestId: "req-publish-internal",
+    correlationId: "corr-publish-internal",
+    error: { code: "internal", message: "Model management request failed." },
+  });
+  const payload = JSON.stringify(response);
+  expect(payload).not.toContain("model publishing runtime task is not implemented");
+  expect(payload).not.toContain("/tmp/runtime");
+  expect(payload).not.toContain("TOKEN=abc");
+});
 });

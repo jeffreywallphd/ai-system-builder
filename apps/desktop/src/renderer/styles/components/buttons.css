@@ -11,6 +11,21 @@
     border-color var(--transition-fast);
 }
 
+.ui-button--icon {
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ui-icon {
+  inline-size: 1.15rem;
+  block-size: 1.15rem;
+  fill: currentColor;
+}
+
 .ui-button:hover:enabled {
   background: var(--color-bg-accent-hover);
   border-color: var(--color-border-inverse);

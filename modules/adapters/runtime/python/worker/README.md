@@ -8,6 +8,11 @@ Endpoints:
 - `GET /capabilities`
 - `POST /models/ensure-downloaded`
 
+Dependency files:
+
+- `requirements.txt` contains startup-safe worker dependencies required to boot the sidecar and support model download/runtime loading.
+- `requirements-training.txt` contains heavier training/dataset dependencies that are not required for worker startup.
+
 Implemented task:
 
 - `prepare-training-dataset`

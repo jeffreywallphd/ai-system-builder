@@ -16,12 +16,14 @@ The system also needs to support engine variability over time (ComfyUI, local Py
 Image generation is established as a **first-class feature** with execution managed through the **Runtime Task Registry** lifecycle.
 
 - Image generation execution uses `RuntimeTaskRegistryPort` lifecycle operations (`startTask`, `getTaskStatus`, `cancelTask`).
+- Shared runtime readiness contracts may describe whether the host-owned `image-generation` capability and its runtime dependencies are available before/around execution, but they do not replace task registry lifecycle records.
 - ComfyUI is treated as a runtime sidecar implementation detail, not a domain dependency.
 - Image generation contracts remain engine-agnostic and do not encode ComfyUI workflow graph structures.
 
 ## Key Principles
 
 - Contracts must not contain UI-specific or ComfyUI-specific payload structures.
+- Readiness summaries/reasons/actions must stay transport-neutral; ComfyUI protocol details and filesystem paths remain adapter details.
 - Image generation follows the same async task lifecycle as dataset preparation and model training.
 - Generated outputs are represented as assets with stable identity and metadata.
 - Artifacts remain storage-backed objects; artifacts do not replace assets as semantic entities.

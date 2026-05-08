@@ -11,7 +11,7 @@ function flush() { return new Promise((resolve) => setTimeout(resolve, 0)); }
 
 function Harness({ client, modelClient }: { client: any; modelClient: any }) {
   const f = useImageGenerationFeature(client, undefined, modelClient);
-  return <div><button id="start" onClick={() => void f.start()}>start</button><button id="selectB" onClick={() => f.setSelectedModelRecordId("b")}>b</button><button id="refresh" onClick={() => void f.refreshModelInventory()}>r</button><input id="prompt" value={f.form.prompt} onInput={(e)=>f.setForm((x)=>({...x,prompt:(e.target as HTMLInputElement).value}))}/><span id="validation">{f.validationError ?? ""}</span><span id="downloaded">{f.downloadedImageGenerationModels.map((m)=>m.modelRecordId).join(",")}</span><span id="selected">{f.selectedModelRecordId}</span></div>;
+  return <div><button id="start" onClick={() => void f.start()}>start</button><button id="selectB" onClick={() => f.setSelectedModelRecordId("b")}>b</button><button id="refresh" onClick={() => void f.refreshModelInventory()}>r</button><input id="prompt" value={f.form.prompt} onInput={(e)=>f.setForm((x)=>({...x,prompt:(e.target as HTMLInputElement).value}))}/><span id="validation">{f.validationError ?? ""}</span><span id="downloaded">{f.downloadedImageGenerationModels.map((m)=>m.modelRecordId).join(",")}</span><span id="selected">{f.selectedModelRecordId}</span><span id="result">{f.results[0]?.storageKey ?? ""}</span></div>;
 }
 
 describe("useImageGenerationFeature", () => {
@@ -29,7 +29,7 @@ describe("useImageGenerationFeature", () => {
     await act(async () => { (c.querySelector("#selectB") as HTMLButtonElement).click(); });
     expect(modelClient.listModels).toHaveBeenCalledTimes(1);
     await act(async () => { (c.querySelector("#prompt") as HTMLInputElement).value = "cat"; (c.querySelector("#prompt") as HTMLInputElement).dispatchEvent(new Event("input", { bubbles: true })); (c.querySelector("#start") as HTMLButtonElement).click(); });
-    expect(client.startImageGeneration).toHaveBeenCalledWith(expect.objectContaining({ model: "b" }));
+    expect(client.startImageGeneration).toHaveBeenCalledWith(expect.objectContaining({ model: "b", engineHints: { runtimeDeviceMode: "auto" } }));
   });
 
   it("manual model fallback applies only when no selected record", async () => {
@@ -111,9 +111,22 @@ describe("useImageGenerationFeature", () => {
     const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [] }) };
     const c = document.createElement("div"); const root = createRoot(c);
     await act(async()=>{root.render(<Harness client={client} modelClient={modelClient} />);});
+    await act(async()=>{(c.querySelector("#prompt") as HTMLInputElement).value = ""; (c.querySelector("#prompt") as HTMLInputElement).dispatchEvent(new Event("input", { bubbles: true }));});
     expect((c.querySelector("#validation") as HTMLElement).textContent).toBe("");
     await act(async()=>{(c.querySelector("#start") as HTMLButtonElement).click();});
     expect((c.querySelector("#validation") as HTMLElement).textContent).toContain("Prompt is required");
+  });
+
+  it("initializes server generation defaults", async () => {
+    const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn() };
+    const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [] }) };
+    function H() {
+      const f = useImageGenerationFeature(client, undefined, modelClient);
+      return <div><span id="defaults">{[f.form.prompt, f.form.negativePrompt, f.form.width, f.form.height, f.form.sampler, f.form.scheduler].join("|")}</span></div>;
+    }
+    const c = document.createElement("div"); const root = createRoot(c);
+    await act(async () => { root.render(<H />); });
+    expect((c.querySelector("#defaults") as HTMLElement).textContent).toBe("raw photo quality image; 35mm camera quality image; a dog in the park|anime; cartoon; melty; blurry|1024|1024|dpmpp_2m|karras");
   });
 
   it('loads model inventory without invalid list source metadata', async () => {
@@ -125,6 +138,19 @@ describe("useImageGenerationFeature", () => {
     expect((c.querySelector('#selected') as HTMLElement).textContent).toBe('img');
   });
 
+
+  it("auto-finalizes on success and assigns random seed when omitted", async () => {
+    const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn().mockResolvedValue({ requestId: "r1" }), readImageGeneration: vi.fn().mockResolvedValue({ requestId: "r1", status: "succeeded" }), finalizeImageGenerationIfCompleted: vi.fn().mockResolvedValue({ finalized: true, assets: [{ assetId: "a1", artifactId: "artifact-1", storageKey: "generated/images/a.png", mediaType: "image/png" }] }), cancelImageGeneration: vi.fn() };
+    const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [] }) };
+    function H() { const f = useImageGenerationFeature(client, undefined, modelClient); return <div><button id="start" onClick={()=>void f.start()}>s</button><button id="prompt" onClick={()=>f.setForm((x)=>({...x,prompt:"cat",seed:""}))}>p</button></div>; }
+    const c = document.createElement("div"); const root = createRoot(c);
+    await act(async()=>{root.render(<H/>);});
+    await act(async()=>{(c.querySelector("#prompt") as HTMLButtonElement).click(); (c.querySelector("#start") as HTMLButtonElement).click(); await flush();});
+    expect(client.finalizeImageGenerationIfCompleted).toHaveBeenCalledWith({ requestId: "r1" });
+    expect(client.startImageGeneration).toHaveBeenCalledWith(expect.objectContaining({ seed: expect.any(Number) }));
+    expect((c.querySelector("#result") as HTMLElement).textContent).toBe("generated/images/a.png");
+  });
+
   it("strict mode still loads model inventory", async () => {
     const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn() };
     const listModels = vi.fn().mockResolvedValue({ models: [model("img", "downloaded", "text-to-image")] });
@@ -132,5 +158,57 @@ describe("useImageGenerationFeature", () => {
     await act(async()=>{root.render(<React.StrictMode><Harness client={client} modelClient={{ listModels }} /></React.StrictMode>);});
     expect(listModels).toHaveBeenCalled();
     expect((c.querySelector('#selected') as HTMLElement).textContent).toBe('img');
+  });
+
+  it("includes faceId payload when enabled with up to three references", async () => {
+    const client = { createArtifactMediaViewUrl: vi.fn(), startImageGeneration: vi.fn().mockResolvedValue({ requestId: "r1" }), readImageGeneration: vi.fn().mockResolvedValue({ requestId: "r1", status: "failed" }), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn(), readRuntimeResources: vi.fn().mockResolvedValue({ memoryUsagePercent: 1, cpuUsagePercent: 2, gpuUsagePercent: 3 }) };
+    const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [] }) };
+    function H() { const f = useImageGenerationFeature(client, undefined, modelClient); return <div><button id="setup" onClick={() => f.setForm((x) => ({ ...x, prompt: "face", faceIdEnabled: true, faceIdArtifactId1: "a1", faceIdArtifactId2: "a1", faceIdArtifactId3: "a2" }))}>set</button><button id="start" onClick={() => void f.start()}>s</button></div>; }
+    const c = document.createElement("div"); const root = createRoot(c);
+    await act(async()=>{root.render(<H />);});
+    await act(async()=>{(c.querySelector("#setup") as HTMLButtonElement).click(); (c.querySelector("#start") as HTMLButtonElement).click();});
+    expect(client.startImageGeneration).toHaveBeenCalledWith(expect.objectContaining({ faceId: { enabled: true, references: [{ artifactId: "a1" }, { artifactId: "a1" }, { artifactId: "a2" }], identityStrength: 0.85, structureStrength: 0.75, noise: 0.35 } }));
+  });
+
+  it("shows artifact-backed results after automatic finalization", async () => {
+    const client = {
+      createArtifactMediaViewUrl: vi.fn(),
+      startImageGeneration: vi.fn().mockResolvedValue({ requestId: "r1" }),
+      readImageGeneration: vi.fn().mockResolvedValue({
+        requestId: "r1",
+        status: "succeeded",
+        data: { outputs: [{ fileName: "x.png", contentBase64: "YWJj", mediaType: "image/png" }] },
+      }),
+      finalizeImageGenerationIfCompleted: vi.fn().mockResolvedValue({ finalized: true, assets: [{ assetId: "a1", artifactId: "artifact-1", storageKey: "generated/images/x.png", mediaType: "image/png" }] }),
+      cancelImageGeneration: vi.fn(),
+      readRuntimeResources: vi.fn().mockResolvedValue({ memoryUsagePercent: 1, cpuUsagePercent: 2, gpuUsagePercent: 3 }),
+      unloadModel: vi.fn(),
+    };
+    const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [] }) };
+    const c = document.createElement("div"); const root = createRoot(c);
+    await act(async()=>{root.render(<Harness client={client} modelClient={modelClient} />);});
+    await act(async()=>{(c.querySelector("#prompt") as HTMLInputElement).value = "cat"; (c.querySelector("#prompt") as HTMLInputElement).dispatchEvent(new Event("input", { bubbles: true })); (c.querySelector("#start") as HTMLButtonElement).click(); await flush();});
+    expect((c.querySelector("#result") as HTMLElement).textContent).toBe("generated/images/x.png");
+    expect(client.finalizeImageGenerationIfCompleted).toHaveBeenCalledWith({ requestId: "r1" });
+    expect(client.finalizeImageGenerationIfCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a failure when automatic finalization registers no image artifacts", async () => {
+    const client = {
+      createArtifactMediaViewUrl: vi.fn(),
+      startImageGeneration: vi.fn().mockResolvedValue({ requestId: "r-empty" }),
+      readImageGeneration: vi.fn().mockResolvedValue({ requestId: "r-empty", status: "succeeded", data: { outputs: [{ fileName: "x.png" }] } }),
+      finalizeImageGenerationIfCompleted: vi.fn().mockResolvedValue({ finalized: true, assets: [] }),
+      cancelImageGeneration: vi.fn(),
+      readRuntimeResources: vi.fn().mockResolvedValue({ memoryUsagePercent: 1, cpuUsagePercent: 2, gpuUsagePercent: 3 }),
+      unloadModel: vi.fn(),
+    };
+    const modelClient = { listModels: vi.fn().mockResolvedValue({ models: [] }) };
+    function H() { const f = useImageGenerationFeature(client, undefined, modelClient); return <div><button id="start" onClick={() => void f.start()}>s</button><button id="prompt" onClick={() => f.setForm((x) => ({ ...x, prompt: "cat" }))}>p</button><span id="status">{f.status}</span><span id="error">{f.error ?? ""}</span></div>; }
+    const c = document.createElement("div"); const root = createRoot(c);
+    await act(async()=>{root.render(<H />);});
+    await act(async()=>{(c.querySelector("#prompt") as HTMLButtonElement).click(); (c.querySelector("#start") as HTMLButtonElement).click(); await flush();});
+    expect((c.querySelector("#status") as HTMLElement).textContent).toBe("failed");
+    expect((c.querySelector("#error") as HTMLElement).textContent).toContain("did not register");
   });
 });

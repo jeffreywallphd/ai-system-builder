@@ -1,3 +1,5 @@
+import { secureFetch } from "../../../security/secureFetch";
+import { parseApiEnvelope, toThinClientApiError } from "../../../security/apiErrorEnvelope";
 export interface ThinClientArtifactUploadInput {
   fileName: string;
   mediaType: string;
@@ -63,7 +65,7 @@ export interface CreateApiArtifactUploadClientOptions {
 const DEFAULT_UPLOAD_SOURCE = "thin-client.artifact-upload.form";
 
 function isApiResponseEnvelope(value: unknown): value is ApiResponseEnvelope {
-  return typeof value === "object" && value !== null && "ok" in value;
+  try { parseApiEnvelope(value); return true; } catch { return false; }
 }
 
 function createUploadUrl(apiBaseUrl: string): string {
@@ -151,27 +153,22 @@ export function createApiArtifactUploadClient(
 
   return {
     async uploadArtifact(input: ThinClientArtifactUploadInput): Promise<ThinClientArtifactUploadResult> {
-      const response = await fetch(uploadUrl, {
+      const response = await secureFetch(uploadUrl, {
         method: "POST",
         body: createUploadFormData(input),
       });
 
       const responseBody = await readApiResponseBody(response);
       if (!response.ok && !isApiResponseEnvelope(responseBody)) {
-        return {
-          ok: false,
-          error: {
-            code: "internal",
-            message: createHttpErrorMessage(response),
-          },
-        };
+        const err = toThinClientApiError(response.status, uploadUrl);
+        return { ok: false, error: { code: err.code ?? "internal", message: err.message } };
       }
 
       return toRendererResult(responseBody);
     },
 
     async getAcceptedTypes(): Promise<ThinClientArtifactUploadAcceptedTypePolicy> {
-      const response = await fetch(uploadPolicyUrl);
+      const response = await secureFetch(uploadPolicyUrl);
       const responseBody = await readApiResponseBody(response);
       if (!isApiResponseEnvelope(responseBody) || !responseBody.ok || !responseBody.value?.policy) {
         throw new Error("Failed to read accepted artifact upload types.");

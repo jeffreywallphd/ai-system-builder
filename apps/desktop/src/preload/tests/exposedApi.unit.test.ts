@@ -36,8 +36,22 @@ import {
   DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL,
   createDesktopPrepareTrainingDatasetStartSuccessResponse,
   createDesktopPrepareTrainingDatasetTaskReadSuccessResponse,
+  DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL,
+  DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
+  createDesktopRuntimeReadinessReadSuccessResponse,
+  createDesktopRuntimeCapabilityStatusReadSuccessResponse,
+  createDesktopAssetDefinitionsListSuccessResponse,
+  createDesktopAssetDefinitionReadSuccessResponse,
+  createDesktopAssetDefinitionVersionReadSuccessResponse,
+  createDesktopAssetResourceBackedViewReadSuccessResponse,
+  createDesktopAssetResourceBackedViewsListSuccessResponse,
   createDesktopPythonRuntimeStatusReadSuccessResponse,
   createDesktopPythonRuntimeControlSuccessResponse,
   DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
@@ -61,6 +75,214 @@ import {
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
 describe("desktop preload exposedApi bridge", () => {
+  it("maps runtime readiness reads to dedicated request channel", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+      createDesktopRuntimeReadinessReadSuccessResponse({
+        status: "unknown",
+        healthy: false,
+        available: false,
+        capabilities: [],
+      }),
+    );
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    const response = await api.readRuntimeReadiness({ requestId: "req-ready" });
+
+    expect(response.ok).toBe(true);
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL.value);
+    expect(invoke.mock.calls[0]?.[1]).toMatchObject({
+      requestId: "req-ready",
+      payload: { boundary: { host: "desktop", source: "desktop.renderer.runtime-readiness" } },
+    });
+  });
+
+  it("maps runtime capability status reads to dedicated request channel", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+      createDesktopRuntimeCapabilityStatusReadSuccessResponse({
+        capabilityId: "python-runtime",
+        status: "ready",
+        healthy: true,
+        available: true,
+      }),
+    );
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    const response = await api.readRuntimeCapabilityStatus({ capabilityId: "python-runtime" });
+
+    expect(response.ok).toBe(true);
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL.value);
+    expect(invoke.mock.calls[0]?.[1]).toMatchObject({
+      payload: {
+        capabilityId: "python-runtime",
+        boundary: { host: "desktop", source: "desktop.renderer.runtime-readiness" },
+      },
+    });
+  });
+
+  it("maps asset definition list reads to the read-only asset registry request channel", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+      createDesktopAssetDefinitionsListSuccessResponse({ items: [] }),
+    );
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    const response = await api.listAssetDefinitions(
+      { searchText: "workflow", builtIn: "built-in", limit: 5, includeMetadata: true },
+      { requestId: "req-assets", correlationId: "corr-assets" },
+    );
+
+    expect(response.ok).toBe(true);
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL.value);
+    expect(invoke.mock.calls[0]?.[1]).toMatchObject({
+      requestId: "req-assets",
+      correlationId: "corr-assets",
+      operation: "asset.definitions-list",
+      payload: {
+        searchText: "workflow",
+        builtIn: "built-in",
+        limit: 5,
+        includeMetadata: true,
+        boundary: { host: "desktop", source: "desktop.renderer.asset-registry" },
+      },
+    });
+  });
+
+  it("maps asset definition detail reads to the read-only asset registry request channel", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+      createDesktopAssetDefinitionReadSuccessResponse({
+        definition: {
+        definitionId: "builtin.workflow",
+        assetType: "workflow",
+        assetFamily: "behavioral",
+        version: "1.0.0",
+        displayName: "Workflow",
+        description: "Workflow definition",
+        lifecycleStatus: "published",
+        provenance: { sourceKind: "system-generated", createdAt: "2026-05-08T00:00:00.000Z" },
+      },
+      }),
+    );
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    const response = await api.readAssetDefinition({
+      definitionId: "builtin.workflow",
+      expand: ["metadata"],
+      includeValidation: true,
+    });
+
+    expect(response.ok).toBe(true);
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL.value);
+    expect(invoke.mock.calls[0]?.[1]).toMatchObject({
+      operation: "asset.definition-read",
+      payload: {
+        definitionId: "builtin.workflow",
+        expand: ["metadata"],
+        includeValidation: true,
+        boundary: { host: "desktop", source: "desktop.renderer.asset-registry" },
+      },
+    });
+  });
+
+  it("maps asset definition version reads to the read-only asset registry request channel", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
+      createDesktopAssetDefinitionVersionReadSuccessResponse({
+        definition: {
+        definitionId: "builtin.workflow",
+        assetType: "workflow",
+        assetFamily: "behavioral",
+        version: "1.0.0",
+        displayName: "Workflow",
+        description: "Workflow definition",
+        lifecycleStatus: "published",
+        provenance: { sourceKind: "system-generated", createdAt: "2026-05-08T00:00:00.000Z" },
+      },
+      }),
+    );
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    const response = await api.readAssetDefinitionVersion({
+      definitionId: "builtin.workflow",
+      version: "1.0.0",
+    });
+
+    expect(response.ok).toBe(true);
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL.value);
+    expect(invoke.mock.calls[0]?.[1]).toMatchObject({
+      operation: "asset.definition-version-read",
+      payload: {
+        definitionId: "builtin.workflow",
+        version: "1.0.0",
+        boundary: { host: "desktop", source: "desktop.renderer.asset-registry" },
+      },
+    });
+  });
+
+  it("maps resource-backed view list and detail reads to read-only asset registry channels", async () => {
+    const responses = [
+      createDesktopAssetResourceBackedViewsListSuccessResponse({
+        items: [{ viewId: "asset-view.generated-output.internal.1", viewKind: "generated-output", displayName: "Generated output" }],
+      }),
+      createDesktopAssetResourceBackedViewReadSuccessResponse({
+        view: { viewId: "asset-view.generated-output.internal.1", viewKind: "generated-output", displayName: "Generated output" },
+      }),
+    ];
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => responses.shift());
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+    const list = await api.listAssetResourceBackedViews({ searchText: "generated", viewKinds: ["generated-output"], limit: 5 });
+    const detail = await api.readAssetResourceBackedView({ viewId: "asset-view.generated-output.internal.1", expand: ["metadata"] });
+
+    expect(list.ok).toBe(true);
+    expect(detail.ok).toBe(true);
+    expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL.value);
+    expect(invoke.mock.calls[0]?.[1]).toMatchObject({
+      operation: "asset.resource-backed-views-list",
+      payload: {
+        searchText: "generated",
+        viewKinds: ["generated-output"],
+        limit: 5,
+        boundary: { host: "desktop", source: "desktop.renderer.asset-registry" },
+      },
+    });
+    expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL.value);
+    expect(invoke.mock.calls[1]?.[1]).toMatchObject({
+      operation: "asset.resource-backed-view-read",
+      payload: {
+        viewId: "asset-view.generated-output.internal.1",
+        expand: ["metadata"],
+        boundary: { host: "desktop", source: "desktop.renderer.asset-registry" },
+      },
+    });
+  });
+
+  it("does not expose asset mutation or seeding methods", () => {
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke: testDouble.fn() } });
+    const methodNames = Object.keys(api);
+    const forbiddenAssetMethods = [
+      "createAsset",
+      "updateAsset",
+      "deleteAsset",
+      "registerAsset",
+      "seedAsset",
+      "seedBuiltInAssetDefinitions",
+      "importAsset",
+      "finalizeAsset",
+      "publishAsset",
+      "executeAsset",
+      "runAsset",
+      "scanAssets",
+      "syncAssets",
+      "repairAsset",
+      "installAsset",
+      "startAsset",
+      "trainAsset",
+      "validateAsset",
+    ];
+
+    expect(methodNames).toContain("listAssetDefinitions");
+    expect(methodNames).toContain("readAssetDefinition");
+    expect(methodNames).toContain("readAssetDefinitionVersion");
+    expect(methodNames).toContain("listAssetResourceBackedViews");
+    expect(methodNames).toContain("readAssetResourceBackedView");
+    for (const method of forbiddenAssetMethods) {
+      expect(methodNames).not.toContain(method);
+    }
+  });
+
   it("maps hugging face token status bridge calls to dedicated request channel", async () => {
     const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createDesktopHuggingFaceTokenGetSuccessResponse({ configured: true, maskedToken: "••••1234" }),

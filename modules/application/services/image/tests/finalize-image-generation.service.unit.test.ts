@@ -12,7 +12,7 @@ describe("FinalizeImageGenerationService", () => {
     const service = new FinalizeImageGenerationService({ imageAssetRegistry, generatedImagePersistence, createAssetId: () => "asset-1", now: () => "2026-05-01T00:00:00.000Z" });
     const result = await service.finalizeCompletedTask(createTask());
     expect(result).toEqual({ assets: [{ assetId: "asset-1", artifactId: "artifacts/image-1", storageKey: "generated/images/artifacts_image-1.png", mediaType: "image/png", source: "generated" }] });
-    expect(imageAssetRegistry.registerImageAsset).toHaveBeenCalledWith(expect.objectContaining({ source: "generated", metadata: expect.objectContaining({ engine: "comfyui", requestId: "req-1", originalFileName: "out.png" }) }));
+    expect(imageAssetRegistry.registerImageAsset.mock.calls[0]?.[0]).toMatchObject({ source: "generated", metadata: { engine: "comfyui", requestId: "req-1", originalFileName: "out.png" } });
   });
 
   it("is idempotent", async () => {
@@ -23,5 +23,13 @@ describe("FinalizeImageGenerationService", () => {
     await service.finalizeCompletedTask(task);
     await service.finalizeCompletedTask(task);
     expect(generatedImagePersistence.persistGeneratedImage).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects succeeded tasks with no generated image outputs", async () => {
+    const imageAssetRegistry: ImageAssetRegistryPort = { registerImageAsset: testDouble.fn(async () => ({ assetId: "asset-1" })), getImageAsset: testDouble.fn(async () => null) };
+    const generatedImagePersistence: GeneratedImagePersistencePort = { persistGeneratedImage: testDouble.fn(async () => ({ artifactId: "artifacts/image-1", storageKey: "generated/images/artifacts_image-1.png", mediaType: "image/png", sizeBytes: 123, checksum: { algorithm: "sha256", value: "abc" }, originalFileName: "out.png" })) };
+    const service = new FinalizeImageGenerationService({ imageAssetRegistry, generatedImagePersistence });
+    await expect(service.finalizeCompletedTask(createTask({ data: { outputs: [] } }))).rejects.toThrow("at least one generated image output");
+    expect(generatedImagePersistence.persistGeneratedImage).not.toHaveBeenCalled();
   });
 });

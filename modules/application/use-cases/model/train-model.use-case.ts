@@ -14,7 +14,7 @@ import { createRetrieveArtifactRequest } from "../../../contracts/storage";
 import type { GeneratedModelStoragePort, ModelPublisherPort, ModelRegistryPort } from "../../ports/model";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
 import type { ArtifactObjectStoragePort, ArtifactStorageBindingPort } from "../../ports/storage";
-import type { TaskPowerLifecyclePort } from "../../services/runtime";
+import type { RuntimeCapabilityGuardService, TaskPowerLifecyclePort } from "../../services/runtime";
 
 function ensureBaseModelSelection(request: ModelTrainingRequest): void {
   if (!request.baseModel.modelRecordId && !request.baseModel.modelId && !request.baseModel.localPath) {
@@ -103,6 +103,7 @@ export class TrainModelUseCase {
       generatedModelStorage?: GeneratedModelStoragePort;
       modelPublisher?: ModelPublisherPort;
       taskPowerLifecycle: TaskPowerLifecyclePort;
+      runtimeCapabilityGuard?: Pick<RuntimeCapabilityGuardService, "requireCapabilityReady">;
     },
   ) {}
 
@@ -111,6 +112,7 @@ export class TrainModelUseCase {
     ensureBaseModelSelection(normalizedRequest);
     ensureDatasetSelections(normalizedRequest);
     ensureOutputDestinationSelection(normalizedRequest);
+    await this.dependencies.runtimeCapabilityGuard?.requireCapabilityReady("model-training");
 
     let baseModelRecordId: string | undefined = normalizedRequest.baseModel.modelRecordId;
 

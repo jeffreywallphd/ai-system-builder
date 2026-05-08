@@ -18,14 +18,13 @@ import {
 import { useArtifactBrowserClient } from "./useArtifactBrowserClient";
 
 export interface UseArtifactBrowserFeatureResult {
-  huggingFaceTokenStatus: { configured: boolean; maskedToken?: string };
-  tokenInput: string;
-  tokenState: ArtifactBrowserViewState;
   items: ThinClientArtifactBrowseItem[];
   selectedStorageKey?: string;
   detail?: ThinClientArtifactDetail;
   content?: ThinClientArtifactContentDescriptor;
   imageViewUrl?: string;
+  canSelectPreviousImage: boolean;
+  canSelectNextImage: boolean;
   publishState: ArtifactBrowserViewState;
   registerState: ArtifactBrowserViewState;
   localizeState: ArtifactBrowserViewState;
@@ -42,9 +41,30 @@ export interface UseArtifactBrowserFeatureResult {
     showRegisterForm: boolean;
   };
   viewState: ArtifactBrowserViewState;
+  pendingDeleteStorageKey?: string;
+  deleteConfirmationInput: string;
+  selectedArtifactKeys: string[];
+  bulkDeleteConfirmationInput: string;
   selectArtifact: (storageKey: string) => Promise<void>;
   refreshArtifacts: () => Promise<void>;
-  publishArtifactToHuggingFace: () => Promise<void>;
+  selectPreviousImage: () => Promise<void>;
+  selectNextImage: () => Promise<void>;
+  requestDeleteRegisteredArtifact: (storageKey: string) => void;
+  confirmPendingDelete: () => Promise<void>;
+  cancelPendingDelete: () => void;
+  setDeleteConfirmationInput: (value: string) => void;
+  toggleSelectedArtifactKey: (storageKey: string) => void;
+  clearSelectedArtifactKeys: () => void;
+  toggleAllArtifactKeys: () => void;
+  areAllArtifactKeysSelected: boolean;
+  setBulkDeleteConfirmationInput: (value: string) => void;
+  deleteSelectedArtifacts: () => Promise<void>;
+  publishArtifactToHuggingFace: (input?: {
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }) => Promise<void>;
   registerArtifactFromHuggingFace: (input?: {
     repository?: string;
     pathInRepo?: string;
@@ -72,9 +92,6 @@ export interface UseArtifactBrowserFeatureResult {
   setRegisterRevision: (value: string) => void;
   setRegisterMediaType: (value: string) => void;
   toggleRegisterForm: () => void;
-  setTokenInput: (value: string) => void;
-  saveHuggingFaceToken: () => Promise<void>;
-  clearHuggingFaceToken: () => Promise<void>;
 }
 
 export function useArtifactBrowserFeature(
@@ -101,7 +118,7 @@ export function useArtifactBrowserFeature(
       return message;
     }
 
-    return `${message} This Hugging Face repository may require an access token. Open Hugging Face token settings in this page to configure host/server access for private or gated repos.`;
+    return `${message} This Hugging Face repository may require a host/server Hugging Face token for private or gated repos.`;
   };
 
   const artifactClient = useArtifactBrowserClient(client);
@@ -124,11 +141,10 @@ export function useArtifactBrowserFeature(
   const [huggingFaceNamespaceDatasets, setHuggingFaceNamespaceDatasets] = useState<ThinClientHuggingFaceNamespaceDataset[]>([]);
   const [datasetFilesByRepository, setDatasetFilesByRepository] = useState<Record<string, DatasetFilesPanelState>>({});
   const [expandedHuggingFaceDataset, setExpandedHuggingFaceDataset] = useState<string | undefined>();
-  const [tokenInput, setTokenInput] = useState("");
-  const [tokenState, setTokenState] = useState<ArtifactBrowserViewState>({ status: "idle" });
-  const [huggingFaceTokenStatus, setHuggingFaceTokenStatus] = useState<{ configured: boolean; maskedToken?: string }>({
-    configured: false,
-  });
+  const [pendingDeleteStorageKey, setPendingDeleteStorageKey] = useState<string | undefined>();
+  const [deleteConfirmationInput, setDeleteConfirmationInput] = useState("");
+  const [selectedArtifactKeys, setSelectedArtifactKeys] = useState<string[]>([]);
+  const [bulkDeleteConfirmationInput, setBulkDeleteConfirmationInput] = useState("");
 
   const publishLogic = useArtifactBrowserPublishLogic<ThinClientArtifactDetail>({
     selectedStorageKey,
@@ -163,34 +179,7 @@ export function useArtifactBrowserFeature(
 
   useEffect(() => {
     void refreshArtifacts();
-    void artifactClient.getHuggingFaceTokenStatus().then(setHuggingFaceTokenStatus).catch(() => {
-      setHuggingFaceTokenStatus({ configured: false });
-    });
   }, [artifactClient]);
-
-  async function saveHuggingFaceToken(): Promise<void> {
-    setTokenState({ status: "loading", message: "Saving Hugging Face token..." });
-    try {
-      const status = await artifactClient.setHuggingFaceToken({ token: tokenInput });
-      setHuggingFaceTokenStatus(status);
-      setTokenInput("");
-      setTokenState({ status: "success", message: "Hugging Face token saved." });
-    } catch (error) {
-      setTokenState({ status: "error", message: error instanceof Error ? error.message : "Failed to save Hugging Face token." });
-    }
-  }
-
-  async function clearHuggingFaceToken(): Promise<void> {
-    setTokenState({ status: "loading", message: "Removing Hugging Face token..." });
-    try {
-      const status = await artifactClient.clearHuggingFaceToken();
-      setHuggingFaceTokenStatus(status);
-      setTokenInput("");
-      setTokenState({ status: "success", message: "Hugging Face token removed." });
-    } catch (error) {
-      setTokenState({ status: "error", message: error instanceof Error ? error.message : "Failed to remove Hugging Face token." });
-    }
-  }
 
   async function selectArtifact(storageKey: string): Promise<void> {
     setSelectedStorageKey(storageKey);
@@ -229,6 +218,93 @@ export function useArtifactBrowserFeature(
         status: "error",
         message: error instanceof Error ? error.message : "Failed to load artifact detail.",
       });
+    }
+  }
+
+  function requestDeleteRegisteredArtifact(storageKey: string): void {
+    setPendingDeleteStorageKey(storageKey);
+    setDeleteConfirmationInput("");
+  }
+
+  function cancelPendingDelete(): void {
+    setPendingDeleteStorageKey(undefined);
+    setDeleteConfirmationInput("");
+  }
+
+  async function confirmPendingDelete(): Promise<void> {
+    if (!pendingDeleteStorageKey) {
+      return;
+    }
+    if (deleteConfirmationInput !== "Delete") {
+      setViewState({ status: "error", message: "Type Delete to confirm artifact deletion." });
+      return;
+    }
+
+    const storageKey = pendingDeleteStorageKey;
+    setViewState({ status: "loading", message: `Deleting ${storageKey}...` });
+    try {
+      await artifactClient.deleteRegisteredArtifact({ storageKey });
+      setPendingDeleteStorageKey(undefined);
+      setDeleteConfirmationInput("");
+      if (selectedStorageKey === storageKey) {
+        setSelectedStorageKey(undefined);
+        setDetail(undefined);
+        setContent(undefined);
+        setImageViewUrl(undefined);
+        publishLogic.setPublishedBackingFromDetail(undefined);
+      }
+      await refreshArtifacts();
+      setViewState({ status: "success", message: `Deleted ${storageKey}.` });
+    } catch (error) {
+      setViewState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Failed to delete artifact.",
+      });
+    }
+  }
+  function toggleSelectedArtifactKey(storageKey: string): void {
+    setSelectedArtifactKeys((current) => (current.includes(storageKey) ? current.filter((key) => key !== storageKey) : [...current, storageKey]));
+  }
+  function clearSelectedArtifactKeys(): void {
+    setSelectedArtifactKeys([]);
+    setBulkDeleteConfirmationInput("");
+  }
+
+  const listedArtifactKeys = items.map((item) => item.storageKey);
+  const areAllArtifactKeysSelected = listedArtifactKeys.length > 0
+    && listedArtifactKeys.every((storageKey) => selectedArtifactKeys.includes(storageKey));
+
+  function toggleAllArtifactKeys(): void {
+    if (areAllArtifactKeysSelected) {
+      clearSelectedArtifactKeys();
+      return;
+    }
+
+    setSelectedArtifactKeys(listedArtifactKeys);
+  }
+
+  async function deleteSelectedArtifacts(): Promise<void> {
+    if (selectedArtifactKeys.length === 0) return;
+    if (bulkDeleteConfirmationInput !== "Delete All") {
+      setViewState({ status: "error", message: "Type Delete All to confirm bulk artifact deletion." });
+      return;
+    }
+    setViewState({ status: "loading", message: `Deleting ${selectedArtifactKeys.length} artifact(s)...` });
+    try {
+      await Promise.all(selectedArtifactKeys.map(async (storageKey) => artifactClient.deleteRegisteredArtifact({ storageKey })));
+      if (selectedStorageKey && selectedArtifactKeys.includes(selectedStorageKey)) {
+        setSelectedStorageKey(undefined);
+        setDetail(undefined);
+        setContent(undefined);
+        setImageViewUrl(undefined);
+        publishLogic.setPublishedBackingFromDetail(undefined);
+      }
+      const deletedCount = selectedArtifactKeys.length;
+      clearSelectedArtifactKeys();
+      await refreshArtifacts();
+      setViewState({ status: "success", message: `Deleted ${deletedCount} artifact(s).` });
+    } catch (error) {
+      setViewState({ status: "error", message: error instanceof Error ? error.message : "Failed to delete selected artifacts." });
     }
   }
 
@@ -404,8 +480,13 @@ export function useArtifactBrowserFeature(
     }
   }
 
-  async function publishArtifactToHuggingFace(): Promise<void> {
-    await publishLogic.publishArtifactToHuggingFace();
+  async function publishArtifactToHuggingFace(input?: {
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }): Promise<void> {
+    await publishLogic.publishArtifactToHuggingFace(input);
     await refreshArtifacts();
   }
 
@@ -414,15 +495,30 @@ export function useArtifactBrowserFeature(
     await refreshArtifacts();
   }
 
+  const imageItems = items.filter((item) => item.artifactFamily === "image" || item.mediaType?.startsWith("image/"));
+  const selectedImageIndex = selectedStorageKey
+    ? imageItems.findIndex((item) => item.storageKey === selectedStorageKey)
+    : -1;
+  const canSelectPreviousImage = selectedImageIndex > 0;
+  const canSelectNextImage = selectedImageIndex >= 0 && selectedImageIndex < imageItems.length - 1;
+
+  async function selectAdjacentImage(offset: -1 | 1): Promise<void> {
+    const nextItem = imageItems[selectedImageIndex + offset];
+    if (!nextItem) {
+      return;
+    }
+
+    await selectArtifact(nextItem.storageKey);
+  }
+
   return {
-    huggingFaceTokenStatus,
-    tokenInput,
-    tokenState,
     items,
     selectedStorageKey,
     detail,
     content,
     imageViewUrl,
+    canSelectPreviousImage,
+    canSelectNextImage,
     publishState: publishLogic.publishState,
     registerState,
     localizeState,
@@ -439,8 +535,23 @@ export function useArtifactBrowserFeature(
       showRegisterForm,
     },
     viewState,
+    pendingDeleteStorageKey,
+    deleteConfirmationInput,
+    selectedArtifactKeys,
+    bulkDeleteConfirmationInput,
     selectArtifact,
     refreshArtifacts,
+    selectPreviousImage: () => selectAdjacentImage(-1),
+    selectNextImage: () => selectAdjacentImage(1),
+    requestDeleteRegisteredArtifact,
+    confirmPendingDelete,
+    cancelPendingDelete,
+    toggleSelectedArtifactKey,
+    clearSelectedArtifactKeys,
+    toggleAllArtifactKeys,
+    areAllArtifactKeysSelected,
+    setBulkDeleteConfirmationInput,
+    deleteSelectedArtifacts,
     publishArtifactToHuggingFace,
     registerArtifactFromHuggingFace,
     registerHuggingFaceNamespace,
@@ -458,15 +569,12 @@ export function useArtifactBrowserFeature(
     setRevision: publishLogic.setRevision,
     setMediaType: publishLogic.setMediaType,
     togglePublishForm: publishLogic.togglePublishForm,
+    setDeleteConfirmationInput,
     setRegisterRepository,
     setRegisterNamespace,
     setRegisterPathInRepo,
     setRegisterRevision,
     setRegisterMediaType,
     toggleRegisterForm: () => setShowRegisterForm((current) => !current),
-    setTokenInput,
-    saveHuggingFaceToken,
-    clearHuggingFaceToken,
   };
 }
-

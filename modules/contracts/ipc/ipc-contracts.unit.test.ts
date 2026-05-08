@@ -7,6 +7,15 @@ import {
   createIpcFailureResponse,
   createIpcRequest,
   createIpcSuccessResponse,
+  DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_RESPONSE_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_OPERATION,
+  DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_RESPONSE_CHANNEL,
+  createDesktopRuntimeCapabilityStatusReadRequest,
+  createDesktopRuntimeReadinessReadRequest,
+  createDesktopRuntimeReadinessReadSuccessResponse,
+  getDesktopRuntimeCapabilityStatusReadChannel,
   isIpcChannelValueForOperation,
   parseIpcChannelValue,
 } from ".";
@@ -154,5 +163,58 @@ describe("ipc contracts", () => {
       operation: "workspace.create",
       metadata: undefined,
     });
+  });
+});
+
+describe("desktop runtime readiness ipc contracts", () => {
+  it("creates host-scoped readiness read requests and success responses", () => {
+    const request = createDesktopRuntimeReadinessReadRequest(
+      {
+        boundary: { host: "desktop", source: " desktop.renderer.runtime-readiness " },
+      },
+      { requestId: "req-ready-1", correlationId: "corr-ready-1" },
+    );
+
+    expect(request).toMatchObject({
+      channel: DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL.value,
+      operation: DESKTOP_RUNTIME_READINESS_READ_OPERATION,
+      requestId: "req-ready-1",
+      correlationId: "corr-ready-1",
+      payload: { boundary: { host: "desktop", source: "desktop.renderer.runtime-readiness" } },
+    });
+
+    const response = createDesktopRuntimeReadinessReadSuccessResponse({
+      status: "ready",
+      healthy: true,
+      available: true,
+      capabilities: [],
+      updatedAt: "2026-05-06T00:00:00.000Z",
+    }, { requestId: request.requestId, correlationId: request.correlationId });
+
+    expect(response).toMatchObject({
+      ok: true,
+      channel: DESKTOP_RUNTIME_READINESS_READ_RESPONSE_CHANNEL.value,
+      operation: DESKTOP_RUNTIME_READINESS_READ_OPERATION,
+      requestId: "req-ready-1",
+      correlationId: "corr-ready-1",
+    });
+  });
+
+  it("normalizes capability ids for capability status read requests", () => {
+    const request = createDesktopRuntimeCapabilityStatusReadRequest({
+      capabilityId: " Python-Runtime " as any,
+      boundary: { host: "desktop", source: "desktop.renderer.runtime-readiness" },
+    });
+
+    expect(request.payload.capabilityId).toBe("python-runtime");
+    expect(request.channel).toBe(DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL.value);
+    expect(getDesktopRuntimeCapabilityStatusReadChannel("response")).toBe(DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_RESPONSE_CHANNEL);
+  });
+
+  it("rejects unknown runtime capability ids in capability status requests", () => {
+    expect(() => createDesktopRuntimeCapabilityStatusReadRequest({
+      capabilityId: "unknown-runtime" as any,
+      boundary: { host: "desktop", source: "desktop.renderer.runtime-readiness" },
+    })).toThrow("Unknown runtime capability id");
   });
 });

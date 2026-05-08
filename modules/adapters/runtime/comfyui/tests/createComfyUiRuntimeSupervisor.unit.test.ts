@@ -18,6 +18,27 @@ function createMockChildProcess() {
 }
 
 describe("createComfyUiRuntimeSupervisor", () => {
+  it("defaults launch arguments to CPU to avoid ComfyUI CUDA autodetection", () => {
+    expect(buildComfyUiRuntimeLaunchArguments({ host: "127.0.0.1", port: 8188 })).toEqual([
+      "main.py",
+      "--cpu",
+      "--listen",
+      "127.0.0.1",
+      "--port",
+      "8188",
+    ]);
+  });
+
+  it("preserves explicit auto launch mode for troubleshooting", () => {
+    expect(buildComfyUiRuntimeLaunchArguments({ host: "127.0.0.1", port: 8188, runtimeDeviceMode: "auto" })).toEqual([
+      "main.py",
+      "--listen",
+      "127.0.0.1",
+      "--port",
+      "8188",
+    ]);
+  });
+
   it("builds DirectML launch arguments without falling through to CUDA autodetection", () => {
     expect(buildComfyUiRuntimeLaunchArguments({ host: "127.0.0.1", port: 8188, runtimeDeviceMode: "directml" })).toEqual([
       "main.py",
@@ -203,6 +224,36 @@ describe("createComfyUiRuntimeSupervisor", () => {
     expect(supervisor.isRunning()).toBe(false);
     const health = await supervisor.getHealth();
     expect(health).toMatchObject({ status: "stopped" });
+  });
+
+  it("waits for process exit when stopping before mode restart", async () => {
+    const mockChild = createMockChildProcess();
+    const spawnImplementation = testDouble.fn(() => mockChild as any);
+    const fetchImplementation = testDouble.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ devices: [] }),
+    });
+    const supervisor = createComfyUiRuntimeSupervisor({
+      workingDirectory: "/tmp/comfyui",
+      spawnImplementation: spawnImplementation as never,
+      fetchImplementation: fetchImplementation as never,
+      healthCheckIntervalMs: 1,
+      startupTimeoutMs: 200,
+    });
+
+    await supervisor.start();
+    const stopped = supervisor.stop();
+    let settled = false;
+    void stopped.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    mockChild.emit("exit", null, "SIGTERM");
+    await stopped;
+    expect(settled).toBe(true);
+    expect(supervisor.isRunning()).toBe(false);
   });
 
   it("fails startup without timeout cleanup when the process exits before health checks complete", async () => {

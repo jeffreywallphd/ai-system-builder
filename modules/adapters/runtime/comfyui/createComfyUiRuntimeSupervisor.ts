@@ -31,6 +31,7 @@ export type ComfyUiRuntimeDeviceMode = "auto" | "cpu" | "directml" | "cuda";
 export interface ComfyUiRuntimeSupervisor {
   start(): Promise<void>;
   isRunning(): boolean;
+  getStatus(): ComfyUiRuntimeHealth["status"];
   getHealth(): Promise<ComfyUiRuntimeHealth>;
   getRecentRuntimeOutput(): string[];
   getRuntimeDeviceMode(): ComfyUiRuntimeDeviceMode;
@@ -53,12 +54,31 @@ function normalizeRuntimeOutput(text: string): string | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
+function waitForProcessExit(process: ChildProcess, timeoutMs = 5_000): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const complete = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      process.off("exit", complete);
+      process.off("error", complete);
+      resolve();
+    };
+    const timeout = setTimeout(complete, timeoutMs);
+    process.once("exit", complete);
+    process.once("error", complete);
+  });
+}
+
 export function buildComfyUiRuntimeLaunchArguments(input: {
   host: string;
   port: number;
   runtimeDeviceMode?: ComfyUiRuntimeDeviceMode;
 }): string[] {
-  const deviceMode = input.runtimeDeviceMode ?? "auto";
+  const deviceMode = input.runtimeDeviceMode ?? "cpu";
   const deviceArguments =
     deviceMode === "directml"
       ? ["--directml"]
@@ -72,7 +92,7 @@ export function buildComfyUiRuntimeLaunchArguments(input: {
 export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupervisorOptions): ComfyUiRuntimeSupervisor {
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 8188;
-  const runtimeDeviceMode = options.runtimeDeviceMode ?? "auto";
+  const runtimeDeviceMode = options.runtimeDeviceMode ?? "cpu";
   const url = `http://${host}:${port}`;
   const startupTimeoutMs = options.startupTimeoutMs ?? 120_000;
   const healthCheckIntervalMs = options.healthCheckIntervalMs ?? 1_000;
@@ -373,6 +393,10 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
       return Boolean(processHandle) && status !== "stopped";
     },
 
+    getStatus() {
+      return status;
+    },
+
     async getHealth() {
       if (!processHandle || status === "stopped") {
         return { status: "stopped", url, port, lastCheckAt };
@@ -395,7 +419,10 @@ export function createComfyUiRuntimeSupervisor(options: CreateComfyUiRuntimeSupe
         return;
       }
 
-      processHandle.kill("SIGTERM");
+      const processToStop = processHandle;
+      const stopped = waitForProcessExit(processToStop);
+      processToStop.kill("SIGTERM");
+      await stopped;
       processHandle = undefined;
       status = "stopped";
       lastCheckAt = Date.now();
