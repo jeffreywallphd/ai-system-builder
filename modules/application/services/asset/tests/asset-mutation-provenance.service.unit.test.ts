@@ -1,0 +1,52 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import type { AssetReference, AssetResourceBackedView, AssetSourceIdentity, RegisterResourceBackedViewCommand } from "../../../../contracts/asset";
+import { AssetMutationProvenanceService } from "../asset-mutation-provenance.service";
+
+const sourceIdentity: AssetSourceIdentity = {
+  sourceKind: "artifact",
+  sourceViewId: "view.safe",
+  sourceViewKind: "artifact",
+  sourceSystem: "artifact",
+  sourceId: "artifact.safe",
+  deduplicationKey: "asset-source.artifact.safe",
+};
+
+const command: RegisterResourceBackedViewCommand = {
+  operation: "asset.register-resource-backed-view",
+  viewId: "view.safe",
+  approval: { userConfirmed: true, confirmationKind: "register-resource-backed-view", confirmationTextVersion: "1" },
+  actor: { initiatedBy: "ai-assisted", actorRef: "assistant.1", actorDisplayName: "Assistant" },
+  context: { idempotencyKey: "idem.safe" },
+};
+
+const view: AssetResourceBackedView = {
+  viewId: "view.safe",
+  viewKind: "artifact",
+  assetType: "data-source",
+  assetFamily: "resource-backed",
+  displayName: "Safe",
+  sourceRef: { kind: "artifact", id: "artifact-ref.safe" as AssetReference["id"] },
+  resourceBacking: {
+    backingId: "artifact.safe",
+    resourceKind: "artifact",
+    ref: { kind: "artifact", id: "artifact-ref.safe" as AssetReference["id"] },
+    metadata: { token: "secret", ok: "safe" },
+  },
+  metadata: { prompt: "raw prompt", ok: "safe" },
+};
+
+describe("asset mutation provenance service", () => {
+  it("creates sanitized mutation provenance and asset provenance", () => {
+    const provenance = new AssetMutationProvenanceService().createForResourceBackedRegistration({
+      command,
+      sourceIdentity,
+      sourceView: view,
+      createdAt: "2026-05-08T12:00:00.000Z",
+    });
+    assert.equal(provenance.operation, "asset.register-resource-backed-view");
+    assert.equal(provenance.actor.initiatedBy, "ai-assisted");
+    assert.equal(provenance.createdProvenance?.authorship, "mixed");
+    assert.doesNotMatch(JSON.stringify(provenance), /secret|raw prompt|base64|bytes|blob|workflow|stack|C:\\/i);
+  });
+});

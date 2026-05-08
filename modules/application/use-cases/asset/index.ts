@@ -4,6 +4,7 @@ export * from "./read-asset-definition.use-case";
 export * from "./list-asset-definitions.use-case";
 export * from "./update-asset-definition.use-case";
 export * from "./create-asset-instance.use-case";
+export * from "./register-resource-backed-view-as-asset-instance.use-case";
 export * from "./read-asset-instance.use-case";
 export * from "./list-asset-instances.use-case";
 export * from "./update-asset-instance.use-case";
