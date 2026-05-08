@@ -223,8 +223,10 @@ describe("AssetLibraryFeature", () => {
     await act(async () => cardButton.click());
     await flush();
 
-    expect(container.textContent).not.toContain("Validation");
-    const validationButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Check validation")) as HTMLButtonElement;
+    expect(container.textContent).toContain("Validation details are loaded only when requested.");
+    expect(container.textContent).not.toContain("Validation summary");
+    expect(container.textContent).not.toContain("Valid With Warnings");
+    const validationButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Check validation details")) as HTMLButtonElement;
     await act(async () => validationButton.click());
     await flush();
 
@@ -235,8 +237,8 @@ describe("AssetLibraryFeature", () => {
         includeValidation: true,
       },
     );
-    expect(container.textContent).toContain("Validation");
-    const validationToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Validation")) as HTMLButtonElement;
+    expect(container.textContent).toContain("Validation summary");
+    const validationToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Validation summary")) as HTMLButtonElement;
     expect(validationToggle.getAttribute("aria-expanded")).toBe("false");
   });
 
@@ -254,7 +256,7 @@ describe("AssetLibraryFeature", () => {
 
     await act(async () => cardButton.click());
     await flush();
-    const validationButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Check validation")) as HTMLButtonElement;
+    const validationButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Check validation details")) as HTMLButtonElement;
     await act(async () => validationButton.click());
     await flush();
 
@@ -271,10 +273,10 @@ describe("AssetLibraryFeature", () => {
     expect(container.textContent).toContain("Configuration");
     expect(container.textContent).toContain("Ports");
     expect(container.textContent).toContain("Requirements");
-    expect(container.textContent).toContain("Provenance");
-    expect(container.textContent).toContain("Safe metadata");
+    expect(container.textContent).toContain("Source");
+    expect(container.textContent).toContain("Details");
 
-    const metadataToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Safe metadata")) as HTMLButtonElement;
+    const metadataToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Details")) as HTMLButtonElement;
     const metadataPanel = document.getElementById(metadataToggle.getAttribute("aria-controls") ?? "") as HTMLDivElement;
     expect(metadataPanel.hidden).toBe(true);
     await act(async () => metadataToggle.click());

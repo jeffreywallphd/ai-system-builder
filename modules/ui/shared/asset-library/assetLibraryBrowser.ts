@@ -67,15 +67,6 @@ export const ASSET_LIBRARY_DETAIL_EXPANSIONS = [
   "metadata",
 ] as const;
 
-export type AssetLibraryAdvancedSectionKey =
-  | "aiContext"
-  | "configuration"
-  | "ports"
-  | "requirements"
-  | "provenance"
-  | "validation"
-  | "metadata";
-
 export function createAssetLibraryQuery(filters: AssetLibraryFiltersState): AssetLibraryQuery {
   const searchText = filters.searchText.trim();
   return {
@@ -100,21 +91,6 @@ export function assetLibraryFiltersAreActive(filters: AssetLibraryFiltersState):
     filters.lifecycleStatus !== "all" ||
     filters.builtIn !== "all"
   );
-}
-
-export function getAssetLibraryAdvancedSections(
-  detail: AssetLibraryDefinitionDetail | undefined,
-): readonly AssetLibraryAdvancedSectionKey[] {
-  if (!detail) return [];
-  return [
-    detail.aiContextSummary ? "aiContext" : undefined,
-    detail.configurationSummary ? "configuration" : undefined,
-    detail.portsSummary ? "ports" : undefined,
-    detail.requirementsSummary ? "requirements" : undefined,
-    detail.provenanceSummary ? "provenance" : undefined,
-    detail.validationSummary ? "validation" : undefined,
-    detail.metadata ? "metadata" : undefined,
-  ].filter((section): section is AssetLibraryAdvancedSectionKey => Boolean(section));
 }
 
 export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): AssetLibraryFeatureState {
