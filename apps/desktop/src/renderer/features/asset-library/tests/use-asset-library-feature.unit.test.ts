@@ -10,6 +10,7 @@ import { useAssetLibraryFeature, type AssetLibraryFeatureState } from "../hooks/
 const dom = new JSDOM("<!doctype html><html><body></body></html>");
 (globalThis as any).window = dom.window;
 (globalThis as any).document = dom.window.document;
+(globalThis as any).Event = dom.window.Event;
 
 const card: AssetLibraryDefinitionCard = {
   id: "builtin.document@1.0.0",

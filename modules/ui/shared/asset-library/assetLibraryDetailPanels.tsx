@@ -324,7 +324,6 @@ export function AssetLibraryDefinitionDetailView({
           <AssetLibraryDetailRow label="Status" value={getAssetLibraryLifecycleStatusLabel(detail)} />
           <AssetLibraryDetailRow label="Version" value={`v${detail.version}`} />
           <AssetLibraryDetailRow label="Source" value={detail.builtIn ? "Built-in" : "Custom"} />
-          <AssetLibraryDetailRow label="Review" value={formatAssetLibraryLabel(detail.overview?.reviewStatus)} />
         </dl>
       </AssetLibraryDetailSection>
 

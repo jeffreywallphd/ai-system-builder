@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "../../../../testing/node-test";
 import {
   ASSET_LIBRARY_DEFAULT_FILTERS,
@@ -13,6 +16,7 @@ import {
 describe("asset library browser helpers", () => {
   it("builds definition queries from active filters only", () => {
     expect(createAssetLibraryQuery(ASSET_LIBRARY_DEFAULT_FILTERS)).toEqual({ limit: 50 });
+    expect("includeValidation" in createAssetLibraryQuery(ASSET_LIBRARY_DEFAULT_FILTERS)).toBe(false);
     expect(createAssetLibraryQuery({
       searchText: "  document  ",
       assetType: "document",
@@ -34,6 +38,26 @@ describe("asset library browser helpers", () => {
       lifecycleStatus: "not-a-real-status",
       builtIn: "all",
     })).toEqual({ limit: 50 });
+  });
+
+  it("keeps list queries read-only and free of validation or mutation operations", () => {
+    const query = createAssetLibraryQuery({
+      searchText: "workflow",
+      assetType: "workflow",
+      assetFamily: "behavioral",
+      lifecycleStatus: "draft",
+      builtIn: "custom",
+    }) as Record<string, unknown>;
+    const serialized = JSON.stringify(query);
+
+    expect(query.includeValidation).toBeUndefined();
+    expect(/create|update|delete|register|seed|import|finalize|publish|execute|run|scan|sync|repair|install|start|train/i.test(serialized)).toBe(false);
+
+    const querySource = readFileSync(join(process.cwd(), "modules/ui/shared/asset-library/assetLibraryQueries.ts"), "utf8");
+    const browserSource = readFileSync(join(process.cwd(), "modules/ui/shared/asset-library/assetLibraryBrowser.ts"), "utf8");
+    const forbiddenOperations = /\b(?:createAsset|updateAsset|deleteAsset|registerAsset|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|publishAsset|executeAsset|runAsset|scanResources)\b/i;
+    expect(forbiddenOperations.test(querySource)).toBe(false);
+    expect(forbiddenOperations.test(browserSource)).toBe(false);
   });
 
   it("detects active filters", () => {

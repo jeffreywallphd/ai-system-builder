@@ -78,6 +78,22 @@ describe("desktop asset library client", () => {
     expect(version).toMatchObject({ ok: true, value: { version: "1.0.0" } });
   });
 
+  it("omits validation flags from default detail requests", async () => {
+    const api = {
+      listAssetDefinitions: testDouble.fn().mockResolvedValue(success({ items: [] })),
+      readAssetDefinition: testDouble.fn().mockResolvedValue(success(detailValue())),
+      readAssetDefinitionVersion: testDouble.fn().mockResolvedValue(success(detailValue())),
+    };
+    setDesktopApi(api);
+
+    const client = createDesktopAssetLibraryClient();
+    await client.readAssetDefinition({ definitionId: "builtin.document" });
+    await client.readAssetDefinitionVersion({ definitionId: "builtin.document", version: "1.0.0" });
+
+    expect(api.readAssetDefinition).toHaveBeenCalledWith({ definitionId: "builtin.document" });
+    expect(api.readAssetDefinitionVersion).toHaveBeenCalledWith({ definitionId: "builtin.document", version: "1.0.0" });
+  });
+
   it("maps validation, not-found, and internal failures safely", async () => {
     const api = {
       listAssetDefinitions: testDouble.fn().mockResolvedValue(failure("validation", "Invalid query.", {

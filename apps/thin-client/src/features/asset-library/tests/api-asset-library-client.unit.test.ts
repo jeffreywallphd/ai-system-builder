@@ -100,6 +100,21 @@ describe("api asset library client", () => {
     }
   });
 
+  it("omits validation query flags from default detail requests", async () => {
+    const fetchMock = queuedFetch([
+      response(200, { ok: true, value: detailValue() }),
+      response(200, { ok: true, value: detailValue() }),
+    ]);
+    installBrowserStubs(fetchMock);
+
+    const client = createApiAssetLibraryClient({ apiBaseUrl: "/api" });
+    await client.readAssetDefinition({ definitionId: "builtin.document" });
+    await client.readAssetDefinitionVersion({ definitionId: "builtin.document", version: "1.0.0" });
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/assets/definitions/builtin.document");
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/assets/definitions/builtin.document/versions/1.0.0");
+  });
+
   it("maps validation, not-found, and internal failures safely", async () => {
     const fetchMock = queuedFetch([
       response(400, {
