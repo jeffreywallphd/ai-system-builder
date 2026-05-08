@@ -136,4 +136,6 @@ The wrappers must depend only on `AssetRegistryDefinitionReadPort` or an equival
 
 Phase 2C now has shared UI-facing Asset Library read models and client helpers for the definitions-only surface. `modules/ui/shared/asset-library` owns display-oriented cards/details, query/detail option types, mapper helpers, safe client errors, and result envelopes; desktop renderer and thin-client clients consume preload/API reads and expose that shared UI shape. They must not call application services, local persistence, host composition, runtime adapters, server route handlers, or Electron IPC handlers directly.
 
-Asset Library pages, routes, navigation, hooks/components, instances/compositions/resource-backed views, registry summaries, mutations, seeding, import/finalize/register, scans, runtime/provider execution, and byte reads remain deferred.
+## Phase 2C Prompt 5: desktop Asset Library page
+
+Desktop now includes a top-level `Assets` navigation item and a definitions-only read-only Asset Library page. The page uses the desktop preload-backed Asset Library client, supports read-facade query filters, renders safe definition cards/details, and keeps advanced AI context, configuration, ports, requirements, provenance, validation, and safe metadata sections collapsed by default when available. It must not seed, mutate, import, finalize, register, scan, execute, read bytes, call runtimes/providers, or bypass the desktop read-only client. Thin-client Asset Library UI, instances/compositions/resource-backed views, and registry summaries remain deferred.

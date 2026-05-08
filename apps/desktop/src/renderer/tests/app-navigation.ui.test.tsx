@@ -37,6 +37,9 @@ describe("desktop renderer page composition", () => {
       verifyPublishedArtifactBacking: vi.fn().mockRejectedValue(new Error("unused")),
       registerArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
       localizeArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
+      listAssetDefinitions: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readAssetDefinition: vi.fn().mockRejectedValue(new Error("unused")),
+      readAssetDefinitionVersion: vi.fn().mockRejectedValue(new Error("unused")),
       readPythonRuntimeStatus: vi.fn().mockResolvedValue({
         ok: true,
         value: {
@@ -115,6 +118,17 @@ describe("desktop renderer page composition", () => {
     });
     expect(container.textContent).toContain("Model Management");
     expect(container.textContent).toContain("Browse Models");
+
+    const assetsButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Assets",
+    );
+    expect(assetsButton).toBeDefined();
+
+    await act(async () => {
+      assetsButton?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("Asset Library");
+    expect(container.textContent).toContain("No asset definitions are registered yet.");
 
 
     const imageGenerationButton = Array.from(container.querySelectorAll("button")).find(
