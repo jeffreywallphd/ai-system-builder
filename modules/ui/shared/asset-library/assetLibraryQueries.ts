@@ -37,15 +37,3 @@ export interface AssetLibraryDetailOptions {
   readonly includeValidation?: boolean;
   readonly expand?: readonly AssetLibraryDefinitionExpansion[];
 }
-
-export const ASSET_LIBRARY_DEFERRED_QUERY_FIELDS = [
-  "mutation",
-  "seeding",
-  "import",
-  "finalize",
-  "register",
-  "scan",
-  "execute",
-  "resourceBytes",
-  "runtime",
-] as const;
