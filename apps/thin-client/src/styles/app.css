@@ -8,6 +8,7 @@
 @import "./components/buttons.css";
 @import "./components/inputs.css";
 @import "./components/panels.css";
+@import "./components/asset-library.css";
 @import "./components/tabs.css";
 @import "./components/feedback.css";
 #root { min-height: 100vh; }

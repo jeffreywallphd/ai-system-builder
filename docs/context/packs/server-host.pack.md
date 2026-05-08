@@ -120,4 +120,8 @@ The current `/api/assets` surface is GET-only for asset definition list/detail/v
 
 ## Phase 2C Prompt 4: thin-client Asset Library read client
 
-The thin-client may now include a read-only Asset Library API client that calls only GET `/api/assets/definitions`, `/api/assets/definitions/:definitionId`, and `/api/assets/definitions/:definitionId/versions/:version`. The client maps server envelopes into shared UI-facing Asset Library read models/results and must not import server route handlers, application services, host composition, persistence adapters, runtime adapters, or mutation/seeding/import/finalize/scan/execute operations. Thin-client Asset Library pages, routes, and navigation remain deferred.
+The thin-client may now include a read-only Asset Library API client that calls only GET `/api/assets/definitions`, `/api/assets/definitions/:definitionId`, and `/api/assets/definitions/:definitionId/versions/:version`. The client maps server envelopes into shared UI-facing Asset Library read models/results and must not import server route handlers, application services, host composition, persistence adapters, runtime adapters, or mutation/seeding/import/finalize/scan/execute operations.
+
+## Phase 2C Prompt 6: thin-client Asset Library page
+
+Thin-client now registers an `Assets` page at `/assets`. The page is definitions-only and uses the read-only server API Asset Library client wrappers for list/detail reads; it must not call application services, host composition, persistence adapters, route handlers, desktop IPC/preload modules, runtime/provider clients, seeding, mutation, import/finalize/register, scans, or execution behavior. Advanced detail sections are read-only and collapsed by default.

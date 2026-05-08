@@ -70,7 +70,7 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.doesNotMatch(desktopHostCompositionSource, /ipc\.asset\.(?:instance|composition|resource|registry-summary|create|update|delete|register|seed|import|finalize|scan|execute)/i);
   });
 
-  it("allows the read-only desktop Asset Library page but no thin-client page or mutation helpers", () => {
+  it("allows read-only desktop and thin-client Asset Library pages with no mutation helpers", () => {
     const rendererSourceWithoutDesktopApi = sourceFilesUnder("apps/desktop/src/renderer")
       .filter((file) => !file.path.replace(/\\/g, "/").endsWith("src/renderer/lib/desktopApi.ts"))
       .map((file) => `\n// ${file.path}\n${file.source}`)
@@ -88,10 +88,12 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.match(rendererSourceWithoutDesktopApi, /\bAssetLibraryPage\b/);
     assert.match(rendererSourceWithoutDesktopApi, /\bAssetLibraryFeature\b/);
     assert.match(rendererSourceWithoutDesktopApi, /key:\s*["'`]assets["'`]/);
+    assert.match(combinedSource("apps/thin-client/src"), /\bAssetLibraryPage\b/);
+    assert.match(combinedSource("apps/thin-client/src"), /\bAssetLibraryFeature\b/);
+    assert.match(combinedSource("apps/thin-client/src/routes"), /key:\s*["'`]assets["'`]/);
+    assert.match(combinedSource("apps/thin-client/src/routes"), /label:\s*["'`]Assets["'`]/);
     assert.match(source, /\blistAssetDefinitions\b/);
     assert.match(source, /\breadAssetDefinition\b/);
-    assert.doesNotMatch(combinedSource("apps/thin-client/src"), /\b(?:AssetLibraryPage|AssetLibraryFeature|useAssetLibraryFeature)\b/i);
-    assert.doesNotMatch(combinedSource("apps/thin-client/src/routes"), /key:\s*["'`]assets["'`]|label:\s*["'`]Assets["'`]/i);
     assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|scanResources|executeAsset)\b/i);
     assert.doesNotMatch(source, /\b(?:listAssetInstances|readAssetInstance|listAssetCompositions|readAssetComposition|readAssetRegistrySummary)\b/i);
   });
@@ -133,6 +135,20 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.doesNotMatch(source, /from\s+["'][^"']*modules\/hosts[^"']*["']/i);
     assert.doesNotMatch(source, /from\s+["'][^"']*adapters\/persistence[^"']*["']/i);
     assert.doesNotMatch(source, /from\s+["'][^"']*ipc-electron[^"']*["']/i);
+    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|scanResources|executeAsset)\b/i);
+  });
+
+  it("keeps thin-client Asset Library files on the server API read-only client boundary", () => {
+    const source = combinedSource("apps/thin-client/src/features/asset-library");
+
+    assert.match(source, /\bcreateApiAssetLibraryClient\b/);
+    assert.match(source, /\blistAssetDefinitions\b/);
+    assert.match(source, /\breadAssetDefinition\b/);
+    assert.doesNotMatch(source, /from\s+["'][^"']*modules\/application[^"']*["']/i);
+    assert.doesNotMatch(source, /from\s+["'][^"']*modules\/hosts[^"']*["']/i);
+    assert.doesNotMatch(source, /from\s+["'][^"']*adapters\/persistence[^"']*["']/i);
+    assert.doesNotMatch(source, /from\s+["'][^"']*api-express[^"']*["']/i);
+    assert.doesNotMatch(source, /from\s+["'][^"']*(?:preload|ipc-electron|electron|desktop)[^"']*["']/i);
     assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|scanResources|executeAsset)\b/i);
   });
 });
