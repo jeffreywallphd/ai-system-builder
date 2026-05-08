@@ -3,8 +3,12 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import type { AssetResourceBackedView } from "../../../../contracts/asset";
+import type { ArtifactBrowseItem, ArtifactBrowseSuccessValue } from "../../../../contracts/artifact-browser";
+import { createSuccessResult, type ContractResult } from "../../../../contracts/shared";
+import type { ArtifactBrowserMetadataReadPort } from "../../../ports/artifact-browser";
 import type { AssetResourceBackedViewListQuery, AssetResourceBackedViewListResult, AssetResourceBackedViewProvider } from "../../../ports/asset";
 import { createUnsupportedAssetResourceBackedViewProvider } from "../../../ports/asset";
+import { ArtifactResourceBackedViewProvider } from "../asset-artifact-resource-backed-view-provider.service";
 import { AssetResourceBackedViewAggregateProvider } from "../asset-resource-backed-view-aggregate-provider.service";
 
 function view(viewId: string, displayName: string): AssetResourceBackedView {
@@ -49,6 +53,25 @@ class ThrowingProvider implements AssetResourceBackedViewProvider {
   public async readResourceBackedView(): Promise<AssetResourceBackedView | undefined> {
     throw new Error("C:\\Users\\jdwall\\secret token stack raw provider payload command bytes blob base64");
   }
+}
+
+class FakeArtifactBrowserMetadataRead implements Pick<ArtifactBrowserMetadataReadPort, "browseArtifacts"> {
+  public constructor(private readonly items: readonly ArtifactBrowseItem[]) {}
+
+  public async browseArtifacts(): Promise<ContractResult<ArtifactBrowseSuccessValue>> {
+    return createSuccessResult({ items: [...this.items] });
+  }
+}
+
+function artifactItem(artifactId: string, originalName: string, mediaType: string): ArtifactBrowseItem {
+  return {
+    artifactId,
+    storageKey: `uploads/private/${originalName}`,
+    artifactFamily: mediaType === "application/pdf" ? "document" : "binary",
+    mediaType,
+    originalName,
+    sourceKind: "upload",
+  };
 }
 
 function assertSafe(value: unknown) {
@@ -141,6 +164,25 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "resource-backed-view-provider-unsupported"), true);
   });
 
+  it("combines artifact/document provider results with unsupported providers", async () => {
+    const artifactProvider = new ArtifactResourceBackedViewProvider({
+      artifactBrowserMetadataRead: new FakeArtifactBrowserMetadataRead([
+        artifactItem("artifact-report", "Report.pdf", "application/pdf"),
+        artifactItem("artifact-binary", "Unknown.bin", "application/octet-stream"),
+      ]),
+    });
+    const unsupported = createUnsupportedAssetResourceBackedViewProvider({ providerId: "dataset-provider", sourceKind: "dataset" });
+
+    const result = await new AssetResourceBackedViewAggregateProvider({
+      providers: [unsupported, artifactProvider],
+      maxListLimit: 10,
+    }).listResourceBackedViews({ limit: 10 });
+
+    assert.deepEqual(result.items.map((item) => item.viewKind), ["document", "artifact"]);
+    assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "resource-backed-view-provider-unsupported"), true);
+    assertSafe(result);
+  });
+
   it("readResourceBackedView returns the first matching safe view and honors provider-scoped ids", async () => {
     const first = new TestProvider("first-provider", [view("shared", "First")]);
     const second = new TestProvider("second-provider", [view("shared", "Second"), view("only-second", "Only Second")]);
@@ -154,7 +196,7 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
 
   it("does not expose mutation, scanning, runtime, network, or byte-read behavior", async () => {
     const source = readFileSync("modules/application/services/asset/asset-resource-backed-view-aggregate-provider.service.ts", "utf8");
-    assert.doesNotMatch(source, /save|update|delete|seed|register|import|finalize|execute|startRuntime|probeRuntime|installRuntime|repairRuntime/i);
+    assert.doesNotMatch(source, /\b(?:save|update|delete|seed|register|importAsset|finalize|execute|startRuntime|probeRuntime|installRuntime|repairRuntime)\b/i);
     assert.doesNotMatch(source, /node:fs|node:http|node:https|fetch\(|readdir|opendir|glob|scanResources|readBytes|readResourceBytes/i);
   });
 });

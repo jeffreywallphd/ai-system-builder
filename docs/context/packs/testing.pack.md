@@ -34,6 +34,7 @@
 - For application seams that drift across families, keep a minimal cross-family invariant layer in `modules/application/ports/tests`.
 - Keep application-port anti-drift tests inside `tests` folders only; avoid ad hoc placement that hides seam guarantees.
 - Resource-backed Asset Registry provider seam tests belong under `modules/application/ports/asset/tests`, while aggregate provider behavior belongs under `modules/application/services/asset/tests`; cover structured diagnostics, no-provider/unsupported behavior, sanitized partial failures, bounded limits, and no outer-layer dependencies.
+- Concrete artifact/document resource-backed provider tests belong under `modules/application/services/asset/tests`; cover metadata-only mapping, document-like detection, storage-path/secret/raw/blob/base64 omission, safe filters/limits/cursor diagnostics, aggregate/facade composition, no content reads, no storage scans, and no asset-instance or durable-mapping creation.
 - Add regression tests for bug fixes when practical in the layer where defect should be caught.
 - For runtime task registry changes, cover start correlation, unknown request ids, delegate recovery, list aggregation/unsupported metadata, cancellation, and no-start behavior on status/list/cancel reads.
 - Keep tests deterministic, CI-suitable, and non-flaky; avoid performative coverage-only tests.

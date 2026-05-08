@@ -55,6 +55,7 @@
 ## Asset Kernel Phase 3 Provider Note
 
 - Phase 3 Prompt 2 places the canonical resource-backed view provider seam under `modules/application/ports/asset`, with structured provider list results, safe diagnostics, and a read-only aggregate provider foundation. Concrete artifact, image, model, dataset, and external repository providers remain deferred; do not add scans, byte reads, runtime calls, host wiring, or public API/IPC/UI exposure when working on the seam.
+- Phase 3 Prompt 3 adds only the artifact/document family provider in application services. It is computed and read-only, uses artifact browser metadata only, detects documents from safe metadata only, omits storage paths/secrets/raw/blob/base64 values, and must not read artifact bytes/content, create asset instances, persist mappings, or add host/API/IPC/preload/UI wiring.
 - Prompt builders must add only targeted companion packs (not all packs by default).
 
 ## Canonical Source Docs
