@@ -46,11 +46,6 @@ import type {
   AssetLifecycleStatus,
   AssetType,
 } from "../../../../../modules/contracts/asset";
-import type {
-  AssetDefinitionCard,
-  AssetDefinitionDetail,
-  AssetRegistryListResult,
-} from "../../../../../modules/application/services/asset/asset-registry-read-facade.types";
 
 export interface DesktopArtifactUploadInput {
   fileName: string;
@@ -335,8 +330,6 @@ export interface DesktopAssetDefinitionReadInput {
 }
 
 export type DesktopAssetDefinitionVersionReadInput = Required<Pick<DesktopAssetDefinitionReadInput, "definitionId" | "version">> & Omit<DesktopAssetDefinitionReadInput, "definitionId" | "version">;
-export type DesktopAssetDefinitionsListResult = AssetRegistryListResult<AssetDefinitionCard>;
-export type DesktopAssetDefinitionDetail = AssetDefinitionDetail;
 
 export interface DesktopDatasetPreparationApi {
   startPrepareTrainingDataset?: (
