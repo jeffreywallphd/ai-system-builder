@@ -127,11 +127,14 @@ describe("asset library mappers", () => {
         displayName: "Document",
         summary: "Metadata-only document asset",
         assetType: "document",
+        assetTypeLabel: "Document",
         assetFamily: "resource-backed",
+        assetFamilyLabel: "Resource Backed",
         lifecycleStatus: "published",
+        lifecycleStatusLabel: "Published",
         builtIn: true,
         updatedAt: "2026-05-02T00:00:00.000Z",
-        badges: ["Built-in", "published"],
+        badges: ["Built-in", "Published"],
       },
       {
         id: "custom.tool@2.0.0",
@@ -141,11 +144,14 @@ describe("asset library mappers", () => {
         displayName: "Custom Tool",
         summary: undefined,
         assetType: "tool",
+        assetTypeLabel: "Tool",
         assetFamily: "behavioral",
+        assetFamilyLabel: "Behavioral",
         lifecycleStatus: "draft",
+        lifecycleStatusLabel: "Draft",
         builtIn: false,
         updatedAt: undefined,
-        badges: ["draft"],
+        badges: ["Draft"],
       },
     ]);
     expect(result.nextCursor).toBe("cursor-2");
@@ -207,6 +213,44 @@ describe("asset library mappers", () => {
     });
 
     expect(mapped.validationSummary).toBeUndefined();
+  });
+
+  it("does not convert invalid canonical values into valid-looking asset semantics", () => {
+    const result = mapAssetDefinitionListResult({
+      items: [
+        {
+          definitionId: "broken.asset",
+          version: "1.0.0",
+          assetType: "definitely-not-tool",
+          assetFamily: "definitely-not-behavioral",
+          lifecycleStatus: "definitely-not-draft",
+          displayName: "Broken asset",
+        },
+        {
+          definitionId: "missing.asset",
+          version: "1.0.0",
+          displayName: "Missing asset",
+        },
+      ],
+    });
+
+    expect(result.items[0]).toMatchObject({
+      assetType: undefined,
+      assetTypeLabel: "Unknown type",
+      assetFamily: undefined,
+      assetFamilyLabel: "Unknown family",
+      lifecycleStatus: undefined,
+      lifecycleStatusLabel: "Unknown status",
+      badges: undefined,
+    });
+    expect(result.items[1]).toMatchObject({
+      assetType: undefined,
+      assetTypeLabel: "Unknown type",
+      assetFamily: undefined,
+      assetFamilyLabel: "Unknown family",
+      lifecycleStatus: undefined,
+      lifecycleStatusLabel: "Unknown status",
+    });
   });
 
   it("normalizes safe client errors without exposing internal detail", () => {

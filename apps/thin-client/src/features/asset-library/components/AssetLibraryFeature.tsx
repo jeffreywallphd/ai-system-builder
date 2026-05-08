@@ -46,7 +46,12 @@ export function AssetLibraryFeature({ client }: AssetLibraryFeatureProps) {
         <AssetDefinitionDetailPanel
           detail={state.selectedDetail}
           isLoading={state.isLoadingDetail}
+          isLoadingValidation={state.isLoadingValidation}
           error={state.detailError}
+          validationError={state.validationError}
+          onLoadValidationDetails={() => {
+            void state.loadValidationDetails();
+          }}
         />
       </div>
     </section>

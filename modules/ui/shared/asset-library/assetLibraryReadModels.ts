@@ -18,9 +18,12 @@ export interface AssetLibraryDefinitionCard {
   readonly version: string;
   readonly displayName: string;
   readonly summary?: string;
-  readonly assetType: AssetType;
-  readonly assetFamily: AssetFamily;
-  readonly lifecycleStatus: AssetLifecycleStatus;
+  readonly assetType?: AssetType;
+  readonly assetTypeLabel?: string;
+  readonly assetFamily?: AssetFamily;
+  readonly assetFamilyLabel?: string;
+  readonly lifecycleStatus?: AssetLifecycleStatus;
+  readonly lifecycleStatusLabel?: string;
   readonly builtIn: boolean;
   readonly updatedAt?: string;
   readonly badges?: readonly string[];

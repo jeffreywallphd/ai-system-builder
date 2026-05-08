@@ -22,7 +22,7 @@ const card: AssetLibraryDefinitionCard = {
   updatedAt: "2026-05-02T00:00:00.000Z",
 };
 
-const detail: AssetLibraryDefinitionDetail = {
+const detailWithoutValidation: AssetLibraryDefinitionDetail = {
   ...card,
   overview: {
     description: "Reusable document descriptor",
@@ -63,22 +63,26 @@ const detail: AssetLibraryDefinitionDetail = {
     createdAt: "2026-05-01T00:00:00.000Z",
     updatedAt: "2026-05-02T00:00:00.000Z",
   },
+  metadata: {
+    safeNote: "safe nested note",
+  },
+};
+
+const detailWithValidation: AssetLibraryDefinitionDetail = {
+  ...detailWithoutValidation,
   validationSummary: {
     status: "valid-with-warnings",
     issueCount: 1,
     errorCount: 0,
     warningCount: 1,
   },
-  metadata: {
-    safeNote: "safe nested note",
-  },
 };
 
 function createClient(overrides: Partial<AssetLibraryClient> = {}): AssetLibraryClient {
   return {
     listAssetDefinitions: vi.fn().mockResolvedValue({ ok: true, value: { items: [card] } }),
-    readAssetDefinition: vi.fn().mockResolvedValue({ ok: true, value: detail }),
-    readAssetDefinitionVersion: vi.fn().mockResolvedValue({ ok: true, value: detail }),
+    readAssetDefinition: vi.fn().mockResolvedValue({ ok: true, value: detailWithoutValidation }),
+    readAssetDefinitionVersion: vi.fn().mockResolvedValue({ ok: true, value: detailWithoutValidation }),
     ...overrides,
   };
 }
@@ -182,7 +186,7 @@ describe("AssetLibraryFeature", () => {
     });
   });
 
-  it("loads selected definition details and keeps advanced sections collapsed by default", async () => {
+  it("loads selected definition details without validation and keeps advanced sections collapsed by default", async () => {
     const client = createClient();
     const { container } = await render(client);
     const cardButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Document")) as HTMLButtonElement;
@@ -194,14 +198,67 @@ describe("AssetLibraryFeature", () => {
       { definitionId: "builtin.document", version: "1.0.0" },
       {
         expand: ["aiContext", "configurationSchema", "ports", "requirements", "provenance", "metadata"],
-        includeValidation: true,
       },
+    );
+    expect(client.readAssetDefinitionVersion).not.toHaveBeenCalledWith(
+      { definitionId: "builtin.document", version: "1.0.0" },
+      expect.objectContaining({ includeValidation: true }),
     );
     expect(container.textContent).toContain("Reusable document descriptor");
 
     const advancedToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("AI-readable context")) as HTMLButtonElement;
     expect(advancedToggle.getAttribute("aria-expanded")).toBe("false");
     expect(document.getElementById(advancedToggle.getAttribute("aria-controls") ?? "")?.hidden).toBe(true);
+  });
+
+  it("renders validation only after the explicit validation action and keeps sections collapsed", async () => {
+    const client = createClient({
+      readAssetDefinitionVersion: vi.fn()
+        .mockResolvedValueOnce({ ok: true, value: detailWithoutValidation })
+        .mockResolvedValueOnce({ ok: true, value: detailWithValidation }),
+    });
+    const { container } = await render(client);
+    const cardButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Document")) as HTMLButtonElement;
+
+    await act(async () => cardButton.click());
+    await flush();
+
+    expect(container.textContent).not.toContain("Validation");
+    const validationButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Check validation")) as HTMLButtonElement;
+    await act(async () => validationButton.click());
+    await flush();
+
+    expect(client.readAssetDefinitionVersion).toHaveBeenLastCalledWith(
+      { definitionId: "builtin.document", version: "1.0.0" },
+      {
+        expand: ["aiContext", "configurationSchema", "ports", "requirements", "provenance", "metadata"],
+        includeValidation: true,
+      },
+    );
+    expect(container.textContent).toContain("Validation");
+    const validationToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Validation")) as HTMLButtonElement;
+    expect(validationToggle.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("renders safe validation load errors", async () => {
+    const client = createClient({
+      readAssetDefinitionVersion: vi.fn()
+        .mockResolvedValueOnce({ ok: true, value: detailWithoutValidation })
+        .mockResolvedValueOnce({
+          ok: false,
+          error: { code: "internal", message: "Unable to read Asset Library data." },
+        }),
+    });
+    const { container } = await render(client);
+    const cardButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Document")) as HTMLButtonElement;
+
+    await act(async () => cardButton.click());
+    await flush();
+    const validationButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Check validation")) as HTMLButtonElement;
+    await act(async () => validationButton.click());
+    await flush();
+
+    expect(container.querySelector("[role='alert']")?.textContent).toContain("Unable to read Asset Library data.");
   });
 
   it("renders available advanced sections only after selection and keeps safe metadata hidden until expanded", async () => {
@@ -215,7 +272,6 @@ describe("AssetLibraryFeature", () => {
     expect(container.textContent).toContain("Ports");
     expect(container.textContent).toContain("Requirements");
     expect(container.textContent).toContain("Provenance");
-    expect(container.textContent).toContain("Validation");
     expect(container.textContent).toContain("Safe metadata");
 
     const metadataToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Safe metadata")) as HTMLButtonElement;
@@ -229,7 +285,7 @@ describe("AssetLibraryFeature", () => {
 
   it("does not render unsafe detail values or unsupported action buttons", async () => {
     const unsafeDetail = {
-      ...detail,
+      ...detailWithoutValidation,
       metadata: {
         safeNote: "visible",
       },

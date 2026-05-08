@@ -74,8 +74,8 @@ export function createDesktopAssetLibraryClient(): AssetLibraryClient {
       return toClientResult<AssetLibraryDefinitionDetail>(
         () => desktopApi.readAssetDefinition({
           definitionId: input.definitionId,
-          expand: options.expand,
-          includeValidation: options.includeValidation,
+          ...(options.expand ? { expand: options.expand } : {}),
+          ...(options.includeValidation !== undefined ? { includeValidation: options.includeValidation } : {}),
         }),
         mapAssetDefinitionDetail,
         "Unable to read asset definition.",
@@ -87,8 +87,8 @@ export function createDesktopAssetLibraryClient(): AssetLibraryClient {
         () => desktopApi.readAssetDefinitionVersion({
           definitionId: input.definitionId,
           version: input.version,
-          expand: options.expand,
-          includeValidation: options.includeValidation,
+          ...(options.expand ? { expand: options.expand } : {}),
+          ...(options.includeValidation !== undefined ? { includeValidation: options.includeValidation } : {}),
         }),
         mapAssetDefinitionDetail,
         "Unable to read asset definition version.",

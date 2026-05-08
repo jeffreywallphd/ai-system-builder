@@ -2,47 +2,32 @@ import { useMemo, useState } from "react";
 
 import { CollapsiblePanel } from "../../../components/ui/CollapsiblePanel";
 import type { AssetLibraryDefinitionDetail } from "../../../../../../../modules/ui/shared/asset-library";
+import {
+  displayAssetLibraryValue,
+  formatAssetLibraryBoolean,
+  formatAssetLibraryDate,
+  formatAssetLibraryLabel,
+  getAssetLibraryAdvancedSections,
+  getAssetLibraryFamilyLabel,
+  getAssetLibraryLifecycleStatusLabel,
+  getAssetLibraryTypeLabel,
+  type AssetLibraryAdvancedSectionKey,
+} from "../../../../../../../modules/ui/shared/asset-library";
 
 interface AssetDefinitionDetailPanelProps {
   readonly detail?: AssetLibraryDefinitionDetail;
   readonly isLoading: boolean;
+  readonly isLoadingValidation: boolean;
   readonly error?: string;
-}
-
-type AdvancedSectionKey =
-  | "aiContext"
-  | "configuration"
-  | "ports"
-  | "requirements"
-  | "provenance"
-  | "validation"
-  | "metadata";
-
-function formatLabel(value: string | undefined): string {
-  if (!value) return "Not specified";
-  return value
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function formatBoolean(value: boolean | undefined): string {
-  if (value === undefined) return "Not specified";
-  return value ? "Yes" : "No";
-}
-
-function formatDate(value: string | undefined): string {
-  if (!value) return "Not specified";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  readonly validationError?: string;
+  readonly onLoadValidationDetails: () => void;
 }
 
 function DefinitionRow({ label, value }: { readonly label: string; readonly value: string | number | undefined }) {
   return (
     <div className="asset-library-definition-row">
       <dt>{label}</dt>
-      <dd>{value === undefined || value === "" ? "Not specified" : value}</dd>
+      <dd>{displayAssetLibraryValue(value)}</dd>
     </div>
   );
 }
@@ -55,8 +40,15 @@ function MetadataView({ metadata }: { readonly metadata: NonNullable<AssetLibrar
   );
 }
 
-export function AssetDefinitionDetailPanel({ detail, isLoading, error }: AssetDefinitionDetailPanelProps) {
-  const [expandedSections, setExpandedSections] = useState<Readonly<Record<AdvancedSectionKey, boolean>>>({
+export function AssetDefinitionDetailPanel({
+  detail,
+  isLoading,
+  isLoadingValidation,
+  error,
+  validationError,
+  onLoadValidationDetails,
+}: AssetDefinitionDetailPanelProps) {
+  const [expandedSections, setExpandedSections] = useState<Readonly<Record<AssetLibraryAdvancedSectionKey, boolean>>>({
     aiContext: false,
     configuration: false,
     ports: false,
@@ -67,19 +59,10 @@ export function AssetDefinitionDetailPanel({ detail, isLoading, error }: AssetDe
   });
 
   const availableAdvancedSections = useMemo(() => {
-    if (!detail) return [];
-    return [
-      detail.aiContextSummary ? "aiContext" : undefined,
-      detail.configurationSummary ? "configuration" : undefined,
-      detail.portsSummary ? "ports" : undefined,
-      detail.requirementsSummary ? "requirements" : undefined,
-      detail.provenanceSummary ? "provenance" : undefined,
-      detail.validationSummary ? "validation" : undefined,
-      detail.metadata ? "metadata" : undefined,
-    ].filter((section): section is AdvancedSectionKey => Boolean(section));
+    return getAssetLibraryAdvancedSections(detail);
   }, [detail]);
 
-  const toggleSection = (section: AdvancedSectionKey) => {
+  const toggleSection = (section: AssetLibraryAdvancedSectionKey) => {
     setExpandedSections((current) => ({ ...current, [section]: !current[section] }));
   };
 
@@ -115,12 +98,12 @@ export function AssetDefinitionDetailPanel({ detail, isLoading, error }: AssetDe
         <h3>Overview</h3>
         <dl className="asset-library-definition-grid">
           <DefinitionRow label="Short summary" value={detail.summary ?? detail.overview?.description} />
-          <DefinitionRow label="Type" value={formatLabel(detail.assetType)} />
-          <DefinitionRow label="Family" value={formatLabel(detail.assetFamily)} />
-          <DefinitionRow label="Status" value={formatLabel(detail.lifecycleStatus)} />
+          <DefinitionRow label="Type" value={getAssetLibraryTypeLabel(detail)} />
+          <DefinitionRow label="Family" value={getAssetLibraryFamilyLabel(detail)} />
+          <DefinitionRow label="Status" value={getAssetLibraryLifecycleStatusLabel(detail)} />
           <DefinitionRow label="Version" value={`v${detail.version}`} />
           <DefinitionRow label="Source" value={detail.builtIn ? "Built-in" : "Custom"} />
-          <DefinitionRow label="Review" value={formatLabel(detail.overview?.reviewStatus)} />
+          <DefinitionRow label="Review" value={formatAssetLibraryLabel(detail.overview?.reviewStatus)} />
         </dl>
       </section>
 
@@ -155,7 +138,7 @@ export function AssetDefinitionDetailPanel({ detail, isLoading, error }: AssetDe
                 <DefinitionRow label="Schema version" value={detail.configurationSummary.schemaVersion} />
                 <DefinitionRow label="Fields" value={detail.configurationSummary.fieldCount} />
                 <DefinitionRow label="Required fields" value={detail.configurationSummary.requiredFieldCount} />
-                <DefinitionRow label="Strict" value={formatBoolean(detail.configurationSummary.strict)} />
+                <DefinitionRow label="Strict" value={formatAssetLibraryBoolean(detail.configurationSummary.strict)} />
                 <DefinitionRow label="Description" value={detail.configurationSummary.description} />
               </dl>
             </CollapsiblePanel>
@@ -188,10 +171,10 @@ export function AssetDefinitionDetailPanel({ detail, isLoading, error }: AssetDe
           {detail.provenanceSummary ? (
             <CollapsiblePanel title="Provenance" isExpanded={expandedSections.provenance} onToggle={() => toggleSection("provenance")}>
               <dl className="asset-library-definition-grid">
-                <DefinitionRow label="Source kind" value={formatLabel(detail.provenanceSummary.sourceKind)} />
-                <DefinitionRow label="Authorship" value={formatLabel(detail.provenanceSummary.authorship)} />
-                <DefinitionRow label="Created" value={formatDate(detail.provenanceSummary.createdAt)} />
-                <DefinitionRow label="Updated" value={formatDate(detail.provenanceSummary.updatedAt)} />
+                <DefinitionRow label="Source kind" value={formatAssetLibraryLabel(detail.provenanceSummary.sourceKind)} />
+                <DefinitionRow label="Authorship" value={formatAssetLibraryLabel(detail.provenanceSummary.authorship)} />
+                <DefinitionRow label="Created" value={formatAssetLibraryDate(detail.provenanceSummary.createdAt)} />
+                <DefinitionRow label="Updated" value={formatAssetLibraryDate(detail.provenanceSummary.updatedAt)} />
                 <DefinitionRow label="Generation summary" value={detail.provenanceSummary.redactedGenerationSummary} />
               </dl>
             </CollapsiblePanel>
@@ -200,11 +183,11 @@ export function AssetDefinitionDetailPanel({ detail, isLoading, error }: AssetDe
           {detail.validationSummary ? (
             <CollapsiblePanel title="Validation" isExpanded={expandedSections.validation} onToggle={() => toggleSection("validation")}>
               <dl className="asset-library-definition-grid">
-                <DefinitionRow label="Status" value={formatLabel(detail.validationSummary.status)} />
+                <DefinitionRow label="Status" value={formatAssetLibraryLabel(detail.validationSummary.status)} />
                 <DefinitionRow label="Issues" value={detail.validationSummary.issueCount} />
                 <DefinitionRow label="Errors" value={detail.validationSummary.errorCount} />
                 <DefinitionRow label="Warnings" value={detail.validationSummary.warningCount} />
-                <DefinitionRow label="Checked" value={formatDate(detail.validationSummary.validatedAt)} />
+                <DefinitionRow label="Checked" value={formatAssetLibraryDate(detail.validationSummary.validatedAt)} />
               </dl>
             </CollapsiblePanel>
           ) : null}
@@ -216,6 +199,18 @@ export function AssetDefinitionDetailPanel({ detail, isLoading, error }: AssetDe
           ) : null}
         </section>
       ) : null}
+      <section className="asset-library-detail__section">
+        <button
+          className="ui-button"
+          type="button"
+          onClick={onLoadValidationDetails}
+          disabled={isLoadingValidation}
+        >
+          {isLoadingValidation ? "Checking validation..." : "Check validation"}
+        </button>
+        {isLoadingValidation ? <p className="ui-status" role="status">Loading validation details...</p> : null}
+        {validationError ? <p className="ui-status" role="alert">{validationError}</p> : null}
+      </section>
     </section>
   );
 }

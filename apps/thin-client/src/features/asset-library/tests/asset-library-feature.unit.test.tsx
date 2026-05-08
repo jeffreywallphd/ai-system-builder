@@ -31,7 +31,7 @@ const card: AssetLibraryDefinitionCard = {
   updatedAt: "2026-05-02T00:00:00.000Z",
 };
 
-const detail: AssetLibraryDefinitionDetail = {
+const detailWithoutValidation: AssetLibraryDefinitionDetail = {
   ...card,
   overview: {
     description: "Reusable document descriptor",
@@ -72,27 +72,36 @@ const detail: AssetLibraryDefinitionDetail = {
     createdAt: "2026-05-01T00:00:00.000Z",
     updatedAt: "2026-05-02T00:00:00.000Z",
   },
+  metadata: {
+    safeNote: "safe nested note",
+  },
+};
+
+const detailWithValidation: AssetLibraryDefinitionDetail = {
+  ...detailWithoutValidation,
   validationSummary: {
     status: "valid-with-warnings",
     issueCount: 1,
     errorCount: 0,
     warningCount: 1,
   },
-  metadata: {
-    safeNote: "safe nested note",
-  },
 };
 
 function createClient(overrides: Partial<AssetLibraryClient> = {}): AssetLibraryClient {
   return {
     listAssetDefinitions: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [card] } }),
-    readAssetDefinition: testDouble.fn().mockResolvedValue({ ok: true, value: detail }),
-    readAssetDefinitionVersion: testDouble.fn().mockResolvedValue({ ok: true, value: detail }),
+    readAssetDefinition: testDouble.fn().mockResolvedValue({ ok: true, value: detailWithoutValidation }),
+    readAssetDefinitionVersion: testDouble.fn().mockResolvedValue({ ok: true, value: detailWithoutValidation }),
     ...overrides,
   };
 }
 
 function queuedListResults(results: readonly unknown[]) {
+  const queue = [...results];
+  return testDouble.fn().mockImplementation(() => Promise.resolve(queue.shift()) as any);
+}
+
+function queuedDetailResults(results: readonly unknown[]) {
   const queue = [...results];
   return testDouble.fn().mockImplementation(() => Promise.resolve(queue.shift()) as any);
 }
@@ -197,7 +206,7 @@ describe("thin-client AssetLibraryFeature", () => {
     });
   });
 
-  it("loads selected detail and keeps advanced sections collapsed by default", async () => {
+  it("loads selected detail without validation and keeps advanced sections collapsed by default", async () => {
     const client = createClient();
     const { container } = await render(client);
     const cardButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Document")) as HTMLButtonElement;
@@ -209,15 +218,69 @@ describe("thin-client AssetLibraryFeature", () => {
       { definitionId: "builtin.document", version: "1.0.0" },
       {
         expand: ["aiContext", "configurationSchema", "ports", "requirements", "provenance", "metadata"],
-        includeValidation: true,
       },
     );
+    expect((client.readAssetDefinitionVersion as ReturnType<typeof testDouble.fn>).mock.calls
+      .some((call) => call[1]?.includeValidation === true)).toBe(false);
     expect(container.textContent).toContain("Reusable document descriptor");
 
     const advancedToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("AI-readable context")) as HTMLButtonElement;
     expect(advancedToggle.getAttribute("aria-expanded")).toBe("false");
     const controlledPanel = document.getElementById(advancedToggle.getAttribute("aria-controls") ?? "") as HTMLDivElement;
     expect(controlledPanel.hidden).toBe(true);
+  });
+
+  it("renders validation only after the explicit validation action and keeps sections collapsed", async () => {
+    const client = createClient({
+      readAssetDefinitionVersion: queuedDetailResults([
+        { ok: true, value: detailWithoutValidation },
+        { ok: true, value: detailWithValidation },
+      ]),
+    });
+    const { container } = await render(client);
+    const cardButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Document")) as HTMLButtonElement;
+
+    await act(async () => cardButton.click());
+    await flush();
+
+    expect(container.textContent).not.toContain("Validation");
+    const validationButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Check validation")) as HTMLButtonElement;
+    await act(async () => validationButton.click());
+    await flush();
+
+    const calls = (client.readAssetDefinitionVersion as ReturnType<typeof testDouble.fn>).mock.calls;
+    expect(calls[calls.length - 1]).toEqual([
+      { definitionId: "builtin.document", version: "1.0.0" },
+      {
+        expand: ["aiContext", "configurationSchema", "ports", "requirements", "provenance", "metadata"],
+        includeValidation: true,
+      },
+    ]);
+    expect(container.textContent).toContain("Validation");
+    const validationToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Validation")) as HTMLButtonElement;
+    expect(validationToggle.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("renders safe validation load errors", async () => {
+    const client = createClient({
+      readAssetDefinitionVersion: queuedDetailResults([
+        { ok: true, value: detailWithoutValidation },
+        {
+          ok: false,
+          error: { code: "internal", message: "Unable to read Asset Library data." },
+        },
+      ]),
+    });
+    const { container } = await render(client);
+    const cardButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Document")) as HTMLButtonElement;
+
+    await act(async () => cardButton.click());
+    await flush();
+    const validationButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Check validation")) as HTMLButtonElement;
+    await act(async () => validationButton.click());
+    await flush();
+
+    expect(container.querySelector("[role='alert']")?.textContent).toContain("Unable to read Asset Library data.");
   });
 
   it("renders available advanced sections only and hides safe metadata until expanded", async () => {
@@ -227,7 +290,7 @@ describe("thin-client AssetLibraryFeature", () => {
     await act(async () => cardButton.click());
     await flush();
 
-    for (const label of ["Configuration", "Ports", "Requirements", "Provenance", "Validation", "Safe metadata"]) {
+    for (const label of ["Configuration", "Ports", "Requirements", "Provenance", "Safe metadata"]) {
       expect(container.textContent).toContain(label);
     }
 
@@ -242,7 +305,7 @@ describe("thin-client AssetLibraryFeature", () => {
 
   it("does not render unsafe detail values or unsupported action buttons", async () => {
     const { container } = await render(createClient({
-      readAssetDefinitionVersion: testDouble.fn().mockResolvedValue({ ok: true, value: detail }),
+      readAssetDefinitionVersion: testDouble.fn().mockResolvedValue({ ok: true, value: detailWithoutValidation }),
     }));
     const cardButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Document")) as HTMLButtonElement;
 

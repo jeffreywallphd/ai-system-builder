@@ -1,24 +1,16 @@
 import type { AssetLibraryDefinitionCard } from "../../../../../../modules/ui/shared/asset-library";
+import {
+  formatAssetLibraryDate,
+  getAssetLibraryFamilyLabel,
+  getAssetLibraryLifecycleStatusLabel,
+  getAssetLibraryTypeLabel,
+} from "../../../../../../modules/ui/shared/asset-library";
 
 interface AssetDefinitionListProps {
   readonly definitions: readonly AssetLibraryDefinitionCard[];
   readonly selectedDefinitionId?: string;
   readonly hasActiveFilters: boolean;
   readonly onSelectDefinition: (definition: AssetLibraryDefinitionCard) => void;
-}
-
-function formatDate(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return undefined;
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(date);
-}
-
-function formatLabel(value: string): string {
-  return value
-    .split("-")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 export function AssetDefinitionList({
@@ -41,7 +33,7 @@ export function AssetDefinitionList({
   return (
     <section className="asset-library-list" aria-label="Asset definitions">
       {definitions.map((definition) => {
-        const updatedAt = formatDate(definition.updatedAt);
+        const updatedAt = formatAssetLibraryDate(definition.updatedAt, { dateStyle: "medium" });
         const isSelected = definition.id === selectedDefinitionId;
 
         return (
@@ -60,9 +52,9 @@ export function AssetDefinitionList({
             </span>
             {definition.summary ? <span className="asset-definition-card__summary">{definition.summary}</span> : null}
             <span className="asset-library-cues" aria-label="Asset cues">
-              <span>{formatLabel(definition.assetType)}</span>
-              <span>{formatLabel(definition.assetFamily)}</span>
-              <span>{formatLabel(definition.lifecycleStatus)}</span>
+              <span>{getAssetLibraryTypeLabel(definition)}</span>
+              <span>{getAssetLibraryFamilyLabel(definition)}</span>
+              <span>{getAssetLibraryLifecycleStatusLabel(definition)}</span>
               <span>v{definition.version}</span>
             </span>
             {updatedAt ? <span className="asset-definition-card__updated">Updated {updatedAt}</span> : null}
