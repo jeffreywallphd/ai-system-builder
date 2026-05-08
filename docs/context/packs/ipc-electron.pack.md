@@ -24,6 +24,7 @@
 - Asset Registry desktop IPC is definitions-only and read-only in Phase 2C: list definitions, read definition detail, and read definition version. Handlers wrap `AssetRegistryDefinitionReadPort`/the read facade only and must not receive persistence adapters, host composition helpers, mutation use cases, seeding services, runtime/storage adapters, provider clients, resource scans, or bytes.
 - Asset Registry IPC input parsing should stay in parity with the server API through shared transport-adapter normalization. Malformed asset type/family/status, built-in, boolean, expansion, limit, cursor, or definition/version input returns validation failure before the read facade is called. Unexpected facade failures return sanitized internal failures while preserving request/correlation ids.
 - Phase 2C Prompt 8 keeps this IPC/preload surface fixed at definition list/read/version-read only. Do not add asset create/update/delete/register/import/finalize/seed/publish/execute/run/scan/sync/repair/install/start/train channels or preload methods. Validation diagnostics remain read-side details requested through `includeValidation`, not runtime validation tasks.
+- Phase 3 Prompt 8 does not change the public desktop IPC/preload Asset Registry surface. Resource-backed provider wiring remains internal unless a later prompt explicitly adds read-only resource-backed channels; mutation/import/finalization/localization/publishing/seeding/scan/runtime/provider/byte-read channels remain forbidden.
 
 ## Canonical Source Docs
 

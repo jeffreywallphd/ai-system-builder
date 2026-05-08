@@ -131,3 +131,9 @@ For Asset Library advanced detail panel prompts, include `asset-kernel`, `deskto
 ## Phase 2C Prompt 8: final Asset Library read-only stabilization
 
 For final Phase 2C stabilization prompts, include `asset-kernel`, `desktop-host`, `server-host`, `ipc-electron`, `security`, `testing`, and `persistence-storage`, plus canonical Asset Kernel/host/dependency/persistence docs. Scope is regression hardening only: read-only API/IPC/preload audits, UI boundary audits, explicit validation behavior, safe metadata/rendering, resource-backed computed-view safety, non-exposure tests, and docs/context alignment. Do not add mutation/execution/import/finalization/seeding, automatic validation, resource scans, runtime/provider calls, byte reads, or new product features.
+
+## Phase 3 resource-backed provider stabilization
+
+For resource-backed provider work, include `asset-kernel`, `persistence-storage`, `security`, `runtime`, `runtime-task-registry`, `desktop-host`, `server-host`, and `testing` as relevant, plus canonical Asset Kernel, host, persistence/storage, runtime, and module-dependency docs. Provider implementations belong in application ports/services; host wiring belongs in host composition; UI must stay behind transport/preload/client layers.
+
+For API/IPC/UI Asset Library work that touches resource-backed Asset Registry reads, also include `ipc-electron`, `desktop-host`, `server-host`, and `security`. Keep public surfaces read-only and do not add registration, import, finalization, localization, publishing, seeding, scans, provider calls, runtime calls, workflow execution, or byte/content reads unless a later phase explicitly scopes controlled mutation behavior.
