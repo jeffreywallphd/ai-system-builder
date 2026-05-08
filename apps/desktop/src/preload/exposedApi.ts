@@ -136,6 +136,15 @@ import {
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_OPERATION,
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_DEFINITIONS_LIST_OPERATION,
+  DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL,
+  DESKTOP_ASSET_DEFINITIONS_LIST_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_DEFINITION_READ_OPERATION,
+  DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_DEFINITION_READ_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_DEFINITION_VERSION_READ_OPERATION,
+  DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_DEFINITION_VERSION_READ_RESPONSE_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_OPERATION,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL,
@@ -163,6 +172,9 @@ import {
   createDesktopPrepareTrainingDatasetTaskReadRequest,
   createDesktopRuntimeReadinessReadRequest,
   createDesktopRuntimeCapabilityStatusReadRequest,
+  createDesktopAssetDefinitionsListRequest,
+  createDesktopAssetDefinitionReadRequest,
+  createDesktopAssetDefinitionVersionReadRequest,
   createDesktopPythonRuntimeControlRequest,
   createDesktopPythonRuntimeStatusReadRequest,
   createDesktopImageGenerationStartRequest,
@@ -175,6 +187,12 @@ import {
   type DesktopPrepareTrainingDatasetTaskReadResponse,
   type DesktopRuntimeReadinessReadResponse,
   type DesktopRuntimeCapabilityStatusReadResponse,
+  type DesktopAssetDefinitionsListRequest,
+  type DesktopAssetDefinitionsListResponse,
+  type DesktopAssetDefinitionReadRequest,
+  type DesktopAssetDefinitionReadResponse,
+  type DesktopAssetDefinitionVersionReadRequest,
+  type DesktopAssetDefinitionVersionReadResponse,
   type DesktopPythonRuntimeControlResponse,
   type DesktopPythonRuntimeStatusReadResponse,
   type DesktopImageGenerationStartRequest,
@@ -277,6 +295,7 @@ import type {
 
 const DEFAULT_UPLOAD_SOURCE = "desktop.renderer.artifact-upload.form";
 const DEFAULT_ARTIFACT_SOURCE = "desktop.renderer.artifact-browser";
+const DEFAULT_ASSET_REGISTRY_SOURCE = "desktop.renderer.asset-registry";
 
 export interface IpcRendererInvokePort {
   invoke: (channel: string, request: unknown) => Promise<unknown>;
@@ -296,6 +315,10 @@ export interface DesktopArtifactUploadBridgeContext {
   requestId?: string;
   correlationId?: string;
 }
+
+export type DesktopAssetDefinitionsListBridgeInput = Omit<DesktopAssetDefinitionsListRequest["payload"], "boundary">;
+export type DesktopAssetDefinitionReadBridgeInput = Omit<DesktopAssetDefinitionReadRequest["payload"], "boundary">;
+export type DesktopAssetDefinitionVersionReadBridgeInput = Omit<DesktopAssetDefinitionVersionReadRequest["payload"], "boundary">;
 
 export interface DesktopPreloadApi {
   getHuggingFaceTokenStatus: (
@@ -358,6 +381,18 @@ export interface DesktopPreloadApi {
     input: { capabilityId: RuntimeCapabilityId },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopRuntimeCapabilityStatusReadResponse>;
+  listAssetDefinitions: (
+    input?: DesktopAssetDefinitionsListBridgeInput,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopAssetDefinitionsListResponse>;
+  readAssetDefinition: (
+    input: DesktopAssetDefinitionReadBridgeInput,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopAssetDefinitionReadResponse>;
+  readAssetDefinitionVersion: (
+    input: DesktopAssetDefinitionVersionReadBridgeInput,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopAssetDefinitionVersionReadResponse>;
   readPythonRuntimeStatus: (
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopPythonRuntimeStatusReadResponse>;
@@ -550,6 +585,7 @@ export function createDesktopPreloadApi(
 ): DesktopPreloadApi {
   const uploadSource = dependencies.uploadSource ?? DEFAULT_UPLOAD_SOURCE;
   const artifactSource = dependencies.artifactSource ?? DEFAULT_ARTIFACT_SOURCE;
+  const assetRegistrySource = DEFAULT_ASSET_REGISTRY_SOURCE;
 
   return {
     async getHuggingFaceTokenStatus(context = {}) {
@@ -840,6 +876,75 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_OPERATION,
         channel: DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop runtime capability status IPC response envelope.",
+      });
+    },
+
+    async listAssetDefinitions(input = {}, context = {}) {
+      const request = createDesktopAssetDefinitionsListRequest(
+        {
+          ...input,
+          boundary: {
+            host: "desktop",
+            source: assetRegistrySource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopAssetDefinitionsListResponse>(response, {
+        operation: DESKTOP_ASSET_DEFINITIONS_LIST_OPERATION,
+        channel: DESKTOP_ASSET_DEFINITIONS_LIST_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop asset definitions list IPC response envelope.",
+      });
+    },
+
+    async readAssetDefinition(input, context = {}) {
+      const request = createDesktopAssetDefinitionReadRequest(
+        {
+          ...input,
+          boundary: {
+            host: "desktop",
+            source: assetRegistrySource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopAssetDefinitionReadResponse>(response, {
+        operation: DESKTOP_ASSET_DEFINITION_READ_OPERATION,
+        channel: DESKTOP_ASSET_DEFINITION_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop asset definition read IPC response envelope.",
+      });
+    },
+
+    async readAssetDefinitionVersion(input, context = {}) {
+      const request = createDesktopAssetDefinitionVersionReadRequest(
+        {
+          ...input,
+          boundary: {
+            host: "desktop",
+            source: assetRegistrySource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopAssetDefinitionVersionReadResponse>(response, {
+        operation: DESKTOP_ASSET_DEFINITION_VERSION_READ_OPERATION,
+        channel: DESKTOP_ASSET_DEFINITION_VERSION_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop asset definition version read IPC response envelope.",
       });
     },
 

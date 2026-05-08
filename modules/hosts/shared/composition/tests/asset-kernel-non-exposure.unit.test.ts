@@ -50,7 +50,7 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.doesNotMatch(source, /\b(?:seedBuiltIns|registerBuiltIns|importAsset|finalizeAsset|scanResources|startRuntime|probeRuntime)\b/i);
   });
 
-  it("does not register asset IPC channels or desktop preload asset methods", () => {
+  it("allows only read-only asset definition IPC/preload methods", () => {
     const publicIpcAndPreloadSource = [
       combinedSource("modules/contracts/ipc"),
       combinedSource("modules/adapters/transport/ipc-electron"),
@@ -58,15 +58,25 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     ].join("\n");
     const desktopHostCompositionSource = combinedSource("modules/hosts/desktop/composition");
 
-    assert.doesNotMatch(publicIpcAndPreloadSource, /ipc\.asset(?:\.|-|:)/i);
-    assert.doesNotMatch(publicIpcAndPreloadSource, /\bASSET_(?:KERNEL|REGISTRY|LIBRARY)?_?[A-Z_]*CHANNEL\b/);
-    assert.doesNotMatch(publicIpcAndPreloadSource, /\b(?:assetKernel|assetRegistry|assetLibrary|listAssetDefinitions|readAssetDefinition|listAssetInstances|readAssetInstance)\b/);
-    assert.doesNotMatch(desktopHostCompositionSource, /ipc\.asset(?:\.|-|:)|\bASSET_(?:KERNEL|REGISTRY|LIBRARY)?_?[A-Z_]*CHANNEL\b/);
+    assert.match(publicIpcAndPreloadSource, /DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL/);
+    assert.match(publicIpcAndPreloadSource, /DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL/);
+    assert.match(publicIpcAndPreloadSource, /DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL/);
+    assert.match(publicIpcAndPreloadSource, /\blistAssetDefinitions\b/);
+    assert.match(publicIpcAndPreloadSource, /\breadAssetDefinition\b/);
+    assert.doesNotMatch(publicIpcAndPreloadSource, /ipc\.asset\.(?:instance|composition|resource|registry-summary|create|update|delete|register|seed|import|finalize|scan|execute)/i);
+    assert.doesNotMatch(publicIpcAndPreloadSource, /\b(?:createAsset|updateAsset|deleteAsset|registerAsset|seedAsset|importAsset|finalizeAsset|listAssetInstances|readAssetInstance)\b/i);
+    assert.match(desktopHostCompositionSource, /assetRegistryRead:\s*internalAssetRegistry\.readFacade/);
+    assert.doesNotMatch(desktopHostCompositionSource, /assetRegistryRead:\s*internalAssetRegistry[,}]/);
+    assert.doesNotMatch(desktopHostCompositionSource, /ipc\.asset\.(?:instance|composition|resource|registry-summary|create|update|delete|register|seed|import|finalize|scan|execute)/i);
   });
 
   it("does not add renderer or thin-client Asset Library UI/API clients", () => {
+    const rendererSourceWithoutDesktopApi = sourceFilesUnder("apps/desktop/src/renderer")
+      .filter((file) => !file.path.replace(/\\/g, "/").endsWith("src/renderer/lib/desktopApi.ts"))
+      .map((file) => `\n// ${file.path}\n${file.source}`)
+      .join("\n");
     const source = [
-      combinedSource("apps/desktop/src/renderer"),
+      rendererSourceWithoutDesktopApi,
       combinedSource("apps/thin-client/src"),
     ].join("\n");
 

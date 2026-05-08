@@ -128,3 +128,7 @@ No automatic trust-store installation is performed. Trust installation is manual
 Phase 2C begins by exposing only a narrow, read-only server API foundation for Asset Registry definition reads. The server routes wrap an application-owned Asset Registry definition read port/read facade and must not receive persistence adapters, host composition helpers, mutation use cases, built-in seeding services, or local repositories.
 
 The initial `/api/assets` surface is GET-only for asset definition list/detail/version reads. It must not scan resources, read bytes, call runtimes, call providers, seed built-ins, import/finalize/register assets, or execute workflows. Desktop IPC/preload/renderer UI and thin-client UI/client exposure remain deferred.
+
+## Phase 2C Prompt 3: read-only Asset Registry desktop IPC/preload foundation
+
+Desktop Asset Registry IPC/preload errors must remain sanitized and generic for unexpected failures. The read-only definition list/read/version-read wrappers trust application facade payload sanitization but must not add raw exception messages, stack traces, filesystem/temp/runtime/storage paths, secrets/tokens/auth headers/env values, command lines, provider payloads, bytes, or resource content to IPC/preload responses.
