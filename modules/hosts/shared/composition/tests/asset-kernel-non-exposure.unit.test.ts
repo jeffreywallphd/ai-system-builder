@@ -112,6 +112,17 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.doesNotMatch(source, /\b(?:PrepareTrainingDataset|DatasetPreparationUseCase|ModelTrainingPort|ModelValidationPort|ModelPublisherPort|TrainModelUseCase|ValidateModelUseCase|PublishModelUseCase|discoverModels|includeDiscovered:\s*true)\b/i);
   });
 
+  it("keeps the external repository resource-backed provider descriptor-only", () => {
+    const source = readFileSync(
+      join(REPO_ROOT, "modules/application/services/asset/asset-external-repository-resource-backed-view-provider.service.ts"),
+      "utf8",
+    );
+
+    assert.doesNotMatch(source, /from\s+["'][^"']*(?:adapters\/|hosts\/|api-express|ipc-electron|electron|express|preload|renderer|thin-client|huggingface)[^"']*["']/i);
+    assert.doesNotMatch(source, /\b(?:HuggingFaceRepoBrowserPort|ArtifactRepoStoragePort|CredentialStore|TokenStore|listFiles|repoInfo|download\(|upload\(|commit\(|createRepo|whoami|retrieveArtifactFromRepo|storeArtifactInRepo|hasArtifactInRepo|LocalizeArtifact|PublishArtifact|RegisterArtifact|RuntimeTaskRegistryPort|readBytes|readResourceBytes|createAssetInstance|persistMapping)\b/i);
+    assert.doesNotMatch(source, /node:fs|node:path|node:http|node:https|fetch\(/i);
+  });
+
   it("keeps public asset transports on the read port instead of local persistence or seeding seams", () => {
     const source = [
       combinedSource("modules/adapters/transport/api-express"),

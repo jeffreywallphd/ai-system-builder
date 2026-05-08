@@ -28,6 +28,7 @@ import type { ModelRegistryPort } from "../../../ports/model";
 import { BUILT_IN_ASSET_DEFINITION_CATALOG } from "../built-ins";
 import { ArtifactResourceBackedViewProvider } from "../asset-artifact-resource-backed-view-provider.service";
 import { AssetDatasetModelResourceBackedViewProvider, type SafeDatasetDescriptorSource } from "../asset-dataset-model-resource-backed-view-provider.service";
+import { AssetExternalRepositoryResourceBackedViewProvider, type SafeExternalRepositoryObjectDescriptorSource } from "../asset-external-repository-resource-backed-view-provider.service";
 import { AssetImageResourceBackedViewProvider, type GeneratedImageOutputDescriptorSource } from "../asset-image-resource-backed-view-provider.service";
 import { AssetRegistryReadFacade, AssetRegistryReadFacadeError } from "../asset-registry-read-facade.service";
 
@@ -228,6 +229,36 @@ class FakeDatasetDescriptorSource implements SafeDatasetDescriptorSource {
   public async readDatasetDescriptor(datasetId: string) {
     const result = await this.listDatasetDescriptors();
     return result.items.find((item) => item.id === datasetId);
+  }
+}
+
+class FakeExternalRepositoryObjectDescriptorSource implements SafeExternalRepositoryObjectDescriptorSource {
+  public providerNetworkCalls = 0;
+  public cacheReadCalls = 0;
+  public runtimeCalls = 0;
+  public fileReadCalls = 0;
+  public validationCalls = 0;
+
+  public async listExternalRepositoryObjectDescriptors() {
+    return {
+      items: [
+        {
+          descriptorId: "external-facade",
+          provider: "huggingface",
+          repositoryId: "org/facade",
+          revision: "main",
+          objectPath: "models/facade.safetensors",
+          objectKind: "model",
+          sizeBytes: 100,
+          metadata: unsafeMetadata(),
+        },
+      ],
+    };
+  }
+
+  public async readExternalRepositoryObjectDescriptor(descriptorId: string) {
+    const result = await this.listExternalRepositoryObjectDescriptors();
+    return result.items.find((item) => item.descriptorId === descriptorId);
   }
 }
 
@@ -663,6 +694,40 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     assert.equal(modelRegistry.publishingCalls, 0);
     assert.equal(modelRegistry.localModelScanCalls, 0);
     assert.equal(datasetSource.prepareCalls + datasetSource.fileReadCalls + datasetSource.storageScanCalls, 0);
+  });
+
+  it("lists and reads external repository provider cards and details without unsafe metadata or automatic validation/provider calls", async () => {
+    const externalSource = new FakeExternalRepositoryObjectDescriptorSource();
+    const provider = new AssetExternalRepositoryResourceBackedViewProvider({
+      externalRepositoryObjectDescriptorSource: externalSource,
+    });
+    const facade = createFacade({ resourceBackedViewProvider: provider });
+
+    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10 });
+    assert.equal(list.items.length, 1);
+    assert.equal(list.items[0]?.viewKind, "external-repository-object");
+    assert.equal(list.items[0]?.assetDefinitionRef, undefined);
+    assert.equal(list.items[0]?.summary?.includes("not imported"), true);
+    assertSafe(list);
+
+    const detail = await facade.readResourceBackedViewDetail(list.items[0]!.viewId, {
+      includeMetadata: true,
+      includeResourceBackings: true,
+    });
+    assert.equal(detail?.view.viewKind, "external-repository-object");
+    assert.equal(detail?.view.assetDefinitionRef, undefined);
+    assert.equal(detail?.view.assetInstanceRef, undefined);
+    assert.equal(detail?.view.resourceBackedAsset, undefined);
+    assert.equal(detail?.view.metadata?.registered, false);
+    assert.equal(detail?.validationSummary, undefined);
+    assert.equal(await facade.readResourceBackedViewDetail("missing-external-view"), undefined);
+    assertSafe(detail);
+
+    assert.equal(externalSource.providerNetworkCalls, 0);
+    assert.equal(externalSource.cacheReadCalls, 0);
+    assert.equal(externalSource.runtimeCalls, 0);
+    assert.equal(externalSource.fileReadCalls, 0);
+    assert.equal(externalSource.validationCalls, 0);
   });
 });
 

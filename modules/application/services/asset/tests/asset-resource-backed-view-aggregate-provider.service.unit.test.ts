@@ -12,6 +12,7 @@ import { createUnsupportedAssetResourceBackedViewProvider } from "../../../ports
 import type { ModelRegistryPort } from "../../../ports/model";
 import { ArtifactResourceBackedViewProvider } from "../asset-artifact-resource-backed-view-provider.service";
 import { AssetDatasetModelResourceBackedViewProvider } from "../asset-dataset-model-resource-backed-view-provider.service";
+import { AssetExternalRepositoryResourceBackedViewProvider, type SafeExternalRepositoryObjectDescriptorSource } from "../asset-external-repository-resource-backed-view-provider.service";
 import { AssetImageResourceBackedViewProvider, type GeneratedImageOutputDescriptorSource } from "../asset-image-resource-backed-view-provider.service";
 import { AssetResourceBackedViewAggregateProvider } from "../asset-resource-backed-view-aggregate-provider.service";
 
@@ -94,6 +95,24 @@ class FakeGeneratedOutputDescriptorSource implements GeneratedImageOutputDescrip
             fileName: "Generated.png",
             mediaType: "image/png",
           },
+        },
+      ],
+    };
+  }
+}
+
+class FakeExternalRepositoryObjectDescriptorSource implements SafeExternalRepositoryObjectDescriptorSource {
+  public async listExternalRepositoryObjectDescriptors() {
+    return {
+      items: [
+        {
+          descriptorId: "external-aggregate",
+          provider: "huggingface",
+          repositoryId: "org/external",
+          revision: "main",
+          objectPath: "objects/external.bin",
+          objectKind: "file",
+          metadata: { localPath: "/tmp/private", token: "hidden" },
         },
       ],
     };
@@ -251,7 +270,7 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
     assertSafe(result);
   });
 
-  it("combines dataset/model provider results with artifact/document, image/generated-output, and unsupported providers deterministically", async () => {
+  it("combines external repository results with artifact/document, image/generated-output, dataset/model, and unsupported providers deterministically", async () => {
     const artifactProvider = new ArtifactResourceBackedViewProvider({
       artifactBrowserMetadataRead: new FakeArtifactBrowserMetadataRead([
         artifactItem("artifact-report", "Report.pdf", "application/pdf"),
@@ -264,16 +283,21 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
     const imageProvider = new AssetImageResourceBackedViewProvider({
       generatedImageOutputDescriptorSource: new FakeGeneratedOutputDescriptorSource("generated-output-1"),
     });
+    const externalProvider = new AssetExternalRepositoryResourceBackedViewProvider({
+      externalRepositoryObjectDescriptorSource: new FakeExternalRepositoryObjectDescriptorSource(),
+    });
     const unsupported = createUnsupportedAssetResourceBackedViewProvider({ providerId: "dataset-provider", sourceKind: "dataset" });
 
     const result = await new AssetResourceBackedViewAggregateProvider({
-      providers: [unsupported, artifactProvider, datasetModelProvider, imageProvider],
+      providers: [unsupported, artifactProvider, datasetModelProvider, imageProvider, externalProvider],
       maxListLimit: 10,
     }).listResourceBackedViews({ limit: 10 });
 
-    assert.deepEqual(result.items.map((item) => item.viewKind), ["document", "model", "generated-output"]);
+    assert.deepEqual(result.items.map((item) => item.viewKind), ["document", "model", "generated-output", "external-repository-object"]);
     assert.equal(result.items[1]?.assetDefinitionRef?.id, "builtin.model");
     assert.equal(result.items[2]?.assetDefinitionRef, undefined);
+    assert.equal(result.items[3]?.assetDefinitionRef, undefined);
+    assert.equal(result.items[3]?.summary?.includes("not imported"), true);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "resource-backed-view-provider-unsupported"), true);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "dataset-resource-backed-view-source-unavailable"), true);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "image-resource-backed-view-image-source-unavailable"), true);
