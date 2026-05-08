@@ -37,6 +37,9 @@ export interface GeneratedImageOutputDescriptorListResult {
   readonly nextCursor?: string;
 }
 
+// Provider-local descriptor-only input seam. It is intentionally not a public
+// Asset Kernel port; host composition may inject it later without broadening the
+// application provider contract.
 export interface GeneratedImageOutputDescriptorSource {
   listGeneratedImageOutputDescriptors(query?: { readonly searchText?: string; readonly limit?: number; readonly cursor?: string }): Promise<GeneratedImageOutputDescriptorListResult>;
   readGeneratedImageOutputDescriptor?(outputId: string): Promise<GeneratedImageOutputDescriptor | null | undefined>;

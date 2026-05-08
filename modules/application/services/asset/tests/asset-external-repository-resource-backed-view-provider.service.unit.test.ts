@@ -271,6 +271,92 @@ describe("AssetExternalRepositoryResourceBackedViewProvider", () => {
     assertSafe(view);
   });
 
+  it("treats local, http, and custom provider labels as descriptor metadata only", async () => {
+    const source = new FakeExternalDescriptorSource([
+      safeDescriptor({
+        descriptorId: "local-object",
+        provider: "local",
+        repositoryId: "org/local-metadata",
+        objectName: "Local Metadata Object",
+        objectPath: "safe/repo-relative.bin",
+        objectKind: "file",
+        metadata: {
+          localPath: "C:\\Users\\name\\private\\safe\\repo-relative.bin",
+          cachePath: "/home/name/.cache/huggingface/file",
+        },
+      }),
+      safeDescriptor({
+        descriptorId: "http-object",
+        provider: "http",
+        repositoryId: "org/http-metadata",
+        objectName: "HTTP Metadata Object",
+        objectPath: "safe/http-object.json",
+        objectKind: "file",
+        metadata: {
+          downloadUrl: "https://example.invalid/object.json?token=hidden",
+          signedUrl: "https://example.invalid/object.json?X-Amz-Signature=hidden",
+        },
+      }),
+      safeDescriptor({
+        descriptorId: "custom-object",
+        provider: "artifact-repo",
+        repositoryId: "org/custom-metadata",
+        objectName: "Custom Metadata Object",
+        objectPath: "safe/custom-object.json",
+        objectKind: "artifact",
+      }),
+    ]);
+
+    const result = await new AssetExternalRepositoryResourceBackedViewProvider({
+      externalRepositoryObjectDescriptorSource: source,
+    }).listResourceBackedViews({ limit: 10 });
+
+    assert.deepEqual(result.items.map((item) => item.metadata?.provider), ["local", "http", "custom"]);
+    assert.deepEqual(result.items.map((item) => item.displayName), ["Local Metadata Object", "HTTP Metadata Object", "Custom Metadata Object"]);
+    assert.equal(result.items.every((item) => item.viewKind === "external-repository-object"), true);
+    assert.equal(result.items.every((item) => item.assetInstanceRef === undefined && item.resourceBackedAsset === undefined), true);
+    assert.equal(result.items.every((item) => item.summary?.includes("not imported")), true);
+    assert.equal(
+      source.providerBrowseCalls + source.providerRetrieveCalls + source.providerStoreCalls + source.providerPublishCalls +
+        source.providerLocalizeCalls + source.tokenReadCalls + source.byteReadCalls,
+      0,
+    );
+    assertSafe(result);
+    assert.equal(serialized(result).includes("safe/repo-relative.bin"), false);
+    assert.equal(serialized(result).includes("safe/http-object.json"), false);
+    assert.equal(serialized(result).includes("safe/custom-object.json"), false);
+  });
+
+  it("omits repository object paths by default and diagnoses unsafe object paths", async () => {
+    const source = new FakeExternalDescriptorSource([
+      safeDescriptor({
+        descriptorId: "safe-object-path",
+        provider: "huggingface",
+        repositoryId: "org/path-policy",
+        objectName: "Safe Path Object",
+        objectPath: "repo/relative/model.safetensors",
+      }),
+      safeDescriptor({
+        descriptorId: "unsafe-object-path",
+        provider: "huggingface",
+        repositoryId: "org/path-policy",
+        objectPath: "../private/model.safetensors",
+        objectKind: "file",
+      }),
+    ]);
+
+    const result = await new AssetExternalRepositoryResourceBackedViewProvider({
+      externalRepositoryObjectDescriptorSource: source,
+    }).listResourceBackedViews({ limit: 10 });
+
+    assert.deepEqual(result.items.map((item) => item.viewId), ["asset-view.external-repository-object.internal.safe-object-path"]);
+    assert.equal(serialized(result).includes("repo/relative/model.safetensors"), false);
+    assert.equal(serialized(result).includes("../private"), false);
+    assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "external-repository-resource-backed-view-object-path-omitted"), true);
+    assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "external-repository-resource-backed-view-skipped-invalid-descriptor"), true);
+    assertSafe(result);
+  });
+
   it("maps artifact-repo descriptors and storage binding metadata without provider client calls", async () => {
     const artifactRepoSource = new FakeArtifactRepoDescriptorSource();
     const provider = new AssetExternalRepositoryResourceBackedViewProvider({

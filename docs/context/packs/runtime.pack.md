@@ -98,6 +98,7 @@
 - Detail reads for generated-output views should use the injected generated-output descriptor read seam when available and must not fall back to Runtime Task Registry discovery. Generated outputs remain unfinalized/unregistered until a separate finalization/registration path runs elsewhere.
 - Dataset/model resource-backed views must not use runtime readiness, Runtime Task Registry, dataset preparation, model training, model validation, model publishing, or runtime/provider clients to discover or enrich records. Dataset views are descriptor-only, and model views read persisted inventory only with model discovery disabled.
 - External repository object resource-backed views must not use runtime readiness, Runtime Task Registry, model publishing tasks, provider clients, or repository/cache/file reads to discover or refresh external objects. Persisted model publishing summaries may be projected only as already-known metadata and must not trigger publish status checks or runtime work.
+- Phase 3 Review B preserves that boundary across aggregate reads: external provider labels are descriptor metadata only, repository object paths are omitted from public output by default, and cross-family aggregation must not call runtime readiness, Runtime Task Registry, provider clients, discovery, import/localize/publish, or byte/content reads.
 
 ## Asset Kernel built-in catalog note
 

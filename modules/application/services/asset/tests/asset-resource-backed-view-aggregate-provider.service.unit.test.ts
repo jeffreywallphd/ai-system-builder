@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 
 import type { AssetResourceBackedView } from "../../../../contracts/asset";
 import type { ArtifactBrowseItem, ArtifactBrowseSuccessValue } from "../../../../contracts/artifact-browser";
+import type { DatasetDescriptor } from "../../../../contracts/dataset";
 import type { ModelInventoryRecord } from "../../../../contracts/model";
 import { createSuccessResult, type ContractResult } from "../../../../contracts/shared";
 import type { ArtifactBrowserMetadataReadPort } from "../../../ports/artifact-browser";
@@ -11,7 +12,7 @@ import type { AssetResourceBackedViewListQuery, AssetResourceBackedViewListResul
 import { createUnsupportedAssetResourceBackedViewProvider } from "../../../ports/asset";
 import type { ModelRegistryPort } from "../../../ports/model";
 import { ArtifactResourceBackedViewProvider } from "../asset-artifact-resource-backed-view-provider.service";
-import { AssetDatasetModelResourceBackedViewProvider } from "../asset-dataset-model-resource-backed-view-provider.service";
+import { AssetDatasetModelResourceBackedViewProvider, type SafeDatasetDescriptorSource } from "../asset-dataset-model-resource-backed-view-provider.service";
 import { AssetExternalRepositoryResourceBackedViewProvider, type SafeExternalRepositoryObjectDescriptorSource } from "../asset-external-repository-resource-backed-view-provider.service";
 import { AssetImageResourceBackedViewProvider, type GeneratedImageOutputDescriptorSource } from "../asset-image-resource-backed-view-provider.service";
 import { AssetResourceBackedViewAggregateProvider } from "../asset-resource-backed-view-aggregate-provider.service";
@@ -101,7 +102,36 @@ class FakeGeneratedOutputDescriptorSource implements GeneratedImageOutputDescrip
   }
 }
 
+class FakeDatasetDescriptorSource implements SafeDatasetDescriptorSource {
+  public prepareCalls = 0;
+  public fileReadCalls = 0;
+  public storageScanCalls = 0;
+  public createDescriptorCalls = 0;
+
+  public async listDatasetDescriptors() {
+    return {
+      items: [
+        {
+          id: "dataset-aggregate",
+          name: "Aggregate Dataset",
+          schema: { fieldCount: 1, fields: [{ name: "text", type: "string" }] },
+          sourceArtifacts: [{ key: "artifact-dataset" }],
+          materializations: [{ artifactKey: "datasets/private/train.parquet", format: "parquet", rowCount: 1 }],
+          metadata: { localPath: "/tmp/dataset", token: "hidden" },
+        } satisfies DatasetDescriptor,
+      ],
+    };
+  }
+}
+
 class FakeExternalRepositoryObjectDescriptorSource implements SafeExternalRepositoryObjectDescriptorSource {
+  public providerNetworkCalls = 0;
+  public tokenReadCalls = 0;
+  public byteReadCalls = 0;
+  public importCalls = 0;
+  public localizeCalls = 0;
+  public publishCalls = 0;
+
   public async listExternalRepositoryObjectDescriptors() {
     return {
       items: [
@@ -277,14 +307,17 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
       ]),
     });
     const modelRegistry = new FakeModelRegistry([modelRecord()]);
+    const datasetSource = new FakeDatasetDescriptorSource();
     const datasetModelProvider = new AssetDatasetModelResourceBackedViewProvider({
+      datasetDescriptorSource: datasetSource,
       modelRegistry,
     });
     const imageProvider = new AssetImageResourceBackedViewProvider({
       generatedImageOutputDescriptorSource: new FakeGeneratedOutputDescriptorSource("generated-output-1"),
     });
+    const externalSource = new FakeExternalRepositoryObjectDescriptorSource();
     const externalProvider = new AssetExternalRepositoryResourceBackedViewProvider({
-      externalRepositoryObjectDescriptorSource: new FakeExternalRepositoryObjectDescriptorSource(),
+      externalRepositoryObjectDescriptorSource: externalSource,
     });
     const unsupported = createUnsupportedAssetResourceBackedViewProvider({ providerId: "dataset-provider", sourceKind: "dataset" });
 
@@ -293,16 +326,55 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
       maxListLimit: 10,
     }).listResourceBackedViews({ limit: 10 });
 
-    assert.deepEqual(result.items.map((item) => item.viewKind), ["document", "model", "generated-output", "external-repository-object"]);
-    assert.equal(result.items[1]?.assetDefinitionRef?.id, "builtin.model");
-    assert.equal(result.items[2]?.assetDefinitionRef, undefined);
+    assert.deepEqual(result.items.map((item) => item.viewKind), ["document", "dataset", "model", "generated-output", "external-repository-object"]);
+    assert.equal(result.items[1]?.assetDefinitionRef?.id, "builtin.dataset");
+    assert.equal(result.items[2]?.assetDefinitionRef?.id, "builtin.model");
     assert.equal(result.items[3]?.assetDefinitionRef, undefined);
-    assert.equal(result.items[3]?.summary?.includes("not imported"), true);
+    assert.equal(result.items[4]?.assetDefinitionRef, undefined);
+    assert.equal(result.items[4]?.summary?.includes("not imported"), true);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "resource-backed-view-provider-unsupported"), true);
-    assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "dataset-resource-backed-view-source-unavailable"), true);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "image-resource-backed-view-image-source-unavailable"), true);
     assert.equal(modelRegistry.discoveryCalls, 0);
+    assert.equal(datasetSource.prepareCalls + datasetSource.fileReadCalls + datasetSource.storageScanCalls + datasetSource.createDescriptorCalls, 0);
+    assert.equal(externalSource.providerNetworkCalls + externalSource.tokenReadCalls + externalSource.byteReadCalls + externalSource.importCalls + externalSource.localizeCalls + externalSource.publishCalls, 0);
     assertSafe(result);
+  });
+
+  it("applies aggregate limits consistently across family providers", async () => {
+    const artifactProvider = new ArtifactResourceBackedViewProvider({
+      artifactBrowserMetadataRead: new FakeArtifactBrowserMetadataRead([
+        artifactItem("artifact-report", "Report.pdf", "application/pdf"),
+      ]),
+    });
+    const datasetModelProvider = new AssetDatasetModelResourceBackedViewProvider({
+      datasetDescriptorSource: new FakeDatasetDescriptorSource(),
+      modelRegistry: new FakeModelRegistry([modelRecord()]),
+    });
+    const imageProvider = new AssetImageResourceBackedViewProvider({
+      generatedImageOutputDescriptorSource: new FakeGeneratedOutputDescriptorSource("generated-output-1"),
+    });
+
+    const result = await new AssetResourceBackedViewAggregateProvider({
+      providers: [artifactProvider, datasetModelProvider, imageProvider],
+      maxListLimit: 3,
+    }).listResourceBackedViews({ limit: 99 });
+
+    assert.deepEqual(result.items.map((item) => item.viewKind), ["document", "dataset", "model"]);
+    assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "resource-backed-view-provider-limit-clamped"), true);
+  });
+
+  it("omits duplicate aggregate view ids deterministically with diagnostics", async () => {
+    const first = new TestProvider("first-provider", [view("duplicate-view", "First"), view("unique-first", "Unique First")]);
+    const second = new TestProvider("second-provider", [view("duplicate-view", "Second"), view("unique-second", "Unique Second")]);
+    const aggregate = new AssetResourceBackedViewAggregateProvider({ providers: [first, second] });
+
+    const result = await aggregate.listResourceBackedViews({ limit: 10 });
+
+    assert.deepEqual(result.items.map((item) => item.viewId), ["duplicate-view", "unique-first", "unique-second"]);
+    assert.equal(result.items.filter((item) => item.viewId === "duplicate-view").length, 1);
+    assert.equal(result.items.find((item) => item.viewId === "duplicate-view")?.displayName, "First");
+    assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "resource-backed-view-provider-duplicate-view-id"), true);
+    assert.equal((await aggregate.readResourceBackedView("duplicate-view"))?.displayName, "First");
   });
 
   it("keeps generated-output views distinct from image asset views when ids could otherwise collide", async () => {
