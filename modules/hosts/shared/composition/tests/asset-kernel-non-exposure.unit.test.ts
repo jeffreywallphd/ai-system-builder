@@ -70,20 +70,28 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.doesNotMatch(desktopHostCompositionSource, /ipc\.asset\.(?:instance|composition|resource|registry-summary|create|update|delete|register|seed|import|finalize|scan|execute)/i);
   });
 
-  it("does not add renderer or thin-client Asset Library UI/API clients", () => {
+  it("allows read-only Asset Library clients but no pages, routes, navigation, or mutation helpers", () => {
     const rendererSourceWithoutDesktopApi = sourceFilesUnder("apps/desktop/src/renderer")
       .filter((file) => !file.path.replace(/\\/g, "/").endsWith("src/renderer/lib/desktopApi.ts"))
       .map((file) => `\n// ${file.path}\n${file.source}`)
       .join("\n");
+    const sharedAssetLibrarySource = combinedSource("modules/ui/shared/asset-library");
     const source = [
       rendererSourceWithoutDesktopApi,
       combinedSource("apps/thin-client/src"),
+      sharedAssetLibrarySource,
     ].join("\n");
 
-    assert.doesNotMatch(source, /\bAssetLibrary\b|\bAssetRegistry\b|\bAssetKernel\b/);
-    assert.doesNotMatch(source, /\/api\/asset(?:\/|["'`?])/i);
-    assert.doesNotMatch(source, /\b(?:assetLibraryClient|assetRegistryClient|assetKernelClient|useAssetLibrary|useAssetRegistry)\b/i);
-    assert.doesNotMatch(source, /\b(?:listAssetDefinitions|readAssetDefinition|listAssetInstances|readAssetInstance)\b/);
+    assert.match(source, /\bcreateDesktopAssetLibraryClient\b/);
+    assert.match(source, /\bcreateApiAssetLibraryClient\b/);
+    assert.match(source, /\bAssetLibraryDefinitionCard\b/);
+    assert.match(source, /\blistAssetDefinitions\b/);
+    assert.match(source, /\breadAssetDefinition\b/);
+    assert.doesNotMatch(source, /\b(?:AssetLibraryPage|AssetLibraryRoute|AssetLibraryNav|useAssetLibrary|useAssetRegistry)\b/i);
+    assert.doesNotMatch(source, /(?:createBrowserRouter|Route|NavLink|Link)\([^)]*asset-library/i);
+    assert.doesNotMatch(source, /["'`]\/(?:asset-library|assets\/library)(?:["'`/?#])/i);
+    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|scanResources|executeAsset)\b/i);
+    assert.doesNotMatch(source, /\b(?:listAssetInstances|readAssetInstance|listAssetCompositions|readAssetComposition|readAssetRegistrySummary)\b/i);
   });
 
   it("keeps application asset services and shared host helpers free of forbidden outer-layer imports and storage scans", () => {

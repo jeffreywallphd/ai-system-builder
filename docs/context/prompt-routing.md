@@ -111,3 +111,7 @@ Desktop IPC/preload Asset Registry work should include `asset-kernel`, `desktop-
 ## Phase 2C cleanup: read-only Asset Registry transport parity
 
 For API/IPC/preload cleanup prompts, include `asset-kernel`, `server-host`, `desktop-host`, `ipc-electron`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Keep the operation scope explicit: definition list, definition read, and definition-version read only unless a later prompt has already added more. Shared transport-adapter input normalization is appropriate; renderer UI, thin-client UI, mutation, seeding, import/finalize/register, scan, runtime execution, provider calls, and persistence access remain out of scope.
+
+## Phase 2C Prompt 4: shared Asset Library read client and UI read models
+
+For shared Asset Library UI-client/read-model prompts, include `asset-kernel`, `desktop-host`, `server-host`, `ipc-electron`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Scope is definitions-only UI-facing read models, safe mappers, shared query/detail option types, desktop renderer preload-backed read client, and thin-client GET-only API read client. Asset Library pages/routes/navigation, mutations, seeding, import/finalize/register, scans, runtime/provider execution, byte reads, application service imports, host composition imports, persistence imports, server route-handler imports, and IPC-handler imports remain out of scope.
