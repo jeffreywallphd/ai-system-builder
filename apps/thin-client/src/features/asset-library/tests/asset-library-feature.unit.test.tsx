@@ -243,8 +243,10 @@ describe("thin-client AssetLibraryFeature", () => {
     await act(async () => cardButton.click());
     await flush();
 
-    expect(container.textContent).not.toContain("Validation");
-    const validationButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Check validation")) as HTMLButtonElement;
+    expect(container.textContent).toContain("Validation details are loaded only when requested.");
+    expect(container.textContent).not.toContain("Validation summary");
+    expect(container.textContent).not.toContain("Valid With Warnings");
+    const validationButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Check validation details")) as HTMLButtonElement;
     await act(async () => validationButton.click());
     await flush();
 
@@ -256,8 +258,8 @@ describe("thin-client AssetLibraryFeature", () => {
         includeValidation: true,
       },
     ]);
-    expect(container.textContent).toContain("Validation");
-    const validationToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Validation")) as HTMLButtonElement;
+    expect(container.textContent).toContain("Validation summary");
+    const validationToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Validation summary")) as HTMLButtonElement;
     expect(validationToggle.getAttribute("aria-expanded")).toBe("false");
   });
 
@@ -276,7 +278,7 @@ describe("thin-client AssetLibraryFeature", () => {
 
     await act(async () => cardButton.click());
     await flush();
-    const validationButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Check validation")) as HTMLButtonElement;
+    const validationButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Check validation details")) as HTMLButtonElement;
     await act(async () => validationButton.click());
     await flush();
 
@@ -290,11 +292,11 @@ describe("thin-client AssetLibraryFeature", () => {
     await act(async () => cardButton.click());
     await flush();
 
-    for (const label of ["Configuration", "Ports", "Requirements", "Provenance", "Safe metadata"]) {
+    for (const label of ["Configuration summary", "Ports", "Requirements", "Source", "Details"]) {
       expect(container.textContent).toContain(label);
     }
 
-    const metadataToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Safe metadata")) as HTMLButtonElement;
+    const metadataToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Details")) as HTMLButtonElement;
     const metadataPanel = document.getElementById(metadataToggle.getAttribute("aria-controls") ?? "") as HTMLDivElement;
     expect(metadataPanel.hidden).toBe(true);
     await act(async () => metadataToggle.click());

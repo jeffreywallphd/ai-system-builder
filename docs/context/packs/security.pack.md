@@ -148,3 +148,7 @@ The desktop read-only Asset Library page renders only shared UI-facing read mode
 ## Phase 2C Prompt 6: thin-client Asset Library page sanitization
 
 The thin-client read-only Asset Library page renders only shared UI-facing read models from the GET-only server API client. List cards avoid raw metadata, detail advanced sections are collapsed by default, safe metadata is rendered only after shared mapper sanitization, and user-visible errors remain generic/safe. The page must not expose asset seeding, mutation, import, finalization, registration, resource scanning, runtime/provider execution, raw payloads, local paths, secrets, tokens, command lines, bytes, blobs, base64 content, or stack traces.
+
+## Phase 2C Prompt 7: Asset Library advanced detail panels
+
+Desktop and thin-client advanced Asset Library detail panels remain read-only and render only sanitized UI read models. Validation summaries are shown only when already present or explicitly requested through the existing bounded read option; normal selection must not request validation. Safe metadata must omit unsafe values entirely, including local/temp paths, secrets, tokens, auth headers, env values, command lines, stack traces, raw provider payloads, bytes, blobs, and base64 content.

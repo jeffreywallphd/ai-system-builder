@@ -154,14 +154,27 @@
   overflow-wrap: anywhere;
 }
 
+.asset-library-empty-value,
+.asset-library-panel-note {
+  color: var(--color-text-secondary);
+}
+
+.asset-library-panel-note {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .asset-library-metadata {
   max-height: 16rem;
   overflow: auto;
+  max-width: 100%;
   margin: 0;
   border-radius: var(--radius-sm);
   background: var(--color-bg-primary);
   color: var(--color-text-secondary);
   padding: var(--space-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 56rem) {
