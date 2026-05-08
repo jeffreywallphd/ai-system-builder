@@ -140,9 +140,13 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.doesNotMatch(source, /\b(?:RuntimeTaskRegistryPort|runtime-readiness|startRuntime|probeRuntime|installRuntime|repairRuntime|executeRuntime|DatasetPreparationUseCase|PrepareTrainingDataset|ModelTrainingPort|TrainModelUseCase|ModelValidationPort|ValidateModelUseCase|ModelPublisherPort|PublishModelUseCase|ImageGenerationUseCase|finalizeGeneratedOutput|Finaliz\w+Generated|createAssetInstance|persistMapping|registerAsset|importAsset|localizeArtifact|publishArtifact|seedBuiltIns)\b/i);
   });
 
-  it("keeps descriptor-source seams provider-local before host wiring", () => {
+  it("keeps descriptor-source seams provider-local through host wiring", () => {
     const portSource = readFileSync(
       join(REPO_ROOT, "modules/application/ports/asset/asset-resource-backed-view-provider.port.ts"),
+      "utf8",
+    );
+    const hostProviderCompositionSource = readFileSync(
+      join(REPO_ROOT, "modules/hosts/shared/composition/composeResourceBackedViewProviders.ts"),
       "utf8",
     );
     const servicesSource = [
@@ -152,6 +156,8 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     ].map((file) => readFileSync(join(REPO_ROOT, file), "utf8")).join("\n");
 
     assert.doesNotMatch(portSource, /\b(?:GeneratedImageOutputDescriptorSource|SafeDatasetDescriptorSource|SafeExternalRepositoryObjectDescriptorSource|SafeArtifactRepoObjectDescriptorSource)\b/);
+    assert.match(hostProviderCompositionSource, /\bcomposeResourceBackedViewProviders\b/);
+    assert.doesNotMatch(hostProviderCompositionSource, /from\s+["'][^"']*(?:adapters\/storage|adapters\/runtime|adapters\/transport|provider-client|huggingface|token|api-express|ipc-electron|preload|renderer|thin-client)[^"']*["']/i);
     assert.match(servicesSource, /Provider-local descriptor-only input seam/);
     assert.match(servicesSource, /Provider-local descriptor-only input seams/);
   });

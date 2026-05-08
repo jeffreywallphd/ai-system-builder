@@ -201,7 +201,10 @@ describe("composeServerHost", () => {
     expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     const internalRegistry = host.getInternalAssetRegistry();
     expect(internalRegistry).toBeDefined();
-    expect(internalRegistry?.diagnostics.resourceBackedViewsEnabled).toBe(false);
+    expect(internalRegistry?.diagnostics.resourceBackedViewsEnabled).toBe(true);
+    const resourceBacked = await internalRegistry?.readFacade.listResourceBackedViewCards({ limit: 10 });
+    expect(resourceBacked?.items).toEqual([]);
+    expect(resourceBacked?.diagnostics?.some((diagnostic) => diagnostic.code.includes("source-unavailable") || diagnostic.code.includes("unsupported"))).toBe(true);
     expect(
       await internalRegistry?.readFacade.listDefinitionCards({ includeBuiltIns: true, includeCustom: true }),
     ).toEqual({ items: [] });
