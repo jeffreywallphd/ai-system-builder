@@ -18,6 +18,12 @@ test("central Asset Kernel sanitizer removes required unsafe keys and string val
     "credential",
     "authorization",
     "auth",
+    "requestId",
+    "taskId",
+    "promptId",
+    "prompt",
+    "negativePrompt",
+    "workflow",
     "storageRootDirectory",
     "runtimeRootDirectory",
     "localPath",
@@ -25,6 +31,10 @@ test("central Asset Kernel sanitizer removes required unsafe keys and string val
     "filePath",
     "path",
     "cache",
+    "signedUrl",
+    "presignedUrl",
+    "accessUrl",
+    "downloadUrl",
     "bytes",
     "blob",
     "contentBase64",
@@ -74,6 +84,8 @@ test("central Asset Kernel sanitizer removes required unsafe keys and string val
     "bytes",
     "blobs",
     "blob",
+    "https://example.invalid/object?X-Amz-Signature=abc",
+    "https://example.invalid/object?token=abc",
   ]) {
     assert.equal(isUnsafeAssetMetadataString(value), true, value);
     assert.equal(sanitizeAssetStringValue(value), undefined, value);
@@ -87,7 +99,15 @@ test("central Asset Kernel sanitizer preserves safe JSON-compatible metadata and
   const sanitized = sanitizeAssetMetadata({
     safe: "visible",
     count: 2,
-    nested: { label: "kept", token: "token=hidden", location: "/tmp/private", storageRootDirectory: "safe-looking-root" },
+    nested: {
+      label: "kept",
+      token: "token=hidden",
+      location: "/tmp/private",
+      storageRootDirectory: "safe-looking-root",
+      prompt: "a safe looking prompt",
+      workflow: { node: "safe-looking-workflow" },
+      signedUrl: "https://example.invalid/object?X-Amz-Signature=abc",
+    },
     values: ["ok", "Bearer hidden", { note: "kept", command: "run" }],
     cyclic,
   });
@@ -95,7 +115,7 @@ test("central Asset Kernel sanitizer preserves safe JSON-compatible metadata and
 
   assert.equal(sanitized?.safe, "visible");
   assert.equal(json.includes("kept"), true);
-  for (const unsafe of ["token=hidden", "/tmp/private", "bearer", "command", "storageRootDirectory", "safe-looking-root", "self"]) {
+  for (const unsafe of ["token=hidden", "/tmp/private", "bearer", "command", "storageRootDirectory", "safe-looking-root", "safe looking prompt", "safe-looking-workflow", "X-Amz-Signature", "self"]) {
     assert.equal(json.includes(unsafe), false, unsafe);
   }
 });
