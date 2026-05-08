@@ -3,4 +3,4 @@ export * from "./assetLibraryReadModels";
 export * from "./assetLibraryMappers";
 export * from "./assetLibraryBrowser";
 export * from "./assetLibraryPresentation";
-export * from "./assetLibraryDetailPanels";
+export * from "./assetLibraryDetailModels";
