@@ -117,3 +117,7 @@
 Phase 2C begins by exposing only a narrow, read-only server API foundation for Asset Registry definition reads. The server routes wrap an application-owned Asset Registry definition read port/read facade and must not receive persistence adapters, host composition helpers, mutation use cases, built-in seeding services, or local repositories.
 
 The current `/api/assets` surface is GET-only for asset definition list/detail/version reads. It must not scan resources, read bytes, call runtimes, call providers, seed built-ins, import/finalize/register assets, mutate assets, or execute workflows. Server host composition may keep the full internal registry private, but `registerExpressApi` and the asset route registration receive only the narrow read facade/read port. Renderer UI and thin-client UI/client exposure remain deferred.
+
+## Phase 2C Prompt 4: thin-client Asset Library read client
+
+The thin-client may now include a read-only Asset Library API client that calls only GET `/api/assets/definitions`, `/api/assets/definitions/:definitionId`, and `/api/assets/definitions/:definitionId/versions/:version`. The client maps server envelopes into shared UI-facing Asset Library read models/results and must not import server route handlers, application services, host composition, persistence adapters, runtime adapters, or mutation/seeding/import/finalize/scan/execute operations. Thin-client Asset Library pages, routes, and navigation remain deferred.

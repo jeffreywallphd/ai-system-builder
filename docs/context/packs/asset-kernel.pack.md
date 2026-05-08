@@ -131,3 +131,9 @@ Desktop IPC and preload now expose read-only Asset Registry definition list/read
 Server API and desktop IPC/preload are now expected to stay in parity for the definitions-only read surface: list definitions, read definition, and read definition version. Public query/input normalization belongs at the transport-adapter boundary before the facade is called, and malformed asset type/family/status, built-in, boolean, expansion, limit, or cursor inputs must fail validation instead of falling through to facade or persistence defaults.
 
 The wrappers must depend only on `AssetRegistryDefinitionReadPort` or an equivalent narrow read-only facade. They must not import or receive `InternalAssetRegistryComposition`, local asset repositories/persistence, mutation use cases, built-in seeding services, resource scanners, runtime adapters, provider clients, or host composition helpers. Asset instances, compositions, registry summaries, resource-backed views, renderer UI, and thin-client UI remain deferred unless a later prompt explicitly adds them.
+
+## Phase 2C Prompt 4: shared Asset Library read clients
+
+Phase 2C now has shared UI-facing Asset Library read models and client helpers for the definitions-only surface. `modules/ui/shared/asset-library` owns display-oriented cards/details, query/detail option types, mapper helpers, safe client errors, and result envelopes; desktop renderer and thin-client clients consume preload/API reads and expose that shared UI shape. They must not call application services, local persistence, host composition, runtime adapters, server route handlers, or Electron IPC handlers directly.
+
+Asset Library pages, routes, navigation, hooks/components, instances/compositions/resource-backed views, registry summaries, mutations, seeding, import/finalize/register, scans, runtime/provider execution, and byte reads remain deferred.
