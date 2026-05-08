@@ -88,6 +88,7 @@ import {
   composeInternalAssetRegistry,
   type InternalAssetRegistryComposition,
 } from "../../shared/composition/composeInternalAssetRegistry";
+import { composeResourceBackedViewProviders } from "../../shared/composition/composeResourceBackedViewProviders";
 
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
 const execFile = promisify(nodeExecFile);
@@ -379,10 +380,6 @@ export function composeServerHost(
       return internalAssetRegistry;
     },
     registerApi(registerOptions) {
-      internalAssetRegistry = composeInternalAssetRegistry({
-        rootDirectory: registerOptions.storageRootDirectory,
-        now: options.now,
-      });
       const env = options.env ?? process.env;
       const defaultRuntimeRootDirectory = joinHostPath(dirname(registerOptions.storageRootDirectory), "server-runtime");
       const applicationSettings = createLocalApplicationSettingsAdapter({
@@ -750,6 +747,20 @@ export function composeServerHost(
       };
 
       const modelRegistry = createLocalModelRegistryAdapter({ filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`, now: options.now });
+      const imageAssetRegistry = createLocalImageAssetRegistryAdapter({
+        filePath: joinHostPath(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
+        now: options.now,
+      });
+      internalAssetRegistry = composeInternalAssetRegistry({
+        rootDirectory: registerOptions.storageRootDirectory,
+        now: options.now,
+        resourceBackedViewProvider: composeResourceBackedViewProviders({
+          artifactBrowserMetadataRead: artifactBrowserRead,
+          imageAssetDescriptorRead: imageAssetRegistry,
+          modelRegistry,
+          publishedModelRegistry: modelRegistry,
+        }),
+      });
       const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({
         accessTokenProvider: () => tokenConfigStore.getToken(),
         logger: modelManagementLogger,
@@ -885,10 +896,7 @@ export function composeServerHost(
       const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({
         runtimeTaskRegistry,
         finalizeImageGenerationService: new FinalizeImageGenerationService({
-          imageAssetRegistry: createLocalImageAssetRegistryAdapter({
-            filePath: join(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
-            now: options.now,
-          }),
+          imageAssetRegistry,
           generatedImagePersistence: createFilesystemGeneratedImagePersistenceAdapter({
             comfyUiOutputRoot: joinHostPath(comfyUiInstallRoot, "output"),
             artifactStorageRoot: registerOptions.storageRootDirectory,

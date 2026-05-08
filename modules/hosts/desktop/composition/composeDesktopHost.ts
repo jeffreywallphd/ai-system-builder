@@ -96,6 +96,7 @@ import {
   composeInternalAssetRegistry,
   type InternalAssetRegistryComposition,
 } from "../../shared/composition/composeInternalAssetRegistry";
+import { composeResourceBackedViewProviders } from "../../shared/composition/composeResourceBackedViewProviders";
 import {
   registerElectronIpc,
 } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
@@ -734,10 +735,6 @@ export function composeDesktopHost(
       return internalAssetRegistry;
     },
     registerArtifactUploadIpc(registerOptions) {
-      internalAssetRegistry = composeInternalAssetRegistry({
-        rootDirectory: registerOptions.storageRootDirectory,
-        now,
-      });
       const comfyUiInstallRoot = resolveComfyUiInstallRoot(process.env, registerOptions.runtimeRootDirectory);
       const comfyUiBasePythonCommand = process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3");
       const comfyUiPythonEnvironmentMode = resolveComfyUiPythonEnvironmentMode(process.env);
@@ -1041,6 +1038,20 @@ export function composeDesktopHost(
         filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`,
         now,
       });
+      const imageAssetRegistry = createLocalImageAssetRegistryAdapter({
+        filePath: join(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
+        now,
+      });
+      internalAssetRegistry = composeInternalAssetRegistry({
+        rootDirectory: registerOptions.storageRootDirectory,
+        now,
+        resourceBackedViewProvider: composeResourceBackedViewProviders({
+          artifactBrowserMetadataRead: artifactBrowserRead,
+          imageAssetDescriptorRead: imageAssetRegistry,
+          modelRegistry,
+          publishedModelRegistry: modelRegistry,
+        }),
+      });
       const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({
         accessTokenProvider: () => tokenConfigStore.getToken(),
       });
@@ -1132,10 +1143,7 @@ export function composeDesktopHost(
       const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({
         runtimeTaskRegistry,
         finalizeImageGenerationService: new FinalizeImageGenerationService({
-          imageAssetRegistry: createLocalImageAssetRegistryAdapter({
-            filePath: join(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
-            now,
-          }),
+          imageAssetRegistry,
           generatedImagePersistence: createFilesystemGeneratedImagePersistenceAdapter({
             comfyUiOutputRoot: join(comfyUiInstallRoot, "output"),
             artifactStorageRoot: registerOptions.storageRootDirectory,
