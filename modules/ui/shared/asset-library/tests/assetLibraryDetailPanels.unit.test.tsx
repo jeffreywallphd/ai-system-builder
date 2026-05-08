@@ -122,6 +122,7 @@ describe("asset library shared detail panels", () => {
     expect(markup).toContain("hidden=\"\"");
     expect(markup).not.toContain("Definition ID");
     expect(markup).not.toContain("asset-definition:");
+    expect(markup).not.toContain("Review");
   });
 
   it("does not render fake validation success or zero issue state when validation is absent", () => {
@@ -161,8 +162,21 @@ describe("asset library shared detail panels", () => {
         displayName: "Custom asset",
         metadata: {
           safeNote: "visible",
-          localPath: "C:\\Users\\name\\secret",
-          token: "Bearer abc",
+          localPath: "C:\\Users\\name\\secret.txt",
+          tempPath: "/tmp/private/file",
+          cachePath: "/home/user/.cache/token",
+          token: "Bearer abc123",
+          apiKey: "apiKey=abc123",
+          password: "password",
+          secret: "secret",
+          auth: "auth",
+          encoded: "data:image/png;base64,AAAA",
+          stack: "stack trace",
+          command: "command",
+          env: "process.env",
+          rawProviderPayload: "raw provider payloads",
+          bytes: "bytes",
+          blobs: "blobs",
         },
       },
     });
@@ -176,7 +190,24 @@ describe("asset library shared detail panels", () => {
     );
 
     expect(markup).toContain("visible");
-    expect(markup).not.toContain("C:\\Users\\name\\secret");
-    expect(markup).not.toContain("Bearer abc");
+    for (const unsafe of [
+      "C:\\Users\\name\\secret.txt",
+      "/tmp/private/file",
+      "/home/user/.cache/token",
+      "Bearer abc123",
+      "apiKey=abc123",
+      "password",
+      "secret",
+      "auth",
+      "data:image/png;base64",
+      "stack trace",
+      "command",
+      "process.env",
+      "raw provider payloads",
+      "bytes",
+      "blobs",
+    ]) {
+      expect(markup).not.toContain(unsafe);
+    }
   });
 });

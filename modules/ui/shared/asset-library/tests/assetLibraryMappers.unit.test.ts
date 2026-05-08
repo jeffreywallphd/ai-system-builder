@@ -9,23 +9,23 @@ import {
 import * as assetLibraryExports from "../index";
 
 const unsafeValues = [
-  "/tmp/secret",
-  "/home/user/private",
-  "C:\\Users\\name\\secret",
-  "Bearer abc",
-  "apiKey",
+  "C:\\Users\\name\\secret.txt",
+  "/tmp/private/file",
+  "/home/user/.cache/token",
+  "Bearer abc123",
+  "apiKey=abc123",
   "token",
   "password",
   "secret",
   "auth",
-  "stack",
   "stack trace",
   "command",
   "process.env",
   "base64",
   "data:image/png;base64,AAAA",
-  "blob",
-  "raw provider payload-like text",
+  "bytes",
+  "blobs",
+  "raw provider payloads",
 ];
 
 function detailPayload(overrides: Record<string, unknown> = {}) {
@@ -76,9 +76,9 @@ function detailPayload(overrides: Record<string, unknown> = {}) {
       ],
       metadata: {
         safe: "visible",
-        localPath: "/tmp/secret",
+        localPath: "/tmp/private/file",
         nested: {
-          token: "Bearer abc",
+          token: "Bearer abc123",
           note: "safe nested note",
         },
       },
@@ -190,9 +190,9 @@ describe("asset library mappers", () => {
     const mapped = mapAssetDefinitionDetail(detailPayload({
       description: "/home/user/private",
       aiContext: {
-        purpose: "Bearer abc",
+        purpose: "Bearer abc123",
         userFacingSummary: "safe user summary",
-        developerFacingSummary: "raw provider payload-like text",
+        developerFacingSummary: "raw provider payloads",
       },
       provenance: {
         sourceKind: "system-generated",
@@ -299,6 +299,6 @@ describe("asset library mappers", () => {
     const source = readFileSync(join(process.cwd(), "modules/ui/shared/asset-library/assetLibraryReadModels.ts"), "utf8");
     expect(source).not.toContain("createAssetDefinition");
     expect(source).not.toContain("seedBuiltInAssetDefinitions");
-    expect(source).not.toMatch(/\b(?:importAsset|finalizeAsset|registerAsset|scanResources|executeAsset)\b/);
+    expect(/\b(?:importAsset|finalizeAsset|registerAsset|scanResources|executeAsset)\b/.test(source)).toBe(false);
   });
 });

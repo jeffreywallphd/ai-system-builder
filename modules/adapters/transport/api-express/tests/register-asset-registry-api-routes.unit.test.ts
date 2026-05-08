@@ -45,6 +45,8 @@ const UNSAFE_PAYLOAD_PATTERNS = [
   /command/i,
   /process\.env/i,
   /base64/i,
+  /bytes/i,
+  /blobs/i,
   /blob/i,
   /provider payload/i,
   /raw exception/i,
@@ -121,6 +123,24 @@ describe("registerAssetRegistryApiRoutes", () => {
     expect(readDefinitionDetail).toHaveBeenCalledWith({ kind: "asset-definition", id: "builtin.workflow", version: "2.0.0" }, expect.any(Object));
     expect(status).toHaveBeenCalledWith(200);
     expect(json.mock.calls[0]?.[0]).toMatchObject({ ok: true, operation: "asset.definition-version-read" });
+  });
+
+  it("does not request validation on default detail reads", async () => {
+    const { app, handlers } = appAndHandlers();
+    const readDefinitionDetail = testDouble.fn(async () => definitionDetail());
+    registerAssetRegistryApiRoutes({ app, assetRegistryRead: { listDefinitionCards: testDouble.fn(), readDefinitionDetail } as any });
+    const { res } = response();
+
+    await handlers.get("/api/assets/definitions/:definitionId")({
+      params: { definitionId: "builtin.workflow" },
+      query: { expand: "aiContext,metadata" },
+      headers: {},
+    }, res);
+
+    expect(readDefinitionDetail).toHaveBeenCalledWith(
+      { kind: "asset-definition", id: "builtin.workflow" },
+      { includeValidation: undefined, includeAiContext: true, includeConfigurationSchema: false, includePorts: false, includeRequirements: false, includeMetadata: true },
+    );
   });
 
   it("returns 404 when a definition is missing", async () => {
@@ -221,6 +241,8 @@ describe("registerAssetRegistryApiRoutes", () => {
             command: "rm -rf /",
             envValue: "process.env",
             base64: "data:image/png;base64,AAAA",
+            bytes: "bytes",
+            blobs: "blobs",
             blob: "raw provider payload",
           },
         })),

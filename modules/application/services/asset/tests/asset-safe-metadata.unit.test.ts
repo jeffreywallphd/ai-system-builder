@@ -40,12 +40,17 @@ test("central Asset Kernel sanitizer removes required unsafe keys and string val
 
   for (const value of [
     "/tmp/private/file.txt",
+    "/tmp/private/file",
+    "/home/user/.cache/token",
     "/etc/passwd",
     "~/private/file.txt",
     "../relative-secret.txt",
+    "C:\\Users\\name\\secret.txt",
     "C:/Users/name/secret.bin",
     "C:\\Users\\name\\secret.bin",
+    "Bearer abc123",
     "Bearer abcdef._~+/=-",
+    "apiKey=abc123",
     "apiKey=hidden",
     "api key: hidden",
     "apiKey",
@@ -66,6 +71,8 @@ test("central Asset Kernel sanitizer removes required unsafe keys and string val
     "command",
     "process.env",
     "base64",
+    "bytes",
+    "blobs",
     "blob",
   ]) {
     assert.equal(isUnsafeAssetMetadataString(value), true, value);

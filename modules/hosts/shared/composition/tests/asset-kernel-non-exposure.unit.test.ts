@@ -94,6 +94,8 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.match(combinedSource("apps/thin-client/src/routes"), /label:\s*["'`]Assets["'`]/);
     assert.match(source, /\blistAssetDefinitions\b/);
     assert.match(source, /\breadAssetDefinition\b/);
+    assert.match(sharedAssetLibrarySource, /readDetail\(definition,\s*\{\s*\}\)/);
+    assert.match(sharedAssetLibrarySource, /readDetail\(selectedDefinition,\s*\{\s*includeValidation:\s*true\s*\}\)/);
     assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|publishAsset|scanResources|executeAsset|runAsset|syncAssets|repairAsset|installAsset|startAsset|trainAsset)\b/i);
     assert.doesNotMatch(source, /\b(?:listAssetInstances|readAssetInstance|listAssetCompositions|readAssetComposition|readAssetRegistrySummary)\b/i);
   });

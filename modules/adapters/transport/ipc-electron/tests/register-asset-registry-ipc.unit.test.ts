@@ -56,6 +56,8 @@ const UNSAFE_PAYLOAD_PATTERNS = [
   /command/i,
   /process\.env/i,
   /base64/i,
+  /bytes/i,
+  /blobs/i,
   /blob/i,
   /provider payload/i,
   /raw exception/i,
@@ -139,6 +141,23 @@ describe("registerAssetRegistryIpc", () => {
 
     expect(readDefinitionDetail).toHaveBeenCalledWith({ kind: "asset-definition", id: "builtin.workflow", version: "2.0.0" }, expect.any(Object));
     expect(response).toMatchObject({ ok: true, operation: "asset.definition-version-read" });
+  });
+
+  it("does not request validation on default detail reads", async () => {
+    const readDefinitionDetail = testDouble.fn(async () => definitionDetail());
+    const handler = createDesktopAssetDefinitionReadIpcHandler({ assetRegistryRead: readPort({ readDefinitionDetail }) });
+    const request = createDesktopAssetDefinitionReadRequest({
+      definitionId: "builtin.workflow",
+      expand: ["aiContext", "metadata"],
+      boundary: { host: "desktop", source: "desktop.renderer.asset-registry" },
+    });
+
+    await handler({}, request);
+
+    expect(readDefinitionDetail).toHaveBeenCalledWith(
+      { kind: "asset-definition", id: "builtin.workflow" },
+      { includeValidation: undefined, includeAiContext: true, includeConfigurationSchema: false, includePorts: false, includeRequirements: false, includeMetadata: true },
+    );
   });
 
   it("maps missing definitions to not-found failures", async () => {
@@ -247,6 +266,8 @@ describe("registerAssetRegistryIpc", () => {
             command: "rm -rf /",
             envValue: "process.env",
             base64: "data:image/png;base64,AAAA",
+            bytes: "bytes",
+            blobs: "blobs",
             blob: "raw provider payload",
           },
         })),
