@@ -2,8 +2,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { describe, expect, it } from "../../../../testing/node-test";
 import {
-  AssetLibraryDefinitionDetailView,
-  AssetLibraryDetailRow,
   buildAssetLibraryAdvancedSections,
   formatAssetLibraryBoolean,
   formatAssetLibraryDate,
@@ -12,6 +10,10 @@ import {
   mapAssetDefinitionDetail,
   type AssetLibraryDefinitionDetail,
 } from "../index";
+import {
+  AssetLibraryDefinitionDetailView,
+  AssetLibraryDetailRow,
+} from "../assetLibraryDetailPanels";
 
 const baseDetail: AssetLibraryDefinitionDetail = {
   id: "builtin.document@1.0.0",

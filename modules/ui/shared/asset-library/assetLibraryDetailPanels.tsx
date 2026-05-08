@@ -3,37 +3,17 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 import type { AssetMetadata } from "../../../contracts/asset";
 import type { AssetLibraryDefinitionDetail } from "./assetLibraryReadModels";
 import {
+  buildAssetLibraryAdvancedSections,
+  type AssetLibraryAdvancedSectionKey,
+  type AssetLibraryAdvancedSectionModel,
+  type AssetLibraryDetailRowModel,
+} from "./assetLibraryDetailModels";
+import {
   displayAssetLibraryValue,
-  formatAssetLibraryBoolean,
-  formatAssetLibraryDate,
-  formatAssetLibraryLabel,
   getAssetLibraryFamilyLabel,
   getAssetLibraryLifecycleStatusLabel,
   getAssetLibraryTypeLabel,
 } from "./assetLibraryPresentation";
-
-export type AssetLibraryAdvancedSectionKey =
-  | "aiContext"
-  | "configuration"
-  | "ports"
-  | "requirements"
-  | "provenance"
-  | "validation"
-  | "metadata";
-
-export interface AssetLibraryDetailRowModel {
-  readonly label: string;
-  readonly value: string | number | undefined;
-}
-
-export interface AssetLibraryAdvancedSectionModel {
-  readonly key: AssetLibraryAdvancedSectionKey;
-  readonly title: string;
-  readonly summary?: string;
-  readonly rows: readonly AssetLibraryDetailRowModel[];
-  readonly note?: string;
-  readonly metadata?: AssetMetadata;
-}
 
 export interface AssetLibraryDefinitionDetailViewProps {
   readonly detail?: AssetLibraryDefinitionDetail;
@@ -53,129 +33,6 @@ const COLLAPSED_SECTIONS: Readonly<Record<AssetLibraryAdvancedSectionKey, boolea
   validation: false,
   metadata: false,
 };
-
-function joined(values: readonly string[]): string | undefined {
-  return values.length > 0 ? values.join(", ") : undefined;
-}
-
-export function buildAssetLibraryAdvancedSections(
-  detail: AssetLibraryDefinitionDetail | undefined,
-): readonly AssetLibraryAdvancedSectionModel[] {
-  if (!detail) return [];
-
-  const sections: AssetLibraryAdvancedSectionModel[] = [];
-
-  if (detail.aiContextSummary) {
-    sections.push({
-      key: "aiContext",
-      title: "AI-readable context",
-      summary: "Summary only. Full prompt context is not shown here.",
-      rows: [
-        { label: "What this is for", value: detail.aiContextSummary.purpose },
-        { label: "User summary", value: detail.aiContextSummary.userFacingSummary },
-        { label: "Developer summary", value: detail.aiContextSummary.developerFacingSummary },
-        { label: "What it can do", value: detail.aiContextSummary.capabilityCount },
-        { label: "Limitations", value: detail.aiContextSummary.limitationCount },
-        { label: "Limits and safety notes", value: detail.aiContextSummary.safetyNoteCount },
-      ],
-    });
-  }
-
-  if (detail.configurationSummary) {
-    sections.push({
-      key: "configuration",
-      title: "Configuration",
-      summary: "Read-only summary. This is not an editable setup form.",
-      rows: [
-        { label: "Schema ID", value: detail.configurationSummary.schemaId },
-        { label: "Schema version", value: detail.configurationSummary.schemaVersion },
-        { label: "Fields", value: detail.configurationSummary.fieldCount },
-        { label: "Required fields", value: detail.configurationSummary.requiredFieldCount },
-        { label: "Strict mode", value: formatAssetLibraryBoolean(detail.configurationSummary.strict) },
-        { label: "Description", value: detail.configurationSummary.description },
-      ],
-    });
-  }
-
-  if (detail.portsSummary) {
-    sections.push({
-      key: "ports",
-      title: "Inputs and outputs",
-      summary: "Connection points this building block describes.",
-      rows: [
-        { label: "Total ports", value: detail.portsSummary.totalCount },
-        { label: "Inputs", value: detail.portsSummary.inputCount },
-        { label: "Outputs", value: detail.portsSummary.outputCount },
-        { label: "Events", value: detail.portsSummary.eventCount },
-        { label: "Actions or controls", value: detail.portsSummary.controlCount },
-      ],
-    });
-  }
-
-  if (detail.requirementsSummary) {
-    sections.push({
-      key: "requirements",
-      title: "Requirements",
-      summary: "Declared needs only. This does not check whether a runtime is currently available.",
-      rows: [
-        { label: "Total requirements", value: detail.requirementsSummary.totalCount },
-        { label: "Required", value: detail.requirementsSummary.requiredCount },
-        { label: "Runtime needs", value: joined(detail.requirementsSummary.runtimeCapabilityIds) },
-        { label: "Where it can run", value: joined(detail.requirementsSummary.hostKinds) },
-        { label: "Safety", value: joined(detail.requirementsSummary.safetyStatuses) },
-      ],
-    });
-  }
-
-  if (detail.provenanceSummary) {
-    sections.push({
-      key: "provenance",
-      title: "Source",
-      summary: "Safe origin and authorship details.",
-      rows: [
-        { label: "Source kind", value: formatAssetLibraryLabel(detail.provenanceSummary.sourceKind) },
-        { label: "Authorship", value: formatAssetLibraryLabel(detail.provenanceSummary.authorship) },
-        { label: "Created", value: formatAssetLibraryDate(detail.provenanceSummary.createdAt) },
-        { label: "Updated", value: formatAssetLibraryDate(detail.provenanceSummary.updatedAt) },
-        { label: "Generation summary", value: detail.provenanceSummary.redactedGenerationSummary },
-      ],
-    });
-  }
-
-  if (detail.validationSummary) {
-    sections.push({
-      key: "validation",
-      title: "Validation summary",
-      summary: "Registry validation details loaded on request.",
-      rows: [
-        { label: "Status", value: formatAssetLibraryLabel(detail.validationSummary.status) },
-        { label: "Issues", value: detail.validationSummary.issueCount },
-        { label: "Errors", value: detail.validationSummary.errorCount },
-        { label: "Warnings", value: detail.validationSummary.warningCount },
-        { label: "Checked", value: formatAssetLibraryDate(detail.validationSummary.validatedAt) },
-      ],
-    });
-  }
-
-  if (detail.metadata) {
-    sections.push({
-      key: "metadata",
-      title: "Details",
-      summary: "Sensitive or unsafe metadata is omitted.",
-      note: "Sensitive or unsafe metadata is omitted",
-      rows: [],
-      metadata: detail.metadata,
-    });
-  }
-
-  return sections;
-}
-
-export function getAssetLibraryAdvancedSections(
-  detail: AssetLibraryDefinitionDetail | undefined,
-): readonly AssetLibraryAdvancedSectionKey[] {
-  return buildAssetLibraryAdvancedSections(detail).map((section) => section.key);
-}
 
 export function AssetLibraryEmptyValue() {
   return <span className="asset-library-empty-value">Not specified</span>;
