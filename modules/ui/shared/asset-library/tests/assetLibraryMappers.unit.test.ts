@@ -28,6 +28,8 @@ const unsafeValues = [
   "bytes",
   "blobs",
   "raw provider payloads",
+  "https://example.invalid/object?X-Amz-Signature=abc",
+  "https://example.invalid/object?token=abc",
 ];
 
 function detailPayload(overrides: Record<string, unknown> = {}) {
@@ -308,7 +310,12 @@ describe("asset library mappers", () => {
         displayName: "Generated output",
         metadata: {
           safe: "visible",
-          prompt: "raw provider payloads",
+          prompt: "safe looking prompt",
+          negativePrompt: "safe looking negative prompt",
+          workflow: { node: "safe-looking-workflow" },
+          requestId: "request-123",
+          taskId: "task-123",
+          signedUrl: "https://example.invalid/object?X-Amz-Signature=abc",
           storageRootDirectory: "/tmp/private/file",
           bytes: "bytes",
         },
@@ -326,6 +333,12 @@ describe("asset library mappers", () => {
     expect(detail.resourceBackingSummary).toMatchObject({ resourceKind: "generated-output", contentType: "image/png" });
     expect(JSON.stringify(detail)).not.toContain("/tmp/private/file");
     expect(JSON.stringify(detail)).not.toContain("raw provider payloads");
+    expect(JSON.stringify(detail)).not.toContain("safe looking prompt");
+    expect(JSON.stringify(detail)).not.toContain("safe looking negative prompt");
+    expect(JSON.stringify(detail)).not.toContain("safe-looking-workflow");
+    expect(JSON.stringify(detail)).not.toContain("request-123");
+    expect(JSON.stringify(detail)).not.toContain("task-123");
+    expect(JSON.stringify(detail)).not.toContain("X-Amz-Signature");
     expect(JSON.stringify(detail)).not.toContain("bytes");
   });
 

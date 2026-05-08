@@ -23,7 +23,7 @@ import type {
 } from "./assetLibraryReadModels";
 
 const UNSAFE_KEY_PATTERN =
-  /(token|secret|password|credential|authorization|auth|storagerootdirectory|runtimerootdirectory|localpath|filesystempath|filepath|path|cache|bytes|blob|contentbase64|base64|raw|payload|command|stack|env|apikey|apiKey)/i;
+  /(token|secret|password|credential|authorization|auth|requestid|taskid|promptid|prompt|negativeprompt|workflow|storagerootdirectory|runtimerootdirectory|localpath|filesystempath|filepath|path|cache|signedurl|presignedurl|accessurl|downloadurl|bytes|blob|contentbase64|base64|raw|payload|command|stack|env|apikey|apiKey)/i;
 const LOCAL_PATH_VALUE_PATTERN =
   /(^~\/|^\.\.?\/|^\/(?:tmp|var|home|users|etc|private|opt|usr|mnt|volumes)(?:\/|$)|^[a-z]:[\\/]|\\(?:Users|Temp)\\|\/(?:tmp|temp)\/)/i;
 const SECRET_VALUE_PATTERN =
@@ -32,6 +32,7 @@ const UNSAFE_DIAGNOSTIC_VALUE_PATTERN =
   /\b(stack trace|stack|command|base64|bytes?|blobs?|raw provider payloads?|provider payloads?|raw exception|exception message|process\.env)\b/i;
 const DATA_BASE64_VALUE_PATTERN = /^data:[^,;]+;base64,/i;
 const LONG_BASE64_VALUE_PATTERN = /^[A-Za-z0-9+/]{80,}={0,2}$/;
+const SIGNED_OR_QUERY_URL_VALUE_PATTERN = /^https?:\/\/\S+\?(?:\S*?(?:x-amz-signature|x-goog-signature|signature|sig|token|access_token|auth|expires|X-Amz-Signature)=\S+|\S{24,})/i;
 
 interface EnvelopeLike {
   readonly ok?: boolean;
@@ -58,7 +59,8 @@ function safeString(value: unknown): string | undefined {
     SECRET_VALUE_PATTERN.test(trimmed) ||
     UNSAFE_DIAGNOSTIC_VALUE_PATTERN.test(trimmed) ||
     DATA_BASE64_VALUE_PATTERN.test(trimmed) ||
-    LONG_BASE64_VALUE_PATTERN.test(trimmed)
+    LONG_BASE64_VALUE_PATTERN.test(trimmed) ||
+    SIGNED_OR_QUERY_URL_VALUE_PATTERN.test(trimmed)
   ) {
     return undefined;
   }
