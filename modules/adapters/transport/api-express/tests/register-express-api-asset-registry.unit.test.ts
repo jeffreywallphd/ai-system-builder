@@ -51,7 +51,7 @@ describe("registerExpressApi asset registry", () => {
 
     const getPaths = app.get.mock.calls.map((call: any) => call[0]);
     expect(getPaths).toContain("/api/runtime/readiness");
-    expect(getPaths.some((path: string) => path.startsWith("/api/artifacts"))).toBe(true);
+    expect(getPaths.some((path: string) => path.startsWith("/api/artifact"))).toBe(true);
     expect(app.post.mock.calls.length > 0).toBe(true);
   });
 });

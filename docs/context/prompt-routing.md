@@ -107,3 +107,7 @@ The initial `/api/assets` surface is GET-only for asset definition list/detail/v
 ## Phase 2C Prompt 3: read-only Asset Registry desktop IPC/preload foundation
 
 Desktop IPC/preload Asset Registry work should include `asset-kernel`, `desktop-host`, `ipc-electron`, `security`, and `testing`. Scope is definition list/read/version-read wrappers around the application read facade/read port only. Renderer UI, thin-client UI/client code, mutations, seeding, import/finalize/register, resource scans, runtime execution, provider calls, and direct persistence access remain out of scope.
+
+## Phase 2C cleanup: read-only Asset Registry transport parity
+
+For API/IPC/preload cleanup prompts, include `asset-kernel`, `server-host`, `desktop-host`, `ipc-electron`, `security`, and `testing`, plus canonical Asset Kernel/host/dependency docs. Keep the operation scope explicit: definition list, definition read, and definition-version read only unless a later prompt has already added more. Shared transport-adapter input normalization is appropriate; renderer UI, thin-client UI, mutation, seeding, import/finalize/register, scan, runtime execution, provider calls, and persistence access remain out of scope.

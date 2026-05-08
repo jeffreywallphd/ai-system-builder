@@ -125,3 +125,9 @@ The initial `/api/assets` surface is GET-only for asset definition list/detail/v
 ## Phase 2C Prompt 3: read-only Asset Registry desktop IPC/preload foundation
 
 Desktop IPC and preload now expose read-only Asset Registry definition list/read/version-read wrappers around the application read facade/read port. The handlers must not receive persistence adapters, host composition helpers, mutation use cases, seed services, runtime/storage adapters, provider clients, or resource scan seams. Renderer UI, thin-client UI/client work, mutations, seeding, import/finalize/register, resource scans, runtime execution, and provider calls remain deferred.
+
+## Phase 2C cleanup checkpoint
+
+Server API and desktop IPC/preload are now expected to stay in parity for the definitions-only read surface: list definitions, read definition, and read definition version. Public query/input normalization belongs at the transport-adapter boundary before the facade is called, and malformed asset type/family/status, built-in, boolean, expansion, limit, or cursor inputs must fail validation instead of falling through to facade or persistence defaults.
+
+The wrappers must depend only on `AssetRegistryDefinitionReadPort` or an equivalent narrow read-only facade. They must not import or receive `InternalAssetRegistryComposition`, local asset repositories/persistence, mutation use cases, built-in seeding services, resource scanners, runtime adapters, provider clients, or host composition helpers. Asset instances, compositions, registry summaries, resource-backed views, renderer UI, and thin-client UI remain deferred unless a later prompt explicitly adds them.
