@@ -11,6 +11,8 @@ Phase 2B Prompt 5 adds a computed internal resource-backed view read model in `m
 
 Phase 2B Prompt 6 adds an internal application Asset Registry read facade in `modules/application/services/asset`. The facade is read-only, transport-neutral, and UI-neutral: it aggregates Asset Kernel repository ports for definitions, instances, compositions, optional binding summaries, built-in definition metadata, explicit validation results, and optional computed resource-backed views supplied by an injected provider. It does not execute seeding, assume catalog entries are persisted, scan artifact/resource storage, save/update/delete records, call runtime readiness or task registry seams, or expose API/IPC/preload/renderer/thin-client/server routes. Validation remains explicit via `includeValidation`; list reads and detail reads do not perform validation by default. Host-level composition of this facade remains deferred to Prompt 7, and Phase 2C may later wrap its read models in read-only transport/UI layers.
 
+Phase 3 Prompt 2 moves the resource-backed view provider seam to `modules/application/ports/asset`. Providers now return structured list results with `items`, optional `nextCursor`, and sanitized structured diagnostics. The application aggregate provider foundation remains read-only and computed: it can combine already-injected family providers, treat unsupported/not-wired families as safe diagnostics, and sanitize partial provider failures without scanning storage, reading bytes, calling networks, calling runtimes, or creating registered assets. Artifact, image, model, dataset, and external repository family providers remain deferred to later Phase 3 prompts.
+
 
 ## Local persistence checkpoint (Prompt 9)
 

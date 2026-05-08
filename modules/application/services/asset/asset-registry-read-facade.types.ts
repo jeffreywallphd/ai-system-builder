@@ -14,6 +14,12 @@ import type {
   AssetResourceBackedViewKind,
   AssetType,
 } from "../../../contracts/asset";
+export type {
+  AssetResourceBackedViewListQuery as AssetResourceBackedViewQuery,
+  AssetResourceBackedViewListResult,
+  AssetResourceBackedViewProvider,
+  AssetResourceBackedViewProviderDiagnostic,
+} from "../../ports/asset";
 import type { AssetValidationResult } from "./asset-validation-helpers";
 
 export interface AssetRegistryListQuery {
@@ -21,6 +27,7 @@ export interface AssetRegistryListQuery {
   readonly assetTypes?: readonly AssetType[];
   readonly assetFamilies?: readonly AssetFamily[];
   readonly lifecycleStatuses?: readonly AssetLifecycleStatus[];
+  readonly viewKinds?: readonly AssetResourceBackedViewKind[];
   readonly includeBuiltIns?: boolean;
   readonly includeCustom?: boolean;
   readonly includeMetadata?: boolean;
@@ -42,6 +49,9 @@ export interface AssetRegistryListDiagnostic {
   readonly severity: "info" | "warning" | "error";
   readonly code: string;
   readonly message: string;
+  readonly providerId?: string;
+  readonly sourceKind?: string;
+  readonly metadata?: AssetMetadata;
 }
 
 export interface AssetRegistryListResult<TCard> {
@@ -138,20 +148,6 @@ export interface AssetRegistryResourceBackedViewCard {
 export interface AssetRegistryResourceBackedViewDetail {
   readonly view: AssetResourceBackedView;
   readonly validationSummary?: AssetResourceBackedView["validationSummary"];
-}
-
-export interface AssetResourceBackedViewQuery {
-  readonly searchText?: string;
-  readonly assetTypes?: readonly AssetType[];
-  readonly assetFamilies?: readonly AssetFamily[];
-  readonly lifecycleStatuses?: readonly AssetLifecycleStatus[];
-  readonly limit?: number;
-  readonly cursor?: string;
-}
-
-export interface AssetResourceBackedViewProvider {
-  listResourceBackedViews(query?: AssetResourceBackedViewQuery): Promise<readonly AssetResourceBackedView[]>;
-  readResourceBackedView(viewId: string): Promise<AssetResourceBackedView | undefined>;
 }
 
 export type AssetRegistryConfigurationValues = AssetConfigurationValues;

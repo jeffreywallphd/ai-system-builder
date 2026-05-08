@@ -19,10 +19,10 @@ import type {
   AssetDefinitionRepositoryPort,
   AssetInstanceListQuery,
   AssetInstanceRepositoryPort,
+  AssetResourceBackedViewProvider,
 } from "../../../ports/asset";
 import { BUILT_IN_ASSET_DEFINITION_CATALOG } from "../built-ins";
 import { AssetRegistryReadFacade, AssetRegistryReadFacadeError } from "../asset-registry-read-facade.service";
-import type { AssetResourceBackedViewProvider } from "../asset-registry-read-facade.types";
 
 const definitionRef: AssetReference = { kind: "asset-definition-version", id: normalizeAssetId("definition.alpha"), version: "1.0.0" };
 const instanceRef: AssetReference = { kind: "asset-instance", id: normalizeAssetId("instance.alpha") };
@@ -352,7 +352,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
       { viewId: "view.external", viewKind: "external-repository-object", displayName: "External", summary: "External object", sourceRef: { kind: "external-repository-object", id: normalizeAssetId("external.one") } },
     ];
     const provider: AssetResourceBackedViewProvider = {
-      async listResourceBackedViews() { return views; },
+      async listResourceBackedViews() { return { items: views, nextCursor: "next-resource", diagnostics: [{ severity: "info", code: "provider-safe", message: "Provider returned safe resource-backed views.", providerId: "test-provider" }] }; },
       async readResourceBackedView(viewId) { return views.find((view) => view.viewId === viewId); },
     };
     const facade = createFacade({ resourceBackedViewProvider: provider });
@@ -361,6 +361,8 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     assert.equal(list.items.length, 1);
     assert.equal(list.items[0]?.viewKind, "generated-output");
     assert.equal(list.items[0]?.assetDefinitionRef, undefined);
+    assert.equal(list.nextCursor, "next-resource");
+    assert.equal(list.diagnostics?.some((diagnostic) => diagnostic.code === "provider-safe"), true);
     assertSafe(list);
 
     const detail = await facade.readResourceBackedViewDetail("view.external", { includeMetadata: true });

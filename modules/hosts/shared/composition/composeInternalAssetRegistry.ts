@@ -1,11 +1,13 @@
 import { AssetRegistryReadFacade } from "../../../application/services/asset/asset-registry-read-facade.service";
-import type { AssetResourceBackedViewProvider } from "../../../application/services/asset/asset-registry-read-facade.types";
+import { createAssetResourceBackedViewAggregateProvider } from "../../../application/services/asset/asset-resource-backed-view-aggregate-provider.service";
+import type { AssetResourceBackedViewProvider } from "../../../application/ports/asset";
 import { composeLocalAssetKernel, type LocalAssetKernelComposition } from "./composeLocalAssetKernel";
 
 export interface ComposeInternalAssetRegistryOptions {
   readonly rootDirectory: string;
   readonly now?: () => string;
   readonly resourceBackedViewProvider?: AssetResourceBackedViewProvider;
+  readonly resourceBackedViewProviders?: readonly AssetResourceBackedViewProvider[];
 }
 
 export interface InternalAssetRegistryComposition {
@@ -22,23 +24,31 @@ export interface InternalAssetRegistryComposition {
 
 export function composeInternalAssetRegistry(options: ComposeInternalAssetRegistryOptions): InternalAssetRegistryComposition {
   const assetKernel = composeLocalAssetKernel({ rootDirectory: options.rootDirectory, now: options.now });
+  const resourceBackedViewProvider = composeResourceBackedViewProvider(options);
   const readFacade = new AssetRegistryReadFacade({
     definitionRepository: assetKernel.repositories.definitionRepository,
     instanceRepository: assetKernel.repositories.instanceRepository,
     compositionRepository: assetKernel.repositories.compositionRepository,
     bindingRepository: assetKernel.repositories.bindingRepository,
-    resourceBackedViewProvider: options.resourceBackedViewProvider,
+    resourceBackedViewProvider,
   });
 
   return {
     assetKernel,
     readFacade,
-    ...(options.resourceBackedViewProvider ? { resourceBackedViewProvider: options.resourceBackedViewProvider } : {}),
+    ...(resourceBackedViewProvider ? { resourceBackedViewProvider } : {}),
     diagnostics: {
       storeKind: assetKernel.diagnostics.storeKind,
       schemaVersion: assetKernel.diagnostics.schemaVersion,
       registryFacadeComposed: true,
-      resourceBackedViewsEnabled: Boolean(options.resourceBackedViewProvider),
+      resourceBackedViewsEnabled: Boolean(resourceBackedViewProvider),
     },
   };
+}
+
+function composeResourceBackedViewProvider(options: ComposeInternalAssetRegistryOptions): AssetResourceBackedViewProvider | undefined {
+  if (options.resourceBackedViewProviders?.length) {
+    return createAssetResourceBackedViewAggregateProvider(options.resourceBackedViewProviders);
+  }
+  return options.resourceBackedViewProvider;
 }

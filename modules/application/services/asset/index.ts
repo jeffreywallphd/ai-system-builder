@@ -5,6 +5,7 @@ export * from "./validate-asset-binding.service";
 export * from "./validate-asset-composition.service";
 export * from "./asset-resource-backed-mapping.service";
 export * from "./asset-resource-backed-view.service";
+export * from "./asset-resource-backed-view-aggregate-provider.service";
 export * from "./built-in-asset-definition-seeding.service";
 export * from "./built-ins";
 
