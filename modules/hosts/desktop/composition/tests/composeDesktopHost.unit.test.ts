@@ -37,6 +37,9 @@ import {
   DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL,
+  DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_REQUEST_CHANNEL,
@@ -248,13 +251,16 @@ describe("composeDesktopHost", () => {
       runtimeRootDirectory,
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(51);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(54);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
       DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL.value,
       DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL.value,
       DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value,
       DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL.value,
       DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL.value,
@@ -303,7 +309,12 @@ describe("composeDesktopHost", () => {
       DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value,
       DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
     ]);
-    expect(channels.some((channel) => String(channel).includes("asset"))).toBe(false);
+    expect(channels.filter((channel) => String(channel).startsWith("ipc.asset."))).toEqual([
+      DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL.value,
+    ]);
+    expect(/asset\.(?:create|update|delete|register|seed|import|finalize|scan|execute)/i.test(channels.join(" "))).toBe(false);
     expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(true);
     expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     const internalRegistry = host.getInternalAssetRegistry();
@@ -316,9 +327,12 @@ describe("composeDesktopHost", () => {
       readFileSync(resolve("apps/desktop/src/preload/index.ts"), "utf8"),
       readFileSync(resolve("apps/desktop/src/preload/exposedApi.ts"), "utf8"),
     ].join("\n");
-    expect(
-      /asset(?:Kernel|Registry|Library)|listAssetDefinitions|readAssetDefinition|listAssetInstances|readAssetInstance/i.test(preloadSource),
-    ).toBe(false);
+    expect(preloadSource).toContain("listAssetDefinitions");
+    expect(preloadSource).toContain("readAssetDefinition");
+    expect(/createAsset|updateAsset|deleteAsset|registerAsset|seedAsset|importAsset|finalizeAsset|listAssetInstances|readAssetInstance/i.test(preloadSource)).toBe(false);
+    const hostSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopHost.ts"), "utf8");
+    expect(hostSource).toContain("assetRegistryRead: internalAssetRegistry.readFacade");
+    expect(hostSource).not.toContain("assetRegistryRead: internalAssetRegistry,");
     const listener = ipcMain.handle.mock.calls[0]?.[1];
     expect(listener).toBeTypeOf("function");
   });

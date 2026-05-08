@@ -21,6 +21,7 @@
 - Desktop runtime readiness IPC wraps shared runtime readiness contracts from `modules/contracts/runtime`; it exposes host-scoped reads through the application `RuntimeReadinessPort` and must not start/stop/install/repair/probe runtimes merely to read readiness.
 - Python-specific runtime IPC remains a detailed control/diagnostic surface and is not the generic runtime readiness model.
 - Server API readiness routes are out of scope for desktop IPC work.
+- Asset Registry desktop IPC is definitions-only and read-only in Phase 2C: list definitions, read definition detail, and read definition version. Handlers wrap `AssetRegistryDefinitionReadPort`/the read facade only and must not receive persistence adapters, host composition helpers, mutation use cases, seeding services, runtime/storage adapters, provider clients, resource scans, or bytes.
 
 ## Canonical Source Docs
 

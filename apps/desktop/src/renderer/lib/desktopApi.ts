@@ -41,6 +41,16 @@ import type {
   PublishModelRequest,
   PublishModelResult,
 } from "../../../../../modules/contracts/model";
+import type {
+  AssetFamily,
+  AssetLifecycleStatus,
+  AssetType,
+} from "../../../../../modules/contracts/asset";
+import type {
+  AssetDefinitionCard,
+  AssetDefinitionDetail,
+  AssetRegistryListResult,
+} from "../../../../../modules/application/services/asset/asset-registry-read-facade.types";
 
 export interface DesktopArtifactUploadInput {
   fileName: string;
@@ -297,6 +307,37 @@ export interface DesktopBridgeRequestContext {
   correlationId?: string;
 }
 
+export type DesktopAssetBuiltInFilter = "all" | "built-in" | "custom";
+export type DesktopAssetDefinitionExpansion =
+  | "aiContext"
+  | "configurationSchema"
+  | "ports"
+  | "requirements"
+  | "provenance"
+  | "metadata";
+
+export interface DesktopAssetDefinitionsListInput {
+  searchText?: string;
+  assetTypes?: readonly AssetType[];
+  assetFamilies?: readonly AssetFamily[];
+  lifecycleStatuses?: readonly AssetLifecycleStatus[];
+  builtIn?: DesktopAssetBuiltInFilter;
+  limit?: number;
+  cursor?: string;
+  includeMetadata?: boolean;
+}
+
+export interface DesktopAssetDefinitionReadInput {
+  definitionId: string;
+  version?: string;
+  expand?: readonly DesktopAssetDefinitionExpansion[];
+  includeValidation?: boolean;
+}
+
+export type DesktopAssetDefinitionVersionReadInput = Required<Pick<DesktopAssetDefinitionReadInput, "definitionId" | "version">> & Omit<DesktopAssetDefinitionReadInput, "definitionId" | "version">;
+export type DesktopAssetDefinitionsListResult = AssetRegistryListResult<AssetDefinitionCard>;
+export type DesktopAssetDefinitionDetail = AssetDefinitionDetail;
+
 export interface DesktopDatasetPreparationApi {
   startPrepareTrainingDataset?: (
     input: DesktopPrepareTrainingDatasetInput,
@@ -348,6 +389,9 @@ interface DesktopApiBridge {
   cancelPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readRuntimeReadiness?: (context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readRuntimeCapabilityStatus?: (input: { capabilityId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  listAssetDefinitions?: (input?: DesktopAssetDefinitionsListInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readAssetDefinition?: (input: DesktopAssetDefinitionReadInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readAssetDefinitionVersion?: (input: DesktopAssetDefinitionVersionReadInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readPythonRuntimeStatus?: () => Promise<unknown>;
   controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
   startImageGeneration?: (input: ImageGenerationRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;

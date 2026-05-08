@@ -1175,6 +1175,7 @@ export function composeDesktopHost(
           readPythonRuntimeStatus,
         },
         runtimeReadiness,
+        assetRegistryRead: internalAssetRegistry.readFacade,
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
         setHuggingFaceToken: (token) => tokenConfigStore.setToken(token),
         clearHuggingFaceToken: () => tokenConfigStore.clearToken(),
