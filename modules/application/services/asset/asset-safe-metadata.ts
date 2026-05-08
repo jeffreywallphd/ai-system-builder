@@ -1,7 +1,7 @@
 import type { AssetJsonObject, AssetJsonValue, AssetMetadata } from "../../../contracts/asset";
 
 const FORBIDDEN_ASSET_METADATA_KEY_PATTERN =
-  /(token|secret|password|credential|authorization|auth|storagerootdirectory|runtimerootdirectory|localpath|filesystempath|filepath|path|cache|bytes|blob|contentbase64|base64|raw|payload|command|stack|env)/i;
+  /(token|secret|password|credential|authorization|auth|requestid|taskid|promptid|storagerootdirectory|runtimerootdirectory|localpath|filesystempath|filepath|path|cache|bytes|blob|contentbase64|base64|raw|payload|command|stack|env)/i;
 const LOCAL_FILESYSTEM_PATH_VALUE_PATTERN = /(^~\/|^\.\.?\/|^\/(?:tmp|var|home|users|etc|private|opt|usr|mnt|volumes)(?:\/|$)|^[a-z]:[\\/]|\\(?:Users|Temp)\\|\/(?:tmp|temp)\/)/i;
 const AUTH_BEARING_VALUE_PATTERN = /(bearer\s+[a-z0-9._~+/=-]+|(?:api[_-]?key|api\s+key|apikey)\s*[=:]|\bapi[_-]?key\b|\bapikey\b|(?:token|password|secret)\s*[=:]|\b(?:token|password|secret|auth)\b|authorization\s*:)/i;
 const DATA_BASE64_VALUE_PATTERN = /^data:[^,;]+;base64,/i;

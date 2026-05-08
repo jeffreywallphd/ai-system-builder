@@ -159,3 +159,11 @@ Phase 2C Prompt 8 stabilizes that public baseline without adding mutation: serve
 - Image cursor pass-through is allowed only for a single active source. Combining finalized image and generated-output sources should omit `nextCursor` and return a safe diagnostic.
 - Image/generated-output prompt text, negative prompt text, workflow/ComfyUI payloads, request/task ids, bytes/blob/base64/data URLs, local/temp/storage paths, storage keys, secrets/tokens/auth values, command lines, stack traces, and raw provider payloads remain hidden from provider and facade output.
 - Generated outputs remain generated-output views, not finalized/registered image assets.
+
+## Phase 3 Prompt 5 dataset/model provider
+
+- Dataset/model resource-backed views are computed application-layer read models only.
+- Dataset views require an injected safe descriptor-only source. Missing dataset seams return empty results plus safe unsupported diagnostics and must not invent a dataset registry, prepare/materialize datasets, read rows/files, scan storage, or create descriptors.
+- Model views read persisted inventory records through the model registry seam only. Provider list calls must pass `includeDiscovered: false`; the provider must not discover local models, scan Hugging Face caches, load models, validate/train/publish models, or read model files.
+- Dataset/model output must omit local/cache/checkpoint/report/output/materialization/source paths, request/task/prompt ids, provider-native raw payloads, commands, env values, logs, bytes/blobs/base64, secrets, tokens, and auth values. Existing stored model validation or publishing metadata may be displayed only after sanitization and without triggering validation or publishing.
+- Host wiring, API/IPC/preload, renderer, and thin-client behavior remain deferred/unchanged for this family.
