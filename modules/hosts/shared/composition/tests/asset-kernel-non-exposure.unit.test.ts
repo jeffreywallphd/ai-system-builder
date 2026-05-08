@@ -123,6 +123,39 @@ describe("Asset Kernel Phase 2C read-only non-exposure boundaries", () => {
     assert.doesNotMatch(source, /node:fs|node:path|node:http|node:https|fetch\(/i);
   });
 
+  it("keeps every resource-backed family provider descriptor-only and free of unsafe imports/operations", () => {
+    const providerFiles = [
+      "modules/application/services/asset/asset-artifact-resource-backed-view-provider.service.ts",
+      "modules/application/services/asset/asset-image-resource-backed-view-provider.service.ts",
+      "modules/application/services/asset/asset-dataset-model-resource-backed-view-provider.service.ts",
+      "modules/application/services/asset/asset-external-repository-resource-backed-view-provider.service.ts",
+      "modules/application/services/asset/asset-resource-backed-view-aggregate-provider.service.ts",
+    ];
+    const source = providerFiles
+      .map((file) => `\n// ${file}\n${readFileSync(join(REPO_ROOT, file), "utf8")}`)
+      .join("\n");
+
+    assert.doesNotMatch(source, /from\s+["'][^"']*(?:modules\/adapters|modules\/hosts|adapters\/|hosts\/|api-express|ipc-electron|contracts\/api|contracts\/ipc|electron|express|preload|renderer|thin-client|runtime\/.*adapter|storage\/.*adapter|persistence\/.*adapter|provider-client|huggingface)[^"']*["']/i);
+    assert.doesNotMatch(source, /\b(?:node:fs|node:path|node:http|node:https|fetch\(|readdir|opendir|glob|walkDir|scanResources|scanArtifacts|scanModels|scanDatasets|discoverModels|listFiles|repoInfo|download\(|upload\(|commit\(|createRepo|whoami|retrieveArtifactFromRepo|storeArtifactInRepo|hasArtifactInRepo|readBytes|readResourceBytes|readContent|readArtifactContent)\b/i);
+    assert.doesNotMatch(source, /\b(?:RuntimeTaskRegistryPort|runtime-readiness|startRuntime|probeRuntime|installRuntime|repairRuntime|executeRuntime|DatasetPreparationUseCase|PrepareTrainingDataset|ModelTrainingPort|TrainModelUseCase|ModelValidationPort|ValidateModelUseCase|ModelPublisherPort|PublishModelUseCase|ImageGenerationUseCase|finalizeGeneratedOutput|Finaliz\w+Generated|createAssetInstance|persistMapping|registerAsset|importAsset|localizeArtifact|publishArtifact|seedBuiltIns)\b/i);
+  });
+
+  it("keeps descriptor-source seams provider-local before host wiring", () => {
+    const portSource = readFileSync(
+      join(REPO_ROOT, "modules/application/ports/asset/asset-resource-backed-view-provider.port.ts"),
+      "utf8",
+    );
+    const servicesSource = [
+      "modules/application/services/asset/asset-image-resource-backed-view-provider.service.ts",
+      "modules/application/services/asset/asset-dataset-model-resource-backed-view-provider.service.ts",
+      "modules/application/services/asset/asset-external-repository-resource-backed-view-provider.service.ts",
+    ].map((file) => readFileSync(join(REPO_ROOT, file), "utf8")).join("\n");
+
+    assert.doesNotMatch(portSource, /\b(?:GeneratedImageOutputDescriptorSource|SafeDatasetDescriptorSource|SafeExternalRepositoryObjectDescriptorSource|SafeArtifactRepoObjectDescriptorSource)\b/);
+    assert.match(servicesSource, /Provider-local descriptor-only input seam/);
+    assert.match(servicesSource, /Provider-local descriptor-only input seams/);
+  });
+
   it("keeps public asset transports on the read port instead of local persistence or seeding seams", () => {
     const source = [
       combinedSource("modules/adapters/transport/api-express"),

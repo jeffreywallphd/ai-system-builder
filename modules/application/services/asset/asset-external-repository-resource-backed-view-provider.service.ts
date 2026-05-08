@@ -53,6 +53,9 @@ export interface SafeExternalRepositoryObjectDescriptorListResult {
   readonly nextCursor?: string;
 }
 
+// Provider-local descriptor-only input seams. These labels and descriptor
+// sources do not grant provider-client, network, token, filesystem, import,
+// localization, publishing, or existence-check authority.
 export interface SafeExternalRepositoryObjectDescriptorSource {
   listExternalRepositoryObjectDescriptors(
     query?: { readonly searchText?: string; readonly limit?: number; readonly cursor?: string },

@@ -31,6 +31,8 @@ export interface SafeDatasetDescriptorListResult {
   readonly nextCursor?: string;
 }
 
+// Provider-local descriptor-only input seam. It remains narrow by design and is
+// not a public Asset Kernel port unless a later host-wiring prompt proves reuse.
 export interface SafeDatasetDescriptorSource {
   listDatasetDescriptors(query?: { readonly searchText?: string; readonly limit?: number; readonly cursor?: string }): Promise<SafeDatasetDescriptorListResult>;
   readDatasetDescriptor?(datasetId: string): Promise<DatasetDescriptor | null | undefined>;

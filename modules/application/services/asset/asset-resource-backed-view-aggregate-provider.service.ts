@@ -57,6 +57,7 @@ export class AssetResourceBackedViewAggregateProvider implements AssetResourceBa
     }
 
     const items: AssetResourceBackedView[] = [];
+    const seenViewIds = new Set<string>();
     let nextCursor: string | undefined;
     for (const provider of this.providers) {
       if (items.length >= limit) break;
@@ -74,7 +75,12 @@ export class AssetResourceBackedViewAggregateProvider implements AssetResourceBa
           const sanitized = sanitizeProviderView(item, diagnostics, provider.providerId);
           if (sanitized) {
             if (!this.providerByPublicViewId.has(sanitized.viewId)) this.providerByPublicViewId.set(sanitized.viewId, provider);
-            if (matchesQuery(sanitized, query)) items.push(sanitized);
+            if (seenViewIds.has(sanitized.viewId)) {
+              diagnostics.push(duplicateViewIdDiagnostic(sanitized.viewId, provider.providerId));
+            } else if (matchesQuery(sanitized, query)) {
+              seenViewIds.add(sanitized.viewId);
+              items.push(sanitized);
+            }
           }
           if (items.length >= limit) break;
         }
@@ -129,6 +135,19 @@ export function createAssetResourceBackedViewAggregateProvider(
   options: Omit<AssetResourceBackedViewAggregateProviderOptions, "providers"> = {},
 ): AssetResourceBackedViewAggregateProvider {
   return new AssetResourceBackedViewAggregateProvider({ ...options, providers });
+}
+
+function duplicateViewIdDiagnostic(
+  viewId: string,
+  providerId: string | undefined,
+): AssetResourceBackedViewProviderDiagnostic {
+  return {
+    severity: "warning",
+    code: "resource-backed-view-provider-duplicate-view-id",
+    message: "A duplicate resource-backed view id was omitted; the first provider result was kept deterministically.",
+    ...(sanitizeIdentifier(providerId) ? { providerId: sanitizeIdentifier(providerId) } : {}),
+    metadata: sanitizeAssetMetadata({ viewId, conflictResolution: "first-provider-wins" }),
+  };
 }
 
 function sanitizeProviderDiagnostic(
