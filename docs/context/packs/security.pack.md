@@ -127,7 +127,7 @@ No automatic trust-store installation is performed. Trust installation is manual
 
 Phase 2C begins by exposing only a narrow, read-only server API foundation for Asset Registry definition reads. The server routes wrap an application-owned Asset Registry definition read port/read facade and must not receive persistence adapters, host composition helpers, mutation use cases, built-in seeding services, or local repositories.
 
-The initial `/api/assets` surface is GET-only for asset definition list/detail/version reads. It must not scan resources, read bytes, call runtimes, call providers, seed built-ins, import/finalize/register assets, or execute workflows. Desktop IPC/preload/renderer UI and thin-client UI/client exposure remain deferred.
+The initial `/api/assets` surface is GET-only for asset definition list/detail/version reads. It must not scan resources, read bytes, call runtimes, call providers, seed built-ins, import/finalize/register assets, or execute workflows. Later Phase 2C prompts add matching read-only desktop IPC/preload and desktop/thin-client Asset Library clients/pages over the same definitions-only read surface.
 
 ## Phase 2C Prompt 3: read-only Asset Registry desktop IPC/preload foundation
 
@@ -152,3 +152,5 @@ The thin-client read-only Asset Library page renders only shared UI-facing read 
 ## Phase 2C Prompt 7: Asset Library advanced detail panels
 
 Desktop and thin-client advanced Asset Library detail panels remain read-only and render only sanitized UI read models. Validation summaries are shown only when already present or explicitly requested through the existing bounded read option; normal selection must not request validation. Safe metadata must omit unsafe values entirely, including local/temp paths, secrets, tokens, auth headers, env values, command lines, stack traces, raw provider payloads, bytes, blobs, and base64 content.
+
+Phase 2C Prompt 8 extends the same sanitization baseline across API, IPC, preload/client, and UI regression tests. Unsafe values must be absent from payloads and rendered output, not hidden with CSS. Treat standalone `password`, `secret`, `token`, `auth`, `base64`, `stack trace`, `command`, `process.env`, local paths, bearer tokens, API keys, raw provider payloads, and bytes/blobs as unsafe.

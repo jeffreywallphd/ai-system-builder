@@ -84,7 +84,7 @@ export function buildAssetLibraryAdvancedSections(
   if (detail.configurationSummary) {
     sections.push({
       key: "configuration",
-      title: "Configuration summary",
+      title: "Configuration",
       summary: "Read-only summary. This is not an editable setup form.",
       rows: [
         { label: "Schema ID", value: detail.configurationSummary.schemaId },
@@ -100,7 +100,7 @@ export function buildAssetLibraryAdvancedSections(
   if (detail.portsSummary) {
     sections.push({
       key: "ports",
-      title: "Ports",
+      title: "Inputs and outputs",
       summary: "Connection points this building block describes.",
       rows: [
         { label: "Total ports", value: detail.portsSummary.totalCount },
@@ -325,16 +325,6 @@ export function AssetLibraryDefinitionDetailView({
           <AssetLibraryDetailRow label="Version" value={`v${detail.version}`} />
           <AssetLibraryDetailRow label="Source" value={detail.builtIn ? "Built-in" : "Custom"} />
           <AssetLibraryDetailRow label="Review" value={formatAssetLibraryLabel(detail.overview?.reviewStatus)} />
-        </dl>
-      </AssetLibraryDetailSection>
-
-      <AssetLibraryDetailSection title="Identity">
-        <dl className="asset-library-definition-grid">
-          <AssetLibraryDetailRow label="Definition ID" value={detail.definitionId} />
-          <AssetLibraryDetailRow
-            label="Reference"
-            value={detail.definitionRef ? `${detail.definitionRef.kind}: ${detail.definitionRef.id}` : undefined}
-          />
         </dl>
       </AssetLibraryDetailSection>
 

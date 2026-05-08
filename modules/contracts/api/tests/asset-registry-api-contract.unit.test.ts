@@ -48,7 +48,7 @@ describe("asset registry API contract", () => {
 
   it("does not export mutation operation identities", async () => {
     const exportedNames = Object.keys(await import("../asset-registry-api-contract"));
-    expect(exportedNames.filter((name) => name.includes("OPERATION")).some((name) => /(CREATE|UPDATE|DELETE|REGISTER|SEED|IMPORT|FINALIZE)/.test(name))).toBe(false);
+    expect(exportedNames.filter((name) => name.includes("OPERATION")).some((name) => /(CREATE|UPDATE|DELETE|REGISTER|SEED|IMPORT|FINALIZE|PUBLISH|EXECUTE|RUN|SCAN|SYNC|REPAIR|INSTALL|START|TRAIN|VALIDATE)/.test(name))).toBe(false);
   });
 
   it("normalizes definition read requests and returns failure envelopes through shared API helpers", () => {

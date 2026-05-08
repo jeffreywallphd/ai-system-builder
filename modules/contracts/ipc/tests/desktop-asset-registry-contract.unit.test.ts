@@ -126,6 +126,6 @@ describe("desktop asset registry IPC contract", () => {
       DESKTOP_ASSET_DEFINITION_READ_OPERATION,
       DESKTOP_ASSET_DEFINITION_VERSION_READ_OPERATION,
     });
-    expect(/CREATE|UPDATE|DELETE|REGISTER|SEED|IMPORT|FINALIZE/i.test(exportedNames.join(" "))).toBe(false);
+    expect(/CREATE|UPDATE|DELETE|REGISTER|SEED|IMPORT|FINALIZE|PUBLISH|EXECUTE|RUN|SCAN|SYNC|REPAIR|INSTALL|START|TRAIN|VALIDATE/i.test(exportedNames.join(" "))).toBe(false);
   });
 });

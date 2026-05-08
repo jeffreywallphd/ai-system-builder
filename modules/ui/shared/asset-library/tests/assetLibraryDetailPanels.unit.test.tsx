@@ -97,6 +97,14 @@ describe("asset library shared detail panels", () => {
       "provenance",
       "metadata",
     ]);
+    expect(buildAssetLibraryAdvancedSections(advancedDetail).map((section) => section.title)).toEqual([
+      "AI-readable context",
+      "Configuration",
+      "Inputs and outputs",
+      "Requirements",
+      "Source",
+      "Details",
+    ]);
   });
 
   it("renders advanced sections collapsed by default", () => {
@@ -112,6 +120,8 @@ describe("asset library shared detail panels", () => {
     expect(markup).toContain("AI-readable context");
     expect(markup).toContain("aria-expanded=\"false\"");
     expect(markup).toContain("hidden=\"\"");
+    expect(markup).not.toContain("Definition ID");
+    expect(markup).not.toContain("asset-definition:");
   });
 
   it("does not render fake validation success or zero issue state when validation is absent", () => {

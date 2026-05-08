@@ -387,7 +387,7 @@ Phase 2B makes the Asset Kernel internally usable without adding a public Asset 
 5. `AssetRegistryReadFacade` is read-only, transport-neutral, UI-neutral, and validation-on-request. It forwards repository-supported filters (`text`, single type/family/status where supported) before applying any remaining deterministic facade-side filtering with diagnostics, and it reads repository records, binding summaries, exact built-in metadata, validation summaries, and optional injected resource-backed views without save/update/delete/seed behavior.
 6. `composeInternalAssetRegistry` privately wires local persistence/use cases to the read facade for desktop/server host-owned consumers. It does not seed automatically, report seed catalog counts, scan resources, expose local paths, or add API/IPC/preload/renderer/thin-client/server routes. Application Asset Kernel mapping/view/facade services share one application-owned sanitizer for safe metadata and view output.
 
-Phase 2C should begin by wrapping the internal read facade through read-only transport contracts and handlers. Asset Library UI work should consume those transport wrappers rather than local persistence adapters or host composition helpers directly.
+Phase 2C wraps the internal read facade through read-only transport contracts, desktop preload, and host-specific Asset Library UI clients. Asset Library UI work consumes those API/preload wrappers and shared UI helpers rather than local persistence adapters, application services, or host composition helpers directly.
 
 ## Architecture boundaries and non-goals
 
@@ -399,12 +399,12 @@ Asset Kernel work must preserve clean architecture boundaries:
 - host wiring belongs in `modules/hosts`,
 - UI belongs in apps/modules UI areas.
 
-Non-goals preserved after Phase 2B:
+Non-goals preserved after Phase 2C:
 
 - no automatic definition version incrementing, conflict-detection policy, version-history service, or additional delete use cases before a later prompt explicitly scopes them,
 - no migrations beyond current manifest schema/kind checks,
-- no renderer/thin-client UI,
-- no API/IPC routes, preload methods, renderer UI, or thin-client UI,
+- no mutation renderer/thin-client UI,
+- no mutation API/IPC routes, preload methods, renderer UI, or thin-client UI,
 - no durable resource-backed mapping repository or transport exposure before a later explicit registration/mapping prompt,
 - no automatic startup seeding,
 - no automatic asset instance creation from artifacts, generated outputs, previews, or external repository objects,
@@ -421,7 +421,7 @@ Non-goals preserved after Phase 2B:
 
 Phase 2C begins by exposing only a narrow, read-only server API foundation for Asset Registry definition reads. The server routes wrap an application-owned Asset Registry definition read port/read facade and must not receive persistence adapters, host composition helpers, mutation use cases, built-in seeding services, or local repositories.
 
-The initial `/api/assets` surface is GET-only for asset definition list/detail/version reads. It must not scan resources, read bytes, call runtimes, call providers, seed built-ins, import/finalize/register assets, or execute workflows. Desktop IPC/preload/renderer UI and thin-client UI/client exposure remain deferred.
+The initial `/api/assets` surface is GET-only for asset definition list/detail/version reads. It must not scan resources, read bytes, call runtimes, call providers, seed built-ins, import/finalize/register assets, or execute workflows. Later Phase 2C prompts add matching read-only desktop IPC/preload and desktop/thin-client Asset Library clients/pages over the same definitions-only read surface.
 
 ## Phase 2C Prompt 3: read-only Asset Registry desktop IPC/preload foundation
 
@@ -442,3 +442,5 @@ The thin-client now has a separate definitions-only, read-only Asset Library pag
 Asset Library detail reads must not request validation automatically on normal definition selection. Validation details remain read-only and may be loaded only through an explicit user action that calls the existing definition read/version-read transport with `includeValidation: true`; the action must not mutate, seed, scan, execute, or probe/start/install runtimes. Shared UI Asset Library mappers are defensive display mappers only: invalid or missing canonical asset type, family, or lifecycle status values must render as unknown/not specified display state instead of being recast to valid Asset Kernel semantics.
 
 Phase 2C Prompt 7 adds shared read-only Asset Library advanced detail panels for AI-readable context, configuration summaries, ports, requirements, source/provenance, available-only validation summaries, and safe metadata. These technical sections stay collapsed by default, validation is never loaded by normal selection, and safe metadata rendering must omit sensitive/path/blob/base64/raw payload/command/stack/env/secret values rather than hiding them in the UI. Shared Asset Library UI helpers/components may be reused by desktop and thin-client surfaces, but they must not import application services, host composition, persistence adapters, transport handlers, runtime/storage adapters, desktop preload internals, or thin-client API client code.
+
+Phase 2C Prompt 8 finalizes the read-only Asset Library baseline. The server API, desktop IPC/preload, desktop page, and thin-client page expose definition list/read/version-read only; they do not expose create/update/delete/register/import/finalize/seed/publish/execute/run/scan/sync/repair/install/start/train operations. Normal list/detail reads do not request validation. Validation diagnostics are explicit/available-only through the same read operation with `includeValidation: true`, and validation failures must remain generic and sanitized. Built-in catalog entries are visible only when persisted/seeded internally; the UI must not seed or expose catalog-only built-ins as registered assets. Resource-backed views remain computed read models and may be empty when no provider is wired; public Phase 2C UI does not scan resources, read bytes, call providers, or represent generated outputs/external repository objects as registered assets.

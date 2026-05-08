@@ -22,7 +22,7 @@ export function AssetDefinitionList({
   if (definitions.length === 0) {
     return (
       <section className="ui-panel asset-library-empty">
-        <h2>{hasActiveFilters ? "No assets match the current filters." : "No asset definitions are registered yet."}</h2>
+        <h2>{hasActiveFilters ? "No assets match the current filters." : "No reusable building blocks are registered yet."}</h2>
         {!hasActiveFilters ? (
           <p>Built-in assets appear here after they are registered for this workspace.</p>
         ) : null}
@@ -31,7 +31,7 @@ export function AssetDefinitionList({
   }
 
   return (
-    <section className="asset-library-list" aria-label="Asset definitions">
+    <section className="asset-library-list" aria-label="Reusable building blocks">
       {definitions.map((definition) => {
         const updatedAt = formatAssetLibraryDate(definition.updatedAt, { dateStyle: "medium" });
         const isSelected = definition.id === selectedDefinitionId;
