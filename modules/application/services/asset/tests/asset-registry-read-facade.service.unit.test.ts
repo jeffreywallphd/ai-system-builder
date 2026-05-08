@@ -26,6 +26,7 @@ import type {
 } from "../../../ports/asset";
 import { BUILT_IN_ASSET_DEFINITION_CATALOG } from "../built-ins";
 import { ArtifactResourceBackedViewProvider } from "../asset-artifact-resource-backed-view-provider.service";
+import { AssetImageResourceBackedViewProvider, type GeneratedImageOutputDescriptorSource } from "../asset-image-resource-backed-view-provider.service";
 import { AssetRegistryReadFacade, AssetRegistryReadFacadeError } from "../asset-registry-read-facade.service";
 
 const definitionRef: AssetReference = { kind: "asset-definition-version", id: normalizeAssetId("definition.alpha"), version: "1.0.0" };
@@ -128,6 +129,59 @@ class FakeArtifactBrowserMetadataRead implements Pick<ArtifactBrowserMetadataRea
   public async browseArtifacts(): Promise<ContractResult<ArtifactBrowseSuccessValue>> {
     this.browseCalls += 1;
     return createSuccessResult({ items: [...this.items] });
+  }
+}
+
+class FakeGeneratedOutputDescriptorSource implements GeneratedImageOutputDescriptorSource {
+  public byteReadCalls = 0;
+  public statusReadCalls = 0;
+  public generationCalls = 0;
+
+  public async listGeneratedImageOutputDescriptors() {
+    return {
+      items: [
+        {
+          outputId: "output-facade",
+          output: {
+            type: "image" as const,
+            engine: "comfyui",
+            fileName: "Draft.png",
+            contentBase64: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ=",
+            mediaType: "image/png",
+            promptId: "prompt-hidden",
+          },
+          metadata: unsafeMetadata(),
+        },
+      ],
+    };
+  }
+}
+
+class FakeImageAssetDescriptorRead {
+  public byteReadCalls = 0;
+  public storageScanCalls = 0;
+  public createAssetInstanceCalls = 0;
+  public persistMappingCalls = 0;
+
+  public async listImageAssetDescriptors() {
+    return {
+      items: [
+        {
+          assetId: "image-facade",
+          artifactId: "artifact-facade",
+          source: "generated" as const,
+          metadata: {
+            originalFileName: "Final.png",
+            prompt: "hidden prompt",
+            negativePrompt: "hidden negative prompt",
+            engine: "comfyui",
+            seed: 12,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            ...unsafeMetadata(),
+          },
+        },
+      ],
+    };
   }
 }
 
@@ -252,7 +306,7 @@ function serialized(value: unknown): string {
 
 function assertSafe(value: unknown) {
   const output = serialized(value);
-  for (const forbidden of ["/tmp/", "token", "secret", "password", "apikey", "api_key", "commandline", "stacktrace", "rawpayload", "blobbytes", "contentbase64", "secret_env", "bearer"]) {
+  for (const forbidden of ["/tmp/", "token", "secret", "password", "apikey", "api_key", "commandline", "stacktrace", "rawpayload", "blobbytes", "contentbase64", "secret_env", "bearer", "hidden prompt", "hidden negative prompt", "prompt-hidden"]) {
     assert.equal(output.includes(forbidden), false, `serialized output included ${forbidden}: ${output}`);
   }
 }
@@ -445,6 +499,47 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
 
     assert.equal(await facade.readResourceBackedViewDetail("missing-artifact-view"), undefined);
     assert.equal(browser.readContentCalls, 0);
+  });
+
+  it("lists and reads image/generated-output provider cards and details without unsafe metadata or automatic validation", async () => {
+    const imageSource = new FakeImageAssetDescriptorRead();
+    const outputSource = new FakeGeneratedOutputDescriptorSource();
+    const provider = new AssetImageResourceBackedViewProvider({
+      imageAssetDescriptorRead: imageSource,
+      generatedImageOutputDescriptorSource: outputSource,
+    });
+    const facade = createFacade({ resourceBackedViewProvider: provider });
+
+    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10 });
+    assert.deepEqual(list.items.map((item) => item.viewKind), ["image-asset", "generated-output"]);
+    assert.equal(list.items[0]?.assetDefinitionRef?.id, "builtin.resource-backed-image");
+    assert.equal(list.items[1]?.assetDefinitionRef, undefined);
+    assert.equal(list.items[1]?.summary?.includes("not finalized or registered"), true);
+    assertSafe(list);
+
+    const imageDetail = await facade.readResourceBackedViewDetail(list.items[0]!.viewId, {
+      includeMetadata: true,
+      includeResourceBackings: true,
+    });
+    assert.equal(imageDetail?.view.viewKind, "image-asset");
+    assert.equal(imageDetail?.validationSummary, undefined);
+    assert.equal(imageDetail?.view.validationSummary, undefined);
+    assertSafe(imageDetail);
+
+    const generatedDetail = await facade.readResourceBackedViewDetail(list.items[1]!.viewId, {
+      includeMetadata: true,
+      includeResourceBackings: true,
+    });
+    assert.equal(generatedDetail?.view.viewKind, "generated-output");
+    assert.equal(generatedDetail?.view.assetDefinitionRef, undefined);
+    assert.equal(generatedDetail?.view.resourceBackedAsset, undefined);
+    assert.equal(generatedDetail?.view.summary?.includes("not finalized or registered"), true);
+    assertSafe(generatedDetail);
+
+    assert.equal(await facade.readResourceBackedViewDetail("missing-image-view"), undefined);
+    assert.equal(imageSource.byteReadCalls + outputSource.byteReadCalls, 0);
+    assert.equal(outputSource.statusReadCalls + outputSource.generationCalls, 0);
+    assert.equal(imageSource.storageScanCalls + imageSource.createAssetInstanceCalls + imageSource.persistMappingCalls, 0);
   });
 });
 

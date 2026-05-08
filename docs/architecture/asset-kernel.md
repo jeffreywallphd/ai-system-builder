@@ -15,6 +15,8 @@ Phase 3 Prompt 2 moves the resource-backed view provider seam to `modules/applic
 
 Phase 3 Prompt 3 adds the first concrete family provider for artifacts and document-like artifacts in the application layer. It projects already-registered artifact browser metadata into computed resource-backed views when explicitly injected into the read facade or aggregate provider. These views do not create `AssetInstance` records, do not persist resource-backed mappings, do not read artifact bytes or document contents, and do not expose storage paths or unsafe storage keys. Document-like classification is metadata-only, using safe media type, format/extension, family/category, or type fields already present in artifact metadata; uncertain artifacts remain generic artifact views. Host wiring and public transport/UI exposure remain deferred.
 
+Phase 3 Prompt 4 adds the image/generated-output resource-backed view provider in the application layer. It projects finalized image asset descriptors only through an explicit descriptor-only list seam and reports safe unsupported diagnostics when that seam is absent. Already-known generated image output descriptors can be injected through a safe descriptor source and remain `generated-output` views, explicitly not finalized or registered image assets. The provider does not finalize outputs, create asset instances, persist mappings, scan storage, read image bytes/base64/content/previews, or query runtime/task systems. Prompt and negative prompt text, raw workflow/ComfyUI payloads, local paths, storage roots, data URLs, secrets, command lines, stacks, and raw payloads are omitted from provider and facade output. Host wiring and public transport/UI exposure remain deferred.
+
 
 ## Local persistence checkpoint (Prompt 9)
 
