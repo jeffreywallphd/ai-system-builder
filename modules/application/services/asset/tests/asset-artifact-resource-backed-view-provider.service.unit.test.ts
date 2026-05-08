@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import type { ArtifactBrowseItem, ArtifactBrowseSuccessValue } from "../../../../contracts/artifact-browser";
+import type { ArtifactBrowseItem, ArtifactBrowseSuccessValue, ArtifactReadSuccessValue } from "../../../../contracts/artifact-browser";
 import { createContractError, createFailureResult, createSuccessResult, type ContractResult } from "../../../../contracts/shared";
 import type { ArtifactBrowserMetadataReadPort } from "../../../ports/artifact-browser";
 import { ArtifactResourceBackedViewProvider } from "../asset-artifact-resource-backed-view-provider.service";
@@ -23,6 +23,23 @@ class FakeArtifactBrowserMetadataRead implements Pick<ArtifactBrowserMetadataRea
     this.browseCalls += 1;
     if (this.throws) throw new Error("C:\\Users\\name\\secret token stack raw provider payload command bytes blob base64");
     return this.result ?? createSuccessResult({ items: [...this.items] });
+  }
+
+  public async readArtifactDetail(request: Parameters<ArtifactBrowserMetadataReadPort["readArtifactDetail"]>[0]): Promise<ContractResult<ArtifactReadSuccessValue>> {
+    this.readDetailCalls += 1;
+    const item = this.items.find((candidate) => candidate.storageKey === request.locator.storageKey) ?? this.items[0]!;
+    return createSuccessResult({
+      artifact: {
+        locator: request.locator,
+        artifactFamily: item.artifactFamily,
+        mediaType: item.mediaType,
+        sizeBytes: item.sizeBytes,
+        sourceKind: item.sourceKind,
+        originalName: item.originalName,
+        createdAt: item.createdAt,
+        metadata: item.metadata,
+      },
+    });
   }
 }
 
@@ -64,6 +81,7 @@ function assertSafe(value: unknown): void {
     "contentbase64",
     "bearer",
     "base64",
+    "file content",
   ]) {
     assert.equal(output.includes(unsafe), false, `serialized output included ${unsafe}: ${output}`);
   }
@@ -203,6 +221,7 @@ describe("ArtifactResourceBackedViewProvider", () => {
 
     assert.equal(result.nextCursor, undefined);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "artifact-resource-backed-view-cursor-unsupported"), true);
+    assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "artifact-resource-backed-view-source-pagination-unavailable"), true);
     assertSafe(result);
   });
 
@@ -236,15 +255,17 @@ describe("ArtifactResourceBackedViewProvider", () => {
     assertSafe([noSource, failed, thrown]);
   });
 
-  it("reads detail by computed view id without validation or byte reads", async () => {
+  it("reads detail by bounded list fallback with an explicit limitation diagnostic and no byte reads", async () => {
     const browser = new FakeArtifactBrowserMetadataRead([safeArtifact({ artifactId: "artifact-read", originalName: "Readme.md", mediaType: "text/markdown" })]);
     const provider = new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser });
     const listed = await provider.listResourceBackedViews();
     const detail = await provider.readResourceBackedView(listed.items[0]!.viewId);
 
     assert.equal(detail?.viewKind, "document");
+    assert.equal(detail?.diagnostics?.some((diagnostic) => diagnostic.code === "artifact-resource-backed-view-detail-list-fallback-limited"), true);
     assert.equal(await provider.readResourceBackedView("missing"), undefined);
     assert.equal(browser.readContentCalls, 0);
+    assert.equal(browser.readDetailCalls, 0);
     assert.equal(browser.createAssetInstanceCalls, 0);
     assert.equal(browser.persistMappingCalls, 0);
   });

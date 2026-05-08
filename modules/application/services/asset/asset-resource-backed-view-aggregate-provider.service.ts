@@ -23,6 +23,7 @@ export class AssetResourceBackedViewAggregateProvider implements AssetResourceBa
   public readonly providerId: string;
   private readonly providers: readonly AssetResourceBackedViewProvider[];
   private readonly maxListLimit: number;
+  private readonly providerByPublicViewId = new Map<string, AssetResourceBackedViewProvider>();
 
   public constructor(options: AssetResourceBackedViewAggregateProviderOptions = {}) {
     this.providers = options.providers ?? [];
@@ -71,7 +72,10 @@ export class AssetResourceBackedViewAggregateProvider implements AssetResourceBa
         for (const diagnostic of result.diagnostics ?? []) diagnostics.push(sanitizeProviderDiagnostic(diagnostic, provider.providerId));
         for (const item of result.items) {
           const sanitized = sanitizeProviderView(item, diagnostics, provider.providerId);
-          if (sanitized && matchesQuery(sanitized, query)) items.push(sanitized);
+          if (sanitized) {
+            if (!this.providerByPublicViewId.has(sanitized.viewId)) this.providerByPublicViewId.set(sanitized.viewId, provider);
+            if (matchesQuery(sanitized, query)) items.push(sanitized);
+          }
           if (items.length >= limit) break;
         }
         if (this.providers.length === 1 && result.nextCursor) nextCursor = sanitizeAssetStringValue(result.nextCursor);
@@ -89,7 +93,8 @@ export class AssetResourceBackedViewAggregateProvider implements AssetResourceBa
 
   public async readResourceBackedView(viewId: string): Promise<AssetResourceBackedView | undefined> {
     const scopedProvider = this.providerForScopedViewId(viewId);
-    const providers = scopedProvider ? [scopedProvider.provider] : this.providers;
+    const cachedProvider = !scopedProvider ? this.providerByPublicViewId.get(viewId) : undefined;
+    const providers = scopedProvider ? [scopedProvider.provider] : cachedProvider ? [cachedProvider] : this.providers;
     const scopedViewId = scopedProvider?.viewId ?? viewId;
 
     for (const provider of providers) {

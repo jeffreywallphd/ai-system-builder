@@ -65,6 +65,7 @@ export class ArtifactResourceBackedViewProvider implements AssetResourceBackedVi
     if (query.cursor) {
       diagnostics.push(this.diagnostic("warning", "artifact-resource-backed-view-cursor-unsupported", "Artifact resource-backed view cursor pagination is not supported by the descriptor list seam."));
     }
+    diagnostics.push(this.diagnostic("info", "artifact-resource-backed-view-source-pagination-unavailable", "Artifact metadata browse does not expose source-level cursor or limit pagination; provider output is bounded after browse."));
 
     if (query.lifecycleStatuses?.length) {
       diagnostics.push(this.diagnostic("info", "artifact-resource-backed-view-lifecycle-filter-unsupported", "Artifact lifecycle state is not mapped to Asset Kernel lifecycle status by this provider."));
@@ -124,7 +125,8 @@ export class ArtifactResourceBackedViewProvider implements AssetResourceBackedVi
 
   public async readResourceBackedView(viewId: string): Promise<AssetResourceBackedView | undefined> {
     const result = await this.listResourceBackedViews({ limit: this.maxListLimit });
-    return result.items.find((view) => view.viewId === viewId);
+    const view = result.items.find((item) => item.viewId === viewId);
+    return view ? withDetailFallbackDiagnostic(view, this.diagnostic("info", "artifact-resource-backed-view-detail-list-fallback-limited", "Artifact detail read used the bounded browse-list fallback because public view ids do not expose reversible artifact locators.")) : undefined;
   }
 
   private viewFromBrowseItem(
@@ -380,4 +382,20 @@ function hasUnsafeMetadata(value: unknown): boolean {
     return Object.entries(value as Record<string, unknown>).some(([key, entry]) => isUnsafeAssetMetadataKey(key) || hasUnsafeMetadata(entry));
   }
   return false;
+}
+
+function withDetailFallbackDiagnostic(
+  view: AssetResourceBackedView,
+  diagnostic: AssetResourceBackedViewProviderDiagnostic,
+): AssetResourceBackedView {
+  return sanitizeAssetViewValue({
+    ...view,
+    diagnostics: [...(view.diagnostics ?? []), {
+      severity: diagnostic.severity,
+      code: diagnostic.code,
+      message: diagnostic.message,
+      sourceKind: diagnostic.sourceKind,
+      metadata: diagnostic.metadata,
+    }],
+  }) as AssetResourceBackedView;
 }

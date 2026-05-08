@@ -53,7 +53,10 @@ export interface AssetImageResourceBackedViewProviderDependencies {
 const DEFAULT_PROVIDER_ID = "asset-image-resource-backed-view-provider";
 const DEFAULT_LIST_LIMIT = 100;
 const ABSOLUTE_MAX_LIST_LIMIT = 250;
+const IMAGE_VIEW_ID_PREFIX = "asset-view.image.internal.";
+const GENERATED_OUTPUT_VIEW_ID_PREFIX = "asset-view.generated-output.internal.";
 type UnknownRecord = Readonly<Record<string, unknown>>;
+type SourceListResult = Readonly<{ views: readonly AssetResourceBackedView[]; nextCursor?: string }>;
 
 export class AssetImageResourceBackedViewProvider implements AssetResourceBackedViewProvider {
   public readonly providerId: string;
@@ -73,6 +76,9 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
   public async listResourceBackedViews(query: AssetResourceBackedViewListQuery = {}): Promise<AssetResourceBackedViewListResult> {
     const diagnostics: AssetResourceBackedViewProviderDiagnostic[] = [];
     const limit = this.safeLimit(query.limit);
+    const imageSourceActive = allowsViewKind(query, "image-asset") && Boolean(this.imageAssetDescriptorRead);
+    const generatedOutputSourceActive = allowsViewKind(query, "generated-output") && Boolean(this.generatedImageOutputDescriptorSource);
+    const combinesSources = imageSourceActive && generatedOutputSourceActive;
 
     if (typeof query.limit === "number" && Number.isFinite(query.limit) && Math.floor(query.limit) > limit) {
       diagnostics.push(this.diagnostic("info", "image-resource-backed-view-limit-clamped", "Image resource-backed view limit was clamped.", {
@@ -81,59 +87,96 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
       }));
     }
 
-    if (query.cursor) {
-      diagnostics.push(this.diagnostic("warning", "image-resource-backed-view-cursor-unsupported", "Image resource-backed view cursor pagination is not supported by this descriptor provider yet."));
+    if (query.cursor && combinesSources) {
+      diagnostics.push(this.diagnostic("warning", "image-resource-backed-view-combined-cursor-unsupported", "Image resource-backed view cursor pagination is not returned when finalized image and generated-output sources are combined."));
     }
 
     if (query.lifecycleStatuses?.length) {
       diagnostics.push(this.diagnostic("info", "image-resource-backed-view-lifecycle-filter-unsupported", "Generated image output descriptors do not have Asset Kernel lifecycle status until finalization."));
     }
 
-    const imageViews = await this.listImageAssetViews(query, limit, diagnostics);
-    const remainingLimit = Math.max(0, limit - imageViews.length);
-    const generatedOutputViews = remainingLimit > 0
-      ? await this.listGeneratedOutputViews(query, remainingLimit, diagnostics)
-      : [];
+    const imageResult = await this.listImageAssetViews(query, limit, diagnostics, !combinesSources ? query.cursor : undefined);
+    const remainingLimit = Math.max(0, limit - imageResult.views.length);
+    const generatedOutputResult = remainingLimit > 0
+      ? await this.listGeneratedOutputViews(query, remainingLimit, diagnostics, !combinesSources ? query.cursor : undefined)
+      : { views: [] };
 
-    const items = [...imageViews, ...generatedOutputViews]
+    const items = [...imageResult.views, ...generatedOutputResult.views]
       .filter((view) => matchesQuery(view, query))
       .slice(0, limit);
+    const nextCursor = !combinesSources ? imageResult.nextCursor ?? generatedOutputResult.nextCursor : undefined;
+    if (combinesSources && (imageResult.nextCursor || generatedOutputResult.nextCursor)) {
+      diagnostics.push(this.diagnostic("info", "image-resource-backed-view-next-cursor-omitted", "Source cursors were omitted because combined finalized-image/generated-output pagination is not enabled."));
+    }
 
     return sanitizeAssetViewValue({
       items,
+      ...(nextCursor ? { nextCursor } : {}),
       ...(diagnostics.length ? { diagnostics } : {}),
     }) as AssetResourceBackedViewListResult;
   }
 
   public async readResourceBackedView(viewId: string): Promise<AssetResourceBackedView | undefined> {
+    const directImageAssetId = parseDirectViewId(viewId, IMAGE_VIEW_ID_PREFIX);
+    if (directImageAssetId && this.imageAssetDescriptorRead?.readImageAssetDescriptor) {
+      try {
+        const descriptor = await this.imageAssetDescriptorRead.readImageAssetDescriptor(directImageAssetId);
+        if (descriptor) {
+          const diagnostics: AssetResourceBackedViewProviderDiagnostic[] = [];
+          const view = this.viewFromImageAsset(descriptor, diagnostics);
+          if (view?.viewId === viewId) return view;
+        }
+      } catch {
+        // Fall back to the bounded list path below; the thrown source details are not exposable.
+      }
+    }
+
+    const directOutputId = parseDirectViewId(viewId, GENERATED_OUTPUT_VIEW_ID_PREFIX);
+    if (directOutputId && this.generatedImageOutputDescriptorSource?.readGeneratedImageOutputDescriptor) {
+      try {
+        const descriptor = await this.generatedImageOutputDescriptorSource.readGeneratedImageOutputDescriptor(directOutputId);
+        if (descriptor) {
+          const diagnostics: AssetResourceBackedViewProviderDiagnostic[] = [];
+          const view = this.viewFromGeneratedOutputDescriptor(descriptor, diagnostics);
+          if (view?.viewId === viewId) return view;
+        }
+      } catch {
+        // Fall back to the bounded list path below; the thrown source details are not exposable.
+      }
+    }
+
     const result = await this.listResourceBackedViews({ limit: this.maxListLimit });
-    return result.items.find((view) => view.viewId === viewId);
+    const view = result.items.find((item) => item.viewId === viewId);
+    return view ? withDetailFallbackDiagnostic(view, this.diagnostic("info", "image-resource-backed-view-detail-list-fallback-limited", "Detail read used the bounded descriptor list fallback because a direct descriptor read seam or reversible safe view id was not available.")) : undefined;
   }
 
   private async listImageAssetViews(
     query: AssetResourceBackedViewListQuery,
     limit: number,
     diagnostics: AssetResourceBackedViewProviderDiagnostic[],
-  ): Promise<readonly AssetResourceBackedView[]> {
-    if (limit <= 0 || !allowsViewKind(query, "image-asset")) return [];
+    cursor: string | undefined,
+  ): Promise<SourceListResult> {
+    if (limit <= 0 || !allowsViewKind(query, "image-asset")) return { views: [] };
     if (!this.imageAssetDescriptorRead) {
       diagnostics.push(this.diagnostic("warning", "image-resource-backed-view-image-source-unavailable", "Finalized image asset descriptor list seam is not available."));
-      return [];
+      return { views: [] };
     }
 
     let items: readonly ImageAsset[];
+    let nextCursor: string | undefined;
     try {
       const result = await this.imageAssetDescriptorRead.listImageAssetDescriptors({
         searchText: query.searchText,
         limit,
-        cursor: undefined,
+        cursor,
       });
       items = result.items;
+      nextCursor = sanitizeAssetStringValue(result.nextCursor);
     } catch {
       diagnostics.push(this.diagnostic("warning", "image-resource-backed-view-image-source-failed", "Finalized image asset descriptor source failed while listing resource-backed views.", {
         failureKind: "source-exception",
       }));
-      return [];
+      return { views: [] };
     }
 
     const views: AssetResourceBackedView[] = [];
@@ -143,33 +186,36 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
       views.push(view);
       if (views.length >= limit) break;
     }
-    return views;
+    return { views, ...(nextCursor ? { nextCursor } : {}) };
   }
 
   private async listGeneratedOutputViews(
     query: AssetResourceBackedViewListQuery,
     limit: number,
     diagnostics: AssetResourceBackedViewProviderDiagnostic[],
-  ): Promise<readonly AssetResourceBackedView[]> {
-    if (limit <= 0 || !allowsViewKind(query, "generated-output")) return [];
+    cursor: string | undefined,
+  ): Promise<SourceListResult> {
+    if (limit <= 0 || !allowsViewKind(query, "generated-output")) return { views: [] };
     if (!this.generatedImageOutputDescriptorSource) {
       diagnostics.push(this.diagnostic("info", "image-resource-backed-view-generated-output-source-unavailable", "Generated image output descriptor source is not available."));
-      return [];
+      return { views: [] };
     }
 
     let items: readonly GeneratedImageOutputDescriptor[];
+    let nextCursor: string | undefined;
     try {
       const result = await this.generatedImageOutputDescriptorSource.listGeneratedImageOutputDescriptors({
         searchText: query.searchText,
         limit,
-        cursor: undefined,
+        cursor,
       });
       items = result.items;
+      nextCursor = sanitizeAssetStringValue(result.nextCursor);
     } catch {
       diagnostics.push(this.diagnostic("warning", "image-resource-backed-view-generated-output-source-failed", "Generated image output descriptor source failed while listing resource-backed views.", {
         failureKind: "source-exception",
       }));
-      return [];
+      return { views: [] };
     }
 
     const views: AssetResourceBackedView[] = [];
@@ -179,7 +225,7 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
       views.push(view);
       if (views.length >= limit) break;
     }
-    return views;
+    return { views, ...(nextCursor ? { nextCursor } : {}) };
   }
 
   private viewFromImageAsset(
@@ -222,7 +268,7 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
     };
 
     return sanitizeAssetViewValue({
-      viewId: `asset-view.image.internal.${stableHash(imageIdentity.raw)}`,
+      viewId: `${IMAGE_VIEW_ID_PREFIX}${imageIdentity.directId ?? stableHash(imageIdentity.raw)}`,
       viewKind: "image-asset",
       assetType: "image" satisfies AssetType,
       assetFamily: "resource-backed" satisfies AssetFamily,
@@ -266,7 +312,7 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
       outputIdentity.safeLabel;
 
     return sanitizeAssetViewValue({
-      viewId: `asset-view.generated-output.internal.${stableHash(outputIdentity.raw)}`,
+      viewId: `${GENERATED_OUTPUT_VIEW_ID_PREFIX}${outputIdentity.directId ?? stableHash(outputIdentity.raw)}`,
       viewKind: "generated-output",
       generatedOutput,
       resourceBacking: {
@@ -367,6 +413,7 @@ interface SafeIdentity {
   readonly raw: string;
   readonly publicId: string;
   readonly safeLabel: string;
+  readonly directId?: string;
 }
 
 function safeIdentity(value: string | undefined, fallbackPrefix: string): SafeIdentity | undefined {
@@ -375,7 +422,7 @@ function safeIdentity(value: string | undefined, fallbackPrefix: string): SafeId
   const pathLikeOrUnsafe = /[\\/]/.test(raw) || /^[a-z]:/i.test(raw) || isUnsafeAssetMetadataString(raw);
   if (!pathLikeOrUnsafe) {
     const publicId = stableToken(raw);
-    return { raw, publicId, safeLabel: raw };
+    return { raw, publicId, safeLabel: raw, ...(publicId === raw ? { directId: publicId } : {}) };
   }
   const publicId = `${fallbackPrefix}.${stableHash(raw)}`;
   return { raw, publicId, safeLabel: publicId };
@@ -531,4 +578,27 @@ function stableHash(value: string): string {
     hash = Math.imul(hash, 16777619);
   }
   return (hash >>> 0).toString(36);
+}
+
+function parseDirectViewId(viewId: string, prefix: string): string | undefined {
+  if (!viewId.startsWith(prefix)) return undefined;
+  const candidate = viewId.slice(prefix.length);
+  if (!candidate || !/^[a-z0-9_.-]+$/i.test(candidate)) return undefined;
+  return candidate;
+}
+
+function withDetailFallbackDiagnostic(
+  view: AssetResourceBackedView,
+  diagnostic: AssetResourceBackedViewProviderDiagnostic,
+): AssetResourceBackedView {
+  return sanitizeAssetViewValue({
+    ...view,
+    diagnostics: [...(view.diagnostics ?? []), {
+      severity: diagnostic.severity,
+      code: diagnostic.code,
+      message: diagnostic.message,
+      sourceKind: diagnostic.sourceKind,
+      metadata: diagnostic.metadata,
+    }],
+  }) as AssetResourceBackedView;
 }
