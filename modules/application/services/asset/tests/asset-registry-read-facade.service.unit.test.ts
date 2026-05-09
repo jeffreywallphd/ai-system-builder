@@ -452,9 +452,15 @@ describe("AssetRegistryReadFacade definition reads", () => {
             sourcePackVersion: "1.0.0",
             categoryId: "ui-structure",
             assetPackInstall: {
+              packId: "system.foundation",
+              packVersion: "1.0.0",
+              entryId: "builtin.definition.system",
+              fingerprint: "fnv1a:definition-system",
               sourceKind: "system",
               sourceLayer: "system-default",
               trustStatus: "system-trusted",
+              managedBy: "asset-kernel",
+              installedAt: "2026-05-09T12:00:00.000Z",
             },
             overridesDefinitionRef: { kind: "asset-definition-version", id: "definition.base", version: "1.0.0" },
             overriddenByDefinitionRefs: [
@@ -503,9 +509,13 @@ describe("AssetRegistryReadFacade definition reads", () => {
         assetPackInstall: {
           packId: "system.foundation",
           packVersion: "1.0.0",
+          entryId: "builtin.system.foundation.fixture",
+          fingerprint: "fnv1a:system-foundation-fixture",
           sourceKind: "system",
           sourceLayer: "system-default",
           trustStatus: "system-trusted",
+          managedBy: "asset-kernel",
+          installedAt: "2026-05-09T12:00:00.000Z",
         },
       },
     });
@@ -527,6 +537,129 @@ describe("AssetRegistryReadFacade definition reads", () => {
     assert.equal((await facade.listDefinitionCards({ includeCustom: true, includeBuiltIns: false })).items.some((item) => item.definitionId === "builtin.system.foundation.fixture"), false);
     assert.equal((await facade.readDefinitionDetail({ kind: "asset-definition-version", id: normalizeAssetId("builtin.system.foundation.fixture"), version: "1.0.0" }))?.builtIn, true);
     assert.equal((await facade.listDefinitionCards({ includeBuiltIns: false })).items.some((item) => item.definitionId === "definition.alpha"), true);
+  });
+
+  it("classifies system foundation defaults only from trusted metadata or installer markers", async () => {
+    const seed = BUILT_IN_ASSET_DEFINITION_CATALOG[0]!;
+    const exactBuiltIn = { ...seed.definition };
+    const legacyBuiltInSeed = validDefinition({
+      definitionId: "definition.legacy-seed",
+      metadata: { builtInSeed: { managedBy: "asset-kernel", seedId: "seed.legacy", seedVersion: "1.0.0", fingerprint: "abc123" } },
+    });
+    const installedSystemDefault = validDefinition({
+      definitionId: "definition.installed-system-default",
+      metadata: {
+        sourcePackId: "system.foundation",
+        sourcePackVersion: "1.0.0",
+        assetPackInstall: {
+          packId: "system.foundation",
+          packVersion: "1.0.0",
+          entryId: "definition.installed-system-default",
+          fingerprint: "fnv1a:installed-system-default",
+          sourceKind: "system",
+          sourceLayer: "system-default",
+          trustStatus: "system-trusted",
+          managedBy: "asset-kernel",
+          installedAt: "2026-05-09T12:00:00.000Z",
+        },
+      },
+    });
+    const trustedSourceMetadata = validDefinition({
+      definitionId: "definition.trusted-source",
+      metadata: {
+        sourcePackId: "system.foundation",
+        sourceKind: "system",
+        sourceLayer: "system-default",
+        trustStatus: "system-trusted",
+      },
+    });
+    const bareSystemFoundation = validDefinition({
+      definitionId: "definition.bare-system-foundation",
+      metadata: { sourcePackId: "system.foundation" },
+    });
+    const wrongSourceKind = validDefinition({
+      definitionId: "definition.wrong-kind",
+      metadata: {
+        sourcePackId: "system.foundation",
+        sourceKind: "user",
+        sourceLayer: "system-default",
+        trustStatus: "system-trusted",
+      },
+    });
+    const wrongSourceLayer = validDefinition({
+      definitionId: "definition.wrong-layer",
+      metadata: {
+        sourcePackId: "system.foundation",
+        sourceKind: "system",
+        sourceLayer: "workspace-pack",
+        trustStatus: "system-trusted",
+      },
+    });
+    const wrongTrustStatus = validDefinition({
+      definitionId: "definition.wrong-trust",
+      metadata: {
+        sourcePackId: "system.foundation",
+        sourceKind: "system",
+        sourceLayer: "system-default",
+        trustStatus: "unverified",
+      },
+    });
+    const customDefinition = validDefinition({
+      definitionId: "definition.custom",
+      metadata: { sourceKind: "user", sourceLayer: "workspace-pack", trustStatus: "unverified" },
+    });
+    const facade = createFacade({
+      definitionRepository: new FakeDefinitionRepository([
+        exactBuiltIn,
+        legacyBuiltInSeed,
+        installedSystemDefault,
+        trustedSourceMetadata,
+        bareSystemFoundation,
+        wrongSourceKind,
+        wrongSourceLayer,
+        wrongTrustStatus,
+        customDefinition,
+      ]),
+    });
+
+    const cards = await facade.listDefinitionCards();
+    const byId = new Map(cards.items.map((item) => [item.definitionId, item]));
+
+    assert.equal(byId.get(String(seed.definition.definitionId))?.builtIn, true);
+    assert.equal(byId.get("definition.legacy-seed")?.builtIn, true);
+    assert.equal(byId.get("definition.installed-system-default")?.builtIn, true);
+    assert.equal(byId.get("definition.installed-system-default")?.systemDefault, true);
+    assert.equal(byId.get("definition.trusted-source")?.builtIn, true);
+    assert.equal(byId.get("definition.trusted-source")?.systemDefault, true);
+    for (const definitionId of [
+      "definition.bare-system-foundation",
+      "definition.wrong-kind",
+      "definition.wrong-layer",
+      "definition.wrong-trust",
+      "definition.custom",
+    ]) {
+      assert.equal(byId.get(definitionId)?.builtIn, undefined, definitionId);
+      assert.equal(byId.get(definitionId)?.systemDefault, undefined, definitionId);
+    }
+    assert.deepEqual(
+      (await facade.listDefinitionCards({ includeBuiltIns: true, includeCustom: false })).items.map((item) => item.definitionId).sort(),
+      [
+        String(seed.definition.definitionId),
+        "definition.installed-system-default",
+        "definition.legacy-seed",
+        "definition.trusted-source",
+      ].sort(),
+    );
+    assert.deepEqual(
+      (await facade.listDefinitionCards({ includeBuiltIns: false })).items.map((item) => item.definitionId).sort(),
+      [
+        "definition.bare-system-foundation",
+        "definition.custom",
+        "definition.wrong-kind",
+        "definition.wrong-layer",
+        "definition.wrong-trust",
+      ].sort(),
+    );
   });
 
   it("marks persisted built-ins without seeding or overwriting definitions", async () => {
