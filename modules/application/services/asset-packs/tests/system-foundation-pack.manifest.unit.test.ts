@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import { validateAssetPackManifest } from "../asset-pack-validation.service";
 import {
+  DISPLAY_PRIMITIVE_ENTRIES,
   SYSTEM_FOUNDATION_PACK_CATEGORIES,
   SYSTEM_FOUNDATION_PACK_CATEGORY_IDS,
   SYSTEM_FOUNDATION_PACK_MANIFEST,
@@ -24,7 +25,7 @@ describe("system foundation pack manifest", () => {
     assert.equal(SYSTEM_FOUNDATION_PACK_MANIFEST.trustStatus, "system-trusted");
   });
 
-  it("contains the expected categories, UI structural primitive assets, and form primitive assets", () => {
+  it("contains the expected categories, UI structural, form, display, state, and message primitive assets", () => {
     assert.deepEqual(
       SYSTEM_FOUNDATION_PACK_MANIFEST.categories,
       SYSTEM_FOUNDATION_PACK_CATEGORY_IDS,
@@ -34,6 +35,7 @@ describe("system foundation pack manifest", () => {
       [
         ...UI_STRUCTURAL_PRIMITIVE_ENTRIES,
         ...FORM_PRIMITIVE_ENTRIES,
+        ...DISPLAY_PRIMITIVE_ENTRIES,
       ].map((entry) => entry.entryId),
     );
     assert.equal(
@@ -44,6 +46,12 @@ describe("system foundation pack manifest", () => {
     );
     assert.equal(
       FORM_PRIMITIVE_ENTRIES.every((entry) =>
+        SYSTEM_FOUNDATION_PACK_MANIFEST.assets.includes(entry),
+      ),
+      true,
+    );
+    assert.equal(
+      DISPLAY_PRIMITIVE_ENTRIES.every((entry) =>
         SYSTEM_FOUNDATION_PACK_MANIFEST.assets.includes(entry),
       ),
       true,
@@ -98,9 +106,9 @@ describe("system foundation pack manifest", () => {
     const fingerprints = new Set<string>();
 
     for (const entry of SYSTEM_FOUNDATION_PACK_MANIFEST.assets) {
-      assert.ok(["ui-structure", "forms-fields"].includes(entry.category));
+      assert.ok(["ui-structure", "forms-fields", "data-display", "state-messages"].includes(entry.category));
       assert.equal(entry.sourceLayer, SYSTEM_FOUNDATION_PACK_SOURCE_LAYER);
-      assert.match(entry.entryId, /^system\.foundation\.(?:ui|form)\.[a-z0-9.-]+$/);
+      assert.match(entry.entryId, /^system\.foundation\.(?:ui|form|display|state)\.[a-z0-9.-]+$/);
       assert.match(entry.fingerprint, /^fnv1a:[a-f0-9]{8}$/);
       assert.equal(entryIds.has(entry.entryId), false, entry.entryId);
       assert.equal(refKeys.has(`${entry.definitionRef.id}@${entry.definitionRef.version}`), false);
