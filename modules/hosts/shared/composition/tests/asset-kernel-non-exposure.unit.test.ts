@@ -33,8 +33,8 @@ function combinedSource(relativeDir: string): string {
   return sourceFilesUnder(relativeDir).map((file) => `\n// ${file.path}\n${file.source}`).join("\n");
 }
 
-describe("Asset Kernel read-only non-exposure boundaries", () => {
-  it("allows only the narrow read-only asset definitions and resource-backed views server API surface", () => {
+describe("Asset Kernel public non-exposure boundaries", () => {
+  it("allows only read APIs plus four approved asset mutation server API routes", () => {
     const source = [
       combinedSource("modules/contracts/api"),
       combinedSource("modules/adapters/transport/api-express"),
@@ -46,13 +46,17 @@ describe("Asset Kernel read-only non-exposure boundaries", () => {
     assert.match(source, /["'`]\/api\/assets\/definitions\/:definitionId\/versions\/:version["'`]/i);
     assert.match(source, /["'`]\/api\/assets\/resource-backed-views["'`]/i);
     assert.match(source, /["'`]\/api\/assets\/resource-backed-views\/:viewId["'`]/i);
-    assert.doesNotMatch(source, /["'`]\/api\/assets\/(?:instances|compositions|resources|registry-summary|create|update|delete|seed|register|import|finalize|publish|execute|run|scan|sync|repair|install|start|train|validate)(?:\/|["'`?])/i);
-    assert.doesNotMatch(source, /\.(?:post|put|patch|delete)\(["'`]\/api\/assets/i);
+    assert.match(source, /["'`]\/api\/assets\/register-resource-backed-view["'`]/i);
+    assert.match(source, /["'`]\/api\/assets\/finalize-generated-output["'`]/i);
+    assert.match(source, /["'`]\/api\/assets\/import-external-repository-object["'`]/i);
+    assert.match(source, /["'`]\/api\/assets\/localize-external-repository-object["'`]/i);
+    assert.doesNotMatch(source, /["'`]\/api\/assets\/(?:instances|compositions|resources|registry-summary|create|update|delete|patch|edit|seed|publish|execute|run|scan|sync|repair|install|start|train|validate)(?:\/|["'`?])/i);
+    assert.doesNotMatch(source, /\.(?:put|patch|delete)\(["'`]\/api\/assets/i);
     assert.doesNotMatch(source, /\basset(?:Kernel|Registry|Library)?(?:Router|Controller)\b/i);
     assert.doesNotMatch(source, /\b(?:seedBuiltIns|registerBuiltIns|importAsset|finalizeAsset|publishAsset|executeAsset|runAsset|scanResources|syncAssets|startRuntime|probeRuntime|installRuntime|repairRuntime|trainAsset|validateAsset)\b/i);
   });
 
-  it("allows only read-only asset definition and resource-backed view IPC/preload methods", () => {
+  it("allows read IPC/preload plus four approved asset mutation IPC/preload methods", () => {
     const publicIpcAndPreloadSource = [
       combinedSource("modules/contracts/ipc"),
       combinedSource("modules/adapters/transport/ipc-electron"),
@@ -69,11 +73,19 @@ describe("Asset Kernel read-only non-exposure boundaries", () => {
     assert.match(publicIpcAndPreloadSource, /\breadAssetDefinition\b/);
     assert.match(publicIpcAndPreloadSource, /\blistAssetResourceBackedViews\b/);
     assert.match(publicIpcAndPreloadSource, /\breadAssetResourceBackedView\b/);
-    assert.doesNotMatch(publicIpcAndPreloadSource, /ipc\.asset\.(?:instance|composition|registry-summary|create|update|delete|register|seed|import|finalize|publish|execute|run|scan|sync|repair|install|start|train|validate)/i);
-    assert.doesNotMatch(publicIpcAndPreloadSource, /\b(?:createAsset|updateAsset|deleteAsset|registerAsset|seedAsset|importAsset|finalizeAsset|publishAsset|executeAsset|runAsset|scanAssets|syncAssets|repairAsset|installAsset|startAsset|trainAsset|validateAsset|listAssetInstances|readAssetInstance)\b/i);
+    assert.match(publicIpcAndPreloadSource, /DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL/);
+    assert.match(publicIpcAndPreloadSource, /DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL/);
+    assert.match(publicIpcAndPreloadSource, /DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL/);
+    assert.match(publicIpcAndPreloadSource, /DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL/);
+    assert.match(publicIpcAndPreloadSource, /\bregisterResourceBackedViewAsAsset\b/);
+    assert.match(publicIpcAndPreloadSource, /\bfinalizeGeneratedOutputAsAsset\b/);
+    assert.match(publicIpcAndPreloadSource, /\bimportExternalRepositoryObjectAsAsset\b/);
+    assert.match(publicIpcAndPreloadSource, /\blocalizeExternalRepositoryObjectAsAsset\b/);
+    assert.doesNotMatch(publicIpcAndPreloadSource, /ipc\.asset\.(?:instance|composition|registry-summary|create|update|delete|patch|edit|seed|publish|execute|run|scan|sync|repair|install|start|train|validate)/i);
+    assert.doesNotMatch(publicIpcAndPreloadSource, /\b(?:createAsset|updateAsset|deleteAsset|patchAsset|editAsset|seedAsset|publishAsset|executeAsset|runAsset|scanAssets|syncAssets|repairAsset|installAsset|startAsset|trainAsset|validateAsset|listAssetInstances|readAssetInstance)\b/i);
     assert.match(desktopHostCompositionSource, /assetRegistryRead:\s*internalAssetRegistry\.readFacade/);
     assert.doesNotMatch(desktopHostCompositionSource, /assetRegistryRead:\s*internalAssetRegistry[,}]/);
-    assert.doesNotMatch(desktopHostCompositionSource, /ipc\.asset\.(?:instance|composition|resource|registry-summary|create|update|delete|register|seed|import|finalize|publish|execute|run|scan|sync|repair|install|start|train|validate)/i);
+    assert.doesNotMatch(desktopHostCompositionSource, /ipc\.asset\.(?:instance|composition|resource|registry-summary|create|update|delete|patch|edit|seed|publish|execute|run|scan|sync|repair|install|start|train|validate)/i);
   });
 
   it("allows read-only desktop and thin-client Asset Library pages with no mutation helpers", () => {
@@ -104,7 +116,7 @@ describe("Asset Kernel read-only non-exposure boundaries", () => {
     assert.match(source, /\breadAssetResourceBackedView\b/);
     assert.match(sharedAssetLibrarySource, /readDetail\(definition,\s*\{\s*\}\)/);
     assert.match(sharedAssetLibrarySource, /readDetail\(selectedDefinition,\s*\{\s*includeValidation:\s*true\s*\}\)/);
-    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|publishAsset|scanResources|executeAsset|runAsset|syncAssets|repairAsset|installAsset|startAsset|trainAsset)\b/i);
+    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|publishAsset|scanResources|executeAsset|runAsset|syncAssets|repairAsset|installAsset|startAsset|trainAsset|registerResourceBackedViewAsAsset|finalizeGeneratedOutputAsAsset|importExternalRepositoryObjectAsAsset|localizeExternalRepositoryObjectAsAsset)\b/i);
     assert.doesNotMatch(source, /\b(?:listAssetInstances|readAssetInstance|listAssetCompositions|readAssetComposition|readAssetRegistrySummary)\b/i);
   });
 
@@ -120,7 +132,7 @@ describe("Asset Kernel read-only non-exposure boundaries", () => {
     assert.doesNotMatch(source, /\b(?:PrepareTrainingDataset|DatasetPreparationUseCase|ModelTrainingPort|ModelValidationPort|ModelPublisherPort|TrainModelUseCase|ValidateModelUseCase|PublishModelUseCase|discoverModels|includeDiscovered:\s*true)\b/i);
   });
 
-  it("allows internal mutation use cases but no public Phase 4 asset mutation exposure", () => {
+  it("allows public Phase 4 exposure only for four approved mutation operations", () => {
     const applicationUseCases = combinedSource("modules/application/use-cases/asset");
     assert.match(applicationUseCases, /asset\.register-resource-backed-view/);
     assert.match(applicationUseCases, /asset\.finalize-generated-output/);
@@ -138,10 +150,14 @@ describe("Asset Kernel read-only non-exposure boundaries", () => {
       combinedSource("modules/ui/shared/asset-library"),
     ].join("\n");
 
-    assert.doesNotMatch(publicSource, /asset\.register-resource-backed-view|asset\.finalize-generated-output|asset\.import-external-repository-object|asset\.localize-external-repository-object/i);
-    assert.doesNotMatch(publicSource, /\b(?:registerResourceBackedView|finalizeGeneratedOutputAsAsset|finalizeGeneratedOutput|importExternalRepositoryObject|localizeExternalRepositoryObject)\b/i);
-    assert.doesNotMatch(publicSource, /\/api\/assets\/(?:register|finalize|import|localize|instances|create|update|delete|patch|edit)(?:\/|["'`?])/i);
-    assert.doesNotMatch(publicSource, /ipc\.asset\.(?:register|finalize|import|localize|instance|create|update|delete|patch|edit)/i);
+    assert.match(publicSource, /asset\.register-resource-backed-view/);
+    assert.match(publicSource, /asset\.finalize-generated-output/);
+    assert.match(publicSource, /asset\.import-external-repository-object/);
+    assert.match(publicSource, /asset\.localize-external-repository-object/);
+    assert.match(publicSource, /\/api\/assets\/register-resource-backed-view/);
+    assert.match(publicSource, /DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL/);
+    assert.doesNotMatch(publicSource, /\/api\/assets\/(?:instances|create|update|delete|patch|edit|seed|publish|execute|run|scan)(?:\/|["'`?])/i);
+    assert.doesNotMatch(publicSource, /ipc\.asset\.(?:instance|create|update|delete|patch|edit|seed|publish|execute|run|scan)/i);
   });
 
   it("keeps the external repository resource-backed provider descriptor-only", () => {

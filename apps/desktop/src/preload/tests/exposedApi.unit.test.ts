@@ -43,6 +43,10 @@ import {
   DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL,
   DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL,
   DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL,
+  DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL,
+  DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
   createDesktopRuntimeReadinessReadSuccessResponse,
@@ -52,6 +56,11 @@ import {
   createDesktopAssetDefinitionVersionReadSuccessResponse,
   createDesktopAssetResourceBackedViewReadSuccessResponse,
   createDesktopAssetResourceBackedViewsListSuccessResponse,
+  createDesktopAssetMutationSuccessResponse,
+  DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL,
   createDesktopPythonRuntimeStatusReadSuccessResponse,
   createDesktopPythonRuntimeControlSuccessResponse,
   DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
@@ -249,7 +258,40 @@ describe("desktop preload exposedApi bridge", () => {
     });
   });
 
-  it("does not expose asset mutation or seeding methods", () => {
+  it("maps approved asset mutation methods to dedicated IPC channels", async () => {
+    const responses = [
+      createDesktopAssetMutationSuccessResponse(DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_RESPONSE_CHANNEL, { ok: true, operation: "asset.register-resource-backed-view", status: "created" }),
+      createDesktopAssetMutationSuccessResponse(DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_RESPONSE_CHANNEL, { ok: true, operation: "asset.finalize-generated-output", status: "existing" }),
+      createDesktopAssetMutationSuccessResponse(DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL, { ok: true, operation: "asset.import-external-repository-object", status: "existing" }),
+      createDesktopAssetMutationSuccessResponse(DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL, { ok: true, operation: "asset.localize-external-repository-object", status: "existing" }),
+    ];
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => responses.shift());
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    const base = {
+      viewId: "asset-view.external.1",
+      approval: { userConfirmed: true, confirmationKind: "register-resource-backed-view" as const },
+      actor: { initiatedBy: "human" as const },
+    };
+
+    await api.registerResourceBackedViewAsAsset({ ...base, operation: "asset.register-resource-backed-view" }, { requestId: "r1", correlationId: "c1", idempotencyKey: "idem-1" });
+    await api.finalizeGeneratedOutputAsAsset({ operation: "asset.finalize-generated-output", generatedOutputId: "out-1", approval: base.approval, actor: base.actor }, { requestId: "r2" });
+    await api.importExternalRepositoryObjectAsAsset({ ...base, operation: "asset.import-external-repository-object" });
+    await api.localizeExternalRepositoryObjectAsAsset({ ...base, operation: "asset.localize-external-repository-object" });
+
+    expect(invoke.mock.calls.map((call) => call[0])).toEqual([
+      DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
+    ]);
+    expect(invoke.mock.calls[0]?.[1]).toMatchObject({
+      requestId: "r1",
+      correlationId: "c1",
+      payload: { context: { requestId: "r1", correlationId: "c1", idempotencyKey: "idem-1" } },
+    });
+  });
+
+  it("does not expose arbitrary asset mutation or seeding methods", () => {
     const api = createDesktopPreloadApi({ ipcRenderer: { invoke: testDouble.fn() } });
     const methodNames = Object.keys(api);
     const forbiddenAssetMethods = [
@@ -278,6 +320,10 @@ describe("desktop preload exposedApi bridge", () => {
     expect(methodNames).toContain("readAssetDefinitionVersion");
     expect(methodNames).toContain("listAssetResourceBackedViews");
     expect(methodNames).toContain("readAssetResourceBackedView");
+    expect(methodNames).toContain("registerResourceBackedViewAsAsset");
+    expect(methodNames).toContain("finalizeGeneratedOutputAsAsset");
+    expect(methodNames).toContain("importExternalRepositoryObjectAsAsset");
+    expect(methodNames).toContain("localizeExternalRepositoryObjectAsAsset");
     for (const method of forbiddenAssetMethods) {
       expect(methodNames).not.toContain(method);
     }

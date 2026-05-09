@@ -40,6 +40,12 @@ import {
   DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL,
+  DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_REQUEST_CHANNEL,
@@ -253,7 +259,7 @@ describe("composeDesktopHost", () => {
       runtimeRootDirectory,
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(54);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(60);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     expect(channels).toEqual([
       DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL.value,
@@ -263,6 +269,12 @@ describe("composeDesktopHost", () => {
       DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL.value,
       DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL.value,
       DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
       DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value,
       DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL.value,
       DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL.value,
@@ -315,8 +327,14 @@ describe("composeDesktopHost", () => {
       DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL.value,
       DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL.value,
       DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
     ]);
-    expect(/asset\.(?:create|update|delete|register|seed|import|finalize|scan|execute)/i.test(channels.join(" "))).toBe(false);
+    expect(/asset\.(?:create|update|delete|patch|edit|seed|publish|scan|execute|run)/i.test(channels.join(" "))).toBe(false);
     expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(true);
     expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     const internalRegistry = host.getInternalAssetRegistry();
@@ -339,9 +357,14 @@ describe("composeDesktopHost", () => {
     ].join("\n");
     expect(preloadSource).toContain("listAssetDefinitions");
     expect(preloadSource).toContain("readAssetDefinition");
-    expect(/createAsset|updateAsset|deleteAsset|registerAsset|seedAsset|importAsset|finalizeAsset|listAssetInstances|readAssetInstance/i.test(preloadSource)).toBe(false);
+    expect(preloadSource).toContain("registerResourceBackedViewAsAsset");
+    expect(preloadSource).toContain("finalizeGeneratedOutputAsAsset");
+    expect(preloadSource).toContain("importExternalRepositoryObjectAsAsset");
+    expect(preloadSource).toContain("localizeExternalRepositoryObjectAsAsset");
+    expect(/createAsset|updateAsset|deleteAsset|patchAsset|editAsset|seedAsset|publishAsset|listAssetInstances|readAssetInstance/i.test(preloadSource)).toBe(false);
     const hostSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopHost.ts"), "utf8");
     expect(hostSource).toContain("assetRegistryRead: internalAssetRegistry.readFacade");
+    expect(hostSource).toContain("assetMutationUseCases");
     expect(hostSource).not.toContain("assetRegistryRead: internalAssetRegistry,");
     const listener = ipcMain.handle.mock.calls[0]?.[1];
     expect(listener).toBeTypeOf("function");

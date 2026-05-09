@@ -164,6 +164,8 @@ Asset Library validation diagnostics are explicit read-side details only: normal
 
 Phase 3 Prompt 8 plus scope reconciliation stabilizes this state for final provider review. Resource-backed provider wiring stays internal to desktop/server host composition and the application Asset Registry read facade; public API routes, IPC channels, preload methods, and desktop/thin-client controls expose only read-only resource-backed list/detail views through that facade. Hosts must not own provider business logic or add automatic seeding, registration/import/finalization/localization/publishing workflows, scans, provider/network calls, runtime/task-registry calls, or byte/content reads for resource-backed views.
 
+Phase 4 Prompt 7 adds host wiring for four approved controlled asset mutation workflows through narrow use-case dependencies only: register resource-backed view, finalize generated output, import external repository object, and localize external repository object. Server API and desktop IPC/preload wrappers remain transport glue; they do not receive host composition objects, repositories, providers, storage/runtime adapters, token stores, or UI objects. Host registration must not execute mutation use cases or perform provider/network/storage/runtime/finalization/localization work at startup, and no general asset editor, built-in seeding, provider browse/download, runtime execution, or Asset Library UI action surface is introduced.
+
 ### Current host parity for repo-backed artifact workflows
 
 - Server API and desktop IPC/preload both expose shared publish, published-verify, source-verify, register-from-repo, and localize-from-repo use cases.

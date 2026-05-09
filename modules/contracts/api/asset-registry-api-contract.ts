@@ -1,4 +1,11 @@
 import type {
+  AssetMutationFailureCode,
+  AssetMutationOperation,
+  AssetMutationResult,
+  FinalizeGeneratedOutputCommand,
+  ImportExternalRepositoryObjectCommand,
+  LocalizeExternalRepositoryObjectCommand,
+  RegisterResourceBackedViewCommand,
   AssetFamily,
   AssetLifecycleStatus,
   AssetReference,
@@ -28,6 +35,37 @@ export const API_ASSET_DEFINITION_READ_OPERATION = createTransportOperation("ass
 export const API_ASSET_DEFINITION_VERSION_READ_OPERATION = createTransportOperation("asset", "definition-version-read");
 export const API_ASSET_RESOURCE_BACKED_VIEWS_LIST_OPERATION = createTransportOperation("asset", "resource-backed-views-list");
 export const API_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION = createTransportOperation("asset", "resource-backed-view-read");
+export const API_ASSET_REGISTER_RESOURCE_BACKED_VIEW_OPERATION =
+  createTransportOperation("asset", "register-resource-backed-view") as "asset.register-resource-backed-view";
+export const API_ASSET_FINALIZE_GENERATED_OUTPUT_OPERATION =
+  createTransportOperation("asset", "finalize-generated-output") as "asset.finalize-generated-output";
+export const API_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_OPERATION =
+  createTransportOperation("asset", "import-external-repository-object") as "asset.import-external-repository-object";
+export const API_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_OPERATION =
+  createTransportOperation("asset", "localize-external-repository-object") as "asset.localize-external-repository-object";
+
+export const API_ASSET_MUTATION_ROUTES = {
+  registerResourceBackedView: {
+    method: "POST",
+    path: "/api/assets/register-resource-backed-view",
+    operation: API_ASSET_REGISTER_RESOURCE_BACKED_VIEW_OPERATION,
+  },
+  finalizeGeneratedOutput: {
+    method: "POST",
+    path: "/api/assets/finalize-generated-output",
+    operation: API_ASSET_FINALIZE_GENERATED_OUTPUT_OPERATION,
+  },
+  importExternalRepositoryObject: {
+    method: "POST",
+    path: "/api/assets/import-external-repository-object",
+    operation: API_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_OPERATION,
+  },
+  localizeExternalRepositoryObject: {
+    method: "POST",
+    path: "/api/assets/localize-external-repository-object",
+    operation: API_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_OPERATION,
+  },
+} as const;
 
 export type ApiAssetBuiltInFilter = "all" | "built-in" | "custom";
 
@@ -109,6 +147,30 @@ export type ApiAssetResourceBackedViewReadRequest = ApiRequest<
   Record<string, never>
 >;
 
+export type ApiAssetRegisterResourceBackedViewRequest = ApiRequest<
+  RegisterResourceBackedViewCommand,
+  typeof API_ASSET_REGISTER_RESOURCE_BACKED_VIEW_OPERATION,
+  Record<string, never>
+>;
+
+export type ApiAssetFinalizeGeneratedOutputRequest = ApiRequest<
+  FinalizeGeneratedOutputCommand,
+  typeof API_ASSET_FINALIZE_GENERATED_OUTPUT_OPERATION,
+  Record<string, never>
+>;
+
+export type ApiAssetImportExternalRepositoryObjectRequest = ApiRequest<
+  ImportExternalRepositoryObjectCommand,
+  typeof API_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_OPERATION,
+  Record<string, never>
+>;
+
+export type ApiAssetLocalizeExternalRepositoryObjectRequest = ApiRequest<
+  LocalizeExternalRepositoryObjectCommand,
+  typeof API_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_OPERATION,
+  Record<string, never>
+>;
+
 export type ApiAssetDefinitionsListResponse = ApiResponse<
   AssetRegistryListResult<AssetDefinitionCard>,
   Record<string, unknown>,
@@ -143,6 +205,24 @@ export type ApiAssetResourceBackedViewReadResponse = ApiResponse<
   typeof API_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION,
   Record<string, never>
 >;
+
+export type ApiAssetMutationResponse<
+  TOperation extends AssetMutationOperation = AssetMutationOperation,
+> = ApiResponse<
+  AssetMutationResult,
+  Record<string, unknown>,
+  TOperation,
+  Record<string, never>
+>;
+
+export type ApiAssetRegisterResourceBackedViewResponse =
+  ApiAssetMutationResponse<typeof API_ASSET_REGISTER_RESOURCE_BACKED_VIEW_OPERATION>;
+export type ApiAssetFinalizeGeneratedOutputResponse =
+  ApiAssetMutationResponse<typeof API_ASSET_FINALIZE_GENERATED_OUTPUT_OPERATION>;
+export type ApiAssetImportExternalRepositoryObjectResponse =
+  ApiAssetMutationResponse<typeof API_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_OPERATION>;
+export type ApiAssetLocalizeExternalRepositoryObjectResponse =
+  ApiAssetMutationResponse<typeof API_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_OPERATION>;
 
 export function createApiAssetDefinitionsListRequest(
   payload: ApiAssetDefinitionsListRequestPayload = {},
@@ -179,6 +259,34 @@ export function createApiAssetResourceBackedViewReadRequest(
   return createApiRequest(API_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION, { ...payload, viewId: payload.viewId.trim() }, options);
 }
 
+export function createApiAssetRegisterResourceBackedViewRequest(
+  payload: RegisterResourceBackedViewCommand,
+  options?: { requestId?: string; correlationId?: string },
+): ApiAssetRegisterResourceBackedViewRequest {
+  return createApiRequest(API_ASSET_REGISTER_RESOURCE_BACKED_VIEW_OPERATION, payload, options);
+}
+
+export function createApiAssetFinalizeGeneratedOutputRequest(
+  payload: FinalizeGeneratedOutputCommand,
+  options?: { requestId?: string; correlationId?: string },
+): ApiAssetFinalizeGeneratedOutputRequest {
+  return createApiRequest(API_ASSET_FINALIZE_GENERATED_OUTPUT_OPERATION, payload, options);
+}
+
+export function createApiAssetImportExternalRepositoryObjectRequest(
+  payload: ImportExternalRepositoryObjectCommand,
+  options?: { requestId?: string; correlationId?: string },
+): ApiAssetImportExternalRepositoryObjectRequest {
+  return createApiRequest(API_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_OPERATION, payload, options);
+}
+
+export function createApiAssetLocalizeExternalRepositoryObjectRequest(
+  payload: LocalizeExternalRepositoryObjectCommand,
+  options?: { requestId?: string; correlationId?: string },
+): ApiAssetLocalizeExternalRepositoryObjectRequest {
+  return createApiRequest(API_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_OPERATION, payload, options);
+}
+
 export function createApiAssetDefinitionsListSuccessResponse(
   value: AssetRegistryListResult<AssetDefinitionCard>,
   options?: { requestId?: string; correlationId?: string },
@@ -212,6 +320,14 @@ export function createApiAssetResourceBackedViewReadSuccessResponse(
   options?: { requestId?: string; correlationId?: string },
 ): ApiAssetResourceBackedViewReadResponse {
   return createApiSuccessResponse(API_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION, value, options);
+}
+
+export function createApiAssetMutationSuccessResponse<TOperation extends AssetMutationOperation>(
+  operation: TOperation,
+  value: AssetMutationResult,
+  options?: { requestId?: string; correlationId?: string },
+): ApiAssetMutationResponse<TOperation> {
+  return createApiSuccessResponse(operation, value, options);
 }
 
 export function createApiAssetDefinitionsListFailureResponse(
@@ -252,6 +368,19 @@ export function createApiAssetResourceBackedViewReadFailureResponse(
   options?: { details?: Record<string, unknown>; requestId?: string; correlationId?: string },
 ): ApiAssetResourceBackedViewReadResponse {
   return createApiFailureResponse(createApiError(API_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION, code, message, options), options);
+}
+
+export function createApiAssetMutationFailureResponse<TOperation extends AssetMutationOperation>(
+  operation: TOperation,
+  code: "validation" | "internal" | "not-found" | "unavailable" | "forbidden" | "conflict",
+  message: string,
+  options?: {
+    details?: Record<string, unknown> & { mutationFailureCode?: AssetMutationFailureCode };
+    requestId?: string;
+    correlationId?: string;
+  },
+): ApiAssetMutationResponse<TOperation> {
+  return createApiFailureResponse(createApiError(operation, code, message, options), options);
 }
 
 export function apiAssetDefinitionReference(payload: Pick<ApiAssetDefinitionReadRequestPayload, "definitionId" | "version">): AssetReference {

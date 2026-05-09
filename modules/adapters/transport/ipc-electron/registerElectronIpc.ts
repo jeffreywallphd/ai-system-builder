@@ -31,6 +31,7 @@ import { registerImageGenerationIpc, type RegisterImageGenerationIpcDependencies
 import { registerComfyUiRuntimeIpc } from "./comfyui-runtime/registerComfyUiRuntimeIpc";
 import { registerRuntimeReadinessIpc, type RegisterRuntimeReadinessIpcDependencies } from "./runtime-readiness/registerRuntimeReadinessIpc";
 import { registerAssetRegistryIpc, type RegisterAssetRegistryIpcDependencies } from "./asset-registry/registerAssetRegistryIpc";
+import { registerAssetMutationIpc, type RegisterAssetMutationIpcDependencies } from "./asset-registry/registerAssetMutationIpc";
 import type { RuntimeInstallerPort } from "../../../application/ports/runtime-installer/runtime-installer.port";
 
 export interface RegisterElectronIpcDependencies {
@@ -38,6 +39,7 @@ export interface RegisterElectronIpcDependencies {
   pythonRuntime: PythonRuntimeControlPort;
   runtimeReadiness: RegisterRuntimeReadinessIpcDependencies["runtimeReadiness"];
   assetRegistryRead?: RegisterAssetRegistryIpcDependencies["assetRegistryRead"];
+  assetMutationUseCases?: Omit<RegisterAssetMutationIpcDependencies, "ipcMain">;
   getHuggingFaceTokenStatus: RegisterArtifactBrowserIpcDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["clearHuggingFaceToken"];
@@ -98,6 +100,13 @@ export function registerElectronIpc(
     registerAssetRegistryIpc({
       ipcMain: dependencies.ipcMain,
       assetRegistryRead: dependencies.assetRegistryRead,
+    });
+  }
+
+  if (dependencies.assetMutationUseCases) {
+    registerAssetMutationIpc({
+      ipcMain: dependencies.ipcMain,
+      ...dependencies.assetMutationUseCases,
     });
   }
 

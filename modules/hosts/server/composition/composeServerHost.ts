@@ -1,5 +1,6 @@
 import type { ArtifactRepoStoragePort } from "../../../application/ports/storage";
 import { execFile as nodeExecFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -35,8 +36,11 @@ import {
   VerifyImportedArtifactSourceBackingUseCase,
   VerifyPublishedArtifactBackingUseCase,
   DeleteRegisteredArtifactUseCase,
+  FinalizeGeneratedOutputAsAssetUseCase,
+  ImportExternalRepositoryObjectAsAssetUseCase,
   BrowseModelsUseCase,
   GetModelDetailsUseCase,
+  LocalizeExternalRepositoryObjectAsAssetUseCase,
   ListModelsUseCase,
   SaveModelReferenceUseCase,
   DownloadModelUseCase,
@@ -46,6 +50,7 @@ import {
   ReadSettingsUseCase,
   UpdateSettingUseCase,
   ClearSettingUseCase,
+  RegisterResourceBackedViewAsAssetInstanceUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import {
@@ -761,6 +766,37 @@ export function composeServerHost(
           publishedModelRegistry: modelRegistry,
         }),
       });
+      const generateAssetInstanceId = () => `asset-instance.${randomUUID()}`;
+      const assetMutationUseCases = {
+        registerResourceBackedViewAsAsset: new RegisterResourceBackedViewAsAssetInstanceUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
+          now: options.now,
+          generateInstanceId: generateAssetInstanceId,
+        }),
+        finalizeGeneratedOutputAsAsset: new FinalizeGeneratedOutputAsAssetUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
+          now: options.now,
+          generateInstanceId: generateAssetInstanceId,
+        }),
+        importExternalRepositoryObjectAsAsset: new ImportExternalRepositoryObjectAsAssetUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
+          now: options.now,
+          generateInstanceId: generateAssetInstanceId,
+        }),
+        localizeExternalRepositoryObjectAsAsset: new LocalizeExternalRepositoryObjectAsAssetUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
+          now: options.now,
+          generateInstanceId: generateAssetInstanceId,
+        }),
+      };
       const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({
         accessTokenProvider: () => tokenConfigStore.getToken(),
         logger: modelManagementLogger,
@@ -948,6 +984,7 @@ export function composeServerHost(
         restartServer: options.restartServer,
         runtimeReadiness,
         assetRegistryRead: internalAssetRegistry.readFacade,
+        assetMutationUseCases,
       });
     },
   };

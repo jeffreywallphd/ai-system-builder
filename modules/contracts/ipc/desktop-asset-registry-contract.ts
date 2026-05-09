@@ -1,4 +1,11 @@
 import type {
+  AssetMutationFailureCode,
+  AssetMutationOperation,
+  AssetMutationResult,
+  FinalizeGeneratedOutputCommand,
+  ImportExternalRepositoryObjectCommand,
+  LocalizeExternalRepositoryObjectCommand,
+  RegisterResourceBackedViewCommand,
   AssetFamily,
   AssetLifecycleStatus,
   AssetReference,
@@ -24,6 +31,14 @@ export const DESKTOP_ASSET_DEFINITION_READ_OPERATION = createTransportOperation(
 export const DESKTOP_ASSET_DEFINITION_VERSION_READ_OPERATION = createTransportOperation("asset", "definition-version-read");
 export const DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_OPERATION = createTransportOperation("asset", "resource-backed-views-list");
 export const DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION = createTransportOperation("asset", "resource-backed-view-read");
+export const DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_OPERATION =
+  createTransportOperation("asset", "register-resource-backed-view") as "asset.register-resource-backed-view";
+export const DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_OPERATION =
+  createTransportOperation("asset", "finalize-generated-output") as "asset.finalize-generated-output";
+export const DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_OPERATION =
+  createTransportOperation("asset", "import-external-repository-object") as "asset.import-external-repository-object";
+export const DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_OPERATION =
+  createTransportOperation("asset", "localize-external-repository-object") as "asset.localize-external-repository-object";
 
 export const DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL = createIpcChannel(DESKTOP_ASSET_DEFINITIONS_LIST_OPERATION, "request");
 export const DESKTOP_ASSET_DEFINITIONS_LIST_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_ASSET_DEFINITIONS_LIST_OPERATION, "response");
@@ -35,6 +50,14 @@ export const DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL = createIp
 export const DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_OPERATION, "response");
 export const DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL = createIpcChannel(DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION, "request");
 export const DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION, "response");
+export const DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL = createIpcChannel(DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_OPERATION, "request");
+export const DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_OPERATION, "response");
+export const DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL = createIpcChannel(DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_OPERATION, "request");
+export const DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_OPERATION, "response");
+export const DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL = createIpcChannel(DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_OPERATION, "request");
+export const DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_OPERATION, "response");
+export const DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL = createIpcChannel(DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_OPERATION, "request");
+export const DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL = createIpcChannel(DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_OPERATION, "response");
 
 export type DesktopAssetBuiltInFilter = "all" | "built-in" | "custom";
 
@@ -130,6 +153,34 @@ export type DesktopAssetResourceBackedViewReadRequest = IpcRequest<
   typeof DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL.value
 >;
 
+export type DesktopAssetRegisterResourceBackedViewRequest = IpcRequest<
+  RegisterResourceBackedViewCommand,
+  typeof DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_OPERATION,
+  Record<string, never>,
+  typeof DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL.value
+>;
+
+export type DesktopAssetFinalizeGeneratedOutputRequest = IpcRequest<
+  FinalizeGeneratedOutputCommand,
+  typeof DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_OPERATION,
+  Record<string, never>,
+  typeof DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL.value
+>;
+
+export type DesktopAssetImportExternalRepositoryObjectRequest = IpcRequest<
+  ImportExternalRepositoryObjectCommand,
+  typeof DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_OPERATION,
+  Record<string, never>,
+  typeof DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value
+>;
+
+export type DesktopAssetLocalizeExternalRepositoryObjectRequest = IpcRequest<
+  LocalizeExternalRepositoryObjectCommand,
+  typeof DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_OPERATION,
+  Record<string, never>,
+  typeof DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value
+>;
+
 export type DesktopAssetDefinitionsListResponse = IpcResponse<
   AssetRegistryListResult<AssetDefinitionCard>,
   Record<string, unknown>,
@@ -168,6 +219,34 @@ export type DesktopAssetResourceBackedViewReadResponse = IpcResponse<
   typeof DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION,
   Record<string, never>,
   typeof DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL.value
+>;
+
+export type DesktopAssetMutationResponse<
+  TOperation extends AssetMutationOperation = AssetMutationOperation,
+  TChannel extends IpcChannelValue<TOperation, "response"> = IpcChannelValue<TOperation, "response">,
+> = IpcResponse<
+  AssetMutationResult,
+  Record<string, unknown> & { mutationFailureCode?: AssetMutationFailureCode },
+  TOperation,
+  Record<string, never>,
+  TChannel
+>;
+
+export type DesktopAssetRegisterResourceBackedViewResponse = DesktopAssetMutationResponse<
+  typeof DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_OPERATION,
+  typeof DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_RESPONSE_CHANNEL.value
+>;
+export type DesktopAssetFinalizeGeneratedOutputResponse = DesktopAssetMutationResponse<
+  typeof DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_OPERATION,
+  typeof DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_RESPONSE_CHANNEL.value
+>;
+export type DesktopAssetImportExternalRepositoryObjectResponse = DesktopAssetMutationResponse<
+  typeof DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_OPERATION,
+  typeof DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL.value
+>;
+export type DesktopAssetLocalizeExternalRepositoryObjectResponse = DesktopAssetMutationResponse<
+  typeof DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_OPERATION,
+  typeof DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL.value
 >;
 
 function normalizeRequiredTextField(value: string, fieldName: string): string {
@@ -253,6 +332,34 @@ export function createDesktopAssetResourceBackedViewReadRequest(
   );
 }
 
+export function createDesktopAssetRegisterResourceBackedViewRequest(
+  payload: RegisterResourceBackedViewCommand,
+  options?: { requestId?: string; correlationId?: string },
+): DesktopAssetRegisterResourceBackedViewRequest {
+  return createIpcRequest(DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL, payload, options);
+}
+
+export function createDesktopAssetFinalizeGeneratedOutputRequest(
+  payload: FinalizeGeneratedOutputCommand,
+  options?: { requestId?: string; correlationId?: string },
+): DesktopAssetFinalizeGeneratedOutputRequest {
+  return createIpcRequest(DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL, payload, options);
+}
+
+export function createDesktopAssetImportExternalRepositoryObjectRequest(
+  payload: ImportExternalRepositoryObjectCommand,
+  options?: { requestId?: string; correlationId?: string },
+): DesktopAssetImportExternalRepositoryObjectRequest {
+  return createIpcRequest(DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL, payload, options);
+}
+
+export function createDesktopAssetLocalizeExternalRepositoryObjectRequest(
+  payload: LocalizeExternalRepositoryObjectCommand,
+  options?: { requestId?: string; correlationId?: string },
+): DesktopAssetLocalizeExternalRepositoryObjectRequest {
+  return createIpcRequest(DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL, payload, options);
+}
+
 export function createDesktopAssetDefinitionsListSuccessResponse(
   value: AssetRegistryListResult<AssetDefinitionCard>,
   options?: { requestId?: string; correlationId?: string },
@@ -286,6 +393,17 @@ export function createDesktopAssetResourceBackedViewReadSuccessResponse(
   options?: { requestId?: string; correlationId?: string },
 ): DesktopAssetResourceBackedViewReadResponse {
   return createIpcSuccessResponse(DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL, value, options);
+}
+
+export function createDesktopAssetMutationSuccessResponse<
+  TOperation extends AssetMutationOperation,
+  TChannel extends IpcChannelValue<TOperation, "response">,
+>(
+  channel: IpcChannel<TOperation, "response", TChannel>,
+  value: AssetMutationResult,
+  options?: { requestId?: string; correlationId?: string },
+): DesktopAssetMutationResponse<TOperation, TChannel> {
+  return createIpcSuccessResponse(channel, value, options);
 }
 
 export function desktopAssetDefinitionReference(payload: Pick<DesktopAssetDefinitionReadRequestPayload, "definitionId" | "version">): AssetReference {
