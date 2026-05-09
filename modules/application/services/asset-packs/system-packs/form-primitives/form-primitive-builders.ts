@@ -12,14 +12,18 @@ import {
   SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
   SYSTEM_FOUNDATION_PACK_VERSION,
 } from "../system-foundation-pack.constants";
-import { UI_STRUCTURAL_PRIMITIVE_VERSION, type UiStructuralPrimitiveId } from "./ui-structural-primitive-ids";
+import {
+  FORM_PRIMITIVE_VERSION,
+  type FormPrimitiveId,
+} from "./form-primitive-ids";
 
-const UI_STRUCTURE_CATEGORY_ID = "ui-structure";
+const FORMS_FIELDS_CATEGORY_ID = "forms-fields";
 
-export interface UiStructuralPrimitiveSpec {
-  readonly id: UiStructuralPrimitiveId;
+export interface FormPrimitiveSpec {
+  readonly id: FormPrimitiveId;
   readonly displayName: string;
   readonly description: string;
+  readonly family: AssetDefinition["assetFamily"];
   readonly purpose: string;
   readonly userSummary: string;
   readonly capabilities: readonly string[];
@@ -30,19 +34,20 @@ export interface UiStructuralPrimitiveSpec {
   readonly compositionRules: AssetDefinition["compositionRules"];
   readonly configurationGuidance: string;
   readonly compositionGuidance: string;
+  readonly validationGuidance: string;
   readonly accessibilityGuidance: string;
   readonly exampleDescription: string;
   readonly tags: readonly string[];
 }
 
-export function createUiStructuralPrimitiveDefinition(
-  spec: UiStructuralPrimitiveSpec,
+export function createFormPrimitiveDefinition(
+  spec: FormPrimitiveSpec,
 ): AssetDefinition {
   return {
     definitionId: spec.id,
     assetType: "ui-component",
-    assetFamily: "structural",
-    version: UI_STRUCTURAL_PRIMITIVE_VERSION,
+    assetFamily: spec.family,
+    version: FORM_PRIMITIVE_VERSION,
     displayName: spec.displayName,
     description: spec.description,
     lifecycleStatus: "published",
@@ -54,7 +59,7 @@ export function createUiStructuralPrimitiveDefinition(
     },
     configurationSchema: {
       schemaId: `${spec.id}.configuration`,
-      schemaVersion: UI_STRUCTURAL_PRIMITIVE_VERSION,
+      schemaVersion: FORM_PRIMITIVE_VERSION,
       fields: spec.configurationFields,
       requiredFieldIds: spec.configurationFields
         .filter((field) => field.required)
@@ -62,7 +67,7 @@ export function createUiStructuralPrimitiveDefinition(
       strict: true,
       description: `${spec.displayName} semantic configuration.`,
       metadata: {
-        categoryId: UI_STRUCTURE_CATEGORY_ID,
+        categoryId: FORMS_FIELDS_CATEGORY_ID,
         declarativeOnly: true,
       },
     },
@@ -94,18 +99,18 @@ export function createUiStructuralPrimitiveDefinition(
       ...sourceMetadata(spec.id),
       builtIn: true,
       systemOwned: true,
-      categoryId: UI_STRUCTURE_CATEGORY_ID,
-      assetPackEntryKind: "ui-structural-primitive",
+      categoryId: FORMS_FIELDS_CATEGORY_ID,
+      assetPackEntryKind: "form-field-primitive",
       declarativeOnly: true,
     },
   };
 }
 
-export function createUiStructuralPrimitiveEntry(
+export function createFormPrimitiveEntry(
   definition: AssetDefinition,
   tags: readonly string[],
 ): AssetPackAssetEntry {
-  const fingerprint = createUiStructuralPrimitiveFingerprint(definition);
+  const fingerprint = createFormPrimitiveFingerprint(definition);
   return {
     entryId: `system.foundation.${String(definition.definitionId).replace(/^builtin\./, "")}`,
     definition,
@@ -115,44 +120,22 @@ export function createUiStructuralPrimitiveEntry(
       version: definition.version,
       label: definition.displayName,
     },
-    category: UI_STRUCTURE_CATEGORY_ID,
+    category: FORMS_FIELDS_CATEGORY_ID,
     sourceLayer: SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
     fingerprint,
-    tags: ["foundation", "ui-structure", ...tags],
+    tags: ["foundation", "forms-fields", ...tags],
     metadata: {
       sourcePack: {
         packId: SYSTEM_FOUNDATION_PACK_ID,
         version: SYSTEM_FOUNDATION_PACK_VERSION,
       },
-      categoryId: UI_STRUCTURE_CATEGORY_ID,
+      categoryId: FORMS_FIELDS_CATEGORY_ID,
       sourceLayer: SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
       builtIn: true,
       systemOwned: true,
       declarativeOnly: true,
       fingerprint,
     },
-  };
-}
-
-export function enumField(
-  fieldId: string,
-  label: string,
-  values: readonly string[],
-  defaultValue: string,
-  description?: string,
-): AssetConfigurationField {
-  return {
-    fieldId,
-    valueKind: "enum",
-    label,
-    ...(description ? { description } : {}),
-    required: false,
-    defaultValue,
-    options: values.map((value) => ({
-      value,
-      label: titleCase(value),
-    })),
-    uiHint: { hintKind: "select" },
   };
 }
 
@@ -173,6 +156,23 @@ export function stringField(
   };
 }
 
+export function textAreaField(
+  fieldId: string,
+  label: string,
+  defaultValue = "",
+  description?: string,
+): AssetConfigurationField {
+  return {
+    fieldId,
+    valueKind: "string",
+    label,
+    ...(description ? { description } : {}),
+    required: false,
+    defaultValue,
+    uiHint: { hintKind: "textarea" },
+  };
+}
+
 export function booleanField(
   fieldId: string,
   label: string,
@@ -187,6 +187,23 @@ export function booleanField(
     required: false,
     defaultValue,
     uiHint: { hintKind: "checkbox" },
+  };
+}
+
+export function numberField(
+  fieldId: string,
+  label: string,
+  defaultValue: number,
+  description?: string,
+): AssetConfigurationField {
+  return {
+    fieldId,
+    valueKind: "number",
+    label,
+    ...(description ? { description } : {}),
+    required: false,
+    defaultValue,
+    uiHint: { hintKind: "number" },
   };
 }
 
@@ -213,11 +230,53 @@ export function integerField(
   };
 }
 
-export function inputPort(
+export function enumField(
+  fieldId: string,
+  label: string,
+  values: readonly string[],
+  defaultValue: string,
+  description?: string,
+): AssetConfigurationField {
+  return {
+    fieldId,
+    valueKind: "enum",
+    label,
+    ...(description ? { description } : {}),
+    required: false,
+    defaultValue,
+    options: values.map((value) => ({
+      value,
+      label: titleCase(value),
+    })),
+    uiHint: { hintKind: "select" },
+  };
+}
+
+export function arrayField(
+  fieldId: string,
+  label: string,
+  defaultValue: readonly AssetConfigurationValue[] = [],
+  description?: string,
+): AssetConfigurationField {
+  return {
+    fieldId,
+    valueKind: "array",
+    label,
+    ...(description ? { description } : {}),
+    required: false,
+    defaultValue: [...defaultValue],
+    uiHint: { hintKind: "json-editor" },
+  };
+}
+
+export function formAssetInputPort(
   portId: string,
   displayName: string,
   description: string,
-  dataKind = "semantic-ui-asset",
+  cardinality: AssetPort["cardinality"] = {
+    preset: "zero-or-more",
+    allowMultiple: true,
+  },
 ): AssetPort {
   return {
     portId,
@@ -227,18 +286,18 @@ export function inputPort(
     contract: {
       contractKind: "asset",
       assetType: "ui-component",
-      assetFamily: "structural",
-      dataKind,
+      dataKind: "semantic-form-asset",
       description,
     },
-    cardinality: { preset: "zero-or-more", allowMultiple: true },
+    cardinality,
   };
 }
 
-export function stateInputPort(
+export function configurationInputPort(
   portId: string,
   displayName: string,
   description: string,
+  dataKind = "semantic-form-state",
 ): AssetPort {
   return {
     portId,
@@ -247,17 +306,38 @@ export function stateInputPort(
     description,
     contract: {
       contractKind: "configuration",
-      dataKind: "semantic-state",
+      dataKind,
       description,
     },
     cardinality: { preset: "optional" },
   };
 }
 
-export function eventPort(
+export function formOutputPort(
   portId: string,
   displayName: string,
   description: string,
+  dataKind = "semantic-form-values",
+): AssetPort {
+  return {
+    portId,
+    direction: "output",
+    displayName,
+    description,
+    contract: {
+      contractKind: "configuration",
+      dataKind,
+      description,
+    },
+    cardinality: { preset: "optional" },
+  };
+}
+
+export function formEventPort(
+  portId: string,
+  displayName: string,
+  description: string,
+  dataKind = "semantic-form-event",
 ): AssetPort {
   return {
     portId,
@@ -266,7 +346,7 @@ export function eventPort(
     description,
     contract: {
       contractKind: "event",
-      dataKind: "semantic-ui-event",
+      dataKind,
       description,
     },
     cardinality: { preset: "optional" },
@@ -276,58 +356,79 @@ export function eventPort(
 export function allowedChildRule(
   ruleId: string,
   description: string,
+  currentScope: string,
 ): NonNullable<AssetDefinition["compositionRules"]>[number] {
   return {
     ruleId,
     ruleKind: "allowed-child",
     description,
     allowedChildTypes: ["ui-component"],
-    message: "May contain semantic UI structure primitives and later compatible UI asset categories.",
+    message:
+      "May contain compatible semantic form assets and foundation UI structure assets.",
     metadata: {
-      currentScope: "ui-structure",
-      futureCompatibleCategories: ["forms-fields", "data-display", "state-messages"],
+      currentScope,
+      compatibleCategories: ["forms-fields", "ui-structure"],
     },
   };
 }
 
-function createAiContext(spec: UiStructuralPrimitiveSpec): AssetAiContext {
+export function allowedParentRule(
+  ruleId: string,
+  description: string,
+): NonNullable<AssetDefinition["compositionRules"]>[number] {
+  return {
+    ruleId,
+    ruleKind: "allowed-parent",
+    description,
+    allowedParentTypes: ["ui-component"],
+    message:
+      "Should be placed within a semantic form, field group, or compatible UI structure primitive.",
+    metadata: {
+      compatibleParentCategories: ["forms-fields", "ui-structure"],
+    },
+  };
+}
+
+function createAiContext(spec: FormPrimitiveSpec): AssetAiContext {
   return {
     purpose: spec.purpose,
     userFacingSummary: spec.userSummary,
     developerFacingSummary:
-      `${spec.displayName} is a semantic asset definition, not a concrete renderer component, CSS class, visual editor node, or executable UI.`,
+      `${spec.displayName} is a semantic asset definition, not a concrete renderer component, form engine, validation engine, data-binding layer, or executable action.`,
     capabilities: spec.capabilities.map((summary, index) => ({
       capabilityId: `${spec.id}.capability.${index + 1}`,
       summary,
     })),
     limitations: [
       ...(spec.limitations ?? []),
-      "Does not render pixels, call runtime or provider systems, persist records, navigate routes, or run workflows.",
-      "Does not define form fields; form and field primitives live in the forms-fields category.",
+      "Does not render pixels, collect data by itself, validate values, submit records, transfer files, call provider systems, write storage, or run workflows.",
+      "Data binding, validation processing, submission handling, file transfer handling, visual editing, and screen rendering are outside this definition.",
     ].map((summary, index) => ({
       limitationId: `${spec.id}.limitation.${index + 1}`,
       summary,
     })),
     inputSummary: {
-      summary: "Accepts semantic child assets or semantic state descriptors through declared ports.",
+      summary:
+        "Accepts semantic form child assets, state descriptors, or value descriptors through declared ports.",
       expectedAssetTypes: ["ui-component"],
       required: false,
     },
     outputSummary: {
-      summary: "No data output is produced; events are declarative composition signals only when listed.",
+      summary:
+        "Outputs and events are declarative signals for future composition; they do not perform effects by themselves.",
     },
     configurationGuidance: {
       summary: spec.configurationGuidance,
       recommendedDefaults: spec.defaultConfiguration,
       commonMistakes: [
-        "Do not use implementation library names, style class names, route handlers, or code snippets.",
-        "Use semantic labels and behavior hints that can be interpreted by future renderers.",
+        "Do not use implementation library names, style class names, element props, route handlers, code snippets, or executable expressions.",
+        "Use semantic labels, declarative options, declarative validation hints, and accessibility labels.",
       ],
     },
     compositionGuidance: {
       summary: spec.compositionGuidance,
       bindingGuidance:
-        "Ports describe semantic containment or state only; they do not bind to runtime calls, routers, or workflows.",
+        "Ports describe semantic containment, values, state, or events only; they do not bind to data stores, form processors, upload handlers, routers, or workflow runners.",
     },
     examples: [
       {
@@ -335,16 +436,19 @@ function createAiContext(spec: UiStructuralPrimitiveSpec): AssetAiContext {
         title: `${spec.displayName} usage`,
         description: spec.exampleDescription,
         configurationValues: spec.defaultConfiguration,
-        expectedOutcome: "A future composer can reason about structure without receiving implementation code.",
+        expectedOutcome:
+          "A future composer can reason about form intent without receiving implementation code.",
       },
     ],
     antiPatterns: [
       {
         antiPatternId: `${spec.id}.anti-pattern.1`,
-        title: "Implementation-specific primitive",
-        description: "Using this definition to name framework components, style classes, files, routes, or executable handlers.",
+        title: "Implementation-specific form primitive",
+        description:
+          "Using this definition to name framework components, element props, style classes, files, routes, validators, submit handlers, or data stores.",
         whyAvoid: "The foundation pack must remain host-neutral and declarative.",
-        saferAlternative: "Keep implementation choices in renderer or host layers outside the asset pack.",
+        saferAlternative:
+          "Keep implementation choices in renderer, host, or application behavior layers outside the asset pack.",
       },
     ],
     safetyNotes: [
@@ -352,14 +456,15 @@ function createAiContext(spec: UiStructuralPrimitiveSpec): AssetAiContext {
         safetyNoteId: `${spec.id}.safety.1`,
         category: "operational",
         severity: "info",
-        summary: "Descriptor-only UI structure with no capability requirement.",
-        details: spec.accessibilityGuidance,
+        summary: "Descriptor-only form primitive with no capability requirement.",
+        details: `${spec.accessibilityGuidance} ${spec.validationGuidance}`,
       },
       {
         safetyNoteId: `${spec.id}.safety.2`,
         category: "thin-client",
         severity: "info",
-        summary: "Safe for read-only catalog display because it carries descriptors only and no sensitive values.",
+        summary:
+          "Safe for read-only catalog display because it carries descriptors only and no sensitive values.",
       },
     ],
     metadata: {
@@ -368,25 +473,30 @@ function createAiContext(spec: UiStructuralPrimitiveSpec): AssetAiContext {
         "use-cases",
         "configuration-guidance",
         "composition-guidance",
+        "validation-guidance",
         "accessibility-guidance",
         "non-goals",
       ],
+      validationGuidance: spec.validationGuidance,
       accessibilityGuidance: spec.accessibilityGuidance,
+      semanticDefinitionOnly: true,
     },
   };
 }
 
-function sourceMetadata(definitionId: UiStructuralPrimitiveId): Record<string, AssetConfigurationValue> {
+function sourceMetadata(
+  definitionId: FormPrimitiveId,
+): Record<string, AssetConfigurationValue> {
   return {
     sourcePackId: SYSTEM_FOUNDATION_PACK_ID,
     sourcePackVersion: SYSTEM_FOUNDATION_PACK_VERSION,
     sourceLayer: SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
-    categoryId: UI_STRUCTURE_CATEGORY_ID,
+    categoryId: FORMS_FIELDS_CATEGORY_ID,
     definitionId,
   };
 }
 
-function createUiStructuralPrimitiveFingerprint(definition: AssetDefinition): string {
+function createFormPrimitiveFingerprint(definition: AssetDefinition): string {
   return `fnv1a:${fnv1a(stableStringify(definition))}`;
 }
 

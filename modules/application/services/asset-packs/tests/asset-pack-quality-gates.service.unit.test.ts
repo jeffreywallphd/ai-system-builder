@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { AssetDefinition, AssetPackAssetEntry } from "../../../../contracts/asset";
+import type { AssetDefinition, AssetMetadata, AssetPackAssetEntry } from "../../../../contracts/asset";
 import { runAssetPackQualityGates } from "../asset-pack-quality-gates.service";
 
 describe("asset pack quality gates", () => {
@@ -50,12 +50,13 @@ describe("asset pack quality gates", () => {
   });
 
   it("fails local paths, tokens, base64, and raw provider payloads", () => {
-    for (const unsafe of [
+    const unsafeMetadataValues: readonly AssetMetadata[] = [
       { localPath: "C:\\Users\\alice\\secret.txt" },
       { note: "token=abc" },
       { image: "data:image/png;base64,AAAA" },
       { providerPayload: { raw: true } },
-    ]) {
+    ];
+    for (const unsafe of unsafeMetadataValues) {
       const result = runAssetPackQualityGates(
         validEntry({
           metadata: {
