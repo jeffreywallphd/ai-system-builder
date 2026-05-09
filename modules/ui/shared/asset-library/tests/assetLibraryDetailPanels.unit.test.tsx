@@ -29,6 +29,18 @@ const baseDetail: AssetLibraryDefinitionDetail = {
 
 const advancedDetail: AssetLibraryDefinitionDetail = {
   ...baseDetail,
+  sourcePackId: "system.foundation",
+  sourcePackVersion: "1.0.0",
+  sourcePackDisplayName: "System Foundation",
+  sourceKind: "system",
+  sourceLayer: "system-default",
+  trustStatus: "system-trusted",
+  packCategoryId: "ui-structure",
+  packCategoryDisplayName: "UI Structure",
+  systemDefault: true,
+  sourceBadgeLabel: "System default",
+  packLabel: "System Foundation",
+  categoryLabel: "UI Structure",
   overview: {
     description: "Reusable document descriptor",
     reviewStatus: "approved",
@@ -96,6 +108,7 @@ describe("asset library shared detail panels", () => {
       "configuration",
       "ports",
       "requirements",
+      "packSource",
       "provenance",
       "metadata",
     ]);
@@ -104,6 +117,7 @@ describe("asset library shared detail panels", () => {
       "Configuration",
       "Inputs and outputs",
       "Requirements",
+      "Pack and source",
       "Source",
       "Details",
     ]);

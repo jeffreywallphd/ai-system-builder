@@ -4,10 +4,18 @@ import type {
   AssetDefinition,
   AssetInstance,
   AssetMetadata,
+  AssetPackSourceKind,
+  AssetPackTrustStatus,
   AssetReference,
   AssetResourceBackedView,
+  AssetSourceLayer,
 } from "../../../contracts/asset";
-import { normalizeAssetId } from "../../../contracts/asset";
+import {
+  isAssetPackSourceKind,
+  isAssetPackTrustStatus,
+  isAssetSourceLayer,
+  normalizeAssetId,
+} from "../../../contracts/asset";
 import type {
   AssetBindingRepositoryPort,
   AssetCompositionListQuery,
@@ -73,6 +81,18 @@ const FACADE_SIDE_FILTERING_DIAGNOSTIC: AssetRegistryListDiagnostic = {
 const builtInDefinitionKeys = new Set(
   BUILT_IN_ASSET_DEFINITION_CATALOG.map((seed) => definitionKey(String(seed.definition.definitionId), String(seed.definition.version))),
 );
+
+const SYSTEM_FOUNDATION_PACK_ID = "system.foundation";
+const SYSTEM_FOUNDATION_PACK_DISPLAY_NAME = "System Foundation";
+const SYSTEM_FOUNDATION_PACK_VERSION = "1.0.0";
+const SYSTEM_FOUNDATION_CATEGORY_LABELS: Readonly<Record<string, string>> = {
+  "ui-structure": "UI Structure",
+  "forms-fields": "Forms and Fields",
+  "data-display": "Data Display",
+  "state-messages": "State Messages",
+  "page-feature-shells": "Page and Feature Shells",
+  "workflow-system-shells": "Workflow and System Shells",
+};
 
 export class AssetRegistryReadFacade {
   private readonly maxListLimit: number;
@@ -192,6 +212,7 @@ export class AssetRegistryReadFacade {
     const builtIn = isBuiltInDefinition(definition);
     if (query.includeBuiltIns === false && builtIn) return undefined;
     if (query.includeCustom === false && !builtIn) return undefined;
+    const sourceMetadata = safeDefinitionSourceMetadata(definition);
     return sanitizeValue({
       definitionRef: definitionRef(definition),
       definitionId: String(definition.definitionId),
@@ -202,6 +223,7 @@ export class AssetRegistryReadFacade {
       summary: definition.description,
       lifecycleStatus: definition.lifecycleStatus,
       ...(builtIn ? { builtIn: true } : {}),
+      ...sourceMetadata,
       ...(query.includeMetadata ? { metadata: metadataOf(definition.metadata) } : {}),
     }) as AssetDefinitionCard;
   }
@@ -468,6 +490,108 @@ function toBindingSummary(binding: AssetBinding): AssetBindingSummary {
     targetRef: binding.targetRef,
     lifecycleStatus: binding.lifecycleStatus,
   }) as AssetBindingSummary;
+}
+
+function safeDefinitionSourceMetadata(definition: AssetDefinition): Partial<AssetDefinitionCard> {
+  const metadata = isRecord(definition.metadata) ? definition.metadata : {};
+  const installMetadata = isRecord(metadata.assetPackInstall) ? metadata.assetPackInstall : {};
+  const sourcePackId = safeIdentifier(metadata.sourcePackId) ?? safeIdentifier(installMetadata.packId);
+  const sourcePackVersion =
+    sanitizeAssetStringValue(stringValue(metadata.sourcePackVersion)) ??
+    sanitizeAssetStringValue(stringValue(installMetadata.packVersion)) ??
+    (sourcePackId === SYSTEM_FOUNDATION_PACK_ID ? SYSTEM_FOUNDATION_PACK_VERSION : undefined);
+  const sourceLayer = safeSourceLayer(metadata.sourceLayer) ?? safeSourceLayer(installMetadata.sourceLayer);
+  const categoryId =
+    safeIdentifier(metadata.packCategoryId) ??
+    safeIdentifier(metadata.categoryId) ??
+    safeIdentifier(installMetadata.categoryId);
+  const sourceKind =
+    safeSourceKind(metadata.sourceKind) ??
+    safeSourceKind(installMetadata.sourceKind) ??
+    (sourcePackId === SYSTEM_FOUNDATION_PACK_ID ? "system" : undefined);
+  const trustStatus =
+    safeTrustStatus(metadata.trustStatus) ??
+    safeTrustStatus(installMetadata.trustStatus) ??
+    (sourcePackId === SYSTEM_FOUNDATION_PACK_ID ? "system-trusted" : undefined);
+  const sourcePackDisplayName =
+    sanitizeAssetStringValue(stringValue(metadata.sourcePackDisplayName)) ??
+    (sourcePackId === SYSTEM_FOUNDATION_PACK_ID ? SYSTEM_FOUNDATION_PACK_DISPLAY_NAME : undefined);
+  const packTags = safeStringArray(metadata.packTags ?? metadata.tags);
+  const overridesDefinitionRef = safeAssetReference(metadata.overridesDefinitionRef);
+  const overriddenByDefinitionRefs = safeAssetReferenceArray(metadata.overriddenByDefinitionRefs);
+  const effectiveResolutionStatus = sanitizeAssetStringValue(stringValue(metadata.effectiveResolutionStatus));
+  const resolutionSummary = sanitizeAssetStringValue(stringValue(metadata.resolutionSummary));
+
+  return {
+    ...(sourcePackId ? { sourcePackId } : {}),
+    ...(sourcePackVersion ? { sourcePackVersion } : {}),
+    ...(sourcePackDisplayName ? { sourcePackDisplayName } : {}),
+    ...(sourceKind ? { sourceKind } : {}),
+    ...(sourceLayer ? { sourceLayer } : {}),
+    ...(trustStatus ? { trustStatus } : {}),
+    ...(categoryId ? { packCategoryId: categoryId } : {}),
+    ...(categoryId && SYSTEM_FOUNDATION_CATEGORY_LABELS[categoryId] ? { packCategoryDisplayName: SYSTEM_FOUNDATION_CATEGORY_LABELS[categoryId] } : {}),
+    ...(packTags.length ? { packTags } : {}),
+    ...(sourcePackId === SYSTEM_FOUNDATION_PACK_ID || (sourceLayer === "system-default" && sourceKind === "system" && trustStatus === "system-trusted") ? { systemDefault: true } : {}),
+    ...(sourceLayer === "installed-pack" ? { installedPack: true } : {}),
+    ...(sourceLayer === "imported-pack" ? { importedPack: true } : {}),
+    ...(sourceLayer === "workspace-pack" ? { workspaceOverride: true } : {}),
+    ...(sourceLayer === "organization-override" ? { organizationOverride: true } : {}),
+    ...(sourceLayer === "user-override" ? { userOverride: true } : {}),
+    ...(overridesDefinitionRef ? { overridesDefinitionRef } : {}),
+    ...(overriddenByDefinitionRefs.length ? { overriddenByDefinitionRefs } : {}),
+    ...(effectiveResolutionStatus ? { effectiveResolutionStatus } : {}),
+    ...(resolutionSummary ? { resolutionSummary } : {}),
+  };
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function safeIdentifier(value: unknown): string | undefined {
+  const sanitized = sanitizeAssetStringValue(stringValue(value));
+  if (!sanitized || !/^[a-z0-9][a-z0-9._:-]*$/i.test(sanitized)) return undefined;
+  return sanitized;
+}
+
+function safeSourceKind(value: unknown): AssetPackSourceKind | undefined {
+  const sanitized = sanitizeAssetStringValue(stringValue(value));
+  return sanitized && isAssetPackSourceKind(sanitized) ? sanitized : undefined;
+}
+
+function safeSourceLayer(value: unknown): AssetSourceLayer | undefined {
+  const sanitized = sanitizeAssetStringValue(stringValue(value));
+  return sanitized && isAssetSourceLayer(sanitized) ? sanitized : undefined;
+}
+
+function safeTrustStatus(value: unknown): AssetPackTrustStatus | undefined {
+  const sanitized = sanitizeAssetStringValue(stringValue(value));
+  return sanitized && isAssetPackTrustStatus(sanitized) ? sanitized : undefined;
+}
+
+function safeStringArray(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value.map(safeIdentifier).filter((entry): entry is string => Boolean(entry))));
+}
+
+function safeAssetReference(value: unknown): AssetReference | undefined {
+  if (!isRecord(value)) return undefined;
+  const kind = sanitizeAssetStringValue(stringValue(value.kind));
+  const id = safeIdentifier(value.id);
+  const version = sanitizeAssetStringValue(stringValue(value.version));
+  if (!kind || !id) return undefined;
+  if (kind !== "asset-definition" && kind !== "asset-definition-version") return undefined;
+  return {
+    kind: kind as AssetReference["kind"],
+    id: normalizeAssetId(id),
+    ...(version ? { version } : {}),
+  };
+}
+
+function safeAssetReferenceArray(value: unknown): readonly AssetReference[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(safeAssetReference).filter((entry): entry is AssetReference => Boolean(entry));
 }
 
 function toRegistryDiagnostic(diagnostic: AssetResourceBackedViewProviderDiagnostic): AssetRegistryListDiagnostic {

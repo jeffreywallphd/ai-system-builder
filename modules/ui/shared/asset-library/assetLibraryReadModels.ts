@@ -3,8 +3,11 @@ import type {
   AssetFamily,
   AssetLifecycleStatus,
   AssetMetadata,
+  AssetPackSourceKind,
+  AssetPackTrustStatus,
   AssetReference,
   AssetResourceBackedViewKind,
+  AssetSourceLayer,
   AssetType,
 } from "../../../contracts/asset";
 import type {
@@ -36,6 +39,24 @@ export interface AssetLibraryDefinitionCard {
   readonly lifecycleStatus?: AssetLifecycleStatus;
   readonly lifecycleStatusLabel?: string;
   readonly builtIn: boolean;
+  readonly sourcePackId?: string;
+  readonly sourcePackVersion?: string;
+  readonly sourcePackDisplayName?: string;
+  readonly sourceKind?: AssetPackSourceKind;
+  readonly sourceLayer?: AssetSourceLayer;
+  readonly trustStatus?: AssetPackTrustStatus;
+  readonly packCategoryId?: string;
+  readonly packCategoryDisplayName?: string;
+  readonly packTags?: readonly string[];
+  readonly systemDefault?: boolean;
+  readonly installedPack?: boolean;
+  readonly importedPack?: boolean;
+  readonly workspaceOverride?: boolean;
+  readonly organizationOverride?: boolean;
+  readonly userOverride?: boolean;
+  readonly sourceBadgeLabel?: string;
+  readonly packLabel?: string;
+  readonly categoryLabel?: string;
   readonly updatedAt?: string;
   readonly badges?: readonly string[];
 }
@@ -104,6 +125,10 @@ export interface AssetLibraryDefinitionDetail extends AssetLibraryDefinitionCard
   readonly provenanceSummary?: AssetLibraryProvenanceSummary;
   readonly validationSummary?: AssetLibraryValidationSummary;
   readonly metadata?: AssetMetadata;
+  readonly overridesDefinitionRef?: AssetReference;
+  readonly overriddenByDefinitionRefs?: readonly AssetReference[];
+  readonly effectiveResolutionStatus?: string;
+  readonly resolutionSummary?: string;
 }
 
 export interface AssetLibraryResourceBackedViewCard {

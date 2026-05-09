@@ -442,6 +442,53 @@ describe("AssetRegistryReadFacade definition reads", () => {
     assert.equal(await facade.readDefinitionDetail({ kind: "asset-definition", id: normalizeAssetId("missing") }), undefined);
   });
 
+  it("includes only safe pack, source, category, and override read fields on definition cards", async () => {
+    const facade = createFacade({
+      definitionRepository: new FakeDefinitionRepository([
+        validDefinition({
+          definitionId: "definition.system",
+          metadata: {
+            sourcePackId: "system.foundation",
+            sourcePackVersion: "1.0.0",
+            categoryId: "ui-structure",
+            assetPackInstall: {
+              sourceKind: "system",
+              sourceLayer: "system-default",
+              trustStatus: "system-trusted",
+            },
+            overridesDefinitionRef: { kind: "asset-definition-version", id: "definition.base", version: "1.0.0" },
+            overriddenByDefinitionRefs: [
+              { kind: "asset-definition-version", id: "definition.child", version: "1.0.0" },
+              { kind: "asset-definition-version", id: "C:\\Users\\name\\secret", version: "Bearer token" },
+            ],
+            effectiveResolutionStatus: "available",
+            resolutionSummary: "Safe informational summary.",
+            unsafeSourcePackDisplayName: "Bearer token C:\\Users\\name\\secret",
+          },
+        }),
+      ]),
+    });
+
+    const card = (await facade.listDefinitionCards()).items[0]!;
+
+    assert.equal(card.sourcePackId, "system.foundation");
+    assert.equal(card.sourcePackVersion, "1.0.0");
+    assert.equal(card.sourcePackDisplayName, "System Foundation");
+    assert.equal(card.sourceKind, "system");
+    assert.equal(card.sourceLayer, "system-default");
+    assert.equal(card.trustStatus, "system-trusted");
+    assert.equal(card.packCategoryId, "ui-structure");
+    assert.equal(card.packCategoryDisplayName, "UI Structure");
+    assert.equal(card.systemDefault, true);
+    assert.deepEqual(card.overridesDefinitionRef, { kind: "asset-definition-version", id: "definition.base", version: "1.0.0" });
+    assert.deepEqual(card.overriddenByDefinitionRefs, [{ kind: "asset-definition-version", id: "definition.child", version: "1.0.0" }]);
+    assert.equal(card.effectiveResolutionStatus, "available");
+    assert.equal(card.resolutionSummary, "Safe informational summary.");
+    assert.equal(JSON.stringify(card).includes("Bearer"), false);
+    assert.equal(JSON.stringify(card).includes("C:\\Users"), false);
+    assertSafe(card);
+  });
+
   it("filters definitions by search text, type, family, lifecycle, and built-in/custom flags", async () => {
     const builtInSeed = BUILT_IN_ASSET_DEFINITION_CATALOG[0]!;
     const builtIn = { ...builtInSeed.definition, metadata: { builtInSeed: { seedId: builtInSeed.seedId, seedVersion: builtInSeed.seedVersion, fingerprint: "abc", managedBy: "asset-kernel", lastSeededAt: "2026-01-01T00:00:00.000Z" } } };

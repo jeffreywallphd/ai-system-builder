@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "../../../testing/node-test";
+import { normalizeAssetId } from "../../asset";
 import type {
   AssetDefinitionCard,
   AssetDefinitionDetail,
@@ -137,6 +138,37 @@ describe("desktop asset registry IPC contract", () => {
       Record<string, never>,
       typeof DESKTOP_ASSET_DEFINITION_READ_RESPONSE_CHANNEL.value
     >>();
+
+    const card: AssetDefinitionCard = {
+      definitionRef: { kind: "asset-definition-version", id: normalizeAssetId("definition.system"), version: "1.0.0" },
+      definitionId: "definition.system",
+      version: "1.0.0",
+      assetType: "tool",
+      assetFamily: "behavioral",
+      displayName: "System component",
+      lifecycleStatus: "published",
+      sourcePackId: "system.foundation",
+      sourcePackVersion: "1.0.0",
+      sourcePackDisplayName: "System Foundation",
+      sourceKind: "system",
+      sourceLayer: "system-default",
+      trustStatus: "system-trusted",
+      packCategoryId: "ui-structure",
+      packCategoryDisplayName: "UI Structure",
+      systemDefault: true,
+    };
+    expect(createDesktopAssetDefinitionsListSuccessResponse({ items: [card] })).toMatchObject({
+      ok: true,
+      value: {
+        items: [{
+          sourcePackId: "system.foundation",
+          sourcePackDisplayName: "System Foundation",
+          sourceLayer: "system-default",
+          packCategoryDisplayName: "UI Structure",
+          systemDefault: true,
+        }],
+      },
+    });
   });
 
   it("preserves request metadata for read and version-read helpers", () => {

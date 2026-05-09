@@ -30,6 +30,18 @@ const card: AssetLibraryDefinitionCard = {
   assetFamily: "resource-backed",
   lifecycleStatus: "published",
   builtIn: true,
+  sourcePackId: "system.foundation",
+  sourcePackVersion: "1.0.0",
+  sourcePackDisplayName: "System Foundation",
+  sourceKind: "system",
+  sourceLayer: "system-default",
+  trustStatus: "system-trusted",
+  packCategoryId: "ui-structure",
+  packCategoryDisplayName: "UI Structure",
+  systemDefault: true,
+  sourceBadgeLabel: "System default",
+  packLabel: "System Foundation",
+  categoryLabel: "UI Structure",
   updatedAt: "2026-05-02T00:00:00.000Z",
 };
 
@@ -179,12 +191,14 @@ describe("thin-client AssetLibraryFeature", () => {
     return { container, client };
   }
 
-  it("renders cards with built-in, lifecycle, type, and family cues", async () => {
+  it("renders cards with category, system default, lifecycle, type, and family cues", async () => {
     const { container } = await render();
 
     expect(container.textContent).toContain("Document");
     expect(container.textContent).toContain("Document building block");
-    expect(container.textContent).toContain("Built-in");
+    expect(container.textContent).toContain("System default");
+    expect(container.textContent).toContain("System Foundation");
+    expect(container.textContent).toContain("UI Structure");
     expect(container.textContent).toContain("Resource Backed");
     expect(container.textContent).toContain("Published");
     expect(container.textContent).toContain("v1.0.0");
@@ -209,7 +223,7 @@ describe("thin-client AssetLibraryFeature", () => {
     );
     expect(container.textContent).toContain("Import external object");
     expect(container.textContent).toContain("Localize external object");
-    assert.doesNotMatch(container.textContent ?? "", /Create asset|Edit asset|Delete asset|Seed built-ins|Scan resources/i);
+    assert.doesNotMatch(container.textContent ?? "", /Create asset|Edit asset|Delete asset|Seed built-ins|Scan resources|Install pack|Import pack|Export pack|Activate pack|Disable pack|Edit override|Override asset/i);
   });
 
   it("requires confirmation and calls the import mutation with a safe thin-client command", async () => {
@@ -363,6 +377,42 @@ describe("thin-client AssetLibraryFeature", () => {
     });
   });
 
+  it("filters definitions locally by category and source metadata", async () => {
+    const client = createClient({
+      listAssetDefinitions: testDouble.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          items: [
+            card,
+            {
+              ...card,
+              id: "builtin.form.form@1.0.0",
+              definitionId: "builtin.form.form",
+              displayName: "Form",
+              packCategoryId: "forms-fields",
+              packCategoryDisplayName: "Forms and Fields",
+              categoryLabel: "Forms and Fields",
+            },
+          ],
+        },
+      }),
+    });
+    const { container } = await render(client);
+    const selects = Array.from(container.querySelectorAll("select"));
+
+    setSelectValue(selects[6] as HTMLSelectElement, "forms-fields");
+    await flush();
+
+    expect(container.textContent).toContain("Form");
+    expect(container.textContent).toContain("Forms and Fields");
+    expect(container.textContent).not.toContain("Document building block");
+
+    setSelectValue(selects[5] as HTMLSelectElement, "imported-pack");
+    await flush();
+
+    expect(container.textContent).toContain("No assets match the current filters.");
+  });
+
   it("loads selected detail without validation and keeps advanced sections collapsed by default", async () => {
     const client = createClient();
     const { container } = await render(client);
@@ -449,7 +499,7 @@ describe("thin-client AssetLibraryFeature", () => {
     await act(async () => cardButton.click());
     await flush();
 
-    for (const label of ["Configuration", "Inputs and outputs", "Requirements", "Source", "Details"]) {
+    for (const label of ["Configuration", "Inputs and outputs", "Requirements", "Pack and source", "Source", "Details"]) {
       expect(container.textContent).toContain(label);
     }
 
@@ -472,7 +522,7 @@ describe("thin-client AssetLibraryFeature", () => {
     await flush();
 
     const text = container.textContent ?? "";
-    assert.doesNotMatch(text, /Create asset|Edit asset|Delete asset|Seed built-ins|Scan resources|Execute workflow/i);
+    assert.doesNotMatch(text, /Create asset|Edit asset|Delete asset|Seed built-ins|Scan resources|Execute workflow|Install pack|Import pack|Export pack|Activate pack|Disable pack|Edit override|Override asset/i);
     expect(text).not.toContain("C:\\Users\\name\\secret");
     expect(text).not.toContain("Bearer abc");
   });

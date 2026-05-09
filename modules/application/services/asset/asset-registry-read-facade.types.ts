@@ -9,9 +9,12 @@ import type {
   AssetInstanceStateSummary,
   AssetLifecycleStatus,
   AssetMetadata,
+  AssetPackSourceKind,
+  AssetPackTrustStatus,
   AssetReference,
   AssetResourceBackedView,
   AssetResourceBackedViewKind,
+  AssetSourceLayer,
   AssetType,
 } from "../../../contracts/asset";
 export type {
@@ -70,6 +73,25 @@ export interface AssetDefinitionCard {
   readonly summary?: string;
   readonly lifecycleStatus: AssetLifecycleStatus;
   readonly builtIn?: boolean;
+  readonly sourcePackId?: string;
+  readonly sourcePackVersion?: string;
+  readonly sourcePackDisplayName?: string;
+  readonly sourceKind?: AssetPackSourceKind;
+  readonly sourceLayer?: AssetSourceLayer;
+  readonly trustStatus?: AssetPackTrustStatus;
+  readonly packCategoryId?: string;
+  readonly packCategoryDisplayName?: string;
+  readonly packTags?: readonly string[];
+  readonly systemDefault?: boolean;
+  readonly installedPack?: boolean;
+  readonly importedPack?: boolean;
+  readonly workspaceOverride?: boolean;
+  readonly organizationOverride?: boolean;
+  readonly userOverride?: boolean;
+  readonly overridesDefinitionRef?: AssetReference;
+  readonly overriddenByDefinitionRefs?: readonly AssetReference[];
+  readonly effectiveResolutionStatus?: string;
+  readonly resolutionSummary?: string;
   readonly metadata?: AssetMetadata;
 }
 

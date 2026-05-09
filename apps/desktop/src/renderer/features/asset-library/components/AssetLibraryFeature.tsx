@@ -65,6 +65,9 @@ export function AssetLibraryFeature({ client }: AssetLibraryFeatureProps) {
         onAssetFamilyChange={state.setAssetFamily}
         onLifecycleStatusChange={state.setLifecycleStatus}
         onBuiltInChange={state.setBuiltIn}
+        onPackIdChange={state.setPackId}
+        onSourceLayerChange={state.setSourceLayer}
+        onCategoryIdChange={state.setCategoryId}
         onRefresh={() => {
           void state.refresh();
         }}

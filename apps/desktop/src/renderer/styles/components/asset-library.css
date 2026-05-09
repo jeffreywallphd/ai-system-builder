@@ -1,6 +1,6 @@
 .asset-library-toolbar {
   display: grid;
-  grid-template-columns: minmax(14rem, 1.6fr) repeat(4, minmax(9rem, 1fr)) auto;
+  grid-template-columns: minmax(14rem, 1.6fr) repeat(7, minmax(8.5rem, 1fr)) auto;
   gap: var(--space-sm);
   align-items: end;
 }

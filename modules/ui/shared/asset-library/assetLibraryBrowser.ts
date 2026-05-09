@@ -19,6 +19,11 @@ import type {
   AssetLibraryResourceBackedViewDetail,
 } from "./assetLibraryReadModels";
 import { sanitizeAssetLibraryDiagnosticMessages, sanitizeAssetLibraryDisplayText } from "./assetLibraryMappers";
+import {
+  filterAssetDefinitionsByCategory,
+  filterAssetDefinitionsByPack,
+  filterAssetDefinitionsBySourceLayer,
+} from "./assetLibraryPackDiscovery";
 
 export type AssetLibraryBrowserTab = "definitions" | "resource-views";
 
@@ -30,6 +35,9 @@ export interface AssetLibraryFiltersState {
   readonly assetFamily: AssetLibraryFilterValue;
   readonly lifecycleStatus: AssetLibraryFilterValue;
   readonly builtIn: AssetLibraryBuiltInFilter;
+  readonly packId: AssetLibraryFilterValue;
+  readonly sourceLayer: AssetLibraryFilterValue;
+  readonly categoryId: AssetLibraryFilterValue;
 }
 
 export interface AssetLibraryFeatureState {
@@ -55,6 +63,9 @@ export interface AssetLibraryFeatureState {
   readonly setAssetFamily: (value: AssetLibraryFilterValue) => void;
   readonly setLifecycleStatus: (value: AssetLibraryFilterValue) => void;
   readonly setBuiltIn: (value: AssetLibraryBuiltInFilter) => void;
+  readonly setPackId: (value: AssetLibraryFilterValue) => void;
+  readonly setSourceLayer: (value: AssetLibraryFilterValue) => void;
+  readonly setCategoryId: (value: AssetLibraryFilterValue) => void;
   readonly setActiveTab: (value: AssetLibraryBrowserTab) => void;
   readonly selectDefinition: (definition: AssetLibraryDefinitionCard) => Promise<void>;
   readonly selectResourceBackedView: (view: AssetLibraryResourceBackedViewCard) => Promise<void>;
@@ -68,6 +79,9 @@ export const ASSET_LIBRARY_DEFAULT_FILTERS: AssetLibraryFiltersState = {
   assetFamily: "all",
   lifecycleStatus: "all",
   builtIn: "all",
+  packId: "all",
+  sourceLayer: "all",
+  categoryId: "all",
 };
 
 export const ASSET_LIBRARY_DETAIL_EXPANSIONS = [
@@ -101,7 +115,10 @@ export function assetLibraryFiltersAreActive(filters: AssetLibraryFiltersState):
     filters.assetType !== "all" ||
     filters.assetFamily !== "all" ||
     filters.lifecycleStatus !== "all" ||
-    filters.builtIn !== "all"
+    filters.builtIn !== "all" ||
+    filters.packId !== "all" ||
+    filters.sourceLayer !== "all" ||
+    filters.categoryId !== "all"
   );
 }
 
@@ -148,7 +165,8 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
       return;
     }
 
-    setDefinitions(result.value.items);
+    const filteredDefinitions = applyLocalDefinitionFilters(result.value.items, filters);
+    setDefinitions(filteredDefinitions);
     if (resourceResult.ok === true) {
       setResourceBackedViews(resourceResult.value.items);
     } else {
@@ -162,7 +180,7 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
     ]);
     setIsLoadingList(false);
 
-    if (selectedDefinition && !result.value.items.some((item) => item.id === selectedDefinition.id)) {
+    if (selectedDefinition && !filteredDefinitions.some((item) => item.id === selectedDefinition.id)) {
       setSelectedDefinition(undefined);
       setSelectedDetail(undefined);
       setDetailError(undefined);
@@ -174,7 +192,7 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
       setDetailError(undefined);
       setValidationError(undefined);
     }
-  }, [client, query, selectedDefinition, selectedResourceBackedView]);
+  }, [client, filters, query, selectedDefinition, selectedResourceBackedView]);
 
   useEffect(() => {
     void loadList();
@@ -274,12 +292,28 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
     setAssetFamily: (value) => setFilters((current) => ({ ...current, assetFamily: value })),
     setLifecycleStatus: (value) => setFilters((current) => ({ ...current, lifecycleStatus: value })),
     setBuiltIn: (value) => setFilters((current) => ({ ...current, builtIn: value })),
+    setPackId: (value) => setFilters((current) => ({ ...current, packId: value })),
+    setSourceLayer: (value) => setFilters((current) => ({ ...current, sourceLayer: value })),
+    setCategoryId: (value) => setFilters((current) => ({ ...current, categoryId: value })),
     setActiveTab,
     selectDefinition,
     selectResourceBackedView,
     loadValidationDetails,
     refresh: loadList,
   };
+}
+
+function applyLocalDefinitionFilters(
+  definitions: readonly AssetLibraryDefinitionCard[],
+  filters: AssetLibraryFiltersState,
+): readonly AssetLibraryDefinitionCard[] {
+  return filterAssetDefinitionsByCategory(
+    filterAssetDefinitionsBySourceLayer(
+      filterAssetDefinitionsByPack(definitions, filters.packId),
+      filters.sourceLayer as never,
+    ),
+    filters.categoryId,
+  );
 }
 
 function safeDisplayText(value: unknown): string | undefined {
