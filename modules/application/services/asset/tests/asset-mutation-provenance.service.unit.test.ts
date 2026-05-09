@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { AssetReference, AssetResourceBackedView, AssetSourceIdentity, FinalizeGeneratedOutputCommand, RegisterResourceBackedViewCommand } from "../../../../contracts/asset";
+import type { AssetReference, AssetResourceBackedView, AssetSourceIdentity, FinalizeGeneratedOutputCommand, ImportExternalRepositoryObjectCommand, RegisterResourceBackedViewCommand } from "../../../../contracts/asset";
 import { AssetMutationProvenanceService } from "../asset-mutation-provenance.service";
 
 const sourceIdentity: AssetSourceIdentity = {
@@ -72,6 +72,53 @@ const generatedView: AssetResourceBackedView = {
   metadata: { prompt: "raw prompt", workflow: "raw workflow", ok: "safe" },
 };
 
+const importCommand: ImportExternalRepositoryObjectCommand = {
+  operation: "asset.import-external-repository-object",
+  viewId: "view.external",
+  approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowPartialCompletion: true },
+  actor: { initiatedBy: "human", actorRef: "user.1", actorDisplayName: "User One" },
+  context: { idempotencyKey: "idem.safe" },
+};
+
+const externalIdentity: AssetSourceIdentity = {
+  sourceKind: "external-repository-object",
+  sourceViewId: "view.external",
+  sourceViewKind: "external-repository-object",
+  sourceSystem: "external-repository-object",
+  sourceId: "external.safe",
+  deduplicationKey: "asset-source.external.safe",
+};
+
+const importedIdentity: AssetSourceIdentity = {
+  sourceKind: "artifact",
+  sourceViewId: "view.external",
+  sourceViewKind: "external-repository-object",
+  sourceSystem: "artifact",
+  sourceId: "import.safe",
+  deduplicationKey: "asset-source.artifact.imported.safe",
+};
+
+const externalView: AssetResourceBackedView = {
+  viewId: "view.external",
+  viewKind: "external-repository-object",
+  assetType: "data-source",
+  displayName: "External Safe",
+  sourceRef: { kind: "external-repository-object", id: "external.safe" as AssetReference["id"] },
+  resourceBacking: {
+    backingId: "external.safe",
+    resourceKind: "external-repository-object",
+    ref: {
+      provider: "huggingface",
+      repositoryId: "owner/repo",
+      objectPath: "model.bin",
+      objectKind: "artifact",
+      metadata: { token: "secret", ok: "safe" },
+    },
+    metadata: { signedUrl: "https://example.test/file?token=secret", ok: "safe" },
+  },
+  metadata: { rawProviderPayload: { token: "secret" }, ok: "safe" },
+};
+
 describe("asset mutation provenance service", () => {
   it("creates sanitized mutation provenance and asset provenance", () => {
     const provenance = new AssetMutationProvenanceService().createForResourceBackedRegistration({
@@ -103,5 +150,26 @@ describe("asset mutation provenance service", () => {
     assert.equal(provenance.createdProvenance?.sourceKind, "runtime-generated");
     assert.equal(provenance.createdProvenance?.authorship, "ai-generated");
     assert.doesNotMatch(JSON.stringify(provenance), /secret|raw prompt|raw workflow|base64|bytes|blob|stack|C:\\/i);
+  });
+
+  it("creates sanitized external repository object import provenance", () => {
+    const provenance = new AssetMutationProvenanceService().createForExternalRepositoryObjectImportOrLocalization({
+      command: importCommand,
+      sourceIdentity: externalIdentity,
+      importedOrLocalizedIdentity: importedIdentity,
+      sourceView: externalView,
+      createdAt: "2026-05-08T12:00:00.000Z",
+      result: {
+        status: "imported",
+        resultId: "import.safe",
+        providerLabel: "Hugging Face",
+        repositoryLabel: "owner/repo",
+        objectLabel: "Model",
+        internalResourceRefs: [{ kind: "artifact", id: "artifact.safe" as AssetReference["id"] }],
+      },
+    });
+    assert.equal(provenance.operation, "asset.import-external-repository-object");
+    assert.equal(provenance.createdProvenance?.sourceKind, "imported");
+    assert.doesNotMatch(JSON.stringify(provenance), /secret|signedUrl|token|rawProviderPayload|base64|bytes|blob|stack|C:\\|https:\/\/example/i);
   });
 });

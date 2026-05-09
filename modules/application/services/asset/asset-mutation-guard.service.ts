@@ -2,12 +2,16 @@ import type {
   AssetMutationDiagnostic,
   AssetMutationFailure,
   FinalizeGeneratedOutputCommand,
+  ImportExternalRepositoryObjectCommand,
+  LocalizeExternalRepositoryObjectCommand,
   RegisterResourceBackedViewCommand,
 } from "../../../contracts/asset";
 import { sanitizeAssetMetadata } from "./asset-safe-metadata";
 
 const REGISTER_OPERATION = "asset.register-resource-backed-view";
 const FINALIZE_GENERATED_OUTPUT_OPERATION = "asset.finalize-generated-output";
+const IMPORT_EXTERNAL_OBJECT_OPERATION = "asset.import-external-repository-object";
+const LOCALIZE_EXTERNAL_OBJECT_OPERATION = "asset.localize-external-repository-object";
 
 export function validateRegisterResourceBackedViewMutationGuard(
   command: RegisterResourceBackedViewCommand,
@@ -85,6 +89,104 @@ export function validateFinalizeGeneratedOutputMutationGuard(
         disallowedAccessFlags,
       }),
     ], FINALIZE_GENERATED_OUTPUT_OPERATION);
+  }
+
+  return undefined;
+}
+
+export function validateImportExternalRepositoryObjectMutationGuard(
+  command: ImportExternalRepositoryObjectCommand,
+): AssetMutationFailure | undefined {
+  if (command.operation !== IMPORT_EXTERNAL_OBJECT_OPERATION) {
+    return failure("validation", "Import external repository object use case received an unsupported mutation operation.", [
+      diagnostic("error", "asset-mutation-operation-unsupported", "Only asset.import-external-repository-object is accepted by this use case."),
+    ], IMPORT_EXTERNAL_OBJECT_OPERATION);
+  }
+
+  if (command.approval.confirmationKind !== "import-external-object") {
+    return failure("validation", "External object import requires the import-external-object confirmation kind.", [
+      diagnostic("error", "asset-mutation-confirmation-kind-invalid", "The confirmation kind does not match external object import."),
+    ], IMPORT_EXTERNAL_OBJECT_OPERATION);
+  }
+
+  if (command.approval.userConfirmed !== true) {
+    return failure("approval-required", "Explicit user confirmation is required before importing an external repository object.", [
+      diagnostic("error", "asset-mutation-user-confirmation-required", "The command approval.userConfirmed flag must be true."),
+    ], IMPORT_EXTERNAL_OBJECT_OPERATION);
+  }
+
+  if (command.approval.allowNetworkAccess !== true) {
+    return failure("permission", "External object import requires explicit network approval for provider-backed import behavior.", [
+      diagnostic("error", "asset-mutation-network-access-required", "The command approval.allowNetworkAccess flag must be true for external object import."),
+    ], IMPORT_EXTERNAL_OBJECT_OPERATION);
+  }
+
+  if (command.approval.allowCredentialUse !== true) {
+    return failure("permission", "External object import requires explicit credential-use approval for configured provider credentials.", [
+      diagnostic("error", "asset-mutation-credential-use-required", "The command approval.allowCredentialUse flag must be true for external object import."),
+    ], IMPORT_EXTERNAL_OBJECT_OPERATION);
+  }
+
+  if (command.approval.allowPartialCompletion !== true) {
+    return failure("permission", "External object import requires explicit partial-completion approval because durable import state can be created before Asset Kernel save.", [
+      diagnostic("error", "asset-mutation-partial-completion-required", "The command approval.allowPartialCompletion flag must be true for external object import."),
+    ], IMPORT_EXTERNAL_OBJECT_OPERATION);
+  }
+
+  if (command.approval.allowFilesystemWrite === true) {
+    return failure("validation", "External object import must not request filesystem-write approval; use localization when bytes are written into controlled storage.", [
+      diagnostic("error", "asset-mutation-access-flags-disallowed", "Import stores or catalogs safe references; localization handles filesystem-backed internal copies.", {
+        disallowedAccessFlags: ["filesystem-write"],
+      }),
+    ], IMPORT_EXTERNAL_OBJECT_OPERATION);
+  }
+
+  return undefined;
+}
+
+export function validateLocalizeExternalRepositoryObjectMutationGuard(
+  command: LocalizeExternalRepositoryObjectCommand,
+): AssetMutationFailure | undefined {
+  if (command.operation !== LOCALIZE_EXTERNAL_OBJECT_OPERATION) {
+    return failure("validation", "Localize external repository object use case received an unsupported mutation operation.", [
+      diagnostic("error", "asset-mutation-operation-unsupported", "Only asset.localize-external-repository-object is accepted by this use case."),
+    ], LOCALIZE_EXTERNAL_OBJECT_OPERATION);
+  }
+
+  if (command.approval.confirmationKind !== "localize-external-object") {
+    return failure("validation", "External object localization requires the localize-external-object confirmation kind.", [
+      diagnostic("error", "asset-mutation-confirmation-kind-invalid", "The confirmation kind does not match external object localization."),
+    ], LOCALIZE_EXTERNAL_OBJECT_OPERATION);
+  }
+
+  if (command.approval.userConfirmed !== true) {
+    return failure("approval-required", "Explicit user confirmation is required before localizing an external repository object.", [
+      diagnostic("error", "asset-mutation-user-confirmation-required", "The command approval.userConfirmed flag must be true."),
+    ], LOCALIZE_EXTERNAL_OBJECT_OPERATION);
+  }
+
+  if (command.approval.allowNetworkAccess !== true) {
+    return failure("permission", "External object localization requires explicit network approval for provider-backed retrieval.", [
+      diagnostic("error", "asset-mutation-network-access-required", "The command approval.allowNetworkAccess flag must be true for external object localization."),
+    ], LOCALIZE_EXTERNAL_OBJECT_OPERATION);
+  }
+
+  if (command.approval.allowCredentialUse !== true) {
+    return failure("permission", "External object localization requires explicit credential-use approval for configured provider credentials.", [
+      diagnostic("error", "asset-mutation-credential-use-required", "The command approval.allowCredentialUse flag must be true for external object localization."),
+    ], LOCALIZE_EXTERNAL_OBJECT_OPERATION);
+  }
+
+  if (command.approval.allowFilesystemWrite !== true) {
+    return failure("permission", "External object localization requires explicit filesystem-write approval for controlled artifact/resource storage.", [
+      diagnostic("error", "asset-mutation-filesystem-write-required", "The command approval.allowFilesystemWrite flag must be true for external object localization."),
+    ], LOCALIZE_EXTERNAL_OBJECT_OPERATION);
+  }
+
+  if (command.approval.allowPartialCompletion !== true) {
+    return failure("permission", "External object localization requires explicit partial-completion approval because durable localized state can be created before Asset Kernel save.", [
+      diagnostic("error", "asset-mutation-partial-completion-required", "The command approval.allowPartialCompletion flag must be true for external object localization."),
+    ], LOCALIZE_EXTERNAL_OBJECT_OPERATION);
   }
 
   return undefined;
