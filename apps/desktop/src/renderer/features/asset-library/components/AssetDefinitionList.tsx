@@ -1,6 +1,9 @@
 import type { AssetLibraryDefinitionCard } from "../../../../../../../modules/ui/shared/asset-library";
 import {
   formatAssetLibraryDate,
+  getAssetCategoryLabel,
+  getAssetPackLabel,
+  getAssetSourceBadge,
   getAssetLibraryFamilyLabel,
   getAssetLibraryLifecycleStatusLabel,
   getAssetLibraryTypeLabel,
@@ -46,11 +49,15 @@ export function AssetDefinitionList({
           >
             <span className="asset-definition-card__header">
               <span className="asset-definition-card__title">{definition.displayName}</span>
-              <span className={`asset-library-badge ${definition.builtIn ? "asset-library-badge--system" : "asset-library-badge--custom"}`}>
-                {definition.builtIn ? "Built-in" : "Custom"}
+              <span className={`asset-library-badge ${definition.systemDefault || definition.builtIn ? "asset-library-badge--system" : "asset-library-badge--custom"}`}>
+                {getAssetSourceBadge(definition)}
               </span>
             </span>
             {definition.summary ? <span className="asset-definition-card__summary">{definition.summary}</span> : null}
+            <span className="asset-library-cues" aria-label="Pack and category cues">
+              <span>{getAssetPackLabel(definition)}</span>
+              <span>{getAssetCategoryLabel(definition)}</span>
+            </span>
             <span className="asset-library-cues" aria-label="Asset cues">
               <span>{getAssetLibraryTypeLabel(definition)}</span>
               <span>{getAssetLibraryFamilyLabel(definition)}</span>

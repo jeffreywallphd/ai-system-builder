@@ -7,6 +7,14 @@ import {
   mapAssetResourceBackedViewDetail,
   mapAssetResourceBackedViewListResult,
   mapTransportEnvelopeError,
+  filterAssetDefinitionsByCategory,
+  filterAssetDefinitionsByPack,
+  filterAssetDefinitionsBySourceLayer,
+  getAssetCategoryLabel,
+  getAssetPackLabel,
+  getAssetSourceBadge,
+  groupAssetDefinitionsByCategory,
+  groupAssetDefinitionsByPack,
   sanitizeAssetLibraryDiagnosticMessages,
 } from "../index";
 import * as assetLibraryExports from "../index";
@@ -119,7 +127,13 @@ describe("asset library mappers", () => {
           lifecycleStatus: "published",
           builtIn: true,
           provenance: { updatedAt: "2026-05-02T00:00:00.000Z" },
-          metadata: { localPath: "/tmp/secret" },
+          metadata: {
+            localPath: "/tmp/secret",
+            sourcePackId: "system.foundation",
+            sourcePackVersion: "1.0.0",
+            sourceLayer: "system-default",
+            categoryId: "ui-structure",
+          },
         },
         {
           definitionId: "custom.tool",
@@ -149,8 +163,20 @@ describe("asset library mappers", () => {
         lifecycleStatus: "published",
         lifecycleStatusLabel: "Published",
         builtIn: true,
+        sourcePackId: "system.foundation",
+        sourcePackVersion: "1.0.0",
+        sourcePackDisplayName: "System Foundation",
+        sourceKind: "system",
+        sourceLayer: "system-default",
+        trustStatus: "system-trusted",
+        packCategoryId: "ui-structure",
+        packCategoryDisplayName: "UI Structure",
+        systemDefault: true,
+        sourceBadgeLabel: "System default",
+        packLabel: "System Foundation",
+        categoryLabel: "UI Structure",
         updatedAt: "2026-05-02T00:00:00.000Z",
-        badges: ["Built-in", "Published"],
+        badges: ["System default", "From System Foundation", "Published"],
       },
       {
         id: "custom.tool@2.0.0",
@@ -166,8 +192,11 @@ describe("asset library mappers", () => {
         lifecycleStatus: "draft",
         lifecycleStatusLabel: "Draft",
         builtIn: false,
+        sourceBadgeLabel: "Custom",
+        packLabel: undefined,
+        categoryLabel: undefined,
         updatedAt: undefined,
-        badges: ["Draft"],
+        badges: ["Custom", "Draft"],
       },
     ]);
     expect(result.nextCursor).toBe("cursor-2");
@@ -257,7 +286,8 @@ describe("asset library mappers", () => {
       assetFamilyLabel: "Unknown family",
       lifecycleStatus: undefined,
       lifecycleStatusLabel: "Unknown status",
-      badges: undefined,
+      sourceBadgeLabel: "Custom",
+      badges: ["Custom"],
     });
     expect(result.items[1]).toMatchObject({
       assetType: undefined,
@@ -267,6 +297,153 @@ describe("asset library mappers", () => {
       lifecycleStatus: undefined,
       lifecycleStatusLabel: "Unknown status",
     });
+  });
+
+  it("maps pack source layers to safe source badges and labels", () => {
+    const result = mapAssetDefinitionListResult({
+      items: [
+        {
+          definitionId: "workspace.override",
+          version: "1.0.0",
+          displayName: "Workspace Override",
+          sourceLayer: "workspace-pack",
+          sourcePackId: "workspace.ui",
+        },
+        {
+          definitionId: "organization.override",
+          version: "1.0.0",
+          displayName: "Organization Override",
+          sourceLayer: "organization-override",
+          sourcePackId: "org.ui",
+        },
+        {
+          definitionId: "user.override",
+          version: "1.0.0",
+          displayName: "User Override",
+          sourceLayer: "user-override",
+          sourcePackId: "user.ui",
+        },
+        {
+          definitionId: "imported.asset",
+          version: "1.0.0",
+          displayName: "Imported Asset",
+          sourceLayer: "imported-pack",
+          sourcePackId: "imported.ui",
+        },
+        {
+          definitionId: "installed.asset",
+          version: "1.0.0",
+          displayName: "Installed Asset",
+          sourceLayer: "installed-pack",
+          sourcePackId: "vendor.ui",
+        },
+        {
+          definitionId: "custom.asset",
+          version: "1.0.0",
+          displayName: "Custom Asset",
+        },
+      ],
+    });
+
+    expect(result.items.map(getAssetSourceBadge)).toEqual([
+      "Workspace override",
+      "Organization override",
+      "User override",
+      "Imported pack",
+      "Installed pack",
+      "Custom",
+    ]);
+  });
+
+  it("groups and filters definitions by pack, category, and source layer", () => {
+    const result = mapAssetDefinitionListResult({
+      items: [
+        {
+          definitionId: "builtin.ui.container",
+          version: "1.0.0",
+          displayName: "Container",
+          sourcePackId: "system.foundation",
+          sourceLayer: "system-default",
+          packCategoryId: "ui-structure",
+        },
+        {
+          definitionId: "builtin.form.form",
+          version: "1.0.0",
+          displayName: "Form",
+          sourcePackId: "system.foundation",
+          sourceLayer: "system-default",
+          packCategoryId: "forms-fields",
+        },
+        {
+          definitionId: "custom.asset",
+          version: "1.0.0",
+          displayName: "Custom Asset",
+        },
+      ],
+    });
+
+    expect(groupAssetDefinitionsByPack(result.items).map((group) => [group.key, group.items.length])).toEqual([
+      ["system.foundation", 2],
+      ["custom", 1],
+    ]);
+    expect(groupAssetDefinitionsByCategory(result.items).map((group) => [group.key, group.label])).toEqual([
+      ["ui-structure", "UI Structure"],
+      ["forms-fields", "Forms and Fields"],
+      ["uncategorized", "Uncategorized"],
+    ]);
+    expect(filterAssetDefinitionsByPack(result.items, "system.foundation").map((asset) => asset.definitionId)).toEqual([
+      "builtin.ui.container",
+      "builtin.form.form",
+    ]);
+    expect(filterAssetDefinitionsBySourceLayer(result.items, "system-default").map((asset) => asset.definitionId)).toEqual([
+      "builtin.ui.container",
+      "builtin.form.form",
+    ]);
+    expect(filterAssetDefinitionsByCategory(result.items, "forms-fields").map((asset) => asset.definitionId)).toEqual([
+      "builtin.form.form",
+    ]);
+    expect(getAssetPackLabel(result.items[0]!)).toBe("System Foundation");
+    expect(getAssetCategoryLabel(result.items[0]!)).toBe("UI Structure");
+  });
+
+  it("drops unsafe pack and override metadata before display", () => {
+    const detail = mapAssetDefinitionDetail({
+      definition: {
+        definitionId: "custom.asset",
+        version: "1.0.0",
+        displayName: "Custom asset",
+        metadata: {
+          sourcePackId: "C:\\Users\\name\\pack",
+          sourcePackDisplayName: "Bearer abc123",
+          sourceLayer: "system-default",
+          categoryId: "/tmp/category",
+          overridesDefinitionRef: {
+            kind: "asset-definition-version",
+            id: "C:\\Users\\name\\secret",
+            version: "1.0.0",
+          },
+          overriddenByDefinitionRefs: [
+            { kind: "asset-definition-version", id: "workspace.override", version: "1.0.0" },
+            { kind: "asset-definition-version", id: "/tmp/unsafe", version: "1.0.0" },
+          ],
+          effectiveResolutionStatus: "applied",
+          resolutionSummary: "Workspace override is active",
+        },
+      },
+    });
+
+    expect(detail.sourcePackId).toBeUndefined();
+    expect(detail.sourcePackDisplayName).toBeUndefined();
+    expect(detail.packCategoryId).toBeUndefined();
+    expect(detail.overridesDefinitionRef).toBeUndefined();
+    expect(detail.overriddenByDefinitionRefs).toEqual([
+      { kind: "asset-definition-version", id: "workspace.override", version: "1.0.0" },
+    ]);
+    expect(detail.effectiveResolutionStatus).toBe("applied");
+    expect(detail.resolutionSummary).toBe("Workspace override is active");
+    expect(JSON.stringify(detail)).not.toContain("C:\\Users");
+    expect(JSON.stringify(detail)).not.toContain("/tmp");
+    expect(JSON.stringify(detail)).not.toContain("Bearer");
   });
 
   it("maps resource-backed cards safely and labels generated/external objects as unregistered", () => {

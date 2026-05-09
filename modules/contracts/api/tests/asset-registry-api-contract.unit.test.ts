@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "../../../testing/node-test";
+import { normalizeAssetId } from "../../asset";
 import type { AssetDefinitionCard, AssetDefinitionDetail, AssetRegistryListResult } from "../../../application/services/asset/asset-registry-read-facade.types";
 import {
   API_ASSET_DEFINITION_READ_OPERATION,
@@ -50,6 +51,37 @@ describe("asset registry API contract", () => {
   it("wraps Asset Registry read-facade read models in API responses", () => {
     expectTypeOf<ApiAssetDefinitionsListResponse>().toExtend<{ value?: AssetRegistryListResult<AssetDefinitionCard> }>();
     expectTypeOf<ApiAssetDefinitionReadResponse>().toExtend<{ value?: AssetDefinitionDetail }>();
+
+    const card: AssetDefinitionCard = {
+      definitionRef: { kind: "asset-definition-version", id: normalizeAssetId("definition.system"), version: "1.0.0" },
+      definitionId: "definition.system",
+      version: "1.0.0",
+      assetType: "tool",
+      assetFamily: "behavioral",
+      displayName: "System component",
+      lifecycleStatus: "published",
+      sourcePackId: "system.foundation",
+      sourcePackVersion: "1.0.0",
+      sourcePackDisplayName: "System Foundation",
+      sourceKind: "system",
+      sourceLayer: "system-default",
+      trustStatus: "system-trusted",
+      packCategoryId: "ui-structure",
+      packCategoryDisplayName: "UI Structure",
+      systemDefault: true,
+    };
+    expect(createApiAssetDefinitionsListSuccessResponse({ items: [card] })).toMatchObject({
+      ok: true,
+      value: {
+        items: [{
+          sourcePackId: "system.foundation",
+          sourcePackDisplayName: "System Foundation",
+          sourceLayer: "system-default",
+          packCategoryDisplayName: "UI Structure",
+          systemDefault: true,
+        }],
+      },
+    });
 
     const detail: AssetDefinitionDetail = {
       definition: {

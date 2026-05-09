@@ -8,6 +8,9 @@ interface AssetLibraryFiltersProps {
   readonly onAssetFamilyChange: (value: AssetLibraryFilterValue) => void;
   readonly onLifecycleStatusChange: (value: AssetLibraryFilterValue) => void;
   readonly onBuiltInChange: (value: AssetLibraryBuiltInFilter) => void;
+  readonly onPackIdChange: (value: AssetLibraryFilterValue) => void;
+  readonly onSourceLayerChange: (value: AssetLibraryFilterValue) => void;
+  readonly onCategoryIdChange: (value: AssetLibraryFilterValue) => void;
   readonly onRefresh: () => void;
   readonly isRefreshing: boolean;
 }
@@ -50,6 +53,25 @@ const LIFECYCLE_STATUS_OPTIONS = [
   "validated",
 ] as const;
 
+const SOURCE_LAYER_OPTIONS = [
+  "system-default",
+  "installed-pack",
+  "imported-pack",
+  "workspace-pack",
+  "organization-override",
+  "user-override",
+  "custom",
+] as const;
+
+const CATEGORY_OPTIONS = [
+  ["ui-structure", "UI Structure"],
+  ["forms-fields", "Forms and Fields"],
+  ["data-display", "Data Display"],
+  ["state-messages", "State Messages"],
+  ["page-feature-shells", "Page and Feature Shells"],
+  ["workflow-system-shells", "Workflow and System Shells"],
+] as const;
+
 function formatLabel(value: string): string {
   return value
     .split("-")
@@ -64,6 +86,9 @@ export function AssetLibraryFilters({
   onAssetFamilyChange,
   onLifecycleStatusChange,
   onBuiltInChange,
+  onPackIdChange,
+  onSourceLayerChange,
+  onCategoryIdChange,
   onRefresh,
   isRefreshing,
 }: AssetLibraryFiltersProps) {
@@ -120,6 +145,35 @@ export function AssetLibraryFilters({
           <option value="all">Built-in and custom</option>
           <option value="built-in">Built-in</option>
           <option value="custom">Custom</option>
+        </select>
+      </label>
+
+      <label className="ui-stack ui-stack--sm">
+        <span className="ui-label">Pack</span>
+        <select className="ui-input" value={filters.packId} onChange={(event) => onPackIdChange(event.currentTarget.value)}>
+          <option value="all">All packs</option>
+          <option value="system.foundation">System Foundation</option>
+          <option value="custom">Custom assets</option>
+        </select>
+      </label>
+
+      <label className="ui-stack ui-stack--sm">
+        <span className="ui-label">Layer</span>
+        <select className="ui-input" value={filters.sourceLayer} onChange={(event) => onSourceLayerChange(event.currentTarget.value)}>
+          <option value="all">All layers</option>
+          {SOURCE_LAYER_OPTIONS.map((option) => (
+            <option key={option} value={option}>{option === "custom" ? "Custom" : formatLabel(option)}</option>
+          ))}
+        </select>
+      </label>
+
+      <label className="ui-stack ui-stack--sm">
+        <span className="ui-label">Category</span>
+        <select className="ui-input" value={filters.categoryId} onChange={(event) => onCategoryIdChange(event.currentTarget.value)}>
+          <option value="all">All categories</option>
+          {CATEGORY_OPTIONS.map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
         </select>
       </label>
 
