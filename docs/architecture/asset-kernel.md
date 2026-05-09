@@ -69,6 +69,8 @@ Phase 5 should populate reviewed reusable default asset definitions for foundati
 
 Phase 5 should build on Phase 4 by using controlled registration, seeding, and versioning semantics rather than ad hoc public writes. It should not jump directly to full visual composition or canvas authoring unless that is explicitly scoped.
 
+Phase 5 Prompt 2 starts the contract vocabulary for pack-compatible foundational assets in `modules/contracts/asset`. System defaults are intended to be representable as versioned system asset packs rather than only loose `builtin.*` definitions. Asset pack manifests, source kind/layer metadata, trust/install status vocabulary, compatibility/dependency declarations, pack asset entries, non-destructive override rules, and future resolver request/result diagnostics are declarative contracts only. Overrides map references to replacement references; they must not mutate system-owned records. Resolver contracts exist for future exact/semantic/compatible/latest-active behavior, but no resolver service, pack validation service, pack import/export/sharing, public marketplace/package-registry behavior, seeding/install behavior, persistence adapter, UI, transport, host wiring, or foundational asset definitions are added in Prompt 2.
+
 Phase 5 non-goals: no arbitrary free-form asset editor unless explicitly scoped, no workflow execution, no canvas/graph editor unless the Phase 5 plan says so, no plugin marketplace, no scheduler/queue, and no automatic AI-generated asset library without review.
 
 
