@@ -4,3 +4,4 @@ export * from "./system-foundation-pack.manifest";
 export * from "./ui-primitives";
 export * from "./form-primitives";
 export * from "./display-primitives";
+export * from "./shell-primitives";
