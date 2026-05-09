@@ -131,6 +131,7 @@ describe("Asset Kernel public non-exposure boundaries", () => {
   it("keeps application asset services and shared host helpers free of forbidden outer-layer imports and storage scans", () => {
     const source = [
       combinedSource("modules/application/services/asset"),
+      combinedSource("modules/application/services/asset-packs"),
       combinedSource("modules/application/use-cases/asset"),
       combinedSource("modules/hosts/shared/composition"),
     ].join("\n");
