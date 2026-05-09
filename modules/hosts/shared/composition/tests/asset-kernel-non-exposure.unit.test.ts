@@ -34,6 +34,32 @@ function combinedSource(relativeDir: string): string {
 }
 
 describe("Asset Kernel public non-exposure boundaries", () => {
+  it("keeps Phase 5 asset pack lifecycle, resolver, and override controls out of public surfaces", () => {
+    const publicSource = [
+      combinedSource("modules/contracts/api"),
+      combinedSource("modules/contracts/ipc"),
+      combinedSource("modules/adapters/transport/api-express"),
+      combinedSource("modules/adapters/transport/ipc-electron"),
+      combinedSource("apps/desktop/src/preload"),
+      combinedSource("apps/desktop/src/renderer"),
+      combinedSource("apps/thin-client/src"),
+      combinedSource("modules/ui/shared/asset-library"),
+    ].join("\n");
+    const hostCompositionSource = [
+      combinedSource("modules/hosts/desktop/composition"),
+      combinedSource("modules/hosts/server/composition"),
+      combinedSource("modules/hosts/shared/composition"),
+    ].join("\n");
+
+    assert.doesNotMatch(publicSource, /\/api\/(?:asset-packs|packs|marketplace|package-registry)(?:\/|["'`?])/i);
+    assert.doesNotMatch(publicSource, /ipc\.asset\.(?:pack|packs|resolver|override|marketplace|package-registry)/i);
+    assert.doesNotMatch(publicSource, /\b(?:installAssetPack|installSystemFoundationPack|importAssetPack|exportAssetPack|uploadAssetPack|downloadAssetPack|publishAssetPack|activateAssetPack|disableAssetPack|resolveAssetDefinition|createAssetOverride|updateAssetOverride|deleteAssetOverride|editAssetOverride)\b/i);
+    assert.doesNotMatch(publicSource, /\b(?:Install pack|Import pack|Export pack|Upload pack|Download pack|Publish pack|Activate pack|Disable pack|Edit override|Create override|Delete override|Resolve asset|Resolver preview|Pack marketplace|Package registry|Asset editor|Visual composition|Canvas authoring|Wizard authoring)\b/i);
+    assert.doesNotMatch(publicSource, /\b(?:activePackRegistry|packActivation|packPriority|marketplaceClient|packageRegistry|archivePath|archiveBytes|signatureValue|filePicker)\b/i);
+    assert.doesNotMatch(hostCompositionSource, /\b(?:installSystemFoundationPack|installAssetPack|importAssetPack|exportAssetPack|activateAssetPack|disableAssetPack|resolveAssetDefinition)\s*\(/i);
+    assert.doesNotMatch(hostCompositionSource, /\b(?:startup.*(?:asset|pack|foundation).*seed|(?:asset|pack|foundation).*seed.*startup|auto.*(?:asset|pack|foundation).*(?:seed|install)|(?:asset|pack|foundation).*auto.*(?:seed|install))\b/i);
+  });
+
   it("allows only read APIs plus four approved asset mutation server API routes", () => {
     const source = [
       combinedSource("modules/contracts/api"),

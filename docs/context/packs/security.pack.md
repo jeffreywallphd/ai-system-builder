@@ -152,6 +152,11 @@ No automatic trust-store installation is performed. Trust installation is manual
 
 - Manifest serialization and fingerprint helpers remain pure and in-memory. Parse/validation tests must reject or safely report unsafe pack metadata, local paths, secrets/tokens/auth values, signed URLs, raw provider payloads, stack traces, command lines, environment values, bytes/blob/base64/data URLs, raw prompt/workflow payloads, and resource contents. Fingerprints must not expose raw manifest content. Public import/export, archive/signature, marketplace/registry, install/activation, API/IPC/preload/UI, filesystem, storage, provider, network, and runtime behavior remain deferred.
 
+## Phase 5 final stabilization safety
+
+- Final Phase 5 review keeps all asset-pack surfaces sanitized. Pack manifests, pack entries, primitive definitions, validation diagnostics, quality-gate diagnostics, install/seeding diagnostics, resolver diagnostics, serialization parse issues, and Asset Library rendered values must omit or reject local/cache/storage/runtime paths, Hugging Face cache paths, tokens/secrets/passwords/API keys/auth headers/session/cookies, signed or query-bearing URLs, raw provider payloads, raw metadata blobs, stack traces, command lines, environment values, bytes/blob/base64/data URLs, prompt and negative prompt text by default, raw workflow JSON, model/dataset/image/document contents, raw artifact contents, renderer file paths, API/IPC channel names, route implementation paths, and workflow-engine/runtime-task implementation details.
+- Public pack import/export/install/activate/disable, public override editing, resolver execution, marketplace/package registry, active-pack registry, asset editor, visual composition/canvas/wizard authoring, workflow execution, runtime execution, filesystem import/export, provider/network/storage side effects, scans, and byte/content reads remain deferred.
+
 ## Phase 2C Prompt 2: read-only Asset Registry server API foundation
 
 Phase 2C begins by exposing only a narrow, read-only server API foundation for Asset Registry definition reads. The server routes wrap an application-owned Asset Registry definition read port/read facade and must not receive persistence adapters, host composition helpers, mutation use cases, built-in seeding services, or local repositories.

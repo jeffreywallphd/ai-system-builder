@@ -91,7 +91,33 @@ Phase 5 Prompt 10 adds a narrow pure application-layer asset resolver in `module
 
 Phase 5 Prompt 11 adds pure in-memory manifest serialization and fingerprint helpers for asset packs. `system.foundation` can now round-trip as a deterministic JSON manifest string with full definitions, category/source/trust metadata, dependencies, override rules when present, and semantic fingerprints/checksums. Test-only user/imported override-pack fixtures demonstrate future sharing semantics without installing, activating, importing, exporting, publishing, signing, archiving, or exposing packs through public API/IPC/preload/UI. Unsafe metadata, local paths, credentials, signed URLs, raw provider payloads, workflow/prompt payloads, resource bytes/content, command lines, stacks, and environment values remain rejected or safely reported by parsing/validation tests. Actual public import/export workflows, archive formats, signature verification, remote publishing, marketplace/package registry behavior, active-pack registries, override editing, and user-facing sharing remain deferred.
 
-Phase 5 non-goals: no arbitrary free-form asset editor unless explicitly scoped, no workflow execution, no canvas/graph editor unless the Phase 5 plan says so, no plugin marketplace, no scheduler/queue, and no automatic AI-generated asset library without review.
+## Final Phase 5 baseline
+
+Phase 5 stabilizes pack-compatible system defaults. `system.foundation` is the canonical versioned, system-trusted system default pack. Its entries are full `AssetDefinition` records with source-pack metadata, category metadata, stable definition refs, stable fingerprints, semantic configuration schemas, AI context, ports, and composition guidance. System defaults are represented as pack entries, not loose hardcoded built-ins.
+
+Foundation primitives remain semantic definitions only. They do not implement renderer components, CSS, routes, API or IPC handlers, workflow engines, runtime tasks, provider calls, resource readers, storage reads/writes, file uploads, data validation, form submission, preview rendering, visual composition/canvas authoring, or AI-generated system composition. Preview entries are placeholders only, and workflow/system/check shells are non-running declarations.
+
+Pack validation, quality gates, install diagnostics, resolver diagnostics, and serialization parsing stay sanitized. Unsafe local/cache/storage/runtime paths, tokens, credentials, signed URLs, raw provider payloads, stack traces, command lines, environment values, bytes/blob/base64/data URLs, prompt text, workflow JSON, and raw resource contents must be rejected or omitted.
+
+Install/seeding for `system.foundation` is explicit, internal, idempotent, and non-destructive. Host startup must not install or seed packs automatically. Validate-only mode writes nothing, install mode validates the manifest, entries, full definitions, and quality gates before save, matching installed system definitions are skipped by default, and user/custom or conflicting definitions are not overwritten unless a later explicit refresh policy is scoped and tested.
+
+The Phase 5 resolver is pure and non-destructive. It accepts explicit candidate definitions, manifests, source-layer ordering, and override rules supplied by the caller; it does not read repositories, install or activate packs, persist active-pack state, edit override rules, or expose public transport/UI behavior. Exact references bypass overrides by default. Semantic/default references may apply explicit enabled override rules only when the request allows overrides. Override rules select effective replacements during resolution and never mutate system records.
+
+Manifest serialization and fingerprint helpers are pure, deterministic, and in-memory. They prove future import/export readiness by round-tripping safe manifests and fixtures, but they do not read or write files, create archives, verify signatures, publish packages, install user packs, activate packs, or add public import/export API, IPC, preload, or UI behavior.
+
+Asset Library discoverability is read-only. It may show sanitized pack/source/category labels, source-layer badges, foundation category labels, and safe informational override/resolution metadata already present in read models. It must not add pack install/import/export/activate/disable controls, public override editing, public resolver execution, general asset editing, visual composition/canvas/wizard authoring, provider/network/runtime calls, scans, or byte/content reads.
+
+Phase 5 non-goals remain explicit: no public pack import/export/install/activation behavior, no marketplace or package registry, no active-pack registry, no arbitrary asset editor, no public override editing, no workflow execution, no runtime task execution, no visual composition/canvas authoring, no provider/network/storage side effects, and no automatic AI-generated asset library.
+
+## Phase 6 handoff
+
+The recommended next phase is **Phase 6 - Asset Authoring, Override Management, and Composition Planning**.
+
+Phase 5 created the pack-compatible foundation: asset pack contracts, system foundation pack definitions, validation/quality gates, explicit internal install, read-only discoverability, pure resolver semantics, and serialization readiness. Phase 6 can now build controlled user authoring and override workflows on top of that foundation without mutating system defaults.
+
+Phase 6 should focus on user-created asset definition drafts, copy/customize flows from `system.foundation` into user-owned assets, non-destructive override management UI, active override preview and conflict diagnostics, pack-aware authoring metadata, basic composition planning using existing primitives, authored asset validation before save, controlled workspace-level pack/override state if ready, read-only resolver preview in Asset Library, and authoring flows that remain non-executing until later phases.
+
+Phase 6 non-goals: no full marketplace, no remote publishing, no arbitrary unvalidated asset editing, no workflow execution, no runtime task execution, no drag-and-drop canvas unless explicitly scoped, no AI-generated assets without human review, and no provider/network/storage side effects from authoring preview.
 
 
 ## Local persistence checkpoint (Prompt 9)

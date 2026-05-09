@@ -65,6 +65,8 @@ The Asset Kernel is a central platform concept for user-composable systems. It d
 
 The Asset Kernel does not rename or replace existing artifact, resource, runtime, host, or storage concepts. Resource-backed assets reference artifact/resource storage, asset runtime requirements reference shared runtime capability IDs, and transport/UI-specific asset models are not allowed. Prompt 3 adds the initial `modules/contracts/asset` family for core identity, lifecycle, provenance, definitions, instances, references, minimal binding/composition shells, and validation issue contracts only; detailed configuration, AI context, port/rule validation, registry ports, persistence, and resource-backed mapping remain later Phase 2A prompts.
 
+Current Phase 5 Asset Kernel work adds pack-compatible system defaults without changing those boundaries. `system.foundation` is the canonical versioned, system-trusted default pack; its entries are full semantic `AssetDefinition` records, not renderer components or loose hardcoded built-ins. System pack install/seeding is explicit/internal/idempotent and not host-startup behavior. The basic resolver is pure and non-destructive: exact references bypass overrides by default, while semantic/default references may apply explicit enabled override rules only when requested. Manifest serialization/fingerprinting is pure in-memory readiness for future import/export, and Asset Library pack/source/category display remains read-only. Public pack import/export/install/activation, override editing, marketplace/package registry, asset editor, visual composition/canvas authoring, workflow execution, runtime execution, and provider/network/storage side effects remain deferred.
+
 ### Core logic
 
 - `modules/domain/`
