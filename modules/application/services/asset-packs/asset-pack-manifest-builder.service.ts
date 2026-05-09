@@ -88,7 +88,7 @@ export function createSystemFoundationPackManifest(
     version: SYSTEM_FOUNDATION_PACK_VERSION,
     displayName: SYSTEM_FOUNDATION_PACK_DISPLAY_NAME,
     description:
-      "System-owned placeholder pack for foundational Asset Kernel catalog categories.",
+      "System-owned pack for foundational Asset Kernel catalog definitions.",
     publisher: "ai-system-builder",
     license: {
       kind: "internal",
@@ -111,7 +111,7 @@ export function createSystemFoundationPackManifest(
     categories: SYSTEM_FOUNDATION_PACK_CATEGORY_IDS,
     metadata: {
       declarativeOnly: true,
-      catalogPhase: "phase-5-prompt-3",
+      catalogPhase: "phase-5-prompt-4",
       categoryCount: SYSTEM_FOUNDATION_PACK_CATEGORIES.length,
       containsDefinitions: entries.length > 0,
     },
