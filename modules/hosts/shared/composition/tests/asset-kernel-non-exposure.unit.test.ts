@@ -53,6 +53,7 @@ describe("Asset Kernel public non-exposure boundaries", () => {
 
     assert.doesNotMatch(publicSource, /\/api\/(?:asset-packs|packs|marketplace|package-registry)(?:\/|["'`?])/i);
     assert.doesNotMatch(publicSource, /ipc\.asset\.(?:pack|packs|resolver|override|marketplace|package-registry)/i);
+    assert.doesNotMatch(publicSource, /\bresolvedDefinition\b/i);
     assert.doesNotMatch(publicSource, /\b(?:installAssetPack|installSystemFoundationPack|importAssetPack|exportAssetPack|uploadAssetPack|downloadAssetPack|publishAssetPack|activateAssetPack|disableAssetPack|resolveAssetDefinition|createAssetOverride|updateAssetOverride|deleteAssetOverride|editAssetOverride)\b/i);
     assert.doesNotMatch(publicSource, /\b(?:Install pack|Import pack|Export pack|Upload pack|Download pack|Publish pack|Activate pack|Disable pack|Edit override|Create override|Delete override|Resolve asset|Resolver preview|Pack marketplace|Package registry|Asset editor|Visual composition|Canvas authoring|Wizard authoring)\b/i);
     assert.doesNotMatch(publicSource, /\b(?:activePackRegistry|packActivation|packPriority|marketplaceClient|packageRegistry|archivePath|archiveBytes|signatureValue|filePicker)\b/i);

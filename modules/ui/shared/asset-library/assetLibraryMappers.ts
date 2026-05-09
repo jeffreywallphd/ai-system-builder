@@ -273,11 +273,18 @@ function sourceMetadataFrom(card: Record<string, unknown>) {
     : identifierArray(metadata.packTags ?? metadata.tags);
   const systemDefault =
     card.systemDefault === true ||
-    sourcePackId === SYSTEM_FOUNDATION_PACK_ID ||
+    (
+      sourcePackId === SYSTEM_FOUNDATION_PACK_ID &&
+      sourceKind === "system" &&
+      (sourceLayer === undefined || sourceLayer === "system-default") &&
+      trustStatus === "system-trusted"
+    ) ||
     (sourceLayer === "system-default" && sourceKind === "system" && trustStatus === "system-trusted");
   const installedPack = card.installedPack === true || sourceLayer === "installed-pack";
   const importedPack = card.importedPack === true || sourceLayer === "imported-pack";
-  const workspaceOverride = card.workspaceOverride === true || sourceLayer === "workspace-pack";
+  const overridesDefinitionRef = safeAssetDefinitionRef(card.overridesDefinitionRef ?? metadata.overridesDefinitionRef);
+  const workspacePack = card.workspacePack === true || sourceLayer === "workspace-pack";
+  const workspaceOverride = sourceLayer === "workspace-pack" && Boolean(overridesDefinitionRef);
   const organizationOverride = card.organizationOverride === true || sourceLayer === "organization-override";
   const userOverride = card.userOverride === true || sourceLayer === "user-override";
 
@@ -294,6 +301,7 @@ function sourceMetadataFrom(card: Record<string, unknown>) {
     ...(systemDefault ? { systemDefault: true } : {}),
     ...(installedPack ? { installedPack: true } : {}),
     ...(importedPack ? { importedPack: true } : {}),
+    ...(workspacePack ? { workspacePack: true } : {}),
     ...(workspaceOverride ? { workspaceOverride: true } : {}),
     ...(organizationOverride ? { organizationOverride: true } : {}),
     ...(userOverride ? { userOverride: true } : {}),
@@ -301,6 +309,7 @@ function sourceMetadataFrom(card: Record<string, unknown>) {
       systemDefault,
       installedPack,
       importedPack,
+      workspacePack,
       workspaceOverride,
       organizationOverride,
       userOverride,
@@ -315,6 +324,7 @@ function sourceBadgeLabel(input: {
   readonly systemDefault: boolean;
   readonly installedPack: boolean;
   readonly importedPack: boolean;
+  readonly workspacePack: boolean;
   readonly workspaceOverride: boolean;
   readonly organizationOverride: boolean;
   readonly userOverride: boolean;
@@ -324,6 +334,7 @@ function sourceBadgeLabel(input: {
   if (input.installedPack) return "Installed pack";
   if (input.importedPack) return "Imported pack";
   if (input.workspaceOverride) return "Workspace override";
+  if (input.workspacePack) return "Workspace pack";
   if (input.organizationOverride) return "Organization override";
   if (input.userOverride) return "User override";
   if (input.sourcePackId) return "Installed pack";

@@ -14,6 +14,8 @@ import {
   createUnsafePackManifestFixture,
   createUserOverridePackManifestFixture,
 } from "./fixtures/asset-pack-manifest.fixtures";
+import { validateAssetPackManifest } from "../asset-pack-validation.service";
+import { parseAssetPackManifestJson } from "../asset-pack-serialization.service";
 
 function firstEntryManifest(): AssetPackManifest {
   const manifest = createSystemFoundationManifestFixture();
@@ -149,6 +151,19 @@ describe("asset pack manifest fingerprints", () => {
     assert.equal(fingerprint.includes("token"), false);
     assert.equal(fingerprint.includes("hidden"), false);
     assert.equal(fingerprint.includes("apiKey"), false);
+  });
+
+  it("does not treat fingerprinting as validation or import approval", () => {
+    const unsafe = createUnsafePackManifestFixture();
+    const fingerprint = createAssetPackManifestFingerprint(unsafe);
+    const validation = validateAssetPackManifest(unsafe);
+    const parsed = parseAssetPackManifestJson(JSON.stringify(unsafe));
+
+    assert.match(fingerprint, /^sha256:[a-f0-9]{64}$/);
+    assert.equal(validation.status, "invalid");
+    assert.equal(parsed.ok, false);
+    assert.equal(JSON.stringify({ fingerprint, validation, parsed }).includes("Bearer"), false);
+    assert.equal(JSON.stringify({ fingerprint, validation, parsed }).includes("token=hidden"), false);
   });
 
   it("does not require filesystem, network, runtime, provider, storage, host, or transport behavior", () => {

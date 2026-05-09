@@ -1,5 +1,5 @@
 import * as assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -134,6 +134,28 @@ function traceText(result: ReturnType<typeof resolveAssetDefinition>): string {
 
 function serialized(value: unknown): string {
   return JSON.stringify(value).toLowerCase();
+}
+
+function combinedSource(relativeDir: string): string {
+  const root = process.cwd();
+  const stack = [join(root, relativeDir)];
+  const sources: string[] = [];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    for (const entry of readdirSync(current)) {
+      const path = join(current, entry);
+      const stats = statSync(path);
+      if (stats.isDirectory()) {
+        if (!["node_modules", "dist", "build", "coverage"].includes(entry)) stack.push(path);
+        continue;
+      }
+      if (/\.(?:ts|tsx|js|jsx|mjs|cjs)$/.test(entry) && !/\.unit\.test\.(?:ts|tsx|js|jsx)$/.test(entry)) {
+        sources.push(readFileSync(path, "utf8"));
+      }
+    }
+  }
+  return sources.join("\n");
 }
 
 describe("asset resolution service exact resolution", () => {
@@ -480,6 +502,27 @@ describe("asset resolution service trace and diagnostics", () => {
       assert.equal(output.includes(unsafe), false, unsafe);
     }
   });
+
+  it("keeps resolvedDefinition as an internal application result with sanitized public diagnostics and trace", () => {
+    const result = resolveAssetDefinition({
+      request: semanticRequest(false),
+      definitions: [systemTextField],
+    });
+    const publicSafeOutput = serialized({
+      requestedRef: result.requestedRef,
+      resolvedRef: result.resolvedRef,
+      appliedOverrideRuleIds: result.appliedOverrideRuleIds,
+      diagnostics: result.diagnostics,
+      conflicts: result.conflicts,
+      trace: result.trace,
+    });
+
+    assert.equal(result.resolvedDefinition, systemTextField);
+    assert.equal(publicSafeOutput.includes("resolveddefinition"), false);
+    assert.equal(publicSafeOutput.includes("c:\\"), false);
+    assert.equal(publicSafeOutput.includes("token"), false);
+    assert.equal(publicSafeOutput.includes("providerpayload"), false);
+  });
 });
 
 describe("asset resolution service boundaries", () => {
@@ -563,6 +606,24 @@ describe("asset resolution service boundaries", () => {
     ]) {
       assert.equal(source.includes(forbidden), false, forbidden);
     }
+  });
+
+  it("has no public route, IPC, preload, or UI resolver exposure", () => {
+    const publicSource = [
+      "modules/contracts/api",
+      "modules/contracts/ipc",
+      "modules/adapters/transport/api-express",
+      "modules/adapters/transport/ipc-electron",
+      "apps/desktop/src/preload",
+      "apps/desktop/src/renderer",
+      "apps/thin-client/src",
+      "modules/ui/shared/asset-library",
+    ].map(combinedSource).join("\n");
+
+    assert.doesNotMatch(publicSource, /\bresolveAssetDefinition\b/i);
+    assert.doesNotMatch(publicSource, /\bresolvedDefinition\b/i);
+    assert.doesNotMatch(publicSource, /\/api\/(?:asset-resolver|assets\/resolve|assets\/resolver)/i);
+    assert.doesNotMatch(publicSource, /ipc\.asset\.(?:resolve|resolver)/i);
   });
 });
 

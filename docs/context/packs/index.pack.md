@@ -120,3 +120,9 @@ Only use these when needed. Do not overload the context window with uncessary in
 ## Server readiness API baseline
 
 - Server API runtime readiness wraps shared host-scoped readiness contracts via the application readiness service; it remains separate from desktop IPC readiness and from feature-specific runtime execution endpoints.
+
+## Phase 5 final cleanup notes
+
+- Pack-backed `system.foundation` definitions are system defaults/built-ins for read-facade filtering and Asset Library display.
+- `workspace-pack` is a workspace pack source label, not a workspace override unless explicit override metadata exists.
+- User/custom system-pack install conflicts fail without overwrite; resolver full outputs remain internal; fingerprinting is not validation or import approval.

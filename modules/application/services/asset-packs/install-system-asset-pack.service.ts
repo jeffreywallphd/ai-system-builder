@@ -317,10 +317,11 @@ export class InstallSystemAssetPackService {
         continue;
       }
 
+      failedEntryCount += 1;
       issues.push({
-        severity: "warning",
+        severity: "error",
         category: "identity",
-        message: "Existing definition was not overwritten because it conflicts with the system pack entry.",
+        message: "Existing definition conflicts with the system pack entry and was not overwritten.",
         assetRef: definitionRef,
         path: ["assets", entry.entryId],
         details: {
@@ -331,23 +332,19 @@ export class InstallSystemAssetPackService {
           existingSystemPackDefinition: existingMetadata !== undefined,
         },
       });
-      actions.push({
-        kind: "skip",
-        entry,
+      diagnostics.push({
+        severity: "error",
+        code: "definition-conflict-not-overwritten",
+        message:
+          "Existing definition was not overwritten. System asset pack install stopped before saving later entries.",
+        entryId: entry.entryId,
         definitionRef,
-        diagnostic: {
-          severity: "warning",
-          code: "definition-conflict-not-overwritten",
-          message:
-            "Existing definition was not overwritten. Future override or resolver behavior should handle replacement without mutating the existing record.",
-          entryId: entry.entryId,
-          definitionRef,
-          metadata: {
-            existingSystemPackDefinition: existingMetadata !== undefined,
-            sourceLayer: entry.sourceLayer,
-          },
+        metadata: {
+          existingSystemPackDefinition: existingMetadata !== undefined,
+          sourceLayer: entry.sourceLayer,
         },
       });
+      return { failed: true, failedEntryCount, actions };
     }
 
     return { failed: failedEntryCount > 0, failedEntryCount, actions };
