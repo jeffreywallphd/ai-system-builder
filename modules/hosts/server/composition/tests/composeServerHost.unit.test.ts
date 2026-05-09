@@ -169,8 +169,8 @@ describe("composeServerHost", () => {
       runtimeRootDirectory,
     });
 
-    expect(app.post).toHaveBeenCalledTimes(33);
-    expect(app.get).toHaveBeenCalledTimes(8);
+    expect(app.post).toHaveBeenCalledTimes(37);
+    expect(app.get).toHaveBeenCalledTimes(10);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
       "/api/artifact/upload",
@@ -205,9 +205,18 @@ describe("composeServerHost", () => {
       "/api/application-settings/read",
       "/api/application-settings/update",
       "/api/application-settings/clear",
+      "/api/assets/register-resource-backed-view",
+      "/api/assets/finalize-generated-output",
+      "/api/assets/import-external-repository-object",
+      "/api/assets/localize-external-repository-object",
       "/api/server/restart",
     ]);
-    expect(registeredPaths.some((path) => String(path).startsWith("/api/assets"))).toBe(false);
+    expect(registeredPaths.filter((path) => String(path).startsWith("/api/assets"))).toEqual([
+      "/api/assets/register-resource-backed-view",
+      "/api/assets/finalize-generated-output",
+      "/api/assets/import-external-repository-object",
+      "/api/assets/localize-external-repository-object",
+    ]);
     expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(true);
     expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     const internalRegistry = host.getInternalAssetRegistry();
@@ -230,13 +239,16 @@ describe("composeServerHost", () => {
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
 
     expect(registeredGetPaths).toContain("/api/assets/definitions");
-    expect(registeredGetPaths.some((path) => /\/api\/assets.*(create|update|delete|register|seed|import|finalize)/i.test(String(path)))).toBe(false);
+    expect(registeredPaths.some((path) => /\/api\/assets.*(create|update|delete|patch|edit|seed|publish|execute|run|scan)/i.test(String(path)))).toBe(false);
     expect(readFileSync(resolve("modules/hosts/server/composition/composeServerHost.ts"), "utf8")).toContain("assetRegistryRead: internalAssetRegistry.readFacade");
+    expect(readFileSync(resolve("modules/hosts/server/composition/composeServerHost.ts"), "utf8")).toContain("assetMutationUseCases");
     expect(registeredGetPaths).toEqual([
       "/api/artifact/upload/policy",
       "/api/artifact/media/view",
       "/api/config/huggingface-token",
       "/api/assets/definitions",
+      "/api/assets/resource-backed-views",
+      "/api/assets/resource-backed-views/:viewId",
       "/api/assets/definitions/:definitionId",
       "/api/assets/definitions/:definitionId/versions/:version",
       "/api/runtime/readiness",

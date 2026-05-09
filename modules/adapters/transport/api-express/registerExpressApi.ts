@@ -16,6 +16,7 @@ import { registerApplicationSettingsApiRoutes, type RegisterApplicationSettingsA
 import { registerServerControlApiRoutes, type RegisterServerControlApiRoutesDependencies } from "./server-control/registerServerControlApiRoutes";
 import { registerRuntimeReadinessApiRoutes, type RegisterRuntimeReadinessApiRoutesDependencies } from "./runtime-readiness/registerRuntimeReadinessApiRoutes";
 import { registerAssetRegistryApiRoutes, type RegisterAssetRegistryApiRoutesDependencies } from "./asset-registry/registerAssetRegistryApiRoutes";
+import { registerAssetMutationApiRoutes, type RegisterAssetMutationApiRoutesDependencies } from "./asset-registry/registerAssetMutationApiRoutes";
 
 export interface RegisterExpressApiDependencies {
   app: RegisterArtifactUploadApiRouteDependencies["app"]
@@ -26,7 +27,8 @@ export interface RegisterExpressApiDependencies {
     & RegisterApplicationSettingsApiRoutesDependencies["app"]
     & RegisterServerControlApiRoutesDependencies["app"]
     & RegisterRuntimeReadinessApiRoutesDependencies["app"]
-    & RegisterAssetRegistryApiRoutesDependencies["app"];
+    & RegisterAssetRegistryApiRoutesDependencies["app"]
+    & RegisterAssetMutationApiRoutesDependencies["app"];
   getHuggingFaceTokenStatus: RegisterArtifactRepoApiRoutesDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];
@@ -65,6 +67,7 @@ export interface RegisterExpressApiDependencies {
   restartServer?: RegisterServerControlApiRoutesDependencies["restartServer"];
   runtimeReadiness?: RegisterRuntimeReadinessApiRoutesDependencies["runtimeReadiness"];
   assetRegistryRead?: RegisterAssetRegistryApiRoutesDependencies["assetRegistryRead"];
+  assetMutationUseCases?: Omit<RegisterAssetMutationApiRoutesDependencies, "app">;
 }
 
 export function registerExpressApi(
@@ -140,6 +143,13 @@ export function registerExpressApi(
     registerAssetRegistryApiRoutes({
       app: dependencies.app,
       assetRegistryRead: dependencies.assetRegistryRead,
+    });
+  }
+
+  if (dependencies.assetMutationUseCases) {
+    registerAssetMutationApiRoutes({
+      app: dependencies.app,
+      ...dependencies.assetMutationUseCases,
     });
   }
 

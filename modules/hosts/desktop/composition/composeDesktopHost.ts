@@ -1,5 +1,6 @@
 import { cpus, totalmem, freemem } from "node:os";
 import { execFile as nodeExecFile, spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -45,6 +46,10 @@ import {
   TrainModelUseCase,
   ValidateModelUseCase,
   PublishModelUseCase,
+  RegisterResourceBackedViewAsAssetInstanceUseCase,
+  FinalizeGeneratedOutputAsAssetUseCase,
+  ImportExternalRepositoryObjectAsAssetUseCase,
+  LocalizeExternalRepositoryObjectAsAssetUseCase,
 } from "../../../application/use-cases";
 import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
@@ -1052,6 +1057,37 @@ export function composeDesktopHost(
           publishedModelRegistry: modelRegistry,
         }),
       });
+      const generateAssetInstanceId = () => `asset-instance.${randomUUID()}`;
+      const assetMutationUseCases = {
+        registerResourceBackedViewAsAsset: new RegisterResourceBackedViewAsAssetInstanceUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
+          now,
+          generateInstanceId: generateAssetInstanceId,
+        }),
+        finalizeGeneratedOutputAsAsset: new FinalizeGeneratedOutputAsAssetUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
+          now,
+          generateInstanceId: generateAssetInstanceId,
+        }),
+        importExternalRepositoryObjectAsAsset: new ImportExternalRepositoryObjectAsAssetUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
+          now,
+          generateInstanceId: generateAssetInstanceId,
+        }),
+        localizeExternalRepositoryObjectAsAsset: new LocalizeExternalRepositoryObjectAsAssetUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
+          now,
+          generateInstanceId: generateAssetInstanceId,
+        }),
+      };
       const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({
         accessTokenProvider: () => tokenConfigStore.getToken(),
       });
@@ -1184,6 +1220,7 @@ export function composeDesktopHost(
         },
         runtimeReadiness,
         assetRegistryRead: internalAssetRegistry.readFacade,
+        assetMutationUseCases,
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
         setHuggingFaceToken: (token) => tokenConfigStore.setToken(token),
         clearHuggingFaceToken: () => tokenConfigStore.clearToken(),

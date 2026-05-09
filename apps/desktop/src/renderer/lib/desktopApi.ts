@@ -44,8 +44,13 @@ import type {
 import type {
   AssetFamily,
   AssetLifecycleStatus,
+  FinalizeGeneratedOutputCommand,
+  ImportExternalRepositoryObjectCommand,
+  LocalizeExternalRepositoryObjectCommand,
+  RegisterResourceBackedViewCommand,
   AssetResourceBackedViewKind,
   AssetType,
+  AssetMutationResult,
 } from "../../../../../modules/contracts/asset";
 
 export interface DesktopArtifactUploadInput {
@@ -301,6 +306,7 @@ export interface DesktopArtifactUploadApi {
 export interface DesktopBridgeRequestContext {
   requestId?: string;
   correlationId?: string;
+  idempotencyKey?: string;
 }
 
 export type DesktopAssetBuiltInFilter = "all" | "built-in" | "custom";
@@ -410,6 +416,10 @@ interface DesktopApiBridge {
   readAssetDefinitionVersion?: (input: DesktopAssetDefinitionVersionReadInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   listAssetResourceBackedViews?: (input?: DesktopAssetResourceBackedViewsListInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readAssetResourceBackedView?: (input: DesktopAssetResourceBackedViewReadInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  registerResourceBackedViewAsAsset?: (command: RegisterResourceBackedViewCommand, context?: DesktopBridgeRequestContext) => Promise<AssetMutationResult | unknown>;
+  finalizeGeneratedOutputAsAsset?: (command: FinalizeGeneratedOutputCommand, context?: DesktopBridgeRequestContext) => Promise<AssetMutationResult | unknown>;
+  importExternalRepositoryObjectAsAsset?: (command: ImportExternalRepositoryObjectCommand, context?: DesktopBridgeRequestContext) => Promise<AssetMutationResult | unknown>;
+  localizeExternalRepositoryObjectAsAsset?: (command: LocalizeExternalRepositoryObjectCommand, context?: DesktopBridgeRequestContext) => Promise<AssetMutationResult | unknown>;
   readPythonRuntimeStatus?: () => Promise<unknown>;
   controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
   startImageGeneration?: (input: ImageGenerationRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;

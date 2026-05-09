@@ -151,6 +151,18 @@ import {
   DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_OPERATION,
   DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL,
   DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_OPERATION,
+  DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL,
+  DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_OPERATION,
+  DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_OPERATION,
+  DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_OPERATION,
+  DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_OPERATION,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_RESPONSE_CHANNEL,
@@ -183,6 +195,10 @@ import {
   createDesktopAssetDefinitionVersionReadRequest,
   createDesktopAssetResourceBackedViewReadRequest,
   createDesktopAssetResourceBackedViewsListRequest,
+  createDesktopAssetRegisterResourceBackedViewRequest,
+  createDesktopAssetFinalizeGeneratedOutputRequest,
+  createDesktopAssetImportExternalRepositoryObjectRequest,
+  createDesktopAssetLocalizeExternalRepositoryObjectRequest,
   createDesktopPythonRuntimeControlRequest,
   createDesktopPythonRuntimeStatusReadRequest,
   createDesktopImageGenerationStartRequest,
@@ -205,6 +221,10 @@ import {
   type DesktopAssetResourceBackedViewReadResponse,
   type DesktopAssetResourceBackedViewsListRequest,
   type DesktopAssetResourceBackedViewsListResponse,
+  type DesktopAssetRegisterResourceBackedViewResponse,
+  type DesktopAssetFinalizeGeneratedOutputResponse,
+  type DesktopAssetImportExternalRepositoryObjectResponse,
+  type DesktopAssetLocalizeExternalRepositoryObjectResponse,
   type DesktopPythonRuntimeControlResponse,
   type DesktopPythonRuntimeStatusReadResponse,
   type DesktopImageGenerationStartRequest,
@@ -299,6 +319,12 @@ import {
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
 import type { RuntimeCapabilityId } from "../../../../modules/contracts/runtime";
 import type {
+  FinalizeGeneratedOutputCommand,
+  ImportExternalRepositoryObjectCommand,
+  LocalizeExternalRepositoryObjectCommand,
+  RegisterResourceBackedViewCommand,
+} from "../../../../modules/contracts/asset";
+import type {
   ListApplicationSettingDefinitionsRequest,
   ReadApplicationSettingsRequest,
   ResolveModelDefaultRequest,
@@ -326,6 +352,7 @@ export interface DesktopArtifactBrowserLocator {
 export interface DesktopArtifactUploadBridgeContext {
   requestId?: string;
   correlationId?: string;
+  idempotencyKey?: string;
 }
 
 export type DesktopAssetDefinitionsListBridgeInput = Omit<DesktopAssetDefinitionsListRequest["payload"], "boundary">;
@@ -415,6 +442,22 @@ export interface DesktopPreloadApi {
     input: DesktopAssetResourceBackedViewReadBridgeInput,
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopAssetResourceBackedViewReadResponse>;
+  registerResourceBackedViewAsAsset: (
+    command: RegisterResourceBackedViewCommand,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopAssetRegisterResourceBackedViewResponse>;
+  finalizeGeneratedOutputAsAsset: (
+    command: FinalizeGeneratedOutputCommand,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopAssetFinalizeGeneratedOutputResponse>;
+  importExternalRepositoryObjectAsAsset: (
+    command: ImportExternalRepositoryObjectCommand,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopAssetImportExternalRepositoryObjectResponse>;
+  localizeExternalRepositoryObjectAsAsset: (
+    command: LocalizeExternalRepositoryObjectCommand,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopAssetLocalizeExternalRepositoryObjectResponse>;
   readPythonRuntimeStatus: (
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopPythonRuntimeStatusReadResponse>;
@@ -599,6 +642,27 @@ function assertDesktopEnvelopeResponse<TResponse extends { operation: string; ch
   }
 
   return response as TResponse;
+}
+
+function withMutationRequestContext<
+  TCommand extends {
+    context?: {
+      requestId?: string;
+      correlationId?: string;
+      idempotencyKey?: string;
+      requestedAt?: string;
+    };
+  },
+>(command: TCommand, context: DesktopArtifactUploadBridgeContext): TCommand {
+  return {
+    ...command,
+    context: {
+      ...(command.context ?? {}),
+      ...(command.context?.requestId === undefined && context.requestId ? { requestId: context.requestId } : {}),
+      ...(command.context?.correlationId === undefined && context.correlationId ? { correlationId: context.correlationId } : {}),
+      ...(command.context?.idempotencyKey === undefined && context.idempotencyKey ? { idempotencyKey: context.idempotencyKey } : {}),
+    },
+  };
 }
 
 
@@ -1013,6 +1077,74 @@ export function createDesktopPreloadApi(
         operation: DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_OPERATION,
         channel: DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop asset resource-backed view read IPC response envelope.",
+      });
+    },
+
+    async registerResourceBackedViewAsAsset(command, context = {}) {
+      const request = createDesktopAssetRegisterResourceBackedViewRequest(
+        withMutationRequestContext(command, context),
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopAssetRegisterResourceBackedViewResponse>(response, {
+        operation: DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_OPERATION,
+        channel: DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop asset register resource-backed view IPC response envelope.",
+      });
+    },
+
+    async finalizeGeneratedOutputAsAsset(command, context = {}) {
+      const request = createDesktopAssetFinalizeGeneratedOutputRequest(
+        withMutationRequestContext(command, context),
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopAssetFinalizeGeneratedOutputResponse>(response, {
+        operation: DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_OPERATION,
+        channel: DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop asset finalize generated output IPC response envelope.",
+      });
+    },
+
+    async importExternalRepositoryObjectAsAsset(command, context = {}) {
+      const request = createDesktopAssetImportExternalRepositoryObjectRequest(
+        withMutationRequestContext(command, context),
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopAssetImportExternalRepositoryObjectResponse>(response, {
+        operation: DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_OPERATION,
+        channel: DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop asset import external repository object IPC response envelope.",
+      });
+    },
+
+    async localizeExternalRepositoryObjectAsAsset(command, context = {}) {
+      const request = createDesktopAssetLocalizeExternalRepositoryObjectRequest(
+        withMutationRequestContext(command, context),
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopAssetLocalizeExternalRepositoryObjectResponse>(response, {
+        operation: DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_OPERATION,
+        channel: DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop asset localize external repository object IPC response envelope.",
       });
     },
 

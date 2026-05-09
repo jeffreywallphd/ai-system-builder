@@ -4,6 +4,7 @@ import {
   DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
 import { registerElectronIpc, type RegisterElectronIpcDependencies } from "../registerElectronIpc";
@@ -96,6 +97,24 @@ describe("registerElectronIpc asset registry wiring", () => {
     expect(withAssetChannels).toContain(DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL.value);
     expect(withAssetChannels).toContain(DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL.value);
     expect(/asset\.(?:create|update|delete|register|seed|import|finalize|scan|execute)/i.test(withAssetChannels.join(" "))).toBe(false);
+  });
+
+  it("registers approved mutation channels only when narrow mutation use cases are supplied", () => {
+    const channels: string[] = [];
+    const execute = testDouble.fn();
+    registerElectronIpc(dependencies({
+      ipcMain: { handle: testDouble.fn((channel: string) => channels.push(channel)) },
+      assetMutationUseCases: {
+        registerResourceBackedViewAsAsset: { execute } as any,
+        finalizeGeneratedOutputAsAsset: { execute } as any,
+        importExternalRepositoryObjectAsAsset: { execute } as any,
+        localizeExternalRepositoryObjectAsAsset: { execute } as any,
+      },
+    }));
+
+    expect(channels).toContain(DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL.value);
+    expect(execute).not.toHaveBeenCalled();
+    expect(/asset\.(?:create|update|delete|patch|edit|seed|publish|scan|execute|run)/i.test(channels.join(" "))).toBe(false);
   });
 
   it("does not require mutation use cases or repositories for asset IPC handlers", () => {
