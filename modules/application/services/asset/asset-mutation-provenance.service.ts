@@ -4,6 +4,7 @@ import type {
   AssetReference,
   AssetResourceBackedView,
   AssetSourceIdentity,
+  FinalizeGeneratedOutputCommand,
   RegisterResourceBackedViewCommand,
 } from "../../../contracts/asset";
 import { sanitizeAssetMetadata, sanitizeAssetStringValue, sanitizeAssetViewValue } from "./asset-safe-metadata";
@@ -59,6 +60,63 @@ export class AssetMutationProvenanceService {
     };
   }
 
+  public createForGeneratedOutputFinalization(input: {
+    readonly command: FinalizeGeneratedOutputCommand;
+    readonly sourceIdentity: AssetSourceIdentity;
+    readonly sourceView: AssetResourceBackedView;
+    readonly createdAt: string;
+    readonly finalizedImage?: {
+      readonly imageAssetId?: string;
+      readonly backingArtifactId?: string;
+      readonly createdAt?: string;
+      readonly mediaType?: string;
+      readonly width?: number;
+      readonly height?: number;
+      readonly seed?: number;
+      readonly model?: string;
+      readonly engine?: string;
+    };
+  }): AssetMutationProvenance {
+    const createdProvenance = this.createGeneratedOutputAssetProvenance(input);
+    return {
+      sourceIdentity: input.sourceIdentity,
+      operation: "asset.finalize-generated-output",
+      actor: {
+        initiatedBy: input.command.actor.initiatedBy,
+        actorRef: sanitizeAssetStringValue(input.command.actor.actorRef),
+        actorDisplayName: sanitizeAssetStringValue(input.command.actor.actorDisplayName),
+        automationSafe: input.command.actor.automationSafe,
+        thinClientSafe: input.command.actor.thinClientSafe,
+      },
+      approvalSummary: {
+        userConfirmed: input.command.approval.userConfirmed,
+        confirmationKind: input.command.approval.confirmationKind,
+        confirmationTextVersion: sanitizeAssetStringValue(input.command.approval.confirmationTextVersion),
+        allowNetworkAccess: input.command.approval.allowNetworkAccess,
+        allowFilesystemWrite: input.command.approval.allowFilesystemWrite,
+        allowCredentialUse: input.command.approval.allowCredentialUse,
+        allowPartialCompletion: input.command.approval.allowPartialCompletion,
+      },
+      createdProvenance,
+      reviewStatus: "reviewed",
+      sourceSnapshot: {
+        viewId: input.sourceIdentity.sourceViewId,
+        viewKind: input.sourceView.viewKind,
+        outputId: input.sourceView.generatedOutput?.outputId,
+        assetType: input.sourceView.assetType,
+        displayName: sanitizeAssetStringValue(input.sourceView.displayName),
+        generatedOutput: sanitizeAssetViewValue({
+          outputId: input.sourceView.generatedOutput?.outputId,
+          runtimeCapabilityId: input.sourceView.generatedOutput?.runtimeCapabilityId,
+          producedAssetType: input.sourceView.generatedOutput?.producedAssetType,
+          producedAt: input.sourceView.generatedOutput?.producedAt,
+        }),
+        finalizedImage: sanitizeAssetMetadata(input.finalizedImage),
+        metadata: sanitizeAssetMetadata(input.sourceView.metadata),
+      },
+    };
+  }
+
   public createAssetProvenance(input: {
     readonly command: RegisterResourceBackedViewCommand;
     readonly sourceIdentity: AssetSourceIdentity;
@@ -88,6 +146,51 @@ export class AssetMutationProvenanceService {
         sourceId: input.sourceIdentity.sourceId,
         sourceFingerprint: input.sourceIdentity.sourceFingerprint,
         deduplicationKey: input.sourceIdentity.deduplicationKey,
+        idempotencyKey: sanitizeAssetStringValue(input.command.context?.idempotencyKey),
+        initiatedBy: input.command.actor.initiatedBy,
+      }),
+    };
+  }
+
+  public createGeneratedOutputAssetProvenance(input: {
+    readonly command: FinalizeGeneratedOutputCommand;
+    readonly sourceIdentity: AssetSourceIdentity;
+    readonly sourceView: AssetResourceBackedView;
+    readonly createdAt: string;
+    readonly finalizedImage?: {
+      readonly imageAssetId?: string;
+      readonly backingArtifactId?: string;
+      readonly createdAt?: string;
+      readonly mediaType?: string;
+      readonly width?: number;
+      readonly height?: number;
+      readonly seed?: number;
+      readonly model?: string;
+      readonly engine?: string;
+    };
+  }): AssetProvenance {
+    const refs = sourceResourceRefsFor(input.sourceView);
+    const actorName = sanitizeAssetStringValue(input.command.actor.actorDisplayName ?? input.command.actor.actorRef);
+    return {
+      createdAt: input.createdAt,
+      updatedAt: input.createdAt,
+      createdBy: actorName,
+      updatedBy: actorName,
+      sourceKind: "runtime-generated",
+      sourceResourceRefs: refs,
+      derivedFromRefs: input.sourceView.generatedOutput?.sourceRefs,
+      authorship: "ai-generated",
+      redactedGenerationSummary: "Generated image output finalized into a managed image asset.",
+      metadata: sanitizeAssetMetadata({
+        operation: "asset.finalize-generated-output",
+        sourceViewId: input.sourceIdentity.sourceViewId,
+        sourceViewKind: input.sourceIdentity.sourceViewKind,
+        sourceSystem: input.sourceIdentity.sourceSystem,
+        sourceId: input.sourceIdentity.sourceId,
+        sourceFingerprint: input.sourceIdentity.sourceFingerprint,
+        deduplicationKey: input.sourceIdentity.deduplicationKey,
+        generatedOutputId: input.sourceView.generatedOutput?.outputId,
+        finalizedImage: input.finalizedImage,
         idempotencyKey: sanitizeAssetStringValue(input.command.context?.idempotencyKey),
         initiatedBy: input.command.actor.initiatedBy,
       }),
