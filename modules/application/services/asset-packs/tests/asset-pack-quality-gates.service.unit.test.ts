@@ -99,6 +99,64 @@ describe("asset pack quality gates", () => {
     assert.equal(result.status, "valid", messages(result));
   });
 
+  it("allows safe deferred and non-goal behavior language", () => {
+    for (const safeSummary of [
+      "Does not fetch data.",
+      "Uses semantic descriptors without reading resources.",
+      "Preview rendering is deferred.",
+      "Resource reads are not implemented by this definition.",
+    ]) {
+      const result = runAssetPackQualityGates(
+        validEntry({
+          definition: validDefinition({
+            description: safeSummary,
+            aiContext: {
+              ...validDefinition().aiContext,
+              purpose: safeSummary,
+              limitations: [{ limitationId: "fixture.safe-non-goal", summary: safeSummary }],
+            },
+          }),
+        }),
+      );
+      assert.equal(result.status, "valid", `${safeSummary}\n${messages(result)}`);
+    }
+  });
+
+  it("rejects positive execution, resource, provider, and preview behavior claims", () => {
+    for (const unsafeSummary of [
+      "This primitive can fetch records for a table.",
+      "This primitive will read file content.",
+      "This primitive can write storage after submit.",
+      "This primitive will run validation on user input.",
+      "This primitive can execute workflow steps.",
+      "This primitive will start runtime workers.",
+      "This primitive can create task records.",
+      "This primitive will schedule job work.",
+      "This primitive can call provider clients.",
+      "This primitive will call API endpoints.",
+      "This primitive can invoke IPC channels.",
+      "This primitive will download resource content.",
+      "This primitive can upload files.",
+      "This primitive will render preview content.",
+      "This primitive can decode image bytes.",
+      "This primitive will open file handles.",
+    ]) {
+      const result = runAssetPackQualityGates(
+        validEntry({
+          definition: validDefinition({
+            description: unsafeSummary,
+            aiContext: {
+              ...validDefinition().aiContext,
+              purpose: unsafeSummary,
+            },
+          }),
+        }),
+      );
+      assert.equal(result.status, "invalid", unsafeSummary);
+      assert.match(messages(result), /unsafe implementation|execution behavior/i);
+    }
+  });
+
   it("rejects runtime execution requirements for foundation primitives", () => {
     const result = runAssetPackQualityGates(
       validEntry({
