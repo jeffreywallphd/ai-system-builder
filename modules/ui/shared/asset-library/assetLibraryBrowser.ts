@@ -18,7 +18,7 @@ import type {
   AssetLibraryResourceBackedViewCard,
   AssetLibraryResourceBackedViewDetail,
 } from "./assetLibraryReadModels";
-import { sanitizeAssetLibraryDisplayText } from "./assetLibraryMappers";
+import { sanitizeAssetLibraryDiagnosticMessages, sanitizeAssetLibraryDisplayText } from "./assetLibraryMappers";
 
 export type AssetLibraryBrowserTab = "definitions" | "resource-views";
 
@@ -155,9 +155,9 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
       setResourceBackedViews([]);
     }
     setDiagnostics([
-      ...(result.value.diagnostics ?? []).map((diagnostic) => diagnostic.message).map(safeDisplayText).filter(isString),
+      ...safeDiagnosticMessages((result.value.diagnostics ?? []).map((diagnostic) => diagnostic.message)),
       ...(resourceResult.ok === true
-        ? (resourceResult.value.diagnostics ?? []).map((diagnostic) => diagnostic.message).map(safeDisplayText).filter(isString)
+        ? safeDiagnosticMessages((resourceResult.value.diagnostics ?? []).map((diagnostic) => diagnostic.message))
         : [safeDisplayText(resourceResult.error.message) ?? "Unable to load resource-backed views."]),
     ]);
     setIsLoadingList(false);
@@ -286,6 +286,6 @@ function safeDisplayText(value: unknown): string | undefined {
   return sanitizeAssetLibraryDisplayText(value);
 }
 
-function isString(value: string | undefined): value is string {
-  return typeof value === "string";
+function safeDiagnosticMessages(value: readonly string[] | undefined): readonly string[] {
+  return sanitizeAssetLibraryDiagnosticMessages(value);
 }

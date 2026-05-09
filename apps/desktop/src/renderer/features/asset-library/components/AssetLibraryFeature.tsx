@@ -2,20 +2,20 @@ import { useState } from "react";
 
 import type { AssetLibraryClient } from "../../../../../../../modules/ui/shared/asset-library";
 import {
-  AssetMutationConfirmationDialog,
   buildAssetLibraryMutationCommand,
   describeAssetMutationResult,
   getAssetLibraryMutationActions,
   getAssetLibraryFamilyLabel,
   getAssetLibraryLifecycleStatusLabel,
   getAssetLibraryTypeLabel,
-  sanitizeAssetLibraryDisplayText,
+  sanitizeAssetLibraryDiagnosticMessages,
   type AssetLibraryMutationAction,
   type AssetLibraryMutationCommand,
   type AssetLibraryMutationDisplay,
   type AssetLibraryResourceBackedViewCard,
   type AssetLibraryResourceBackedViewDetail,
 } from "../../../../../../../modules/ui/shared/asset-library";
+import { AssetMutationConfirmationDialog } from "../../../../../../../modules/ui/shared/asset-library/AssetMutationConfirmationDialog";
 import { AssetDefinitionDetailPanel } from "./AssetDefinitionDetailPanel";
 import { AssetDefinitionList } from "./AssetDefinitionList";
 import { AssetLibraryFilters } from "./AssetLibraryFilters";
@@ -30,6 +30,7 @@ export function AssetLibraryFeature({ client }: AssetLibraryFeatureProps) {
   const [pendingAction, setPendingAction] = useState<AssetLibraryMutationAction | undefined>();
   const [isMutating, setIsMutating] = useState(false);
   const [mutationDisplay, setMutationDisplay] = useState<AssetLibraryMutationDisplay | undefined>();
+  const topLevelDiagnostics = safeDiagnosticMessages(state.diagnostics);
 
   async function confirmMutation() {
     if (!pendingAction || !state.selectedResourceBackedViewDetail) return;
@@ -72,9 +73,9 @@ export function AssetLibraryFeature({ client }: AssetLibraryFeatureProps) {
 
       {state.isLoadingList ? <div className="ui-status" role="status">Loading asset definitions...</div> : null}
       {state.listError ? <div className="ui-status" role="alert">{state.listError}</div> : null}
-      {state.diagnostics.length > 0 ? (
+      {topLevelDiagnostics.length > 0 ? (
         <div className="ui-status" role="status">
-          {state.diagnostics.join(" ")}
+          {topLevelDiagnostics.join(" ")}
         </div>
       ) : null}
 
@@ -277,7 +278,5 @@ function assertNever(value: never): never {
 }
 
 function safeDiagnosticMessages(value: readonly string[] | undefined): readonly string[] {
-  return (value ?? [])
-    .map((message) => sanitizeAssetLibraryDisplayText(message))
-    .filter((message): message is string => typeof message === "string");
+  return sanitizeAssetLibraryDiagnosticMessages(value);
 }

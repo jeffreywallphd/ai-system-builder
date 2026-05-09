@@ -7,6 +7,7 @@ import {
   mapAssetResourceBackedViewDetail,
   mapAssetResourceBackedViewListResult,
   mapTransportEnvelopeError,
+  sanitizeAssetLibraryDiagnosticMessages,
 } from "../index";
 import * as assetLibraryExports from "../index";
 
@@ -391,6 +392,36 @@ describe("asset library mappers", () => {
     for (const unsafe of unsafeValues) {
       expect(serialized.includes(unsafe)).toBe(false);
     }
+  });
+
+  it("sanitizes standalone diagnostic message arrays for UI rendering", () => {
+    expect(sanitizeAssetLibraryDiagnosticMessages([
+      "Safe descriptor-only diagnostic.",
+      ...unsafeValues,
+    ])).toEqual(["Safe descriptor-only diagnostic."]);
+
+    expect(sanitizeAssetLibraryDiagnosticMessages(unsafeValues)).toEqual([]);
+    expect(sanitizeAssetLibraryDiagnosticMessages(undefined)).toEqual([]);
+    expect(/C:\\|\/tmp|\/home|Bearer|token|secret|password|apiKey|signedUrl|access_token|base64|data:image|raw provider payload|workflowJson|prompt|stack|command line|process\.env/i.test(JSON.stringify(sanitizeAssetLibraryDiagnosticMessages([
+      "C:\\Users\\name\\file.png",
+      "/tmp/generated.png",
+      "/home/user/cache",
+      "Bearer abc",
+      "token",
+      "secret",
+      "password",
+      "apiKey",
+      "signedUrl",
+      "access_token",
+      "base64",
+      "data:image",
+      "raw provider payload",
+      "workflowJson",
+      "prompt",
+      "stack",
+      "command line",
+      "process.env",
+    ])))).toBe(false);
   });
 
   it("normalizes safe client errors without exposing internal detail", () => {
