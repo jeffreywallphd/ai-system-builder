@@ -24,10 +24,16 @@ describe("AssetLibraryPage", () => {
   });
 
   it("renders title and subtitle", async () => {
-    (window as Window & { desktopApi?: unknown }).desktopApi = {
+    (window as any).desktopApi = {
       listAssetDefinitions: vi.fn().mockResolvedValue(success({ items: [] })),
       readAssetDefinition: vi.fn().mockResolvedValue(success({ definition: {} })),
       readAssetDefinitionVersion: vi.fn().mockResolvedValue(success({ definition: {} })),
+      listAssetResourceBackedViews: vi.fn().mockResolvedValue(success({ items: [] })),
+      readAssetResourceBackedView: vi.fn().mockResolvedValue(success({ view: {} })),
+      registerResourceBackedViewAsAsset: vi.fn().mockResolvedValue(success({ ok: true, operation: "asset.register-resource-backed-view", status: "created" })),
+      finalizeGeneratedOutputAsAsset: vi.fn().mockResolvedValue(success({ ok: true, operation: "asset.finalize-generated-output", status: "created" })),
+      importExternalRepositoryObjectAsAsset: vi.fn().mockResolvedValue(success({ ok: true, operation: "asset.import-external-repository-object", status: "created" })),
+      localizeExternalRepositoryObjectAsAsset: vi.fn().mockResolvedValue(success({ ok: true, operation: "asset.localize-external-repository-object", status: "created" })),
     };
 
     const container = document.createElement("div");

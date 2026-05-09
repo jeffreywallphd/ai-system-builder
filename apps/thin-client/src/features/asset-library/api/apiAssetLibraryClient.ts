@@ -3,8 +3,10 @@ import {
   mapAssetDefinitionListResult,
   mapAssetResourceBackedViewDetail,
   mapAssetResourceBackedViewListResult,
+  mapAssetMutationTransportFailure,
   mapTransportEnvelopeError,
   mapTransportEnvelopeSuccess,
+  sanitizeAssetMutationResult,
   type AssetLibraryClient,
   type AssetLibraryClientResult,
   type AssetLibraryDefinitionCard,
@@ -19,6 +21,13 @@ import {
   type AssetLibraryResourceBackedViewExpansion,
   type AssetLibraryResourceBackedViewQuery,
 } from "../../../../../../modules/ui/shared/asset-library";
+import type {
+  AssetMutationResult,
+  FinalizeGeneratedOutputCommand,
+  ImportExternalRepositoryObjectCommand,
+  LocalizeExternalRepositoryObjectCommand,
+  RegisterResourceBackedViewCommand,
+} from "../../../../../../modules/contracts/asset";
 import { parseApiEnvelope } from "../../../security/apiErrorEnvelope";
 import { secureFetch } from "../../../security/secureFetch";
 
@@ -88,6 +97,18 @@ async function getJson(endpoint: string): Promise<{ status: number; envelope: un
   };
 }
 
+async function postJson(endpoint: string, body: unknown): Promise<{ status: number; envelope: unknown }> {
+  const response = await secureFetch(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return {
+    status: response.status,
+    envelope: parseApiEnvelope(await response.json()),
+  };
+}
+
 async function toClientResult<T>(
   endpoint: string,
   mapper: (payload: unknown) => T,
@@ -104,6 +125,26 @@ async function toClientResult<T>(
       error: {
         code: "internal",
         message: fallbackMessage,
+      },
+    };
+  }
+}
+
+async function toMutationClientResult(
+  endpoint: string,
+  command: RegisterResourceBackedViewCommand | FinalizeGeneratedOutputCommand | ImportExternalRepositoryObjectCommand | LocalizeExternalRepositoryObjectCommand,
+): Promise<AssetLibraryClientResult<AssetMutationResult>> {
+  try {
+    const { envelope } = await postJson(endpoint, command);
+    const success = mapTransportEnvelopeSuccess(envelope, sanitizeAssetMutationResult);
+    if (success) return success;
+    return { ok: true, value: mapAssetMutationTransportFailure(envelope, command.operation) };
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: "internal",
+        message: "Unable to complete this asset action.",
       },
     };
   }
@@ -162,6 +203,22 @@ export function createApiAssetLibraryClient(
         mapAssetResourceBackedViewDetail,
         "Unable to read asset resource-backed view.",
       );
+    },
+
+    async registerResourceBackedViewAsAsset(command) {
+      return toMutationClientResult(createApiUrl(apiBaseUrl, "/assets/register-resource-backed-view"), command);
+    },
+
+    async finalizeGeneratedOutputAsAsset(command) {
+      return toMutationClientResult(createApiUrl(apiBaseUrl, "/assets/finalize-generated-output"), command);
+    },
+
+    async importExternalRepositoryObjectAsAsset(command) {
+      return toMutationClientResult(createApiUrl(apiBaseUrl, "/assets/import-external-repository-object"), command);
+    },
+
+    async localizeExternalRepositoryObjectAsAsset(command) {
+      return toMutationClientResult(createApiUrl(apiBaseUrl, "/assets/localize-external-repository-object"), command);
     },
   };
 }

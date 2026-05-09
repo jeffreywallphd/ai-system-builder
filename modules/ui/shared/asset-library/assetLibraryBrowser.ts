@@ -32,6 +32,7 @@ export interface AssetLibraryFiltersState {
 }
 
 export interface AssetLibraryFeatureState {
+  readonly client: AssetLibraryClient;
   readonly activeTab: AssetLibraryBrowserTab;
   readonly filters: AssetLibraryFiltersState;
   readonly definitions: readonly AssetLibraryDefinitionCard[];
@@ -250,6 +251,7 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
   }, [readDetail, selectedDefinition]);
 
   return {
+    client,
     filters,
     activeTab,
     definitions,
