@@ -46,6 +46,7 @@ class FakeInstanceRepository implements AssetInstanceRepositoryPort {
   public instances: AssetInstance[] = [];
   public saveFails = false;
   public lastQuery?: AssetInstanceListQuery;
+  public listCalls = 0;
   public async saveInstance(instance: AssetInstance): Promise<AssetInstance> {
     if (this.saveFails) throw new Error("C:\\secret\\raw stack token prompt workflow base64");
     this.saved.push(instance);
@@ -56,6 +57,7 @@ class FakeInstanceRepository implements AssetInstanceRepositoryPort {
     return this.instances.find((instance) => String(instance.instanceId) === reference.id);
   }
   public async listInstances(query?: AssetInstanceListQuery) {
+    this.listCalls += 1;
     this.lastQuery = query;
     return { instances: this.instances.slice(0, query?.limit ?? this.instances.length) };
   }
@@ -236,7 +238,7 @@ describe("FinalizeGeneratedOutputAsAssetUseCase", () => {
   it("requires approval, confirmation kind, filesystem write, and rejects network or credential access", async () => {
     const read = new FakeReadPort();
     read.details.set("view.generated", { view: generatedView() });
-    const { useCase, finalizer } = makeUseCase(read);
+    const { useCase, finalizer, instances } = makeUseCase(read);
 
     assert.equal((await useCase.execute(command({ approval: { userConfirmed: false, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true } }))).failure?.code, "approval-required");
     assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "register-resource-backed-view", allowFilesystemWrite: true } }))).failure?.code, "validation");
@@ -244,6 +246,67 @@ describe("FinalizeGeneratedOutputAsAssetUseCase", () => {
     assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowNetworkAccess: true } }))).failure?.code, "validation");
     assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowCredentialUse: true } }))).failure?.code, "validation");
     assert.equal(finalizer?.calls.length, 0);
+    assert.equal(read.readCalls.length, 0);
+    assert.equal(instances.listCalls, 0);
+    assert.equal(instances.saved.length, 0);
+  });
+
+  it("does not read sources, repositories, or finalization ports when the command guard fails", async () => {
+    const guardFailures = [
+      command({ approval: { userConfirmed: false, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true } }),
+      command({ approval: { userConfirmed: true, confirmationKind: "register-resource-backed-view", allowFilesystemWrite: true } }),
+      command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output" } }),
+      command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowNetworkAccess: true } }),
+      command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowCredentialUse: true } }),
+    ];
+
+    for (const failingCommand of guardFailures) {
+      const read = new FakeReadPort();
+      read.details.set("view.generated", { view: generatedView() });
+      const { useCase, finalizer, instances } = makeUseCase(read);
+      const result = await useCase.execute(failingCommand);
+
+      assert.equal(result.ok, false);
+      assert.equal(read.readCalls.length, 0);
+      assert.equal(finalizer?.calls.length, 0);
+      assert.equal(instances.listCalls, 0);
+      assert.equal(instances.saved.length, 0);
+    }
+  });
+
+  it("fails safely before source reads or saves when no instance ID generator is injected", async () => {
+    const read = new FakeReadPort();
+    read.details.set("view.generated", { view: generatedView() });
+    const instances = new FakeInstanceRepository();
+    const finalizer = new FakeFinalizer();
+    const useCase = new FinalizeGeneratedOutputAsAssetUseCase({
+      assetRegistryRead: read,
+      generatedOutputFinalizer: finalizer,
+      definitionRepository: new FakeDefinitionRepository(),
+      instanceRepository: instances,
+      now: () => "2026-05-08T12:00:00.000Z",
+    });
+
+    const result = await useCase.execute(command());
+
+    assert.equal(result.ok, false);
+    assert.equal(result.failure?.code, "unavailable");
+    assert.doesNotMatch(JSON.stringify(result), /Math\.random|random|C:\\|\/tmp|token|prompt|workflow|base64|stack/i);
+    assert.equal(read.readCalls.length, 0);
+    assert.equal(finalizer.calls.length, 0);
+    assert.equal(instances.listCalls, 0);
+    assert.equal(instances.saved.length, 0);
+  });
+
+  it("uses the injected ID generator for created instances", async () => {
+    const read = new FakeReadPort();
+    read.details.set("view.generated", { view: generatedView() });
+    const { useCase, instances } = makeUseCase(read);
+
+    const result = await useCase.execute(command());
+
+    assert.equal(result.ok, true);
+    assert.equal(instances.saved[0]?.instanceId, "finalized.1");
   });
 
   it("uses supplied target definition, infers builtin image definition, and fails when missing", async () => {
@@ -278,6 +341,21 @@ describe("FinalizeGeneratedOutputAsAssetUseCase", () => {
     assert.equal(instances.saved.length, 1);
   });
 
+  it("performs duplicate detection before finalization after the guard passes", async () => {
+    const read = new FakeReadPort();
+    read.details.set("view.generated", { view: generatedView() });
+    const { useCase, instances, finalizer } = makeUseCase(read);
+    const first = await useCase.execute(command());
+    assert.equal(first.ok, true);
+
+    finalizer!.calls.length = 0;
+    const second = await useCase.execute(command());
+
+    assert.equal(second.status, "existing");
+    assert.equal(finalizer?.calls.length, 0);
+    assert.equal(instances.saved.length, 1);
+  });
+
   it("registers the missing AssetInstance when finalization reports already-finalized", async () => {
     const read = new FakeReadPort();
     read.details.set("view.generated", { view: generatedView() });
@@ -293,6 +371,21 @@ describe("FinalizeGeneratedOutputAsAssetUseCase", () => {
     assert.match(JSON.stringify(result.diagnostics), /already finalized/i);
   });
 
+  it("returns existing for an already-finalized retry when the AssetInstance exists", async () => {
+    const read = new FakeReadPort();
+    read.details.set("view.generated", { view: generatedView() });
+    const finalizer = new FakeFinalizer();
+    finalizer.result = finalizedResult({ status: "already-finalized" });
+    const { useCase, instances } = makeUseCase(read, new FakeDefinitionRepository(), new FakeInstanceRepository(), finalizer);
+
+    const first = await useCase.execute(command());
+    const second = await useCase.execute(command());
+
+    assert.equal(first.status, "created");
+    assert.equal(second.status, "existing");
+    assert.equal(instances.saved.length, 1);
+  });
+
   it("validates before save and returns partial-failure after successful finalization when validation or save fails", async () => {
     const read = new FakeReadPort();
     read.details.set("view.generated", { view: generatedView() });
@@ -306,6 +399,16 @@ describe("FinalizeGeneratedOutputAsAssetUseCase", () => {
     });
     const invalidResult = await invalid.execute(command());
     assert.equal(invalidResult.failure?.code, "partial-failure");
+    assert.equal(invalidResult.failure?.safeDetails?.retrySafe, true);
+    assert.deepEqual(Object.keys((invalidResult.failure?.safeDetails?.finalizedImage as Record<string, unknown>) ?? {}).sort(), [
+      "backingArtifactId",
+      "createdAt",
+      "height",
+      "imageAssetId",
+      "mediaType",
+      "source",
+      "width",
+    ].sort());
 
     const instances = new FakeInstanceRepository();
     instances.saveFails = true;
@@ -314,6 +417,7 @@ describe("FinalizeGeneratedOutputAsAssetUseCase", () => {
     const result = await saveFailure.useCase.execute(command());
     assert.equal(result.ok, false);
     assert.equal(result.failure?.code, "partial-failure");
+    assert.equal(result.failure?.safeDetails?.retrySafe, true);
     assert.equal(finalizer.calls.length, 1);
     assert.doesNotMatch(JSON.stringify(result), /raw stack|C:\\|token|prompt|workflow|bytes|blob|base64/i);
   });

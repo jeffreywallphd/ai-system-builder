@@ -40,6 +40,7 @@ class FakeInstanceRepository implements AssetInstanceRepositoryPort {
   public readonly saved: AssetInstance[] = [];
   public lastQuery?: AssetInstanceListQuery;
   public instances: AssetInstance[] = [];
+  public listCalls = 0;
   public async saveInstance(instance: AssetInstance): Promise<AssetInstance> {
     this.saved.push(instance);
     this.instances.push(instance);
@@ -49,6 +50,7 @@ class FakeInstanceRepository implements AssetInstanceRepositoryPort {
     return this.instances.find((instance) => String(instance.instanceId) === reference.id);
   }
   public async listInstances(query?: AssetInstanceListQuery) {
+    this.listCalls += 1;
     this.lastQuery = query;
     return { instances: this.instances.slice(0, query?.limit ?? this.instances.length) };
   }
@@ -212,6 +214,51 @@ describe("RegisterResourceBackedViewAsAssetInstanceUseCase", () => {
     assert.equal(instances.saved.length, 0);
   });
 
+  it("returns guard failures before source reads, duplicate reads, or saves", async () => {
+    const read = new FakeReadPort();
+    read.details.set("view.artifact", { view: artifactView() });
+    const { useCase, instances } = makeUseCase(read);
+
+    assert.equal((await useCase.execute(command({ approval: { userConfirmed: false, confirmationKind: "register-resource-backed-view" } }))).failure?.code, "approval-required");
+    assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "register-resource-backed-view", allowFilesystemWrite: true } }))).failure?.code, "validation");
+
+    assert.equal(read.readCalls.length, 0);
+    assert.equal(instances.listCalls, 0);
+    assert.equal(instances.saved.length, 0);
+  });
+
+  it("fails safely before source reads or saves when no instance ID generator is injected", async () => {
+    const read = new FakeReadPort();
+    read.details.set("view.artifact", { view: artifactView() });
+    const instances = new FakeInstanceRepository();
+    const useCase = new RegisterResourceBackedViewAsAssetInstanceUseCase({
+      assetRegistryRead: read,
+      definitionRepository: new FakeDefinitionRepository(),
+      instanceRepository: instances,
+      now: () => "2026-05-08T12:00:00.000Z",
+    });
+
+    const result = await useCase.execute(command());
+
+    assert.equal(result.ok, false);
+    assert.equal(result.failure?.code, "unavailable");
+    assert.doesNotMatch(JSON.stringify(result), /Math\.random|random|C:\\|\/tmp|token|prompt|workflow|base64|stack/i);
+    assert.equal(read.readCalls.length, 0);
+    assert.equal(instances.listCalls, 0);
+    assert.equal(instances.saved.length, 0);
+  });
+
+  it("uses the injected ID generator for created instances", async () => {
+    const read = new FakeReadPort();
+    read.details.set("view.artifact", { view: artifactView() });
+    const { useCase, instances } = makeUseCase(read);
+
+    const result = await useCase.execute(command());
+
+    assert.equal(result.ok, true);
+    assert.equal(instances.saved[0]?.instanceId, "registered.1");
+  });
+
   it("requires a present target definition, supports supplied target definitions, and infers only safe built-ins", async () => {
     const read = new FakeReadPort();
     read.details.set("view.artifact", { view: artifactView({ assetDefinitionRef: undefined }) });
@@ -282,6 +329,17 @@ describe("RegisterResourceBackedViewAsAssetInstanceUseCase", () => {
     }];
     const notDisplayDuplicate = await useCase.execute(command({ displayName: "Changed Name" }));
     assert.equal(notDisplayDuplicate.status, "created");
+  });
+
+  it("does not write source systems for generated output or external-object deferrals", async () => {
+    const read = new FakeReadPort();
+    read.details.set("view.generated", { view: artifactView({ viewId: "view.generated", viewKind: "generated-output", assetType: undefined, assetDefinitionRef: undefined }) });
+    read.details.set("view.external", { view: artifactView({ viewId: "view.external", viewKind: "external-repository-object", assetType: "data-source", assetDefinitionRef: undefined, metadata: { imported: false, localized: false, registered: false } }) });
+    const { useCase, instances } = makeUseCase(read);
+
+    assert.equal((await useCase.execute(command({ viewId: "view.generated" }))).ok, false);
+    assert.equal((await useCase.execute(command({ viewId: "view.external" }))).ok, false);
+    assert.equal(instances.saved.length, 0);
   });
 
   it("keeps source identity, provenance, metadata, and failures sanitized", async () => {

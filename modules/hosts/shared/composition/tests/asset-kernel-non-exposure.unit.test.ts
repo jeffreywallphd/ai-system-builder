@@ -120,6 +120,28 @@ describe("Asset Kernel read-only non-exposure boundaries", () => {
     assert.doesNotMatch(source, /\b(?:PrepareTrainingDataset|DatasetPreparationUseCase|ModelTrainingPort|ModelValidationPort|ModelPublisherPort|TrainModelUseCase|ValidateModelUseCase|PublishModelUseCase|discoverModels|includeDiscovered:\s*true)\b/i);
   });
 
+  it("allows internal mutation use cases but no public Phase 4 asset mutation exposure", () => {
+    const applicationUseCases = combinedSource("modules/application/use-cases/asset");
+    assert.match(applicationUseCases, /asset\.register-resource-backed-view/);
+    assert.match(applicationUseCases, /asset\.finalize-generated-output/);
+
+    const publicSource = [
+      combinedSource("modules/contracts/api"),
+      combinedSource("modules/contracts/ipc"),
+      combinedSource("modules/adapters/transport/api-express"),
+      combinedSource("modules/adapters/transport/ipc-electron"),
+      combinedSource("apps/desktop/src/preload"),
+      combinedSource("apps/desktop/src/renderer/features/asset-library"),
+      combinedSource("apps/thin-client/src/features/asset-library"),
+      combinedSource("modules/ui/shared/asset-library"),
+    ].join("\n");
+
+    assert.doesNotMatch(publicSource, /asset\.register-resource-backed-view|asset\.finalize-generated-output|asset\.import-external-repository-object|asset\.localize-external-repository-object/i);
+    assert.doesNotMatch(publicSource, /\b(?:registerResourceBackedView|finalizeGeneratedOutputAsAsset|finalizeGeneratedOutput|importExternalRepositoryObject|localizeExternalRepositoryObject)\b/i);
+    assert.doesNotMatch(publicSource, /\/api\/assets\/(?:register|finalize|import|localize|instances|create|update|delete|patch|edit)(?:\/|["'`?])/i);
+    assert.doesNotMatch(publicSource, /ipc\.asset\.(?:register|finalize|import|localize|instance|create|update|delete|patch|edit)/i);
+  });
+
   it("keeps the external repository resource-backed provider descriptor-only", () => {
     const source = readFileSync(
       join(REPO_ROOT, "modules/application/services/asset/asset-external-repository-resource-backed-view-provider.service.ts"),

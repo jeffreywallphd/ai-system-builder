@@ -8,6 +8,8 @@ const DATA_BASE64_VALUE_PATTERN = /^data:[^,;]+;base64,/i;
 const LONG_BASE64_VALUE_PATTERN = /^[A-Za-z0-9+/]{80,}={0,2}$/;
 const RAW_PROVIDER_OR_EXCEPTION_VALUE_PATTERN = /\b(?:raw\s+)?(?:provider\s+payloads?|exception\s+message|raw\s+exception|stack\s+trace|stack|command|base64|bytes?|blobs?|process\.env)\b/i;
 const SIGNED_OR_QUERY_URL_VALUE_PATTERN = /^https?:\/\/\S+\?(?:\S*?(?:x-amz-signature|x-goog-signature|signature|sig|token|access_token|auth|expires|X-Amz-Signature)=\S+|\S{24,})/i;
+const PROVIDER_OR_TOKEN_URL_VALUE_PATTERN = /^(?:hf|huggingface|s3|gs|file):\/\/\S+/i;
+const PROMPT_OR_WORKFLOW_VALUE_PATTERN = /^(?:prompt|negative[-_ ]?prompt|workflowjson|workflow[-_ ]?json)(?:\b|[-_:])/i;
 
 export function isUnsafeAssetMetadataKey(key: string): boolean {
   return FORBIDDEN_ASSET_METADATA_KEY_PATTERN.test(key);
@@ -21,7 +23,9 @@ export function isUnsafeAssetMetadataString(value: string): boolean {
     DATA_BASE64_VALUE_PATTERN.test(trimmed) ||
     LONG_BASE64_VALUE_PATTERN.test(trimmed) ||
     RAW_PROVIDER_OR_EXCEPTION_VALUE_PATTERN.test(trimmed) ||
-    SIGNED_OR_QUERY_URL_VALUE_PATTERN.test(trimmed)
+    SIGNED_OR_QUERY_URL_VALUE_PATTERN.test(trimmed) ||
+    PROVIDER_OR_TOKEN_URL_VALUE_PATTERN.test(trimmed) ||
+    PROMPT_OR_WORKFLOW_VALUE_PATTERN.test(trimmed)
   );
 }
 

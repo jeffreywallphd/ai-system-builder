@@ -148,10 +148,20 @@ function assetReferenceId(value: unknown): string | undefined {
 
 function safeIdentityPart(value: string, fallbackPrefix: string): string {
   const sanitized = sanitizeAssetStringValue(value);
-  if (sanitized && /^[a-z0-9_.:-]{1,180}$/i.test(sanitized) && !/[\\/]/.test(sanitized) && !/^https?:/i.test(sanitized)) {
+  if (
+    sanitized &&
+    /^[a-z0-9_.:-]{1,180}$/i.test(sanitized) &&
+    !/[\\/]/.test(sanitized) &&
+    !/^https?:/i.test(sanitized) &&
+    !looksSensitiveSourceId(sanitized)
+  ) {
     return stableToken(sanitized);
   }
   return `${fallbackPrefix}.${stableHash(value)}`;
+}
+
+function looksSensitiveSourceId(value: string): boolean {
+  return /(?:prompt|negativeprompt|workflow|bearer|token|secret|password|credential|auth|base64|data:image|raw|payload|command|stack|process\.env|signed|presigned|hf:|huggingface)/i.test(value);
 }
 
 function stableToken(value: string): string {
