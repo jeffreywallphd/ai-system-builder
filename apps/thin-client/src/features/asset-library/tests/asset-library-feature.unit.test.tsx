@@ -259,6 +259,66 @@ describe("thin-client AssetLibraryFeature", () => {
     expect(client.readAssetResourceBackedView).toHaveBeenCalledTimes(2);
   });
 
+  it("does not render unsafe top-level diagnostics while preserving safe diagnostics", async () => {
+    const unsafeTopLevelDiagnostics = [
+      "C:\\Users\\name\\file.png",
+      "/tmp/generated.png",
+      "/home/user/cache",
+      "Bearer abc",
+      "token",
+      "secret",
+      "password",
+      "apiKey",
+      "signedUrl",
+      "access_token",
+      "base64",
+      "data:image",
+      "raw provider payload",
+      "workflowJson",
+      "prompt",
+      "stack",
+      "command line",
+      "process.env",
+    ];
+    const client = createClient({
+      listAssetDefinitions: testDouble.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          items: [card],
+          diagnostics: [
+            { severity: "info", code: "safe-definition", message: "Safe definition diagnostic." },
+            ...unsafeTopLevelDiagnostics.map((message, index) => ({
+              severity: "warning" as const,
+              code: `unsafe-definition-${index}`,
+              message,
+            })),
+          ],
+        },
+      }),
+      listAssetResourceBackedViews: testDouble.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          items: [resourceViewCard],
+          diagnostics: [
+            { severity: "info", code: "safe-resource", message: "Safe aggregate diagnostic." },
+            { severity: "warning", code: "unsafe-resource", message: "/tmp/secret Bearer token data:image base64 raw provider payload command line process.env" },
+          ],
+        },
+      }),
+    });
+    const { container } = await render(client);
+
+    expect(container.textContent).toContain("Safe definition diagnostic.");
+    expect(container.textContent).toContain("Safe aggregate diagnostic.");
+    const diagnosticStatusText = Array.from(container.querySelectorAll("[role='status'], [role='alert']"))
+      .map((element) => element.textContent ?? "")
+      .join(" ");
+    assert.doesNotMatch(
+      diagnosticStatusText,
+      /C:\\|\/tmp|\/home|Bearer|token|secret|password|apiKey|signedUrl|access_token|base64|data:image|raw provider payload|workflowJson|prompt|stack|command line|process\.env/i,
+    );
+  });
+
   it("renders empty states for no registered definitions and filtered misses", async () => {
     const client = createClient({
       listAssetDefinitions: queuedListResults([

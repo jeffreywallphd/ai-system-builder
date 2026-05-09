@@ -316,7 +316,41 @@ describe("AssetLibraryFeature", () => {
   });
 
   it("does not render unsafe resource view diagnostics or mutation details", async () => {
+    const unsafeTopLevelDiagnostics = [
+      "C:\\Users\\name\\file.png",
+      "/tmp/generated.png",
+      "/home/user/cache",
+      "Bearer abc",
+      "token",
+      "secret",
+      "password",
+      "apiKey",
+      "signedUrl",
+      "access_token",
+      "base64",
+      "data:image",
+      "raw provider payload",
+      "workflowJson",
+      "prompt",
+      "stack",
+      "command line",
+      "process.env",
+    ];
     const client = createClient({
+      listAssetDefinitions: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          items: [card],
+          diagnostics: [
+            { severity: "info", code: "safe-definition", message: "Safe definition diagnostic." },
+            ...unsafeTopLevelDiagnostics.map((message, index) => ({
+              severity: "warning" as const,
+              code: `unsafe-definition-${index}`,
+              message,
+            })),
+          ],
+        },
+      }),
       listAssetResourceBackedViews: vi.fn().mockResolvedValue({
         ok: true,
         value: {
@@ -361,6 +395,7 @@ describe("AssetLibraryFeature", () => {
     await flush();
 
     expect(container.textContent).toContain("Safe aggregate diagnostic.");
+    expect(container.textContent).toContain("Safe definition diagnostic.");
     expect(container.textContent).toContain("Safe list diagnostic.");
     expect(container.textContent).toContain("Safe detail diagnostic.");
 
@@ -373,7 +408,10 @@ describe("AssetLibraryFeature", () => {
     await flush();
 
     expect(container.textContent).toContain("Something went wrong while completing this action.");
-    expect(container.textContent ?? "").not.toMatch(/C:\\|\/tmp|\/home|Bearer|token|secret|password|apiKey|signedUrl|access_token|base64|data:image|raw provider payload|workflowJson|prompt|stack|command line|process\.env/i);
+    const diagnosticStatusText = Array.from(container.querySelectorAll("[role='status'], [role='alert']"))
+      .map((element) => element.textContent ?? "")
+      .join(" ");
+    expect(diagnosticStatusText).not.toMatch(/C:\\|\/tmp|\/home|Bearer|token|secret|password|apiKey|signedUrl|access_token|base64|data:image|raw provider payload|workflowJson|prompt|stack|command line|process\.env/i);
   });
 
   it("renders empty states for no registered definitions and filtered misses", async () => {

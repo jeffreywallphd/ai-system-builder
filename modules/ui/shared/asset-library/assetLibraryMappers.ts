@@ -29,7 +29,7 @@ const LOCAL_PATH_VALUE_PATTERN =
 const SECRET_VALUE_PATTERN =
   /(bearer\s+[a-z0-9._~+/=-]+|\bapi[_-]?key\b|\bapikey\b|\btoken\b|\bpassword\b|\bsecret\b|\bauth\b|authorization\s*:)/i;
 const UNSAFE_DIAGNOSTIC_VALUE_PATTERN =
-  /\b(stack trace|stack|command(?: line)?|base64|bytes?|blobs?|raw provider payloads?|provider payloads?|workflowJson|workflow json|raw exception|exception message|process\.env)\b/i;
+  /\b(stack trace|stack|command(?: line)?|base64|bytes?|blobs?|raw provider payloads?|provider payloads?|workflowJson|workflow json|prompt|signedUrl|access_token|data:image|data:|raw exception|exception message|process\.env)\b/i;
 const DATA_BASE64_VALUE_PATTERN = /^data:[^,;]+;base64,/i;
 const LONG_BASE64_VALUE_PATTERN = /^[A-Za-z0-9+/]{80,}={0,2}$/;
 const SIGNED_OR_QUERY_URL_VALUE_PATTERN = /^https?:\/\/\S+\?(?:\S*?(?:x-amz-signature|x-goog-signature|signature|sig|token|access_token|auth|expires|X-Amz-Signature)=\S+|\S{24,})/i;
@@ -69,6 +69,12 @@ function safeString(value: unknown): string | undefined {
 
 export function sanitizeAssetLibraryDisplayText(value: unknown): string | undefined {
   return safeString(value);
+}
+
+export function sanitizeAssetLibraryDiagnosticMessages(value: readonly string[] | undefined): readonly string[] {
+  return (value ?? [])
+    .map((message) => sanitizeAssetLibraryDisplayText(message))
+    .filter((message): message is string => typeof message === "string");
 }
 
 function safeJsonValue(value: unknown, seen = new WeakSet<object>()): AssetJsonValue | undefined {
