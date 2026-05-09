@@ -269,6 +269,46 @@ export function arrayField(
   };
 }
 
+export function semanticOptionDescriptorArrayField(
+  fieldId: string,
+  label: string,
+): AssetConfigurationField {
+  return {
+    fieldId,
+    valueKind: "array",
+    label,
+    description:
+      "Array of semantic option descriptors shaped as optionId, label, value, optional description, and optional disabled flag.",
+    required: false,
+    defaultValue: [],
+    exampleValues: [
+      [
+        {
+          optionId: "example-option",
+          label: "Example option",
+          value: "example",
+          description: "Optional user-facing option description.",
+          disabled: false,
+        },
+      ],
+    ],
+    uiHint: {
+      hintKind: "advanced",
+      helpText:
+        "Semantic option descriptors; future editors may provide a dedicated option list control.",
+    },
+    metadata: {
+      semanticItemKind: "form-option-descriptor",
+      itemSchemaStatus: "deferred",
+      expectedFields: ["optionId", "label", "value"],
+      optionalFields: ["description", "disabled"],
+      dynamicFetch: false,
+      rendererSpecific: false,
+      executable: false,
+    },
+  };
+}
+
 export function formAssetInputPort(
   portId: string,
   displayName: string,

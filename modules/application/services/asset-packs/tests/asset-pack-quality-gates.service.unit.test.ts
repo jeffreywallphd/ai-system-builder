@@ -69,7 +69,37 @@ describe("asset pack quality gates", () => {
     }
   });
 
-  it("warns on runtime execution requirements for UI primitive fixtures", () => {
+  it("allows explanatory non-goal language about workflows and execution", () => {
+    const result = runAssetPackQualityGates(
+      validEntry({
+        definition: validDefinition({
+          description: "Fixture primitive. Does not run workflows.",
+          aiContext: {
+            ...validDefinition().aiContext,
+            purpose: "Does not run workflows.",
+            limitations: [
+              {
+                limitationId: "fixture.no-workflows",
+                summary: "No runtime execution occurs.",
+              },
+            ],
+            safetyNotes: [
+              {
+                safetyNoteId: "fixture.no-execution",
+                category: "operational",
+                severity: "info",
+                summary: "Does not execute workflows.",
+              },
+            ],
+          },
+        }),
+      }),
+    );
+
+    assert.equal(result.status, "valid", messages(result));
+  });
+
+  it("rejects runtime execution requirements for foundation primitives", () => {
     const result = runAssetPackQualityGates(
       validEntry({
         definition: validDefinition({
@@ -85,8 +115,22 @@ describe("asset pack quality gates", () => {
       }),
     );
 
-    assert.equal(result.status, "valid-with-warnings");
+    assert.equal(result.status, "invalid");
     assert.match(messages(result), /runtime/i);
+  });
+
+  it("rejects actual execution claims outside explanatory non-goals", () => {
+    const result = runAssetPackQualityGates(
+      validEntry({
+        definition: validDefinition({
+          displayName: "Workflow Runner",
+          description: "This primitive will execute workflow runs.",
+        }),
+      }),
+    );
+
+    assert.equal(result.status, "invalid");
+    assert.match(messages(result), /unsafe implementation/i);
   });
 
   it("fails shell primitives that claim execution behavior", () => {
@@ -105,6 +149,24 @@ describe("asset pack quality gates", () => {
 
     assert.equal(result.status, "invalid");
     assert.match(messages(result), /execution behavior/i);
+  });
+
+  it("rejects renderer library and path details", () => {
+    const result = runAssetPackQualityGates(
+      validEntry({
+        definition: validDefinition({
+          aiContext: {
+            ...validDefinition().aiContext,
+            configurationGuidance: {
+              summary: "Use React from apps/desktop/src/renderer/Foo.tsx.",
+            },
+          },
+        }),
+      }),
+    );
+
+    assert.equal(result.status, "invalid");
+    assert.match(messages(result), /unsafe implementation/i);
   });
 });
 

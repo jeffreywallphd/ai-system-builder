@@ -36,6 +36,21 @@ const SAFE_ENTRY_ID_PATTERN = /^[a-z0-9][a-z0-9.-]{2,159}$/;
 const SAFE_VERSION_RANGE_PATTERN = /^[~^<>=*0-9A-Za-z .|,-]+$/;
 const FORBIDDEN_TEXT_PATTERN =
   /\b(?:install|activate|disable|marketplace|package manager|registry publish|renderer implementation|renderer file|resource bytes|workflow json|provider payload|raw payload|signed url|token|secret|password|api key|prompt text|resource content|execution code|runtime execution|local path|filesystem path)\b/i;
+const UNSAFE_FIELD_KEY_PATTERN =
+  /^(?:token|secret|password|apiKey|api_key|authorization|authHeader|bearerToken|signedUrl|presignedUrl|accessUrl|downloadUrl|dataUrl|localPath|filesystemPath|filePath|cachePath|storagePath|runtimePath|providerRef|sourceRef|providerPayload|rawProviderPayload|rawPayload|workflowJson|promptText|executionCode|resourceContent|resourceBytes|contentBase64|base64)$/i;
+const UNSAFE_VALUE_CONTEXT_KEY_PATTERN =
+  /(?:^|\.)(?:packId|entryId|ruleId|definitionId|schemaId|fingerprint|checksum|versionRange|reason|sourceRef|providerRef|path|url|token|secret|password|payload|content|bytes|base64|workflowJson|promptText|executionCode)$/i;
+const EXPLANATORY_CONTEXT_KEY_PATTERN =
+  /^(?:description|purpose|limitations|safetyNotes|antiPatterns|configurationGuidance|compositionGuidance|validationGuidance|accessibilityGuidance|examples|commonMistakes|developerFacingSummary|userFacingSummary|inputSummary|outputSummary|summary|details|whyAvoid|saferAlternative|expectedOutcome|message|helpText)$/i;
+const LOCAL_FILESYSTEM_PATH_VALUE_PATTERN =
+  /(^~\/|^\.\.?\/|^\/(?:tmp|var|home|users|etc|private|opt|usr|mnt|volumes)(?:\/|$)|^[a-z]:[\\/]|\\(?:Users|Temp)\\|\/(?:tmp|temp)\/|[\\/]\.cache[\\/]huggingface(?:[\\/]|$)|[\\/]huggingface[\\/]hub(?:[\\/]|$))/i;
+const AUTH_BEARING_VALUE_PATTERN =
+  /(bearer\s+[a-z0-9._~+/=-]+|(?:api[_-]?key|api\s+key|apikey)\s*[=:]|(?:token|password|secret)\s*[=:]|authorization\s*:)/i;
+const DATA_BASE64_VALUE_PATTERN = /^data:[^,;]+;base64,/i;
+const LONG_BASE64_VALUE_PATTERN = /^[A-Za-z0-9+/]{80,}={0,2}$/;
+const SIGNED_OR_QUERY_URL_VALUE_PATTERN =
+  /^https?:\/\/\S+\?(?:\S*?(?:x-amz-signature|x-goog-signature|signature|sig|token|access_token|auth|expires|X-Amz-Signature)=\S+|\S{24,})/i;
+const PROVIDER_OR_TOKEN_URL_VALUE_PATTERN = /^(?:hf|huggingface|s3|gs|file):\/\/\S+/i;
 
 export function validateAssetPackManifest(
   manifest: AssetPackManifest,
@@ -364,7 +379,25 @@ function validateNoForbiddenValues(
   path: readonly string[],
 ): void {
   walk(value, path, (current, currentPath) => {
-    if (typeof current.value === "string" && isUnsafeText(current.value)) {
+    if (typeof current.key === "string" && isUnsafeManifestFieldKey(current.key)) {
+      addIssue(issues, "error", "security", "Asset pack manifest contains an unsafe payload field.", currentPath);
+      return;
+    }
+    if (typeof current.value !== "string") return;
+    if (isExplanatoryContextPath(currentPath)) {
+      if (isActualUnsafePayloadString(current.value)) {
+        addIssue(issues, "error", "security", "Asset pack manifest contains an unsafe value.", currentPath);
+      }
+      return;
+    }
+    if (
+      isUnsafeValueContextPath(currentPath) &&
+      (isUnsafeText(current.value) || isActualUnsafePayloadString(current.value))
+    ) {
+      addIssue(issues, "error", "security", "Asset pack manifest contains an unsafe value.", currentPath);
+      return;
+    }
+    if (isActualUnsafePayloadString(current.value)) {
       addIssue(issues, "error", "security", "Asset pack manifest contains an unsafe value.", currentPath);
     }
   });
@@ -410,6 +443,33 @@ function walk(
 
 function isUnsafeText(value: string): boolean {
   return isUnsafeAssetMetadataString(value) || FORBIDDEN_TEXT_PATTERN.test(value);
+}
+
+function isUnsafeManifestFieldKey(key: string): boolean {
+  return UNSAFE_FIELD_KEY_PATTERN.test(key);
+}
+
+function isExplanatoryContextPath(path: readonly string[]): boolean {
+  if (path.includes("metadata")) return false;
+  if (path.some((part) => isUnsafeManifestFieldKey(part))) return false;
+  return path.some((part) => EXPLANATORY_CONTEXT_KEY_PATTERN.test(part));
+}
+
+function isUnsafeValueContextPath(path: readonly string[]): boolean {
+  if (path.includes("metadata")) return true;
+  return UNSAFE_VALUE_CONTEXT_KEY_PATTERN.test(path.join("."));
+}
+
+function isActualUnsafePayloadString(value: string): boolean {
+  const trimmed = value.trim();
+  return (
+    LOCAL_FILESYSTEM_PATH_VALUE_PATTERN.test(trimmed) ||
+    AUTH_BEARING_VALUE_PATTERN.test(trimmed) ||
+    DATA_BASE64_VALUE_PATTERN.test(trimmed) ||
+    LONG_BASE64_VALUE_PATTERN.test(trimmed) ||
+    SIGNED_OR_QUERY_URL_VALUE_PATTERN.test(trimmed) ||
+    PROVIDER_OR_TOKEN_URL_VALUE_PATTERN.test(trimmed)
+  );
 }
 
 function referenceKey(reference: AssetReference): string {
