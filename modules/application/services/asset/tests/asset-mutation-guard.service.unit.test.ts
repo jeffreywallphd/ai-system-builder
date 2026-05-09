@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { FinalizeGeneratedOutputCommand, RegisterResourceBackedViewCommand } from "../../../../contracts/asset";
-import { validateFinalizeGeneratedOutputMutationGuard, validateRegisterResourceBackedViewMutationGuard } from "../asset-mutation-guard.service";
+import type { FinalizeGeneratedOutputCommand, ImportExternalRepositoryObjectCommand, LocalizeExternalRepositoryObjectCommand, RegisterResourceBackedViewCommand } from "../../../../contracts/asset";
+import { validateFinalizeGeneratedOutputMutationGuard, validateImportExternalRepositoryObjectMutationGuard, validateLocalizeExternalRepositoryObjectMutationGuard, validateRegisterResourceBackedViewMutationGuard } from "../asset-mutation-guard.service";
 
 function command(overrides: Partial<RegisterResourceBackedViewCommand> = {}): RegisterResourceBackedViewCommand {
   return {
@@ -18,6 +18,39 @@ function finalizeCommand(overrides: Partial<FinalizeGeneratedOutputCommand> = {}
     operation: "asset.finalize-generated-output",
     viewId: "view.generated",
     approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true },
+    actor: { initiatedBy: "human" },
+    ...overrides,
+  };
+}
+
+function importCommand(overrides: Partial<ImportExternalRepositoryObjectCommand> = {}): ImportExternalRepositoryObjectCommand {
+  return {
+    operation: "asset.import-external-repository-object",
+    viewId: "view.external",
+    approval: {
+      userConfirmed: true,
+      confirmationKind: "import-external-object",
+      allowNetworkAccess: true,
+      allowCredentialUse: true,
+      allowPartialCompletion: true,
+    },
+    actor: { initiatedBy: "human" },
+    ...overrides,
+  };
+}
+
+function localizeCommand(overrides: Partial<LocalizeExternalRepositoryObjectCommand> = {}): LocalizeExternalRepositoryObjectCommand {
+  return {
+    operation: "asset.localize-external-repository-object",
+    viewId: "view.external",
+    approval: {
+      userConfirmed: true,
+      confirmationKind: "localize-external-object",
+      allowNetworkAccess: true,
+      allowCredentialUse: true,
+      allowFilesystemWrite: true,
+      allowPartialCompletion: true,
+    },
     actor: { initiatedBy: "human" },
     ...overrides,
   };
@@ -41,5 +74,25 @@ describe("asset mutation guard", () => {
     assert.equal(validateFinalizeGeneratedOutputMutationGuard(finalizeCommand({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output" } }))?.code, "permission");
     assert.equal(validateFinalizeGeneratedOutputMutationGuard(finalizeCommand({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowNetworkAccess: true } }))?.code, "validation");
     assert.equal(validateFinalizeGeneratedOutputMutationGuard(finalizeCommand({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowCredentialUse: true } }))?.code, "validation");
+  });
+
+  it("requires explicit external object import approval, network, credential, and partial-completion approval", () => {
+    assert.equal(validateImportExternalRepositoryObjectMutationGuard(importCommand()), undefined);
+    assert.equal(validateImportExternalRepositoryObjectMutationGuard(importCommand({ approval: { userConfirmed: false, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowPartialCompletion: true } }))?.code, "approval-required");
+    assert.equal(validateImportExternalRepositoryObjectMutationGuard(importCommand({ approval: { userConfirmed: true, confirmationKind: "localize-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowPartialCompletion: true } }))?.code, "validation");
+    assert.equal(validateImportExternalRepositoryObjectMutationGuard(importCommand({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowCredentialUse: true, allowPartialCompletion: true } }))?.code, "permission");
+    assert.equal(validateImportExternalRepositoryObjectMutationGuard(importCommand({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowPartialCompletion: true } }))?.code, "permission");
+    assert.equal(validateImportExternalRepositoryObjectMutationGuard(importCommand({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true } }))?.code, "permission");
+    assert.equal(validateImportExternalRepositoryObjectMutationGuard(importCommand({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowPartialCompletion: true, allowFilesystemWrite: true } }))?.code, "validation");
+  });
+
+  it("requires explicit external object localization approval, network, credential, filesystem write, and partial-completion approval", () => {
+    assert.equal(validateLocalizeExternalRepositoryObjectMutationGuard(localizeCommand()), undefined);
+    assert.equal(validateLocalizeExternalRepositoryObjectMutationGuard(localizeCommand({ approval: { userConfirmed: false, confirmationKind: "localize-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowFilesystemWrite: true, allowPartialCompletion: true } }))?.code, "approval-required");
+    assert.equal(validateLocalizeExternalRepositoryObjectMutationGuard(localizeCommand({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowFilesystemWrite: true, allowPartialCompletion: true } }))?.code, "validation");
+    assert.equal(validateLocalizeExternalRepositoryObjectMutationGuard(localizeCommand({ approval: { userConfirmed: true, confirmationKind: "localize-external-object", allowCredentialUse: true, allowFilesystemWrite: true, allowPartialCompletion: true } }))?.code, "permission");
+    assert.equal(validateLocalizeExternalRepositoryObjectMutationGuard(localizeCommand({ approval: { userConfirmed: true, confirmationKind: "localize-external-object", allowNetworkAccess: true, allowFilesystemWrite: true, allowPartialCompletion: true } }))?.code, "permission");
+    assert.equal(validateLocalizeExternalRepositoryObjectMutationGuard(localizeCommand({ approval: { userConfirmed: true, confirmationKind: "localize-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowPartialCompletion: true } }))?.code, "permission");
+    assert.equal(validateLocalizeExternalRepositoryObjectMutationGuard(localizeCommand({ approval: { userConfirmed: true, confirmationKind: "localize-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowFilesystemWrite: true } }))?.code, "permission");
   });
 });

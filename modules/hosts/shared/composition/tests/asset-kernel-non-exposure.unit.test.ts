@@ -124,6 +124,8 @@ describe("Asset Kernel read-only non-exposure boundaries", () => {
     const applicationUseCases = combinedSource("modules/application/use-cases/asset");
     assert.match(applicationUseCases, /asset\.register-resource-backed-view/);
     assert.match(applicationUseCases, /asset\.finalize-generated-output/);
+    assert.match(applicationUseCases, /asset\.import-external-repository-object/);
+    assert.match(applicationUseCases, /asset\.localize-external-repository-object/);
 
     const publicSource = [
       combinedSource("modules/contracts/api"),
