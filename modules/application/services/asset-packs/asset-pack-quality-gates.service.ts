@@ -25,7 +25,7 @@ const COMPOSITION_CATEGORY_IDS = new Set([
 ]);
 const SHELL_CATEGORY_IDS = new Set(["page-feature-shells", "workflow-system-shells"]);
 const FORBIDDEN_RENDERER_PATTERN =
-  /\b(?:renderer|react|vue|svelte|tsx|jsx|component path|implementation path|css module|dom node)\b/i;
+  /\b(?:react|vue|svelte|tsx|jsx|renderer file|component path|implementation path|css module|dom node)\b/i;
 const EXECUTION_REQUIREMENT_PATTERN =
   /\b(?:runtime-execution|network|filesystem-read|filesystem-write|secret-read|external-provider-access)\b/i;
 

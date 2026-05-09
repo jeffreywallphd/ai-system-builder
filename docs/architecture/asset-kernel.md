@@ -73,6 +73,8 @@ Phase 5 Prompt 2 starts the contract vocabulary for pack-compatible foundational
 
 Phase 5 Prompt 3 adds the application-side pack catalog foundation in `modules/application/services/asset-packs`. The placeholder `system.foundation` pack declares system source metadata, foundation category/group constants, an empty manifest, pure manifest construction helpers, manifest validation, reusable pack-asset quality gates, and resolver-planning fixtures for exact versus semantic override intent. It still adds no real foundational UI/form/data/page/workflow/system definitions, no pack install/seeding/import/export/marketplace behavior, no persistence, no host wiring, no API/IPC/preload/UI surface, and no full asset resolver. Foundational primitive definitions begin in Prompt 4, while full resolver behavior remains deferred to Prompt 10.
 
+Phase 5 Prompt 4 populates `system.foundation` with the first real foundational pack entries: semantic UI structural primitives for containers, sections, panels, cards, stacks, grids, tabs, and collapsible sections. These are full `AssetDefinition` records with configuration schemas, AI context, ports, and composition guidance under the `ui-structure` category. They are not renderer components, visual editor nodes, CSS classes, UI route definitions, workflow behavior, runtime/provider calls, seeding/install behavior, or resolver implementation. Form and field primitives remain deferred to Phase 5 Prompt 5.
+
 Phase 5 non-goals: no arbitrary free-form asset editor unless explicitly scoped, no workflow execution, no canvas/graph editor unless the Phase 5 plan says so, no plugin marketplace, no scheduler/queue, and no automatic AI-generated asset library without review.
 
 
