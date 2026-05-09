@@ -61,6 +61,64 @@ const expectedPortsById: Record<string, readonly string[]> = {
   "builtin.system.test-check": ["candidate", "context", "check-result", "review-required"],
 };
 
+const expectedShellKindById: Record<string, string> = {
+  "builtin.shell.page": "page-shell",
+  "builtin.shell.feature": "feature-shell",
+  "builtin.shell.dashboard-section": "dashboard-section-shell",
+  "builtin.shell.settings-panel": "settings-panel-shell",
+  "builtin.shell.resource-browser": "resource-browser-shell",
+  "builtin.shell.detail-page": "detail-page-shell",
+  "builtin.shell.wizard-step": "wizard-step-shell",
+  "builtin.shell.navigation-group": "navigation-group-shell",
+  "builtin.workflow.workflow": "workflow-shell",
+  "builtin.workflow.step": "workflow-step-shell",
+  "builtin.workflow.input-step": "workflow-step-shell",
+  "builtin.workflow.transform-step": "workflow-step-shell",
+  "builtin.workflow.validation-step": "workflow-step-shell",
+  "builtin.workflow.approval-step": "workflow-step-shell",
+  "builtin.workflow.output-step": "workflow-step-shell",
+  "builtin.system.system": "system-shell",
+  "builtin.system.subsystem": "subsystem-shell",
+  "builtin.system.policy-check": "policy-check-shell",
+  "builtin.system.test-check": "test-check-shell",
+};
+
+const pageTypedRegionShellIds = [
+  "builtin.shell.dashboard-section",
+  "builtin.shell.settings-panel",
+  "builtin.shell.resource-browser",
+  "builtin.shell.detail-page",
+  "builtin.shell.wizard-step",
+  "builtin.shell.navigation-group",
+] as const;
+
+const unsafePositiveBehaviorClaims = [
+  /\bfetch records\b/i,
+  /\bfetch data\b/i,
+  /\bread file\b/i,
+  /\bread resource\b/i,
+  /\bread storage\b/i,
+  /\bwrite storage\b/i,
+  /\bwrite file\b/i,
+  /\bsubmit data\b/i,
+  /\bsave data\b/i,
+  /\brun validation\b/i,
+  /\bvalidate data\b/i,
+  /\bexecute workflow\b/i,
+  /\brun workflow\b/i,
+  /\bstart runtime\b/i,
+  /\bcreate task\b/i,
+  /\bschedule job\b/i,
+  /\bcall provider\b/i,
+  /\bcall API\b/i,
+  /\binvoke IPC\b/i,
+  /\bdownload\b/i,
+  /\bupload\b/i,
+  /\brender preview\b/i,
+  /\bdecode image\b/i,
+  /\bopen file\b/i,
+] as const;
+
 describe("page, feature, workflow, and system shell primitives", () => {
   it("publishes stable namespaced shell primitive IDs", () => {
     assert.deepEqual(PAGE_FEATURE_SHELL_PRIMITIVE_IDS, [
@@ -109,6 +167,8 @@ describe("page, feature, workflow, and system shell primitives", () => {
       assert.equal(definition.metadata?.sourcePackVersion, SYSTEM_FOUNDATION_PACK_VERSION);
       assert.equal(definition.metadata?.sourceLayer, SYSTEM_FOUNDATION_PACK_SOURCE_LAYER);
       assert.equal(definition.metadata?.builtIn, true);
+      assert.equal(definition.metadata?.shellKind, expectedShellKindById[String(definition.definitionId)]);
+      assert.equal(definition.aiContext?.metadata?.shellKind, expectedShellKindById[String(definition.definitionId)]);
       assert.ok(["page-feature-shells", "workflow-system-shells"].includes(String(definition.metadata?.categoryId)));
     }
   });
@@ -132,7 +192,7 @@ describe("page, feature, workflow, and system shell primitives", () => {
       assert.ok((schema?.fields.length ?? 0) >= 5);
       assert.deepEqual(schema?.fields.map((field) => field.fieldId), expectedFields);
       assert.deepEqual(Object.keys(definition.defaultConfiguration ?? {}), expectedFields);
-      assert.ok(schema?.fields.some((field) => ["enum", "integer", "boolean", "array"].includes(field.valueKind)));
+      assert.equal(schema?.fields.every((field) => Boolean(field.fieldId && field.label)), true);
       assert.equal(schema?.fields.some((field) => ["className", "routePath", "apiEndpoint", "ipcChannel", "taskId"].includes(field.fieldId)), false);
     }
   });
@@ -149,6 +209,52 @@ describe("page, feature, workflow, and system shell primitives", () => {
       assert.match(output, /schedulers|scheduler/i);
       assert.match(output, /provider calls/i);
       assert.match(output, /AI-created composition/i);
+    }
+  });
+
+  it("distinguishes page-region shell semantics from concrete routes or pages", () => {
+    for (const definitionId of pageTypedRegionShellIds) {
+      const definition = SHELL_PRIMITIVE_DEFINITIONS.find(
+        (candidate) => candidate.definitionId === definitionId,
+      );
+      assert.ok(definition);
+      assert.equal(definition.assetType, "page");
+      assert.equal(definition.metadata?.shellKind, expectedShellKindById[definitionId]);
+      assert.match(definition.aiContext?.developerFacingSummary ?? "", /not a concrete renderer page/i);
+      assert.match(JSON.stringify(definition.aiContext), /not.*route|without.*route|do not use route/i);
+      assert.match(JSON.stringify(definition.compositionRules), /semantic/i);
+      assert.doesNotMatch(JSON.stringify(definition), /\b(?:routePath|routeName|pathName|url|href|apiEndpoint|ipcChannel|navigation handler)\b/i);
+      assert.equal(typeof definition.metadata?.shellKind, "string");
+    }
+  });
+
+  it("does not contain positive execution, transfer, resource-read, or preview-rendering claims", () => {
+    for (const definition of SHELL_PRIMITIVE_DEFINITIONS) {
+      const output = JSON.stringify(definition);
+      for (const unsafePattern of unsafePositiveBehaviorClaims) {
+        const matches = output.match(new RegExp(unsafePattern.source, "gi")) ?? [];
+        for (const match of matches) {
+          assert.equal(
+            isSafeNonGoalContext(output, match),
+            true,
+            `${definition.definitionId} contains unsafe claim: ${match}`,
+          );
+        }
+      }
+    }
+  });
+
+  it("keeps workflow, system, and check shell ports semantic and non-running", () => {
+    for (const definition of SHELL_PRIMITIVE_DEFINITIONS.filter((candidate) =>
+      /^(builtin\.workflow|builtin\.system)/.test(String(candidate.definitionId)),
+    )) {
+      const output = JSON.stringify(definition);
+      assert.match(output, /non-running/i);
+      assert.match(output, /declarative/i);
+      assert.doesNotMatch(output, /\b(?:handler implementation|task id|scheduler config|queue name|runtime task id|assigned actor id|decision record id|generated system payload)\b/i);
+      for (const port of definition.ports ?? []) {
+        assert.match(port.contract?.dataKind ?? "", /^semantic-/);
+      }
     }
   });
 
@@ -200,6 +306,7 @@ describe("page, feature, workflow, and system shell primitives", () => {
       assert.equal(entry.sourceLayer, "system-default");
       assert.equal(sourcePack?.packId, "system.foundation");
       assert.equal(sourcePack?.version, "1.0.0");
+      assert.equal(entry.metadata?.shellKind, expectedShellKindById[String(entry.definition.definitionId)]);
       assert.match(entry.entryId, /^system\.foundation\.(?:shell|workflow|system)\.[a-z0-9.-]+$/);
       assert.match(entry.fingerprint, /^fnv1a:[a-f0-9]{8}$/);
       assert.deepEqual(entry.definitionRef, {
@@ -272,4 +379,11 @@ describe("page, feature, workflow, and system shell primitives", () => {
 
 function messages(result: { readonly issues: readonly { readonly message: string }[] }): string {
   return result.issues.map((issue) => issue.message).join("\n");
+}
+
+function isSafeNonGoalContext(output: string, match: string): boolean {
+  const index = output.toLowerCase().indexOf(match.toLowerCase());
+  if (index < 0) return true;
+  const context = output.slice(Math.max(0, index - 180), index + match.length + 180);
+  return /\b(?:does not|do not|without|outside|deferred|not implemented by this definition)\b/i.test(context);
 }

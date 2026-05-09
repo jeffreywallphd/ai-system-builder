@@ -169,6 +169,33 @@ const expectedPortsById: Record<string, readonly string[]> = {
   "builtin.state.success-message": ["state", "dismissed"],
 };
 
+const unsafePositiveBehaviorClaims = [
+  /\bfetch records\b/i,
+  /\bfetch data\b/i,
+  /\bread file\b/i,
+  /\bread resource\b/i,
+  /\bread storage\b/i,
+  /\bwrite storage\b/i,
+  /\bwrite file\b/i,
+  /\bsubmit data\b/i,
+  /\bsave data\b/i,
+  /\brun validation\b/i,
+  /\bvalidate data\b/i,
+  /\bexecute workflow\b/i,
+  /\brun workflow\b/i,
+  /\bstart runtime\b/i,
+  /\bcreate task\b/i,
+  /\bschedule job\b/i,
+  /\bcall provider\b/i,
+  /\bcall API\b/i,
+  /\binvoke IPC\b/i,
+  /\bdownload\b/i,
+  /\bupload\b/i,
+  /\brender preview\b/i,
+  /\bdecode image\b/i,
+  /\bopen file\b/i,
+] as const;
+
 describe("data display, state, and message primitives", () => {
   it("publishes stable namespaced IDs for display and state/message primitives", () => {
     assert.deepEqual(DISPLAY_PRIMITIVE_IDS, [
@@ -271,6 +298,22 @@ describe("data display, state, and message primitives", () => {
     }
   });
 
+  it("does not contain positive execution, transfer, resource-read, or preview-rendering claims", () => {
+    for (const definition of DISPLAY_PRIMITIVE_DEFINITIONS) {
+      const output = JSON.stringify(definition);
+      for (const unsafePattern of unsafePositiveBehaviorClaims) {
+        const matches = output.match(new RegExp(unsafePattern.source, "gi")) ?? [];
+        for (const match of matches) {
+          assert.equal(
+            isSafeNonGoalContext(output, match),
+            true,
+            `${definition.definitionId} contains unsafe claim: ${match}`,
+          );
+        }
+      }
+    }
+  });
+
   it("provides AI context with required sections and explicit non-goals", () => {
     for (const definition of DISPLAY_PRIMITIVE_DEFINITIONS) {
       const context = definition.aiContext;
@@ -311,6 +354,33 @@ describe("data display, state, and message primitives", () => {
           ["allowed-parent", "optional-child", "cardinality"].includes(rule.ruleKind),
         ),
       );
+    }
+  });
+
+  it("keeps preview placeholders placeholder-only", () => {
+    for (const definitionId of [
+      "builtin.display.image-preview-placeholder",
+      "builtin.display.resource-preview-placeholder",
+    ]) {
+      const definition = DISPLAY_PRIMITIVE_DEFINITIONS.find(
+        (candidate) => candidate.definitionId === definitionId,
+      );
+      assert.ok(definition);
+      assert.deepEqual(definition.ports?.map((port) => port.portId), [
+        "resource-reference",
+        "preview-state",
+        "preview-requested",
+      ]);
+      assert.deepEqual(
+        definition.ports?.map((port) => port.contract?.dataKind),
+        ["semantic-resource-reference", "semantic-preview-state", "semantic-preview-event"],
+      );
+      const output = JSON.stringify(definition);
+      assert.match(output, /placeholder/i);
+      assert.match(output, /does not read/i);
+      assert.match(output, /rendering.*outside this definition|without rendering content/i);
+      assert.doesNotMatch(output, /https?:\/\/|file:\/\/|data:image|base64|byte|encoded content/i);
+      assert.doesNotMatch(output, /\b(?:path|url|uri)\b/i);
     }
   });
 
@@ -437,4 +507,11 @@ describe("data display, state, and message primitives", () => {
 
 function messages(result: { readonly issues: readonly { readonly message: string }[] }): string {
   return result.issues.map((issue) => issue.message).join("\n");
+}
+
+function isSafeNonGoalContext(output: string, match: string): boolean {
+  const index = output.toLowerCase().indexOf(match.toLowerCase());
+  if (index < 0) return true;
+  const context = output.slice(Math.max(0, index - 80), index + match.length + 80);
+  return /\b(?:does not|do not|without|outside|deferred|not implemented by this definition)\b/i.test(context);
 }

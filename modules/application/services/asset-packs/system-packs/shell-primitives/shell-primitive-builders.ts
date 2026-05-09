@@ -21,6 +21,22 @@ export type ShellPrimitiveCategoryId =
   | "page-feature-shells"
   | "workflow-system-shells";
 
+export type ShellPrimitiveKind =
+  | "page-shell"
+  | "feature-shell"
+  | "dashboard-section-shell"
+  | "settings-panel-shell"
+  | "resource-browser-shell"
+  | "detail-page-shell"
+  | "wizard-step-shell"
+  | "navigation-group-shell"
+  | "workflow-shell"
+  | "workflow-step-shell"
+  | "system-shell"
+  | "subsystem-shell"
+  | "policy-check-shell"
+  | "test-check-shell";
+
 export interface ShellPrimitiveSpec {
   readonly id: ShellPrimitiveId;
   readonly categoryId: ShellPrimitiveCategoryId;
@@ -47,6 +63,7 @@ export interface ShellPrimitiveSpec {
 export function createShellPrimitiveDefinition(
   spec: ShellPrimitiveSpec,
 ): AssetDefinition {
+  const shellKind = shellKindForDefinitionId(spec.id);
   return {
     definitionId: spec.id,
     assetType: spec.assetType,
@@ -72,6 +89,7 @@ export function createShellPrimitiveDefinition(
       description: `${spec.displayName} semantic shell configuration.`,
       metadata: {
         categoryId: spec.categoryId,
+        shellKind,
         declarativeOnly: true,
       },
     },
@@ -110,6 +128,7 @@ export function createShellPrimitiveDefinition(
         spec.categoryId === "page-feature-shells"
           ? "page-feature-shell-primitive"
           : "workflow-system-shell-primitive",
+      shellKind,
       declarativeOnly: true,
       nonRunning: true,
     },
@@ -122,6 +141,7 @@ export function createShellPrimitiveEntry(
   tags: readonly string[],
 ): AssetPackAssetEntry {
   const fingerprint = createShellPrimitiveFingerprint(definition);
+  const shellKind = definition.metadata?.shellKind;
   return {
     entryId: `system.foundation.${String(definition.definitionId).replace(/^builtin\./, "")}`,
     definition,
@@ -144,6 +164,7 @@ export function createShellPrimitiveEntry(
       sourceLayer: SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
       builtIn: true,
       systemOwned: true,
+      ...(typeof shellKind === "string" ? { shellKind } : {}),
       declarativeOnly: true,
       nonRunning: true,
       fingerprint,
@@ -428,6 +449,7 @@ export function optionalChildRule(
 }
 
 function createAiContext(spec: ShellPrimitiveSpec): AssetAiContext {
+  const shellKind = shellKindForDefinitionId(spec.id);
   return {
     purpose: spec.purpose,
     userFacingSummary: spec.userSummary,
@@ -519,6 +541,7 @@ function createAiContext(spec: ShellPrimitiveSpec): AssetAiContext {
       ],
       shellGuidance: spec.shellGuidance,
       nonRunningGuidance: spec.nonRunningGuidance,
+      shellKind,
       semanticDefinitionOnly: true,
       nonRunning: true,
     },
@@ -536,6 +559,44 @@ function sourceMetadata(
     categoryId,
     definitionId,
   };
+}
+
+function shellKindForDefinitionId(definitionId: ShellPrimitiveId): ShellPrimitiveKind {
+  switch (definitionId) {
+    case "builtin.shell.page":
+      return "page-shell";
+    case "builtin.shell.feature":
+      return "feature-shell";
+    case "builtin.shell.dashboard-section":
+      return "dashboard-section-shell";
+    case "builtin.shell.settings-panel":
+      return "settings-panel-shell";
+    case "builtin.shell.resource-browser":
+      return "resource-browser-shell";
+    case "builtin.shell.detail-page":
+      return "detail-page-shell";
+    case "builtin.shell.wizard-step":
+      return "wizard-step-shell";
+    case "builtin.shell.navigation-group":
+      return "navigation-group-shell";
+    case "builtin.workflow.workflow":
+      return "workflow-shell";
+    case "builtin.workflow.step":
+    case "builtin.workflow.input-step":
+    case "builtin.workflow.transform-step":
+    case "builtin.workflow.validation-step":
+    case "builtin.workflow.approval-step":
+    case "builtin.workflow.output-step":
+      return "workflow-step-shell";
+    case "builtin.system.system":
+      return "system-shell";
+    case "builtin.system.subsystem":
+      return "subsystem-shell";
+    case "builtin.system.policy-check":
+      return "policy-check-shell";
+    case "builtin.system.test-check":
+      return "test-check-shell";
+  }
 }
 
 function createShellPrimitiveFingerprint(definition: AssetDefinition): string {

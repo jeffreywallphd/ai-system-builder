@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import type { AssetPackOverrideRule } from "../../../../contracts/asset";
+import { validateAssetDefinition } from "../../asset/validate-asset-definition.service";
+import { runAssetPackQualityGates } from "../asset-pack-quality-gates.service";
 import { validateAssetPackManifest } from "../asset-pack-validation.service";
 import {
   DISPLAY_PRIMITIVE_ENTRIES,
@@ -17,6 +20,15 @@ function serialized(value: unknown): string {
   return JSON.stringify(value).toLowerCase();
 }
 
+const expectedCategoryGroups = [
+  "ui-structure",
+  "forms-fields",
+  "data-display",
+  "state-messages",
+  "page-feature-shells",
+  "workflow-system-shells",
+] as const;
+
 describe("system foundation pack manifest", () => {
   it("declares the system foundation placeholder pack identity and source metadata", () => {
     assert.equal(SYSTEM_FOUNDATION_PACK_MANIFEST.packId, "system.foundation");
@@ -29,8 +41,9 @@ describe("system foundation pack manifest", () => {
   it("contains the expected categories, UI structural, form, display, state, message, and shell primitive assets", () => {
     assert.deepEqual(
       SYSTEM_FOUNDATION_PACK_MANIFEST.categories,
-      SYSTEM_FOUNDATION_PACK_CATEGORY_IDS,
+      expectedCategoryGroups,
     );
+    assert.deepEqual(SYSTEM_FOUNDATION_PACK_CATEGORY_IDS, expectedCategoryGroups);
     assert.deepEqual(
       SYSTEM_FOUNDATION_PACK_MANIFEST.assets.map((entry) => entry.entryId),
       [
@@ -136,10 +149,179 @@ describe("system foundation pack manifest", () => {
     }
   });
 
+  it("has no duplicate display names within a category", () => {
+    const displayNamesByCategory = new Map<string, Set<string>>();
+    for (const entry of SYSTEM_FOUNDATION_PACK_MANIFEST.assets) {
+      const displayNames = displayNamesByCategory.get(entry.category) ?? new Set<string>();
+      const displayName = String(entry.definition.displayName).toLowerCase();
+      assert.equal(displayNames.has(displayName), false, `${entry.category}:${displayName}`);
+      displayNames.add(displayName);
+      displayNamesByCategory.set(entry.category, displayNames);
+    }
+  });
+
+  it("requires source pack and category metadata on every entry", () => {
+    for (const entry of SYSTEM_FOUNDATION_PACK_MANIFEST.assets) {
+      const sourcePack = entry.metadata?.sourcePack as
+        | { readonly packId?: string; readonly version?: string }
+        | undefined;
+      assert.equal(sourcePack?.packId, "system.foundation", entry.entryId);
+      assert.equal(sourcePack?.version, "1.0.0", entry.entryId);
+      assert.equal(entry.metadata?.categoryId, entry.category, entry.entryId);
+      assert.equal(entry.definition.metadata?.categoryId, entry.category, entry.entryId);
+      assert.equal(entry.definition.metadata?.sourcePackId, "system.foundation", entry.entryId);
+      assert.equal(entry.definition.metadata?.sourcePackVersion, "1.0.0", entry.entryId);
+      assert.equal(entry.definition.provenance.metadata?.categoryId, entry.category, entry.entryId);
+    }
+  });
+
+  it("contains only safe tags and metadata values", () => {
+    for (const entry of SYSTEM_FOUNDATION_PACK_MANIFEST.assets) {
+      for (const tag of entry.tags ?? []) {
+        assert.match(tag, /^[a-z0-9][a-z0-9-]{1,39}$/, `${entry.entryId}:${tag}`);
+      }
+      const metadata = serialized({
+        entryMetadata: entry.metadata,
+        definitionMetadata: entry.definition.metadata,
+        provenanceMetadata: entry.definition.provenance.metadata,
+      });
+      for (const forbidden of [
+        "token",
+        "secret",
+        "password",
+        "signedurl",
+        "providerpayload",
+        "rawpayload",
+        "resourcebytes",
+        "resourcecontent",
+        "localpath",
+        "filesystempath",
+        "filepath",
+        "base64",
+        "workflowjson",
+        "prompttext",
+        "executioncode",
+      ]) {
+        assert.equal(metadata.includes(forbidden), false, `${entry.entryId}:${forbidden}`);
+      }
+    }
+  });
+
+  it("contains no implementation, editor, route, runtime, provider, storage, or workflow engine leakage", () => {
+    const output = serialized(SYSTEM_FOUNDATION_PACK_MANIFEST);
+    for (const forbidden of [
+      "react",
+      "vue",
+      "svelte",
+      "tsx",
+      "jsx",
+      "css module",
+      "renderer file",
+      "component path",
+      "implementation path",
+      "dom node",
+      "routepath",
+      "apiendpoint",
+      "ipcchannel",
+      "workflowjson",
+      "schedulerconfig",
+      "queue name",
+      "taskid",
+      "providerpayload",
+      "rawpayload",
+      "storage path",
+      "filesystem path",
+      "visual composition editor",
+      "canvas authoring",
+      "wizard authoring",
+    ]) {
+      assert.equal(output.includes(forbidden), false, forbidden);
+    }
+  });
+
+  it("declares no runtime, provider, network, storage, filesystem, or resource requirements", () => {
+    for (const entry of SYSTEM_FOUNDATION_PACK_MANIFEST.assets) {
+      for (const requirement of entry.definition.requirements ?? []) {
+        assert.notEqual(requirement.requirementKind, "runtime-capability", entry.entryId);
+        assert.notEqual(requirement.requirementKind, "network-access", entry.entryId);
+        assert.notEqual(requirement.requirementKind, "filesystem-access", entry.entryId);
+        assert.notEqual(requirement.requirementKind, "secret-access", entry.entryId);
+        assert.notEqual(requirement.requirementKind, "external-provider", entry.entryId);
+        assert.notEqual(requirement.requirementKind, "resource", entry.entryId);
+        assert.notEqual(requirement.requirementKind, "artifact", entry.entryId);
+        assert.equal(requirement.permissionKind, undefined, entry.entryId);
+      }
+    }
+  });
+
   it("is JSON-serializable and validates through the pack validator", () => {
     const cloned = JSON.parse(JSON.stringify(SYSTEM_FOUNDATION_PACK_MANIFEST));
     assert.deepEqual(cloned, SYSTEM_FOUNDATION_PACK_MANIFEST);
     assert.equal(validateAssetPackManifest(SYSTEM_FOUNDATION_PACK_MANIFEST).status, "valid");
+  });
+
+  it("passes quality gates and asset definition validation for every entry", () => {
+    for (const entry of SYSTEM_FOUNDATION_PACK_MANIFEST.assets) {
+      assert.equal(validateAssetDefinition(entry.definition).status, "valid", entry.entryId);
+      const quality = runAssetPackQualityGates(entry);
+      assert.equal(quality.status, "valid", `${entry.entryId}\n${quality.issues.map((issue) => issue.message).join("\n")}`);
+    }
+  });
+
+  it("keeps every entry resolver and override ready without mutating system defaults", () => {
+    const seenDefinitionIds = new Set<string>();
+    for (const entry of SYSTEM_FOUNDATION_PACK_MANIFEST.assets) {
+      const sourcePack = entry.metadata?.sourcePack as
+        | { readonly packId?: string; readonly version?: string }
+        | undefined;
+      assert.equal(entry.definitionRef.kind, "asset-definition-version", entry.entryId);
+      assert.equal(entry.definitionRef.id, entry.definition.definitionId, entry.entryId);
+      assert.equal(entry.definitionRef.version, entry.definition.version, entry.entryId);
+      assert.equal(entry.sourceLayer, "system-default", entry.entryId);
+      assert.equal(sourcePack?.packId, "system.foundation", entry.entryId);
+      assert.equal(sourcePack?.version, "1.0.0", entry.entryId);
+      assert.match(entry.fingerprint, /^fnv1a:[a-f0-9]{8}$/, entry.entryId);
+      assert.match(String(entry.definition.definitionId), /^builtin\.[a-z0-9.-]+$/, entry.entryId);
+      assert.equal(seenDefinitionIds.has(String(entry.definition.definitionId)), false, entry.entryId);
+      seenDefinitionIds.add(String(entry.definition.definitionId));
+    }
+    assert.deepEqual(SYSTEM_FOUNDATION_PACK_MANIFEST.overrideRules, []);
+    assert.deepEqual(SYSTEM_FOUNDATION_PACK_MANIFEST.dependencies, []);
+  });
+
+  it("can express a future override rule targeting a foundation definition ref without changing the original", () => {
+    const targetEntry = SYSTEM_FOUNDATION_PACK_MANIFEST.assets[0];
+    assert.ok(targetEntry);
+    const original = JSON.parse(JSON.stringify(targetEntry));
+    const replacementRef = {
+      kind: "asset-definition-version",
+      id: "workspace.override.fixture" as never,
+      version: "1.0.0",
+      label: "Workspace Override Fixture",
+    } as const;
+    const overrideRule: AssetPackOverrideRule = {
+      ruleId: "workspace.override.fixture-rule",
+      targetRef: targetEntry.definitionRef,
+      replacementRef,
+      scope: "workspace",
+      sourceLayer: "workspace-pack",
+      priority: 100,
+      enabled: true,
+      conflictPolicy: "prefer-replacement",
+      reason: "Fixture demonstrates future non-mutating override targeting.",
+      createdByPackRef: {
+        packId: "workspace.fixture" as never,
+        version: "1.0.0",
+      },
+      metadata: {
+        fixtureOnly: true,
+        mutatesOriginal: false,
+      },
+    };
+
+    assert.equal(overrideRule.targetRef, targetEntry.definitionRef);
+    assert.notDeepEqual(overrideRule.replacementRef, targetEntry.definitionRef);
+    assert.deepEqual(targetEntry, original);
   });
 
   it("does not contain unsafe values or imply install and activation behavior", () => {

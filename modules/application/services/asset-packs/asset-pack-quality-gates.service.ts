@@ -26,10 +26,16 @@ const COMPOSITION_CATEGORY_IDS = new Set([
 const SHELL_CATEGORY_IDS = new Set(["page-feature-shells", "workflow-system-shells"]);
 const FORBIDDEN_RENDERER_PATTERN =
   /\b(?:react|vue|svelte|tsx|jsx|renderer file|component path|implementation path|css module|dom node)\b/i;
+const FORBIDDEN_IMPLEMENTATION_LEAKAGE_PATTERN =
+  /\b(?:route path|route implementation|api endpoint|api client|ipc channel|ipc handler|renderer component|renderer page|component implementation|css class|style class|table library|data-grid implementation)\b/i;
+const FORBIDDEN_WORKFLOW_RUNTIME_PATTERN =
+  /\b(?:workflow engine|workflow runner|task runner|scheduler|queue|runtime task|runtime execution|start runtime|create task|schedule job)\b/i;
 const EXECUTION_REQUIREMENT_PATTERN =
   /\b(?:runtime-execution|network|filesystem-read|filesystem-write|secret-read|external-provider-access)\b/i;
 const EXECUTION_CLAIM_PATTERN =
   /\b(?:can|will|must|should|required to|requires)\s+(?:execute|run|start|call|write|read|submit|validate)\b/i;
+const UNSAFE_BEHAVIOR_CLAIM_PATTERN =
+  /\b(?:fetch records|fetch data|read(?:ing)? file|read(?:ing)? resource|read(?:ing)? resources|read(?:ing)? storage|write storage|write file|submit data|save data|run validation|validate data|execute workflow|run workflow|start runtime|create task|schedule job|call provider|call api|invoke ipc|download|upload|render preview|preview rendering|render(?:ing)? resource content|decode image|open file|call network|network call|provider call|provider integration|storage read|storage write|filesystem read|filesystem write|read bytes|read content|resource content|resource bytes|byte read|content read)\b/i;
 
 export function runAssetPackQualityGates(
   entry: AssetPackAssetEntry,
@@ -220,6 +226,8 @@ function validateNoUnsafeValues(
     if (
       isUnsafeAssetMetadataString(current.value) ||
       FORBIDDEN_RENDERER_PATTERN.test(current.value) ||
+      isUnsafeImplementationLeakage(current.value) ||
+      isUnsafeBehaviorClaim(current.value) ||
       (EXECUTION_CLAIM_PATTERN.test(current.value) &&
         !isSafeNonGoalExecutionText(current.value))
     ) {
@@ -245,9 +253,10 @@ function validateRuntimeRequirements(
     walk(entry.definition, ["definition"], (current, path) => {
       if (typeof current.value !== "string") return;
       if (
-        /\b(?:execute|execution|run workflow|start runtime|task runner|workflow engine|scheduler)\b/i.test(
-          current.value,
-        ) &&
+        (FORBIDDEN_WORKFLOW_RUNTIME_PATTERN.test(current.value) ||
+          /\b(?:execute|execution|run workflow|start runtime)\b/i.test(
+            current.value,
+          )) &&
         !isSafeNonGoalExecutionText(current.value)
       ) {
         addIssue(issues, "error", "composition", "Shell primitives must not imply execution behavior.", path);
@@ -257,7 +266,19 @@ function validateRuntimeRequirements(
 }
 
 function isSafeNonGoalExecutionText(value: string): boolean {
-  return /\b(?:does not|do not|no|not|without|outside|avoid|deferred)\b/i.test(value);
+  return /\b(?:does not|do not|no|not|without|outside|avoid|deferred|not implemented by this definition)\b/i.test(value);
+}
+
+function isUnsafeImplementationLeakage(value: string): boolean {
+  return (
+    (FORBIDDEN_IMPLEMENTATION_LEAKAGE_PATTERN.test(value) ||
+      FORBIDDEN_WORKFLOW_RUNTIME_PATTERN.test(value)) &&
+    !isSafeNonGoalExecutionText(value)
+  );
+}
+
+function isUnsafeBehaviorClaim(value: string): boolean {
+  return UNSAFE_BEHAVIOR_CLAIM_PATTERN.test(value) && !isSafeNonGoalExecutionText(value);
 }
 
 function walk(
