@@ -120,8 +120,9 @@ export class AssetSourceIdentityService {
   public deriveFromImportedOrLocalizedExternalObject(
     input: ImportedOrLocalizedExternalObjectIdentityInput,
   ): AssetSourceIdentity {
+    const safeBackings = safeImportedBackings(input.backings);
     const seed = input.resourceRefs.map((ref) => `${ref.kind}:${safeIdentityPart(ref.id, "resource")}:${sanitizeAssetStringValue(ref.version) ?? ""}`).join("|")
-      || input.backings.map((backing) => safeIdentityPart(backing.backingId, "backing")).join("|");
+      || safeBackings.map((backing) => safeIdentityPart(backing.backingId, "backing")).join("|");
     const sourceFingerprint = stableHash(JSON.stringify(sanitizeAssetViewValue({
       operation: input.operation,
       seed,
@@ -143,7 +144,7 @@ export class AssetSourceIdentityService {
       sourceSystem: sourceKind === "image-asset" ? "image-asset" : sourceKind,
       sourceId: `${input.operation}.${stableHash(seed)}`,
       sourceFingerprint,
-      backingRefs: input.backings,
+      ...(safeBackings.length ? { backingRefs: safeBackings } : {}),
       deduplicationKey: `asset-source.${sourceKind}.${stableHash([input.operation, seed, sourceFingerprint].join("|"))}`,
     };
   }
@@ -225,6 +226,32 @@ function safeBackingsFor(view: AssetResourceBackedView): readonly AssetResourceB
     if (key && !unique.has(key)) unique.set(key, safeBacking);
   }
   return [...unique.values()];
+}
+
+function safeImportedBackings(backings: readonly AssetResourceBacking[]): readonly AssetResourceBacking[] {
+  return backings
+    .map((backing) => {
+      const sanitized = sanitizeAssetViewValue(backing) as AssetResourceBacking;
+      const ref = sanitizeImportedBackingRef(sanitized.ref);
+      return {
+        ...sanitized,
+        backingId: safeIdentityPart(backing.backingId, "backing"),
+        ...(ref ? { ref } : {}),
+      };
+    })
+    .filter((backing) => typeof backing.backingId === "string" && backing.backingId.length > 0);
+}
+
+function sanitizeImportedBackingRef(ref: unknown): AssetResourceBacking["ref"] | undefined {
+  if (!ref || typeof ref !== "object") return sanitizeAssetViewValue(ref) as AssetResourceBacking["ref"] | undefined;
+  const record = sanitizeAssetViewValue(ref) as Record<string, unknown>;
+  if (typeof record.id === "string") {
+    return {
+      ...record,
+      id: safeIdentityPart(record.id, "resource"),
+    } as AssetResourceBacking["ref"];
+  }
+  return record as unknown as AssetResourceBacking["ref"];
 }
 
 function assetReferenceId(value: unknown): string | undefined {

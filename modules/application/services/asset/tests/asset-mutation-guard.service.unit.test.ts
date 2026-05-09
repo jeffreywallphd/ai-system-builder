@@ -88,6 +88,28 @@ describe("asset mutation guard", () => {
     assert.equal(validateImportExternalRepositoryObjectMutationGuard(importCommand({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowFilesystemWrite: true } }))?.code, "permission");
   });
 
+  it("keeps metadata-only import modes under conservative Phase 4 capability approval", () => {
+    for (const importMode of ["remote-reference", "catalog-registration"] as const) {
+      assert.equal(validateImportExternalRepositoryObjectMutationGuard(importCommand({ importMode })), undefined);
+      assert.equal(validateImportExternalRepositoryObjectMutationGuard(importCommand({
+        importMode,
+        approval: { userConfirmed: true, confirmationKind: "import-external-object", allowCredentialUse: true, allowFilesystemWrite: true, allowPartialCompletion: true },
+      }))?.code, "permission");
+      assert.equal(validateImportExternalRepositoryObjectMutationGuard(importCommand({
+        importMode,
+        approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowFilesystemWrite: true, allowPartialCompletion: true },
+      }))?.code, "permission");
+      assert.equal(validateImportExternalRepositoryObjectMutationGuard(importCommand({
+        importMode,
+        approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowPartialCompletion: true },
+      }))?.code, "permission");
+      assert.equal(validateImportExternalRepositoryObjectMutationGuard(importCommand({
+        importMode,
+        approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowFilesystemWrite: true },
+      }))?.code, "permission");
+    }
+  });
+
   it("requires explicit external object localization approval, network, credential, filesystem write, and partial-completion approval", () => {
     assert.equal(validateLocalizeExternalRepositoryObjectMutationGuard(localizeCommand()), undefined);
     assert.equal(validateLocalizeExternalRepositoryObjectMutationGuard(localizeCommand({ approval: { userConfirmed: false, confirmationKind: "localize-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowFilesystemWrite: true, allowPartialCompletion: true } }))?.code, "approval-required");

@@ -47,9 +47,23 @@ describe("ExternalRepositoryObjectLocalizationPort", () => {
     const result = await port.processExternalRepositoryObject(request);
     assert.equal(result.ok, true);
     assert.equal(result.status, "localized");
-    assert.equal("token" in request, false);
-    assert.equal("authorization" in request, false);
-    assert.equal("bytes" in request, false);
+    assert.deepEqual(Object.keys(request).sort(), [
+      "correlationId",
+      "externalObjectRef",
+      "idempotencyKey",
+      "operation",
+      "requestId",
+      "sourceIdentity",
+      "targetDefinitionRef",
+      "viewId",
+    ]);
+    assert.deepEqual(Object.keys(request.externalObjectRef).sort(), [
+      "objectKind",
+      "objectPath",
+      "provider",
+      "repositoryId",
+    ]);
+    assert.doesNotMatch(JSON.stringify(request), /token|secret|authorization|authHeader|signedUrl|downloadUrl|localPath|destinationPath|C:\\|\/tmp|rawProvider|payload|bytes|blob|base64|data:|sourceView|fileContents|raw error|stack/i);
   });
 
   it("port module does not import adapters, hosts, transport, UI, runtime, storage, persistence, provider clients, or filesystem APIs", () => {

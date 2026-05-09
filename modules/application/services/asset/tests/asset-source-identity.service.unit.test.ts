@@ -171,4 +171,32 @@ describe("asset source identity service", () => {
     assert.notEqual(imported.deduplicationKey, localized.deduplicationKey);
     assert.doesNotMatch(JSON.stringify({ finalized, imported, localized }), /data.csv|C:\\|token|base64|prompt/i);
   });
+
+  it("hashes imported/localized source ids when internal refs contain local or object paths", () => {
+    const service = new AssetSourceIdentityService();
+    const external = service.deriveFromResourceBackedView(view({
+      viewKind: "external-repository-object",
+      assetType: "model",
+      resourceBacking: {
+        backingId: "https://host/private/model.bin?token=hidden",
+        resourceKind: "external-repository-object",
+        ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "private/model.bin" },
+      },
+    })).sourceIdentity!;
+    const localized = service.deriveFromImportedOrLocalizedExternalObject({
+      operation: "localize",
+      sourceIdentity: external,
+      resourceRefs: [{ kind: "artifact", id: "C:\\Users\\name\\.cache\\huggingface\\hub\\model.bin" as AssetReference["id"] }],
+      backings: [{
+        backingId: "private/model.bin",
+        resourceKind: "artifact",
+        ref: { kind: "artifact", id: "/tmp/cache/private/model.bin" as AssetReference["id"] },
+        metadata: { localPath: "C:\\Users\\name\\model.bin", objectPath: "private/model.bin", token: "hidden" },
+      }],
+    });
+
+    assert.match(localized.sourceId, /^localize\.[a-z0-9]+$/);
+    assert.match(localized.deduplicationKey, /^asset-source\.model\.[a-z0-9]+$/);
+    assert.doesNotMatch(JSON.stringify(localized), /C:\\|\/tmp|\.cache|huggingface|private\/model\.bin|token|https:\/\/host/i);
+  });
 });

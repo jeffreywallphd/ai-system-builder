@@ -1,12 +1,12 @@
 import type { AssetJsonObject, AssetJsonValue, AssetMetadata } from "../../../contracts/asset";
 
 const FORBIDDEN_ASSET_METADATA_KEY_PATTERN =
-  /(token|secret|password|credential|authorization|auth|requestid|taskid|promptid|prompt|negativeprompt|workflow|storagerootdirectory|runtimerootdirectory|localpath|filesystempath|filepath|path|cache|signedurl|presignedurl|accessurl|downloadurl|bytes|blob|contentbase64|base64|raw|payload|command|stack|env)/i;
-const LOCAL_FILESYSTEM_PATH_VALUE_PATTERN = /(^~\/|^\.\.?\/|^\/(?:tmp|var|home|users|etc|private|opt|usr|mnt|volumes)(?:\/|$)|^[a-z]:[\\/]|\\(?:Users|Temp)\\|\/(?:tmp|temp)\/)/i;
+  /(token|secret|password|credential|authorization|auth|api[_-]?key|apikey|requestid|taskid|promptid|prompt|negativeprompt|workflow|storagerootdirectory|runtimerootdirectory|localpath|filesystempath|filepath|path|cache|hf[_-]?home|huggingface|signedurl|presignedurl|accessurl|downloadurl|dataurl|bytes|blob|contentbase64|base64|raw|payload|command|stack|env)/i;
+const LOCAL_FILESYSTEM_PATH_VALUE_PATTERN = /(^~\/|^\.\.?\/|^\/(?:tmp|var|home|users|etc|private|opt|usr|mnt|volumes)(?:\/|$)|^[a-z]:[\\/]|\\(?:Users|Temp)\\|\/(?:tmp|temp)\/|[\\/]\.cache[\\/]huggingface(?:[\\/]|$)|[\\/]huggingface[\\/]hub(?:[\\/]|$))/i;
 const AUTH_BEARING_VALUE_PATTERN = /(bearer\s+[a-z0-9._~+/=-]+|(?:api[_-]?key|api\s+key|apikey)\s*[=:]|\bapi[_-]?key\b|\bapikey\b|(?:token|password|secret)\s*[=:]|\b(?:token|password|secret|auth)\b|authorization\s*:)/i;
 const DATA_BASE64_VALUE_PATTERN = /^data:[^,;]+;base64,/i;
 const LONG_BASE64_VALUE_PATTERN = /^[A-Za-z0-9+/]{80,}={0,2}$/;
-const RAW_PROVIDER_OR_EXCEPTION_VALUE_PATTERN = /\b(?:raw\s+)?(?:provider\s+payloads?|exception\s+message|raw\s+exception|stack\s+trace|stack|command|base64|bytes?|blobs?|process\.env)\b/i;
+const RAW_PROVIDER_OR_EXCEPTION_VALUE_PATTERN = /\b(?:raw\s+)?(?:provider\s+payloads?|metadata\s+payloads?|exception\s+message|raw\s+exception|stack\s+trace|stack|command|base64|bytes?|blobs?|process\.env|hf_home|huggingface_home|transformers_cache)\b/i;
 const SIGNED_OR_QUERY_URL_VALUE_PATTERN = /^https?:\/\/\S+\?(?:\S*?(?:x-amz-signature|x-goog-signature|signature|sig|token|access_token|auth|expires|X-Amz-Signature)=\S+|\S{24,})/i;
 const PROVIDER_OR_TOKEN_URL_VALUE_PATTERN = /^(?:hf|huggingface|s3|gs|file):\/\/\S+/i;
 const PROMPT_OR_WORKFLOW_VALUE_PATTERN = /^(?:prompt|negative[-_ ]?prompt|workflowjson|workflow[-_ ]?json)(?:\b|[-_:])/i;
