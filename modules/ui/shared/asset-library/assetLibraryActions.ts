@@ -59,6 +59,10 @@ export interface AssetLibraryMutationDisplay {
   readonly details?: readonly string[];
 }
 
+export interface GetAssetLibraryMutationActionsOptions {
+  readonly thinClientMode?: boolean;
+}
+
 const ELIGIBLE_REGISTER_VIEW_KINDS = new Set([
   "artifact",
   "document",
@@ -68,18 +72,24 @@ const ELIGIBLE_REGISTER_VIEW_KINDS = new Set([
 ]);
 
 const UNSAFE_TEXT_PATTERN =
-  /(C:\\|\/tmp\/|\/var\/|\/Users\/|\\Users\\|bearer|token|secret|password|authorization|signed|x-amz-signature|access_token|base64|data:|bytes|blob|stack|process\.env|workflow|prompt|provider payload|raw payload|command line)/i;
+  /(C:\\|\/tmp\/|\/var\/|\/home\/|\/Users\/|\\Users\\|bearer|token|secret|password|authorization|signed|signedUrl|x-amz-signature|access_token|apiKey|base64|data:|data:image|bytes|blob|stack|process\.env|workflowJson|workflow|prompt|provider payload|raw payload|command line)/i;
+const SAFE_VIEW_ID_PATTERN = /^[A-Za-z0-9._:-]{3,200}$/;
 
 export function getAssetLibraryMutationActions(
   view: AssetLibraryResourceBackedViewCard | AssetLibraryResourceBackedViewDetail,
+  options: GetAssetLibraryMutationActionsOptions = {},
 ): readonly AssetLibraryMutationAction[] {
+  if (!hasSafeViewId(view) || hasUnsafeOrUnsupportedDiagnostics(view) || sourceIdentityIsMissing(view)) return [];
   if (isAlreadyRegistered(view)) return [];
+  if (options.thinClientMode === true && isThinClientUnsafe(view)) return [];
 
   if (view.viewKind === "generated-output") {
+    if (generatedOutputIsIneligible(view)) return [];
     return [finalizeGeneratedOutputAction()];
   }
 
   if (view.viewKind === "external-repository-object") {
+    if (externalRepositoryLabelsAreUnsafe(view)) return [];
     return [importExternalObjectAction(), localizeExternalObjectAction()];
   }
 
@@ -113,33 +123,35 @@ export function buildAssetLibraryMutationCommand({
     ...(context ? { context } : {}),
   };
 
-  if (action.id === "finalize-generated-output") {
-    return {
-      ...base,
-      operation: "asset.finalize-generated-output",
-      viewId: view.viewId,
-    };
+  switch (action.operation) {
+    case "asset.register-resource-backed-view":
+      return {
+        ...base,
+        operation: "asset.register-resource-backed-view",
+        viewId: view.viewId,
+      };
+    case "asset.finalize-generated-output":
+      return {
+        ...base,
+        operation: "asset.finalize-generated-output",
+        viewId: view.viewId,
+      };
+    case "asset.import-external-repository-object":
+      return {
+        ...base,
+        operation: "asset.import-external-repository-object",
+        viewId: view.viewId,
+        importMode: "remote-reference",
+      };
+    case "asset.localize-external-repository-object":
+      return {
+        ...base,
+        operation: "asset.localize-external-repository-object",
+        viewId: view.viewId,
+      };
+    default:
+      return assertNeverOperation(action.operation);
   }
-  if (action.id === "import-external-object") {
-    return {
-      ...base,
-      operation: "asset.import-external-repository-object",
-      viewId: view.viewId,
-      importMode: "remote-reference",
-    };
-  }
-  if (action.id === "localize-external-object") {
-    return {
-      ...base,
-      operation: "asset.localize-external-repository-object",
-      viewId: view.viewId,
-    };
-  }
-  return {
-    ...base,
-    operation: "asset.register-resource-backed-view",
-    viewId: view.viewId,
-  };
 }
 
 export function describeAssetMutationResult(result: AssetMutationResult): AssetLibraryMutationDisplay {
@@ -268,7 +280,7 @@ function importExternalObjectAction(): AssetLibraryMutationAction {
     operation: "asset.import-external-repository-object",
     requiresConfirmation: true,
     confirmationTitle: "Import this external object?",
-    confirmationMessage: "This may contact the provider, use configured credentials, write local metadata, and create an asset record.",
+    confirmationMessage: "This remote-reference import is intentionally conservative: it may contact the provider, use configured credentials, write durable catalog or local metadata, partly complete, and create an asset record.",
     creates: "An imported asset record",
     approvalDefaults: {
       userConfirmed: false,
@@ -278,7 +290,7 @@ function importExternalObjectAction(): AssetLibraryMutationAction {
       allowFilesystemWrite: true,
       allowPartialCompletion: true,
     },
-    riskSummary: ["Network or provider access may occur.", "Configured credentials may be used.", "Local storage may be written."],
+    riskSummary: ["Network or provider access may occur.", "Configured credentials may be used.", "Durable catalog or local storage may be written.", "If import partly completes, you may need to retry."],
   };
 }
 
@@ -309,9 +321,51 @@ function localizeExternalObjectAction(): AssetLibraryMutationAction {
 function isAlreadyRegistered(view: AssetLibraryResourceBackedViewCard | AssetLibraryResourceBackedViewDetail): boolean {
   const metadata = "metadata" in view ? view.metadata : undefined;
   if (metadata && typeof metadata.registered === "boolean") return metadata.registered;
+  if (metadata && typeof metadata.finalized === "boolean" && metadata.finalized === true) return true;
+  if (metadata && typeof metadata.imported === "boolean" && metadata.imported === true) return true;
   return view.registrationStatusLabel === "Registered" ||
     view.registrationStatusLabel === "Finalized or registered" ||
     view.registrationStatusLabel === "Imported or registered";
+}
+
+function hasSafeViewId(view: AssetLibraryResourceBackedViewCard | AssetLibraryResourceBackedViewDetail): boolean {
+  return safeText(view.viewId) !== undefined && SAFE_VIEW_ID_PATTERN.test(view.viewId);
+}
+
+function hasUnsafeOrUnsupportedDiagnostics(view: AssetLibraryResourceBackedViewCard | AssetLibraryResourceBackedViewDetail): boolean {
+  return (view.diagnostics ?? []).some((diagnostic) => {
+    if (safeText(diagnostic) === undefined) return true;
+    return /\b(unsupported|not configured|not wired|not-wired|unavailable|deferred|unsafe)\b/i.test(diagnostic);
+  });
+}
+
+function sourceIdentityIsMissing(view: AssetLibraryResourceBackedViewCard | AssetLibraryResourceBackedViewDetail): boolean {
+  if (!Object.prototype.hasOwnProperty.call(view, "sourceKind")) return false;
+  return safeText(view.sourceKind) === undefined;
+}
+
+function isThinClientUnsafe(view: AssetLibraryResourceBackedViewCard | AssetLibraryResourceBackedViewDetail): boolean {
+  const metadata = "metadata" in view ? view.metadata : undefined;
+  return isRecord(metadata) && metadata.thinClientSafe === false;
+}
+
+function generatedOutputIsIneligible(view: AssetLibraryResourceBackedViewCard | AssetLibraryResourceBackedViewDetail): boolean {
+  const metadata = "metadata" in view ? view.metadata : undefined;
+  if (!isRecord(metadata)) return false;
+  if (metadata.previewOnly === true || metadata.preview === true) return true;
+  if (metadata.eligibleForFinalization === false || metadata.finalizationEligible === false) return true;
+  const status = safeText(metadata.status ?? metadata.generatedOutputStatus ?? metadata.finalizationStatus);
+  if (!status) return false;
+  return !/^(completed|complete|ready|succeeded|success)$/i.test(status);
+}
+
+function externalRepositoryLabelsAreUnsafe(view: AssetLibraryResourceBackedViewCard | AssetLibraryResourceBackedViewDetail): boolean {
+  const metadata = "metadata" in view ? view.metadata : undefined;
+  if (!isRecord(metadata)) return false;
+  for (const key of ["provider", "repository", "objectLabel", "objectName", "objectKind"] as const) {
+    if (Object.prototype.hasOwnProperty.call(metadata, key) && safeText(metadata[key]) === undefined) return true;
+  }
+  return false;
 }
 
 function safeDiagnosticMessages(value: unknown): readonly string[] {
@@ -384,4 +438,8 @@ function safeDiagnosticSeverity(value: unknown): "info" | "warning" | "error" | 
 
 function failureMessageForCode(code: NonNullable<AssetMutationResult["failure"]>["code"]): string {
   return describeAssetMutationResult({ ok: false, operation: "asset.register-resource-backed-view", failure: { code, operation: "asset.register-resource-backed-view", message: "" } }).message;
+}
+
+function assertNeverOperation(value: never): never {
+  throw new Error(`Unsupported asset mutation operation: ${String(value)}`);
 }

@@ -7,7 +7,9 @@ import {
   type AssetLibraryResourceBackedViewCard,
 } from "../index";
 
-function view(overrides: Partial<AssetLibraryResourceBackedViewCard>): AssetLibraryResourceBackedViewCard {
+type TestResourceView = AssetLibraryResourceBackedViewCard & { readonly metadata?: Record<string, unknown> };
+
+function view(overrides: Partial<TestResourceView>): TestResourceView {
   return {
     id: "view-1",
     viewId: "view-1",
@@ -18,6 +20,7 @@ function view(overrides: Partial<AssetLibraryResourceBackedViewCard>): AssetLibr
     assetFamilyLabel: "Unknown family",
     lifecycleStatusLabel: "Not registered",
     registrationStatusLabel: "Read-only view",
+    sourceKind: "artifact-browser",
     ...overrides,
   };
 }
@@ -52,6 +55,16 @@ describe("asset library mutation action helpers", () => {
   it("does not expose actions for preview or already registered views", () => {
     expect(getAssetLibraryMutationActions(view({ viewKind: "preview" }))).toEqual([]);
     expect(getAssetLibraryMutationActions(view({ viewKind: "artifact", registrationStatusLabel: "Registered" }))).toEqual([]);
+    expect(getAssetLibraryMutationActions(view({ viewKind: "generated-output", registrationStatusLabel: "Not finalized or registered", metadata: { finalized: true } }))).toEqual([]);
+    expect(getAssetLibraryMutationActions(view({ viewKind: "external-repository-object", registrationStatusLabel: "Not imported or registered", metadata: { imported: true } }))).toEqual([]);
+  });
+
+  it("keeps UI eligibility conservative and advisory for clearly unsafe or incomplete views", () => {
+    expect(getAssetLibraryMutationActions(view({ viewId: "C:\\Users\\name\\secret", viewKind: "artifact" }))).toEqual([]);
+    expect(getAssetLibraryMutationActions(view({ viewKind: "artifact", sourceKind: undefined }))).toEqual([]);
+    expect(getAssetLibraryMutationActions(view({ viewKind: "artifact", diagnostics: ["Provider is not wired for this host."] }))).toEqual([]);
+    expect(getAssetLibraryMutationActions(view({ viewKind: "generated-output", metadata: { status: "running" } }))).toEqual([]);
+    expect(getAssetLibraryMutationActions(view({ viewKind: "artifact", metadata: { thinClientSafe: false } }), { thinClientMode: true })).toEqual([]);
   });
 
   it("builds safe commands without copying the full view payload", () => {

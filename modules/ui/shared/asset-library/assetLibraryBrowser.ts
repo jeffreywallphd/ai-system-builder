@@ -18,6 +18,7 @@ import type {
   AssetLibraryResourceBackedViewCard,
   AssetLibraryResourceBackedViewDetail,
 } from "./assetLibraryReadModels";
+import { sanitizeAssetLibraryDisplayText } from "./assetLibraryMappers";
 
 export type AssetLibraryBrowserTab = "definitions" | "resource-views";
 
@@ -154,10 +155,10 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
       setResourceBackedViews([]);
     }
     setDiagnostics([
-      ...(result.value.diagnostics ?? []).map((diagnostic) => diagnostic.message),
+      ...(result.value.diagnostics ?? []).map((diagnostic) => diagnostic.message).map(safeDisplayText).filter(isString),
       ...(resourceResult.ok === true
-        ? (resourceResult.value.diagnostics ?? []).map((diagnostic) => diagnostic.message)
-        : [resourceResult.error.message || "Unable to load resource-backed views."]),
+        ? (resourceResult.value.diagnostics ?? []).map((diagnostic) => diagnostic.message).map(safeDisplayText).filter(isString)
+        : [safeDisplayText(resourceResult.error.message) ?? "Unable to load resource-backed views."]),
     ]);
     setIsLoadingList(false);
 
@@ -231,7 +232,7 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
     if (result.ok === true) {
       setSelectedResourceBackedViewDetail(result.value);
     } else {
-      setDetailError(result.error.message || "Unable to load this resource-backed view.");
+      setDetailError(safeDisplayText(result.error.message) ?? "Unable to load this resource-backed view.");
     }
     setIsLoadingDetail(false);
   }, [client]);
@@ -279,4 +280,12 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient): As
     loadValidationDetails,
     refresh: loadList,
   };
+}
+
+function safeDisplayText(value: unknown): string | undefined {
+  return sanitizeAssetLibraryDisplayText(value);
+}
+
+function isString(value: string | undefined): value is string {
+  return typeof value === "string";
 }

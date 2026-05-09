@@ -35,6 +35,7 @@ const resourceViewCard: AssetLibraryResourceBackedViewCard = {
   assetFamily: "resource-backed",
   assetFamilyLabel: "Resource Backed",
   lifecycleStatusLabel: "Not registered",
+  sourceKind: "generated-output",
   registrationStatusLabel: "Not finalized or registered",
 };
 
