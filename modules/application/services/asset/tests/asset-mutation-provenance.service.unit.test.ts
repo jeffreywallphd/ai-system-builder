@@ -155,8 +155,20 @@ describe("asset mutation provenance service", () => {
   it("creates sanitized external repository object import provenance", () => {
     const provenance = new AssetMutationProvenanceService().createForExternalRepositoryObjectImportOrLocalization({
       command: importCommand,
-      sourceIdentity: externalIdentity,
-      importedOrLocalizedIdentity: importedIdentity,
+      sourceIdentity: {
+        ...externalIdentity,
+        sourceId: "external.unsafe-path-source",
+      },
+      importedOrLocalizedIdentity: {
+        ...importedIdentity,
+        sourceId: "import.opaque",
+        backingRefs: [{
+          backingId: "backing.opaque",
+          resourceKind: "artifact",
+          ref: { kind: "artifact", id: "resource.opaque" as AssetReference["id"] },
+          metadata: { localPath: "C:\\Users\\name\\model.bin", token: "secret" },
+        }],
+      },
       sourceView: externalView,
       createdAt: "2026-05-08T12:00:00.000Z",
       result: {
@@ -170,6 +182,6 @@ describe("asset mutation provenance service", () => {
     });
     assert.equal(provenance.operation, "asset.import-external-repository-object");
     assert.equal(provenance.createdProvenance?.sourceKind, "imported");
-    assert.doesNotMatch(JSON.stringify(provenance), /secret|signedUrl|token|rawProviderPayload|base64|bytes|blob|stack|C:\\|https:\/\/example/i);
+    assert.doesNotMatch(JSON.stringify(provenance), /secret|signedUrl|token|rawProviderPayload|localPath|storageRoot|runtimeRoot|cache|base64|bytes|blob|stack|command|process\.env|C:\\|https:\/\/example/i);
   });
 });

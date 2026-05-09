@@ -19,7 +19,7 @@ import type {
   ExternalRepositoryObjectLocalizationResult,
 } from "../../../ports/asset";
 import type { AssetRegistryReadOptions, AssetRegistryResourceBackedViewDetail } from "../../../services/asset";
-import { AssetSourceIdentityService, BUILT_IN_ASSET_DEFINITIONS } from "../../../services/asset";
+import { AssetSourceIdentityService, BUILT_IN_ASSET_DEFINITIONS, validateImportExternalRepositoryObjectMutationGuard } from "../../../services/asset";
 import { ImportExternalRepositoryObjectAsAssetUseCase } from "..";
 
 class FakeDefinitionRepository implements AssetDefinitionRepositoryPort {
@@ -75,8 +75,10 @@ class FakeReadPort {
 class FakeExternalObjectPort implements ExternalRepositoryObjectLocalizationPort {
   public readonly calls: ExternalRepositoryObjectLocalizationRequest[] = [];
   public result: ExternalRepositoryObjectLocalizationResult = importedResult();
+  public throws = false;
   public async processExternalRepositoryObject(request: ExternalRepositoryObjectLocalizationRequest): Promise<ExternalRepositoryObjectLocalizationResult> {
     this.calls.push(request);
+    if (this.throws) throw new Error("C:\\secret\\token raw provider payload stack");
     return this.result;
   }
 }
@@ -125,7 +127,7 @@ function externalView(overrides: Partial<AssetResourceBackedView> = {}): AssetRe
         objectPath: "artifacts/model.bin",
         objectKind: "artifact",
         contentType: "application/octet-stream",
-        metadata: { token: "secret-token", ok: "safe" },
+        metadata: { providerLabel: "Hugging Face", repositoryLabel: "owner/repo", objectLabel: "model.bin" },
       },
       role: "source",
       displayName: "External Safe",
@@ -198,6 +200,10 @@ describe("ImportExternalRepositoryObjectAsAssetUseCase", () => {
     assert.equal(result.assetInstance?.definitionRef.id, "builtin.artifact");
     assert.equal(result.assetInstance?.metadata?.externalRepositoryObjectImport, true);
     assert.doesNotMatch(JSON.stringify({ result, saved: instances.saved }), /secret-token|signedUrl|rawProviderPayload|localPath|C:\\|token|base64|bytes|blob|stack/i);
+    assert.match(String(result.sourceIdentity?.deduplicationKey), /^asset-source\.external-repository-object\.[a-z0-9]+$/);
+    const externalMetadata = result.assetInstance?.metadata?.externalRepositoryObject as Record<string, unknown> | undefined;
+    const importedIdentity = externalMetadata?.importedOrLocalizedIdentity as Record<string, unknown> | undefined;
+    assert.match(String(importedIdentity?.sourceId), /^import\.[a-z0-9]+$/);
   });
 
   it("runs guard failures before source reads, duplicate lookups, definition lookups, port calls, or saves", async () => {
@@ -243,6 +249,28 @@ describe("ImportExternalRepositoryObjectAsAssetUseCase", () => {
     assert.equal(instances.saved.length, 0);
   });
 
+  it("keeps import approval conservative for remote-reference and catalog-registration modes", async () => {
+    for (const importMode of ["remote-reference", "catalog-registration"] as const) {
+      assert.equal(validateImportResult(command({ importMode })), undefined);
+      assert.equal(validateImportResult(command({
+        importMode,
+        approval: { userConfirmed: true, confirmationKind: "import-external-object", allowCredentialUse: true, allowFilesystemWrite: true, allowPartialCompletion: true },
+      })), "permission");
+      assert.equal(validateImportResult(command({
+        importMode,
+        approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowFilesystemWrite: true, allowPartialCompletion: true },
+      })), "permission");
+      assert.equal(validateImportResult(command({
+        importMode,
+        approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowPartialCompletion: true },
+      })), "permission");
+      assert.equal(validateImportResult(command({
+        importMode,
+        approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowFilesystemWrite: true },
+      })), "permission");
+    }
+  });
+
   it("re-reads by view id, rejects invalid external views, and does not trust caller payloads", async () => {
     const read = new FakeReadPort();
     read.details.set("view.external", { view: externalView({ displayName: "Server Truth" }) });
@@ -264,6 +292,43 @@ describe("ImportExternalRepositoryObjectAsAssetUseCase", () => {
     assert.equal((await useCase.execute(command({ viewId: "view.unsafe" }))).failure?.code, "validation");
     assert.equal((await useCase.execute(command({ viewId: "view.unsupported" }))).failure?.code, "validation");
     assert.equal(port?.calls.length, 1);
+  });
+
+  it("rejects unsafe external object refs before calling the port", async () => {
+    const unsafeRefs: Array<{ name: string; ref: Record<string, unknown> }> = [
+      { name: "signed URL", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", signedUrl: "https://example.invalid/file?X-Amz-Signature=secret" } },
+      { name: "token URL", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", downloadUrl: "https://example.invalid/file?token=secret" } },
+      { name: "query credentials", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin?token=secret" } },
+      { name: "Bearer", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", authorization: "Bearer secret" } },
+      { name: "token", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", token: "secret" } },
+      { name: "secret", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", secret: "hidden" } },
+      { name: "password", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", password: "hidden" } },
+      { name: "apiKey", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", apiKey: "hidden" } },
+      { name: "auth headers", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", headers: { authorization: "Bearer hidden" } } },
+      { name: "local filesystem path", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "C:\\Users\\name\\model.bin" } },
+      { name: "Hugging Face cache path", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "models/model.bin", cachePath: "C:\\Users\\name\\.cache\\huggingface\\hub\\model.bin" } },
+      { name: "temp cache path", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "models/model.bin", tempPath: "/tmp/cache/model.bin" } },
+      { name: "raw provider payload", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", rawProviderPayload: { ok: true } } },
+      { name: "raw metadata payload", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", rawMetadata: { ok: true } } },
+      { name: "bytes", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", bytes: [1, 2, 3] } },
+      { name: "blob", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", blob: "blob" } },
+      { name: "base64", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", contentBase64: "QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB" } },
+      { name: "data URL", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", dataUrl: "data:application/octet-stream;base64,AAAA" } },
+      { name: "command line", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", commandLine: "python download.py" } },
+      { name: "stack trace", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", stack: "Error: bad\n    at file.ts:1:2" } },
+      { name: "environment value", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin", env: "HF_TOKEN=secret" } },
+    ];
+
+    for (const { name, ref } of unsafeRefs) {
+      const read = new FakeReadPort();
+      read.details.set("view.external", { view: externalView({ resourceBacking: { ...externalView().resourceBacking!, ref: ref as never } }) });
+      const { useCase, port } = makeUseCase(read);
+      const result = await useCase.execute(command());
+
+      assert.equal(result.failure?.code, "validation", name);
+      assert.equal(port?.calls.length, 0, name);
+      assert.doesNotMatch(JSON.stringify(result), /Bearer secret|HF_TOKEN|X-Amz-Signature|contentBase64|rawProviderPayload|python download|file\.ts|C:\\Users/i, name);
+    }
   });
 
   it("does not call the port before duplicate and target-definition checks pass", async () => {
@@ -291,6 +356,27 @@ describe("ImportExternalRepositoryObjectAsAssetUseCase", () => {
     const serialized = JSON.stringify(port?.calls[0]);
     assert.match(serialized, /owner\/repo|artifacts\/model.bin|idem.safe/);
     assert.doesNotMatch(serialized, /secret-token|signedUrl|rawProviderPayload|downloadUrl|authorization|authHeader|localPath|C:\\|base64|bytes|blob|payload/i);
+    assert.deepEqual(Object.keys(port?.calls[0] ?? {}).sort(), [
+      "correlationId",
+      "externalObjectRef",
+      "idempotencyKey",
+      "importMode",
+      "operation",
+      "requestId",
+      "sourceIdentity",
+      "targetDefinitionRef",
+      "viewId",
+    ]);
+    assert.deepEqual(Object.keys(port?.calls[0]?.externalObjectRef ?? {}).sort(), [
+      "contentType",
+      "metadata",
+      "objectKind",
+      "objectPath",
+      "provider",
+      "repositoryId",
+      "revision",
+    ]);
+    assert.equal(port?.calls[0]?.externalObjectRef.metadata?.providerLabel, "Hugging Face");
   });
 
   it("registers missing instances for existing imported state and returns existing on later retries", async () => {
@@ -344,6 +430,34 @@ describe("ImportExternalRepositoryObjectAsAssetUseCase", () => {
     assert.equal(partial.failure?.safeDetails?.retrySafe, true);
   });
 
+  it("maps localization port failures to consistent sanitized mutation failure codes", async () => {
+    const read = new FakeReadPort();
+    read.details.set("view.external", { view: externalView() });
+
+    for (const code of ["validation", "permission", "not-found", "unavailable"] as const) {
+      const port = new FakeExternalObjectPort();
+      port.result = {
+        ok: false,
+        failure: {
+          code,
+          message: `Safe ${code} failure.`,
+          diagnostics: [{ severity: "error", code: `safe-${code}`, message: "Safe diagnostic.", safeDetails: { rawProviderPayload: "hidden", ok: "safe" } }],
+          safeDetails: { authorization: "Bearer hidden", ok: "safe" },
+        },
+      };
+
+      const result = await makeUseCase(read, new FakeDefinitionRepository(), new FakeInstanceRepository(), port).useCase.execute(command({ context: { idempotencyKey: `idem.${code}` } }));
+      assert.equal(result.failure?.code, code);
+      assert.doesNotMatch(JSON.stringify(result), /Bearer hidden|rawProviderPayload|authorization|token|C:\\|stack/i);
+    }
+
+    const throwingPort = new FakeExternalObjectPort();
+    throwingPort.throws = true;
+    const internal = await makeUseCase(read, new FakeDefinitionRepository(), new FakeInstanceRepository(), throwingPort).useCase.execute(command({ context: { idempotencyKey: "idem.internal" } }));
+    assert.equal(internal.failure?.code, "internal");
+    assert.doesNotMatch(JSON.stringify(internal), /C:\\secret|raw provider|token|stack/i);
+  });
+
   it("imports no adapters, hosts, public transports, UI, runtime, storage adapters, provider clients, or byte readers", () => {
     const source = readFileSync(
       join(process.cwd(), "modules/application/use-cases/asset/external-repository-object-as-asset-workflow.ts"),
@@ -353,6 +467,10 @@ describe("ImportExternalRepositoryObjectAsAssetUseCase", () => {
     assert.doesNotMatch(source, /\b(?:readBytes|readResourceBytes|fetch\(|startRuntime|probeRuntime|installRuntime|repairRuntime|RuntimeTaskRegistry|ComfyUI|ImageGenerationUseCase|seedBuiltIns|discoverModels|prepareDataset|trainModel|validateModel|publishModel|download\(|upload\(|readContent)\b/i);
   });
 });
+
+function validateImportResult(input: ImportExternalRepositoryObjectCommand): string | undefined {
+  return validateImportExternalRepositoryObjectMutationGuard(input)?.code;
+}
 
 function definitionRef(definition: AssetDefinition): AssetReference {
   return { kind: "asset-definition-version", id: String(definition.definitionId) as AssetReference["id"], version: definition.version };

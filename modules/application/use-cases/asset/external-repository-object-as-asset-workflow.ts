@@ -32,6 +32,8 @@ import {
   AssetMutationProvenanceService,
   assetSourceIdentityService,
   AssetSourceIdentityService,
+  isUnsafeAssetMetadataKey,
+  isUnsafeAssetMetadataString,
   sanitizeAssetMetadata,
   sanitizeAssetStringValue,
   sanitizeAssetViewValue,
@@ -578,24 +580,59 @@ function safeExternalObjectRef(view: AssetResourceBackedView): AssetExternalRepo
   const ref = view.resourceBacking?.ref;
   if (!ref || typeof ref !== "object") return undefined;
   const record = ref as unknown as Record<string, unknown>;
+  if (containsUnsafeExternalObjectRefContent(record)) return undefined;
   const provider = safeText(record.provider);
   const repositoryId = safeText(record.repositoryId);
-  if (!provider || !repositoryId || !safeProvider(provider) || !safeRepositoryId(repositoryId)) return undefined;
+  const safeProviderValue = provider ? safeProvider(provider) : undefined;
+  if (!safeProviderValue || !repositoryId || !safeRepositoryId(repositoryId)) return undefined;
   const objectKind = safeObjectKind(record.objectKind);
   const objectPath = safeObjectPath(record.objectPath);
   if (record.objectPath && !objectPath) return undefined;
   const revision = safeRevision(record.revision);
   const contentType = safeContentType(record.contentType);
   const metadata = sanitizeAssetMetadata(record.metadata as Record<string, unknown> | undefined);
-  return sanitizeAssetViewValue({
-    provider: safeProvider(provider),
+  return {
+    provider: safeProviderValue,
     repositoryId,
     ...(revision ? { revision } : {}),
     ...(objectPath ? { objectPath } : {}),
     ...(objectKind ? { objectKind } : {}),
     ...(contentType ? { contentType } : {}),
     ...(metadata ? { metadata } : {}),
-  }) as AssetExternalRepositoryObjectReference;
+  };
+}
+
+function containsUnsafeExternalObjectRefContent(value: unknown, seen = new WeakSet<object>()): boolean {
+  if (typeof value === "string") return unsafeExternalObjectRefString(value);
+  if (typeof value === "number" || typeof value === "boolean" || value === null || value === undefined) return false;
+  if (Array.isArray(value)) return value.some((entry) => containsUnsafeExternalObjectRefContent(entry, seen));
+  if (typeof value !== "object") return true;
+  if (seen.has(value)) return true;
+  seen.add(value);
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (unsafeExternalObjectRefKey(key)) return true;
+    if (containsUnsafeExternalObjectRefContent(entry, seen)) return true;
+  }
+  seen.delete(value);
+  return false;
+}
+
+function unsafeExternalObjectRefKey(key: string): boolean {
+  if (/^(provider|repositoryId|revision|objectKind|objectPath|contentType|metadata)$/i.test(key)) return false;
+  return isUnsafeAssetMetadataKey(key)
+    || /(headers?|cookies?|session|destination|download|upload|content|contents|body|buffer|dataurl|rawmetadata|metadataobject|providerpayload|providerresponse|local|filesystem|storage|runtime|temp|tmp)/i.test(key);
+}
+
+function unsafeExternalObjectRefString(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  return isUnsafeAssetMetadataString(trimmed)
+    || /^https?:\/\/\S+/i.test(trimmed)
+    || /[\\/]\.cache[\\/]huggingface(?:[\\/]|$)|[\\/]huggingface[\\/]hub(?:[\\/]|$)/i.test(trimmed)
+    || /^(?:curl|wget|python|node|powershell|cmd(?:\.exe)?|bash|sh)\b/i.test(trimmed)
+    || /\bat\s+\S+\s+\(.*:\d+:\d+\)|stack trace|^error:/i.test(trimmed)
+    || /^[A-Z_][A-Z0-9_]*=/.test(trimmed)
+    || /\b(?:raw\s+)?(?:provider|metadata)\s+payload\b/i.test(trimmed);
 }
 
 function safeInternalBackingFromView(view: AssetResourceBackedView): SafeInternalState | undefined {
