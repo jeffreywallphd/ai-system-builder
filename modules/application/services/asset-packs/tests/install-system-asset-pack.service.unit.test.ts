@@ -1,0 +1,308 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, it } from "node:test";
+
+import type { AssetDefinition, AssetPackManifest, AssetReference } from "../../../../contracts/asset";
+import type { AssetDefinitionListQuery, AssetDefinitionRepositoryPort } from "../../../ports/asset";
+import { InstallSystemAssetPackService } from "../install-system-asset-pack.service";
+import { SYSTEM_FOUNDATION_PACK_ID, SYSTEM_FOUNDATION_PACK_MANIFEST } from "../system-packs";
+
+class MemoryDefinitionRepository implements AssetDefinitionRepositoryPort {
+  public saveCount = 0;
+  public getCount = 0;
+  public throwOnSave = false;
+  public throwOnGet = false;
+  private readonly definitions = new Map<string, AssetDefinition>();
+
+  public async saveDefinition(definition: AssetDefinition): Promise<AssetDefinition> {
+    this.saveCount += 1;
+    if (this.throwOnSave) throw new Error("C:\\tmp\\raw token stack providerPayload");
+    this.definitions.set(keyForDefinition(definition), structuredClone(definition));
+    return structuredClone(definition);
+  }
+
+  public async getDefinition(reference: AssetReference): Promise<AssetDefinition | undefined> {
+    this.getCount += 1;
+    if (this.throwOnGet) throw new Error("C:\\tmp\\raw token stack providerPayload");
+    const version = reference.version;
+    if (version) return cloneOrUndefined(this.definitions.get(`${reference.id}@${version}`));
+    const matches = [...this.definitions.values()].filter((definition) => definition.definitionId === reference.id);
+    return cloneOrUndefined(matches.at(-1));
+  }
+
+  public async listDefinitions(_query: AssetDefinitionListQuery = {}) {
+    return { definitions: [...this.definitions.values()].map((definition) => structuredClone(definition)) };
+  }
+}
+
+const now = () => new Date("2026-05-09T12:00:00.000Z");
+
+describe("InstallSystemAssetPackService", () => {
+  it("validate-only mode validates the manifest and persists nothing", async () => {
+    const repository = new MemoryDefinitionRepository();
+    const result = await service(repository).install({
+      manifest: singleEntryManifest(),
+      mode: "validate-only",
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      now,
+    });
+
+    assert.equal(result.status, "validated");
+    assert.equal(result.checkedEntryCount, 1);
+    assert.equal(result.installedEntryCount, 0);
+    assert.equal(repository.saveCount, 0);
+    assert.equal(repository.getCount, 0);
+  });
+
+  it("validates manifest identity before persisting", async () => {
+    const repository = new MemoryDefinitionRepository();
+    const result = await service(repository).install({
+      manifest: { ...singleEntryManifest(), packId: "workspace.foundation" as never },
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      now,
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(repository.saveCount, 0);
+    assert.match(messages(result), /expected system pack ID/i);
+  });
+
+  it("invalid manifests block all writes", async () => {
+    const repository = new MemoryDefinitionRepository();
+    const result = await service(repository).install({
+      manifest: { ...singleEntryManifest(), categories: ["ui-structure", "ui-structure"] },
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      now,
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(repository.saveCount, 0);
+    assert.match(messages(result), /unique/i);
+  });
+
+  it("invalid asset definitions block all writes", async () => {
+    const repository = new MemoryDefinitionRepository();
+    const manifest = withFirstDefinition({ displayName: "" });
+    const result = await service(repository).install({
+      manifest,
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      now,
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(repository.saveCount, 0);
+    assert.match(messages(result), /display name/i);
+  });
+
+  it("quality-gate errors block all writes", async () => {
+    const repository = new MemoryDefinitionRepository();
+    const manifest = withFirstDefinition({
+      description: "This primitive will execute workflow runs.",
+    });
+    const result = await service(repository).install({
+      manifest,
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      now,
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(repository.saveCount, 0);
+    assert.match(messages(result), /unsafe implementation|execution behavior/i);
+  });
+
+  it("installs valid system foundation entries with safe definition refs", async () => {
+    const repository = new MemoryDefinitionRepository();
+    const result = await service(repository).install({
+      manifest: singleEntryManifest(),
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      now,
+    });
+
+    assert.equal(result.status, "installed");
+    assert.equal(result.checkedEntryCount, 1);
+    assert.equal(result.installedEntryCount, 1);
+    assert.deepEqual(result.installedDefinitionRefs, [
+      {
+        kind: "asset-definition-version",
+        id: singleEntryManifest().assets[0]!.definitionRef.id,
+        version: singleEntryManifest().assets[0]!.definitionRef.version,
+      },
+    ]);
+    assert.equal(repository.saveCount, 1);
+    assert.doesNotMatch(JSON.stringify(result), /(?:C:\\|\/tmp|token|secret|providerPayload|stack|base64|bytes|command)/i);
+  });
+
+  it("reinstall is idempotent and does not create duplicate records", async () => {
+    const repository = new MemoryDefinitionRepository();
+    const installer = service(repository);
+
+    const first = await installer.install({
+      manifest: singleEntryManifest(),
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      now,
+    });
+    const second = await installer.install({
+      manifest: singleEntryManifest(),
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      now,
+    });
+
+    assert.equal(first.status, "installed");
+    assert.equal(second.status, "installed-with-skips");
+    assert.equal(second.installedEntryCount, 0);
+    assert.equal(second.skippedEntryCount, 1);
+    assert.equal(repository.saveCount, 1);
+    assert.equal((await repository.listDefinitions()).definitions.length, 1);
+    assert.match(JSON.stringify(second.diagnostics), /definition-already-installed/);
+  });
+
+  it("does not overwrite existing user or custom definitions with the same ID and version", async () => {
+    const repository = new MemoryDefinitionRepository();
+    const entry = singleEntryManifest().assets[0];
+    assert.ok(entry);
+    await repository.saveDefinition({
+      ...entry.definition,
+      displayName: "User Modified Definition",
+      metadata: { userOwned: true },
+      provenance: { sourceKind: "human-authored", authorship: "human-authored" },
+    });
+    repository.saveCount = 0;
+
+    const result = await service(repository).install({
+      manifest: singleEntryManifest(),
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      now,
+    });
+    const saved = await repository.getDefinition(entry.definitionRef);
+
+    assert.equal(result.status, "installed-with-skips");
+    assert.equal(result.skippedEntryCount, 1);
+    assert.equal(repository.saveCount, 0);
+    assert.equal(saved?.displayName, "User Modified Definition");
+    assert.match(messages(result), /conflicts with the system pack entry/i);
+    assert.match(JSON.stringify(result.diagnostics), /definition-conflict-not-overwritten/);
+    assert.doesNotMatch(JSON.stringify(result), /(?:C:\\|\/tmp|token|secret|providerPayload|stack|base64|bytes|command)/i);
+  });
+
+  it("skips existing system-owned same-pack definitions by default", async () => {
+    const repository = new MemoryDefinitionRepository();
+    const installer = service(repository);
+    await installer.install({ manifest: singleEntryManifest(), expectedPackId: SYSTEM_FOUNDATION_PACK_ID, now });
+    repository.saveCount = 0;
+
+    const result = await installer.install({
+      manifest: singleEntryManifest(),
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      now,
+    });
+
+    assert.equal(result.status, "installed-with-skips");
+    assert.equal(result.skippedEntryCount, 1);
+    assert.equal(repository.saveCount, 0);
+  });
+
+  it("refreshes same-pack system-owned definitions only when explicitly enabled", async () => {
+    const repository = new MemoryDefinitionRepository();
+    const installer = service(repository);
+    await installer.install({ manifest: singleEntryManifest(), expectedPackId: SYSTEM_FOUNDATION_PACK_ID, now });
+    repository.saveCount = 0;
+
+    const changed = {
+      ...singleEntryManifest(),
+      assets: [
+        {
+          ...singleEntryManifest().assets[0]!,
+          fingerprint: "fnv1a:ffffffff",
+          definition: {
+            ...singleEntryManifest().assets[0]!.definition,
+            displayName: "Refreshed Definition",
+          },
+        },
+      ],
+    };
+
+    const skipped = await installer.install({
+      manifest: changed,
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      now,
+    });
+    const refreshed = await installer.install({
+      manifest: changed,
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      allowSystemDefinitionRefresh: true,
+      now,
+    });
+
+    assert.equal(skipped.status, "installed-with-skips");
+    assert.equal(repository.saveCount, 1);
+    assert.equal(refreshed.status, "installed");
+    assert.equal((await repository.getDefinition(changed.assets[0]!.definitionRef))?.displayName, "Refreshed Definition");
+  });
+
+  it("returns safe diagnostics for raw persistence failures", async () => {
+    const repository = new MemoryDefinitionRepository();
+    repository.throwOnSave = true;
+
+    const result = await service(repository).install({
+      manifest: singleEntryManifest(),
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      now,
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.failedEntryCount, 1);
+    assert.doesNotMatch(JSON.stringify(result), /(?:C:\\|\/tmp|token|secret|providerPayload|stack|raw|base64|bytes|command)/i);
+  });
+
+  it("imports no adapters, hosts, UI, API, IPC, preload, runtime, provider, filesystem, or network modules", () => {
+    const source = readFileSync(
+      join(process.cwd(), "modules/application/services/asset-packs/install-system-asset-pack.service.ts"),
+      "utf8",
+    );
+
+    assert.doesNotMatch(source, /from\s+["'][^"']*(?:adapters\/|hosts\/|modules\/ui|contracts\/api|contracts\/ipc|api-express|ipc-electron|electron|express|preload|renderer|thin-client|runtime\/|provider-client|huggingface|openai|node:fs|node:path|node:http|node:https)[^"']*["']/i);
+    assert.doesNotMatch(source, /\b(?:readFile|writeFile|readdir|opendir|glob|fetch\(|startRuntime|probeRuntime|installRuntime|repairRuntime|readBytes|readResourceBytes)\b/i);
+  });
+});
+
+function service(repository: AssetDefinitionRepositoryPort): InstallSystemAssetPackService {
+  return new InstallSystemAssetPackService({ definitionRepository: repository });
+}
+
+function singleEntryManifest(): AssetPackManifest {
+  return {
+    ...SYSTEM_FOUNDATION_PACK_MANIFEST,
+    assets: [SYSTEM_FOUNDATION_PACK_MANIFEST.assets[0]!],
+    categories: [SYSTEM_FOUNDATION_PACK_MANIFEST.assets[0]!.category],
+  };
+}
+
+function withFirstDefinition(overrides: Partial<AssetDefinition>): AssetPackManifest {
+  const manifest = singleEntryManifest();
+  const first = manifest.assets[0]!;
+  return {
+    ...manifest,
+    assets: [
+      {
+        ...first,
+        definition: {
+          ...first.definition,
+          ...overrides,
+        },
+      },
+    ],
+  };
+}
+
+function keyForDefinition(definition: AssetDefinition): string {
+  return `${definition.definitionId}@${definition.version}`;
+}
+
+function cloneOrUndefined(definition: AssetDefinition | undefined): AssetDefinition | undefined {
+  return definition ? structuredClone(definition) : undefined;
+}
+
+function messages(result: { readonly issues: readonly { readonly message: string }[] }): string {
+  return result.issues.map((issue) => issue.message).join("\n");
+}
