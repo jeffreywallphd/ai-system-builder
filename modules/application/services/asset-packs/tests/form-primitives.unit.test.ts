@@ -283,6 +283,43 @@ describe("form and field primitives", () => {
     }
   });
 
+  it("declares semantic static option descriptor shape without requiring raw JSON editing", () => {
+    for (const definitionId of [
+      "builtin.form.select-field",
+      "builtin.form.radio-group",
+    ]) {
+      const definition = FORM_PRIMITIVE_DEFINITIONS.find(
+        (candidate) => candidate.definitionId === definitionId,
+      );
+      assert.ok(definition);
+      const staticOptions = definition.configurationSchema?.fields.find(
+        (field) => field.fieldId === "staticOptions",
+      );
+      assert.ok(staticOptions);
+      assert.equal(staticOptions.valueKind, "array");
+      assert.equal(staticOptions.uiHint?.hintKind, "advanced");
+      assert.notEqual(staticOptions.uiHint?.hintKind, "json-editor");
+      assert.equal(
+        staticOptions.metadata?.semanticItemKind,
+        "form-option-descriptor",
+      );
+      assert.equal(staticOptions.metadata?.itemSchemaStatus, "deferred");
+      assert.deepEqual(staticOptions.metadata?.expectedFields, [
+        "optionId",
+        "label",
+        "value",
+      ]);
+      assert.deepEqual(staticOptions.metadata?.optionalFields, [
+        "description",
+        "disabled",
+      ]);
+      assert.equal(staticOptions.metadata?.dynamicFetch, false);
+      assert.equal(staticOptions.metadata?.rendererSpecific, false);
+      assert.equal(staticOptions.metadata?.executable, false);
+      assert.ok(staticOptions.exampleValues?.length);
+    }
+  });
+
   it("keeps validation, submission, and file-transfer semantics declarative only", () => {
     for (const definition of FORM_PRIMITIVE_DEFINITIONS) {
       const output = JSON.stringify(definition).toLowerCase();

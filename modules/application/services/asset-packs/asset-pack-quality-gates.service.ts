@@ -28,6 +28,8 @@ const FORBIDDEN_RENDERER_PATTERN =
   /\b(?:react|vue|svelte|tsx|jsx|renderer file|component path|implementation path|css module|dom node)\b/i;
 const EXECUTION_REQUIREMENT_PATTERN =
   /\b(?:runtime-execution|network|filesystem-read|filesystem-write|secret-read|external-provider-access)\b/i;
+const EXECUTION_CLAIM_PATTERN =
+  /\b(?:can|will|must|should|required to|requires)\s+(?:execute|run|start|call|write|read|submit|validate)\b/i;
 
 export function runAssetPackQualityGates(
   entry: AssetPackAssetEntry,
@@ -217,7 +219,9 @@ function validateNoUnsafeValues(
     if (typeof current.value !== "string") return;
     if (
       isUnsafeAssetMetadataString(current.value) ||
-      FORBIDDEN_RENDERER_PATTERN.test(current.value)
+      FORBIDDEN_RENDERER_PATTERN.test(current.value) ||
+      (EXECUTION_CLAIM_PATTERN.test(current.value) &&
+        !isSafeNonGoalExecutionText(current.value))
     ) {
       addIssue(issues, "error", "security", "Foundation asset contains unsafe implementation or resource detail.", path);
     }
@@ -230,7 +234,7 @@ function validateRuntimeRequirements(
 ): void {
   const serializedRequirements = JSON.stringify(entry.definition.requirements ?? []);
   if (serializedRequirements && EXECUTION_REQUIREMENT_PATTERN.test(serializedRequirements)) {
-    addIssue(issues, "warning", "requirement", "Foundation primitive declares runtime, provider, network, or storage requirements.", [
+    addIssue(issues, "error", "requirement", "Foundation primitive declares runtime, provider, network, or storage requirements.", [
       "definition",
       "requirements",
     ]);
@@ -245,6 +249,10 @@ function validateRuntimeRequirements(
       "definition",
     ]);
   }
+}
+
+function isSafeNonGoalExecutionText(value: string): boolean {
+  return /\b(?:does not|do not|no|not|without|outside|avoid|deferred)\b/i.test(value);
 }
 
 function walk(

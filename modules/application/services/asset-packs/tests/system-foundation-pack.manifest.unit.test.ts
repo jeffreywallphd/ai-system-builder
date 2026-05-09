@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import { validateAssetPackManifest } from "../asset-pack-validation.service";
 import {
+  SYSTEM_FOUNDATION_PACK_CATEGORIES,
   SYSTEM_FOUNDATION_PACK_CATEGORY_IDS,
   SYSTEM_FOUNDATION_PACK_MANIFEST,
   SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
@@ -49,6 +50,46 @@ describe("system foundation pack manifest", () => {
     );
     assert.deepEqual(SYSTEM_FOUNDATION_PACK_MANIFEST.dependencies, []);
     assert.deepEqual(SYSTEM_FOUNDATION_PACK_MANIFEST.overrideRules, []);
+  });
+
+  it("uses stable manifest metadata without phase or prompt workflow labels", () => {
+    assert.deepEqual(SYSTEM_FOUNDATION_PACK_MANIFEST.metadata, {
+      declarativeOnly: true,
+      catalogKind: "system-foundation",
+      catalogStatus: "in-progress",
+      catalogVersion: "1.0.0",
+      categoryCount: SYSTEM_FOUNDATION_PACK_CATEGORIES.length,
+      containsDefinitions: true,
+    });
+
+    const output = serialized(SYSTEM_FOUNDATION_PACK_MANIFEST.metadata);
+    for (const forbidden of [
+      "phase-5-prompt-5",
+      "prompt-4",
+      "prompt-5",
+      "review-a",
+      "phase 5",
+      "phase-5",
+    ]) {
+      assert.equal(output.includes(forbidden), false, forbidden);
+    }
+  });
+
+  it("keeps manifest category IDs backed by catalog-side descriptors", () => {
+    const descriptorIds = new Set<string>(
+      SYSTEM_FOUNDATION_PACK_CATEGORIES.map((category) => category.categoryId),
+    );
+    for (const categoryId of SYSTEM_FOUNDATION_PACK_MANIFEST.categories ?? []) {
+      assert.equal(descriptorIds.has(categoryId), true, categoryId);
+    }
+    for (const entry of SYSTEM_FOUNDATION_PACK_MANIFEST.assets) {
+      assert.equal(
+        SYSTEM_FOUNDATION_PACK_MANIFEST.categories?.includes(entry.category),
+        true,
+        entry.category,
+      );
+      assert.equal(descriptorIds.has(entry.category), true, entry.category);
+    }
   });
 
   it("keeps entry IDs, definition refs, and fingerprints unique and stable", () => {

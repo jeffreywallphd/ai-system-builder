@@ -111,7 +111,9 @@ export function createSystemFoundationPackManifest(
     categories: SYSTEM_FOUNDATION_PACK_CATEGORY_IDS,
     metadata: {
       declarativeOnly: true,
-      catalogPhase: "phase-5-prompt-5",
+      catalogKind: "system-foundation",
+      catalogStatus: "in-progress",
+      catalogVersion: "1.0.0",
       categoryCount: SYSTEM_FOUNDATION_PACK_CATEGORIES.length,
       containsDefinitions: entries.length > 0,
     },

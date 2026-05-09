@@ -82,6 +82,130 @@ describe("asset pack validation service", () => {
     assert.match(messages(result), /unsafe/i);
   });
 
+  it("allows explanatory non-goal language in AI context and docs-like descriptions", () => {
+    const entry = validEntry({
+      definition: validDefinition({
+        description:
+          "Avoid renderer implementation details. Does not include prompt text.",
+        aiContext: {
+          ...validDefinition().aiContext,
+          purpose:
+            "Does not run workflows, does not store resource bytes, and does not contain workflow JSON.",
+          limitations: [
+            {
+              limitationId: "fixture.limitation",
+              summary: "No runtime execution occurs.",
+            },
+            {
+              limitationId: "fixture.prompt-text",
+              summary: "Does not include prompt text.",
+            },
+          ],
+          safetyNotes: [
+            {
+              safetyNoteId: "fixture.safety",
+              category: "operational",
+              severity: "info",
+              summary: "Does not store resource bytes.",
+            },
+          ],
+          antiPatterns: [
+            {
+              antiPatternId: "fixture.anti-pattern",
+              title: "Renderer implementation leakage",
+              description: "Avoid renderer implementation details.",
+              whyAvoid: "The pack remains semantic only.",
+              saferAlternative: "Keep implementation choices outside the pack.",
+            },
+          ],
+        },
+      }),
+    });
+
+    const result = validateAssetPackManifest(createSystemFoundationPackManifest([entry]));
+
+    assert.equal(result.status, "valid", messages(result));
+  });
+
+  it("still rejects unsafe payload, path, token, provider, content, and execution fields", () => {
+    const unsafeManifests: readonly AssetPackManifest[] = [
+      {
+        ...createSystemFoundationPackManifest(),
+        metadata: { note: "C:\\Users\\alice\\secret.txt" },
+      },
+      {
+        ...createSystemFoundationPackManifest(),
+        metadata: { note: "/tmp/asset-cache/value.json" },
+      },
+      {
+        ...createSystemFoundationPackManifest(),
+        metadata: { token: "abc" },
+      },
+      {
+        ...createSystemFoundationPackManifest(),
+        metadata: { authorization: "Bearer abc" },
+      },
+      {
+        ...createSystemFoundationPackManifest(),
+        metadata: {
+          download:
+            "https://example.test/object?X-Amz-Signature=abc&expires=999",
+        },
+      },
+      createSystemFoundationPackManifest([
+        validEntry({
+          definition: validDefinition({
+            metadata: {
+              rawProviderPayload: { provider: "example" },
+            } as never,
+          }),
+        }),
+      ]),
+      createSystemFoundationPackManifest([
+        validEntry({
+          definition: validDefinition({
+            metadata: {
+              workflowJson: { nodes: [] },
+            } as never,
+          }),
+        }),
+      ]),
+      createSystemFoundationPackManifest([
+        validEntry({
+          definition: validDefinition({
+            metadata: {
+              promptText: "write a system",
+            } as never,
+          }),
+        }),
+      ]),
+      createSystemFoundationPackManifest([
+        validEntry({
+          definition: validDefinition({
+            metadata: {
+              executionCode: "console.log('run')",
+            } as never,
+          }),
+        }),
+      ]),
+      createSystemFoundationPackManifest([
+        validEntry({
+          definition: validDefinition({
+            metadata: {
+              preview: "data:text/plain;base64,SGVsbG8=",
+            },
+          }),
+        }),
+      ]),
+    ];
+
+    for (const manifest of unsafeManifests) {
+      const result = validateAssetPackManifest(manifest);
+      assert.equal(result.status, "invalid", JSON.stringify(manifest));
+      assert.match(messages(result), /unsafe/i);
+    }
+  });
+
   it("fails invalid override rules", () => {
     const ref = definitionRef("system.foundation.fixture");
     const overrideRule: AssetPackOverrideRule = {
