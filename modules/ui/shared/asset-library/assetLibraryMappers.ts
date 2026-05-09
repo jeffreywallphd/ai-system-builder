@@ -41,7 +41,6 @@ const LONG_BASE64_VALUE_PATTERN = /^[A-Za-z0-9+/]{80,}={0,2}$/;
 const SIGNED_OR_QUERY_URL_VALUE_PATTERN = /^https?:\/\/\S+\?(?:\S*?(?:x-amz-signature|x-goog-signature|signature|sig|token|access_token|auth|expires|X-Amz-Signature)=\S+|\S{24,})/i;
 
 const SYSTEM_FOUNDATION_PACK_ID = "system.foundation";
-const SYSTEM_FOUNDATION_PACK_VERSION = "1.0.0";
 const SYSTEM_FOUNDATION_PACK_DISPLAY_NAME = "System Foundation";
 const SYSTEM_FOUNDATION_CATEGORY_LABELS: Readonly<Record<string, string>> = {
   "ui-structure": "UI Structure",
@@ -239,17 +238,11 @@ function sourceMetadataFrom(card: Record<string, unknown>) {
   const sourcePackVersion =
     safeString(card.sourcePackVersion) ??
     safeString(metadata.sourcePackVersion) ??
-    safeString(installMetadata.packVersion) ??
-    (sourcePackId === SYSTEM_FOUNDATION_PACK_ID ? SYSTEM_FOUNDATION_PACK_VERSION : undefined);
-  const sourcePackDisplayName =
-    safeString(card.sourcePackDisplayName) ??
-    safeString(metadata.sourcePackDisplayName) ??
-    (sourcePackId === SYSTEM_FOUNDATION_PACK_ID ? SYSTEM_FOUNDATION_PACK_DISPLAY_NAME : undefined);
+    safeString(installMetadata.packVersion);
   const sourceKind =
     safeAssetPackSourceKind(card.sourceKind) ??
     safeAssetPackSourceKind(metadata.sourceKind) ??
-    safeAssetPackSourceKind(installMetadata.sourceKind) ??
-    (sourcePackId === SYSTEM_FOUNDATION_PACK_ID ? "system" : undefined);
+    safeAssetPackSourceKind(installMetadata.sourceKind);
   const sourceLayer =
     safeAssetSourceLayer(card.sourceLayer) ??
     safeAssetSourceLayer(metadata.sourceLayer) ??
@@ -257,8 +250,7 @@ function sourceMetadataFrom(card: Record<string, unknown>) {
   const trustStatus =
     safeAssetPackTrustStatus(card.trustStatus) ??
     safeAssetPackTrustStatus(metadata.trustStatus) ??
-    safeAssetPackTrustStatus(installMetadata.trustStatus) ??
-    (sourcePackId === SYSTEM_FOUNDATION_PACK_ID ? "system-trusted" : undefined);
+    safeAssetPackTrustStatus(installMetadata.trustStatus);
   const packCategoryId =
     identifier(card.packCategoryId) ??
     identifier(metadata.packCategoryId) ??
@@ -273,13 +265,17 @@ function sourceMetadataFrom(card: Record<string, unknown>) {
     : identifierArray(metadata.packTags ?? metadata.tags);
   const systemDefault =
     card.systemDefault === true ||
-    (
-      sourcePackId === SYSTEM_FOUNDATION_PACK_ID &&
-      sourceKind === "system" &&
-      (sourceLayer === undefined || sourceLayer === "system-default") &&
-      trustStatus === "system-trusted"
-    ) ||
-    (sourceLayer === "system-default" && sourceKind === "system" && trustStatus === "system-trusted");
+    hasTrustedSystemFoundationInstallMarker(metadata) ||
+    hasTrustedSystemFoundationSourceMetadata({
+      sourcePackId,
+      sourceKind,
+      sourceLayer,
+      trustStatus,
+    });
+  const sourcePackDisplayName =
+    safeString(card.sourcePackDisplayName) ??
+    safeString(metadata.sourcePackDisplayName) ??
+    (systemDefault ? SYSTEM_FOUNDATION_PACK_DISPLAY_NAME : undefined);
   const installedPack = card.installedPack === true || sourceLayer === "installed-pack";
   const importedPack = card.importedPack === true || sourceLayer === "imported-pack";
   const overridesDefinitionRef = safeAssetDefinitionRef(card.overridesDefinitionRef ?? metadata.overridesDefinitionRef);
@@ -313,7 +309,6 @@ function sourceMetadataFrom(card: Record<string, unknown>) {
       workspaceOverride,
       organizationOverride,
       userOverride,
-      sourcePackId,
     }),
     packLabel: sourcePackDisplayName ?? sourcePackId,
     categoryLabel: packCategoryDisplayName ?? (packCategoryId ? formatKnownLabel(packCategoryId) : undefined),
@@ -328,7 +323,6 @@ function sourceBadgeLabel(input: {
   readonly workspaceOverride: boolean;
   readonly organizationOverride: boolean;
   readonly userOverride: boolean;
-  readonly sourcePackId?: string;
 }): string {
   if (input.systemDefault) return "System default";
   if (input.installedPack) return "Installed pack";
@@ -337,8 +331,37 @@ function sourceBadgeLabel(input: {
   if (input.workspacePack) return "Workspace pack";
   if (input.organizationOverride) return "Organization override";
   if (input.userOverride) return "User override";
-  if (input.sourcePackId) return "Installed pack";
   return "Custom";
+}
+
+function hasTrustedSystemFoundationInstallMarker(metadata: Record<string, unknown>): boolean {
+  const installMetadata = isRecord(metadata.assetPackInstall) ? metadata.assetPackInstall : undefined;
+  return Boolean(
+    installMetadata &&
+      identifier(installMetadata.packId) === SYSTEM_FOUNDATION_PACK_ID &&
+      typeof installMetadata.packVersion === "string" &&
+      typeof installMetadata.entryId === "string" &&
+      typeof installMetadata.fingerprint === "string" &&
+      installMetadata.sourceKind === "system" &&
+      installMetadata.sourceLayer === "system-default" &&
+      installMetadata.trustStatus === "system-trusted" &&
+      installMetadata.managedBy === "asset-kernel" &&
+      typeof installMetadata.installedAt === "string",
+  );
+}
+
+function hasTrustedSystemFoundationSourceMetadata(input: {
+  readonly sourcePackId?: string;
+  readonly sourceKind?: AssetPackSourceKind;
+  readonly sourceLayer?: AssetSourceLayer;
+  readonly trustStatus?: AssetPackTrustStatus;
+}): boolean {
+  return (
+    input.sourcePackId === SYSTEM_FOUNDATION_PACK_ID &&
+    input.sourceKind === "system" &&
+    input.sourceLayer === "system-default" &&
+    input.trustStatus === "system-trusted"
+  );
 }
 
 function cardRecordValue(

@@ -131,7 +131,9 @@ describe("asset library mappers", () => {
             localPath: "/tmp/secret",
             sourcePackId: "system.foundation",
             sourcePackVersion: "1.0.0",
+            sourceKind: "system",
             sourceLayer: "system-default",
+            trustStatus: "system-trusted",
             categoryId: "ui-structure",
           },
         },
@@ -367,6 +369,99 @@ describe("asset library mappers", () => {
     expect(result.items[1]?.workspaceOverride).toBe(true);
   });
 
+  it("displays system default only for trusted system foundation metadata", () => {
+    const result = mapAssetDefinitionListResult({
+      items: [
+        {
+          definitionId: "trusted.foundation",
+          version: "1.0.0",
+          displayName: "Trusted Foundation",
+          sourcePackId: "system.foundation",
+          sourceKind: "system",
+          sourceLayer: "system-default",
+          trustStatus: "system-trusted",
+        },
+        {
+          definitionId: "bare.foundation",
+          version: "1.0.0",
+          displayName: "Bare Foundation",
+          sourcePackId: "system.foundation",
+        },
+        {
+          definitionId: "marker.foundation",
+          version: "1.0.0",
+          displayName: "Installed Foundation",
+          metadata: {
+            sourcePackId: "system.foundation",
+            assetPackInstall: {
+              packId: "system.foundation",
+              packVersion: "1.0.0",
+              entryId: "marker.foundation",
+              fingerprint: "fnv1a:marker-foundation",
+              sourceKind: "system",
+              sourceLayer: "system-default",
+              trustStatus: "system-trusted",
+              managedBy: "asset-kernel",
+              installedAt: "2026-05-09T12:00:00.000Z",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(result.items[0]?.systemDefault).toBe(true);
+    expect(result.items[0]?.sourceBadgeLabel).toBe("System default");
+    expect(result.items[1]?.systemDefault).toBeUndefined();
+    expect(result.items[1]?.sourceBadgeLabel).toBe("Custom");
+    expect(result.items[1]?.badges).toEqual(["Custom", "From system.foundation"]);
+    expect(result.items[2]?.systemDefault).toBe(true);
+    expect(result.items[2]?.sourceBadgeLabel).toBe("System default");
+  });
+
+  it("does not display system default for spoofed system foundation metadata", () => {
+    const result = mapAssetDefinitionListResult({
+      items: [
+        {
+          definitionId: "wrong.kind",
+          version: "1.0.0",
+          displayName: "Wrong Kind",
+          metadata: {
+            sourcePackId: "system.foundation",
+            sourceKind: "user",
+            sourceLayer: "system-default",
+            trustStatus: "system-trusted",
+          },
+        },
+        {
+          definitionId: "wrong.layer",
+          version: "1.0.0",
+          displayName: "Wrong Layer",
+          metadata: {
+            sourcePackId: "system.foundation",
+            sourceKind: "system",
+            sourceLayer: "workspace-pack",
+            trustStatus: "system-trusted",
+          },
+        },
+        {
+          definitionId: "wrong.trust",
+          version: "1.0.0",
+          displayName: "Wrong Trust",
+          metadata: {
+            sourcePackId: "system.foundation",
+            sourceKind: "system",
+            sourceLayer: "system-default",
+            trustStatus: "unverified",
+          },
+        },
+      ],
+    });
+
+    expect(result.items.map(getAssetSourceBadge)).toEqual(["Custom", "Workspace pack", "Custom"]);
+    expect(result.items.some((item) => item.systemDefault === true)).toBe(false);
+    expect(result.items.some((item) => item.sourceBadgeLabel === "System default")).toBe(false);
+  });
+
   it("displays workspace-pack override relationships as read-only metadata", () => {
     const detail = mapAssetDefinitionDetail({
       definition: {
@@ -436,7 +531,7 @@ describe("asset library mappers", () => {
     expect(filterAssetDefinitionsByCategory(result.items, "forms-fields").map((asset) => asset.definitionId)).toEqual([
       "builtin.form.form",
     ]);
-    expect(getAssetPackLabel(result.items[0]!)).toBe("System Foundation");
+    expect(getAssetPackLabel(result.items[0]!)).toBe("system.foundation");
     expect(getAssetCategoryLabel(result.items[0]!)).toBe("UI Structure");
   });
 

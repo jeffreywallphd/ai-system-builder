@@ -3,8 +3,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import type { AssetDefinition, AssetPackManifest, AssetReference } from "../../../../contracts/asset";
-import type { AssetDefinitionListQuery, AssetDefinitionRepositoryPort } from "../../../ports/asset";
+import type { AssetComposition, AssetDefinition, AssetInstance, AssetPackManifest, AssetReference } from "../../../../contracts/asset";
+import type { AssetCompositionListQuery, AssetCompositionRepositoryPort, AssetDefinitionListQuery, AssetDefinitionRepositoryPort, AssetInstanceListQuery, AssetInstanceRepositoryPort } from "../../../ports/asset";
+import { AssetRegistryReadFacade } from "../../asset";
+import { mapAssetDefinitionCard } from "../../../../ui/shared/asset-library";
 import { InstallSystemAssetPackService } from "../install-system-asset-pack.service";
 import { SYSTEM_FOUNDATION_PACK_ID, SYSTEM_FOUNDATION_PACK_MANIFEST } from "../system-packs";
 
@@ -34,6 +36,20 @@ class MemoryDefinitionRepository implements AssetDefinitionRepositoryPort {
   public async listDefinitions(_query: AssetDefinitionListQuery = {}) {
     return { definitions: [...this.definitions.values()].map((definition) => structuredClone(definition)) };
   }
+}
+
+class EmptyInstanceRepository implements AssetInstanceRepositoryPort {
+  public async saveInstance(instance: AssetInstance): Promise<AssetInstance> { return instance; }
+  public async getInstance(_reference: AssetReference): Promise<AssetInstance | undefined> { return undefined; }
+  public async listInstances(_query: AssetInstanceListQuery = {}) { return { instances: [] }; }
+  public async deleteInstance(_reference: AssetReference): Promise<void> {}
+}
+
+class EmptyCompositionRepository implements AssetCompositionRepositoryPort {
+  public async saveComposition(composition: AssetComposition): Promise<AssetComposition> { return composition; }
+  public async getComposition(_reference: AssetReference): Promise<AssetComposition | undefined> { return undefined; }
+  public async listCompositions(_query: AssetCompositionListQuery = {}) { return { compositions: [] }; }
+  public async deleteComposition(_reference: AssetReference): Promise<void> {}
 }
 
 const now = () => new Date("2026-05-09T12:00:00.000Z");
@@ -131,6 +147,41 @@ describe("InstallSystemAssetPackService", () => {
     ]);
     assert.equal(repository.saveCount, 1);
     assert.doesNotMatch(JSON.stringify(result), /(?:C:\\|\/tmp|token|secret|providerPayload|stack|base64|bytes|command)/i);
+  });
+
+  it("writes metadata that the read facade and shared UI treat as system default", async () => {
+    const repository = new MemoryDefinitionRepository();
+    const result = await service(repository).install({
+      manifest: singleEntryManifest(),
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      now,
+    });
+    const saved = (await repository.listDefinitions()).definitions[0]!;
+    const marker = saved.metadata?.assetPackInstall as Record<string, unknown> | undefined;
+    const facade = new AssetRegistryReadFacade({
+      definitionRepository: repository,
+      instanceRepository: new EmptyInstanceRepository(),
+      compositionRepository: new EmptyCompositionRepository(),
+    });
+    const card = (await facade.listDefinitionCards()).items[0]!;
+    const uiCard = mapAssetDefinitionCard(card);
+
+    assert.equal(result.status, "installed");
+    assert.deepEqual(marker, {
+      packId: "system.foundation",
+      packVersion: "1.0.0",
+      entryId: singleEntryManifest().assets[0]!.entryId,
+      fingerprint: singleEntryManifest().assets[0]!.fingerprint,
+      sourceKind: "system",
+      sourceLayer: "system-default",
+      trustStatus: "system-trusted",
+      managedBy: "asset-kernel",
+      installedAt: "2026-05-09T12:00:00.000Z",
+    });
+    assert.equal(card.builtIn, true);
+    assert.equal(card.systemDefault, true);
+    assert.equal(uiCard.systemDefault, true);
+    assert.equal(uiCard.sourceBadgeLabel, "System default");
   });
 
   it("reinstall is idempotent and does not create duplicate records", async () => {
