@@ -4,3 +4,5 @@ export * from "./assetLibraryMappers";
 export * from "./assetLibraryBrowser";
 export * from "./assetLibraryPresentation";
 export * from "./assetLibraryDetailModels";
+export * from "./assetLibraryActions";
+export * from "./AssetMutationConfirmationDialog";

@@ -115,6 +115,10 @@ function createClient(overrides: Partial<AssetLibraryClient> = {}): AssetLibrary
     readAssetDefinitionVersion: testDouble.fn().mockResolvedValue({ ok: true, value: detailWithoutValidation }),
     listAssetResourceBackedViews: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [resourceViewCard] } }),
     readAssetResourceBackedView: testDouble.fn().mockResolvedValue({ ok: true, value: resourceViewDetail }),
+    registerResourceBackedViewAsAsset: testDouble.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.register-resource-backed-view", status: "created" } }),
+    finalizeGeneratedOutputAsAsset: testDouble.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.finalize-generated-output", status: "created" } }),
+    importExternalRepositoryObjectAsAsset: testDouble.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.import-external-repository-object", status: "created" } }),
+    localizeExternalRepositoryObjectAsAsset: testDouble.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.localize-external-repository-object", status: "created" } }),
     ...overrides,
   };
 }
@@ -202,7 +206,56 @@ describe("thin-client AssetLibraryFeature", () => {
       { viewId: "asset-view.external-repository-object.internal.1" },
       { expand: ["metadata", "resourceBackings"] },
     );
-    assert.doesNotMatch(container.textContent ?? "", /Register asset|Import asset|Finalize asset|Scan resources/i);
+    expect(container.textContent).toContain("Import external object");
+    expect(container.textContent).toContain("Localize external object");
+    assert.doesNotMatch(container.textContent ?? "", /Create asset|Edit asset|Delete asset|Seed built-ins|Scan resources/i);
+  });
+
+  it("requires confirmation and calls the import mutation with a safe thin-client command", async () => {
+    const client = createClient();
+    const { container } = await render(client);
+    const resourceTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Resource views") as HTMLButtonElement;
+
+    await act(async () => resourceTab.click());
+    await flush();
+    const cardButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("External object")) as HTMLButtonElement;
+    await act(async () => cardButton.click());
+    await flush();
+
+    const actionButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Import external object") as HTMLButtonElement;
+    await act(async () => actionButton.click());
+    await flush();
+
+    expect(container.textContent).toContain("Import this external object?");
+    expect(container.textContent).toContain("Network or provider");
+    expect(client.importExternalRepositoryObjectAsAsset).not.toHaveBeenCalled();
+
+    const dialog = container.querySelector("[role='dialog']") as HTMLElement;
+    const confirmButton = Array.from(dialog.querySelectorAll("button")).find((button) => button.textContent === "Import object") as HTMLButtonElement;
+    await act(async () => confirmButton.click());
+    await flush();
+
+    expect(client.importExternalRepositoryObjectAsAsset).toHaveBeenCalledWith({
+      operation: "asset.import-external-repository-object",
+      viewId: "asset-view.external-repository-object.internal.1",
+      importMode: "remote-reference",
+      approval: {
+        userConfirmed: true,
+        confirmationKind: "import-external-object",
+        allowNetworkAccess: true,
+        allowCredentialUse: true,
+        allowFilesystemWrite: true,
+        allowPartialCompletion: true,
+      },
+      actor: {
+        initiatedBy: "human",
+        automationSafe: false,
+        thinClientSafe: true,
+      },
+    });
+    expect(/metadata|C:\\|Bearer|base64|workflow|prompt/i.test(JSON.stringify((client.importExternalRepositoryObjectAsAsset as any).mock.calls[0][0]))).toBe(false);
+    expect(container.textContent).toContain("Asset registered.");
+    expect(client.readAssetResourceBackedView).toHaveBeenCalledTimes(2);
   });
 
   it("renders empty states for no registered definitions and filtered misses", async () => {
@@ -358,7 +411,7 @@ describe("thin-client AssetLibraryFeature", () => {
     await flush();
 
     const text = container.textContent ?? "";
-    assert.doesNotMatch(text, /Create asset|Edit asset|Delete asset|Register asset|Seed built-ins|Import asset|Finalize asset|Scan resources|Execute workflow/i);
+    assert.doesNotMatch(text, /Create asset|Edit asset|Delete asset|Seed built-ins|Scan resources|Execute workflow/i);
     expect(text).not.toContain("C:\\Users\\name\\secret");
     expect(text).not.toContain("Bearer abc");
   });

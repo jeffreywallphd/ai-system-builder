@@ -1,4 +1,5 @@
 import type {
+  AssetMutationResult,
   AssetFamily,
   AssetLifecycleStatus,
   AssetMetadata,
@@ -14,6 +15,12 @@ import type {
   AssetLibraryResourceBackedViewExpansion,
   AssetLibraryResourceBackedViewQuery,
 } from "./assetLibraryQueries";
+import type {
+  FinalizeGeneratedOutputCommand,
+  ImportExternalRepositoryObjectCommand,
+  LocalizeExternalRepositoryObjectCommand,
+  RegisterResourceBackedViewCommand,
+} from "../../../contracts/asset";
 
 export interface AssetLibraryDefinitionCard {
   readonly id: string;
@@ -176,6 +183,18 @@ export interface AssetLibraryClient {
     input: { readonly viewId: string },
     options?: AssetLibraryResourceBackedViewDetailOptions,
   ) => Promise<AssetLibraryClientResult<AssetLibraryResourceBackedViewDetail>>;
+  readonly registerResourceBackedViewAsAsset: (
+    command: RegisterResourceBackedViewCommand,
+  ) => Promise<AssetLibraryClientResult<AssetMutationResult>>;
+  readonly finalizeGeneratedOutputAsAsset: (
+    command: FinalizeGeneratedOutputCommand,
+  ) => Promise<AssetLibraryClientResult<AssetMutationResult>>;
+  readonly importExternalRepositoryObjectAsAsset: (
+    command: ImportExternalRepositoryObjectCommand,
+  ) => Promise<AssetLibraryClientResult<AssetMutationResult>>;
+  readonly localizeExternalRepositoryObjectAsAsset: (
+    command: LocalizeExternalRepositoryObjectCommand,
+  ) => Promise<AssetLibraryClientResult<AssetMutationResult>>;
 }
 
 export type {

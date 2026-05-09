@@ -3,8 +3,10 @@ import {
   mapAssetDefinitionListResult,
   mapAssetResourceBackedViewDetail,
   mapAssetResourceBackedViewListResult,
+  mapAssetMutationTransportFailure,
   mapTransportEnvelopeError,
   mapTransportEnvelopeSuccess,
+  sanitizeAssetMutationResult,
   type AssetLibraryClient,
   type AssetLibraryClientResult,
   type AssetLibraryDefinitionCard,
@@ -17,6 +19,13 @@ import {
   type AssetLibraryResourceBackedViewDetailOptions,
   type AssetLibraryResourceBackedViewQuery,
 } from "../../../../../../../modules/ui/shared/asset-library";
+import type {
+  AssetMutationResult,
+  FinalizeGeneratedOutputCommand,
+  ImportExternalRepositoryObjectCommand,
+  LocalizeExternalRepositoryObjectCommand,
+  RegisterResourceBackedViewCommand,
+} from "../../../../../../../modules/contracts/asset";
 
 interface DesktopAssetLibraryApiBridge {
   listAssetDefinitions?: (input?: AssetLibraryQuery, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
@@ -33,6 +42,10 @@ interface DesktopAssetLibraryApiBridge {
     input: { viewId: string; expand?: AssetLibraryResourceBackedViewDetailOptions["expand"]; includeValidation?: boolean },
     context?: { requestId?: string; correlationId?: string },
   ) => Promise<unknown>;
+  registerResourceBackedViewAsAsset?: (command: RegisterResourceBackedViewCommand, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
+  finalizeGeneratedOutputAsAsset?: (command: FinalizeGeneratedOutputCommand, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
+  importExternalRepositoryObjectAsAsset?: (command: ImportExternalRepositoryObjectCommand, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
+  localizeExternalRepositoryObjectAsAsset?: (command: LocalizeExternalRepositoryObjectCommand, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
 }
 
 function getDesktopAssetLibraryApi(): Required<DesktopAssetLibraryApiBridge> {
@@ -43,7 +56,11 @@ function getDesktopAssetLibraryApi(): Required<DesktopAssetLibraryApiBridge> {
     typeof desktopApi.readAssetDefinition !== "function" ||
     typeof desktopApi.readAssetDefinitionVersion !== "function" ||
     typeof desktopApi.listAssetResourceBackedViews !== "function" ||
-    typeof desktopApi.readAssetResourceBackedView !== "function"
+    typeof desktopApi.readAssetResourceBackedView !== "function" ||
+    typeof desktopApi.registerResourceBackedViewAsAsset !== "function" ||
+    typeof desktopApi.finalizeGeneratedOutputAsAsset !== "function" ||
+    typeof desktopApi.importExternalRepositoryObjectAsAsset !== "function" ||
+    typeof desktopApi.localizeExternalRepositoryObjectAsAsset !== "function"
   ) {
     throw new Error("Desktop Asset Library preload API is unavailable.");
   }
@@ -66,6 +83,26 @@ async function toClientResult<T>(
       error: {
         code: "internal",
         message: fallbackMessage,
+      },
+    };
+  }
+}
+
+async function toMutationClientResult(
+  call: () => Promise<unknown>,
+  operation: AssetMutationResult["operation"],
+): Promise<AssetLibraryClientResult<AssetMutationResult>> {
+  try {
+    const response = await call();
+    const success = mapTransportEnvelopeSuccess(response, sanitizeAssetMutationResult);
+    if (success) return success;
+    return { ok: true, value: mapAssetMutationTransportFailure(response, operation) };
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: "internal",
+        message: "Unable to complete this asset action.",
       },
     };
   }
@@ -125,6 +162,34 @@ export function createDesktopAssetLibraryClient(): AssetLibraryClient {
         }),
         mapAssetResourceBackedViewDetail,
         "Unable to read asset resource-backed view.",
+      );
+    },
+
+    async registerResourceBackedViewAsAsset(command) {
+      return toMutationClientResult(
+        () => desktopApi.registerResourceBackedViewAsAsset(command),
+        "asset.register-resource-backed-view",
+      );
+    },
+
+    async finalizeGeneratedOutputAsAsset(command) {
+      return toMutationClientResult(
+        () => desktopApi.finalizeGeneratedOutputAsAsset(command),
+        "asset.finalize-generated-output",
+      );
+    },
+
+    async importExternalRepositoryObjectAsAsset(command) {
+      return toMutationClientResult(
+        () => desktopApi.importExternalRepositoryObjectAsAsset(command),
+        "asset.import-external-repository-object",
+      );
+    },
+
+    async localizeExternalRepositoryObjectAsAsset(command) {
+      return toMutationClientResult(
+        () => desktopApi.localizeExternalRepositoryObjectAsAsset(command),
+        "asset.localize-external-repository-object",
       );
     },
   };

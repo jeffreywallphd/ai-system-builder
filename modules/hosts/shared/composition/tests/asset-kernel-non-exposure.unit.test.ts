@@ -88,7 +88,7 @@ describe("Asset Kernel public non-exposure boundaries", () => {
     assert.doesNotMatch(desktopHostCompositionSource, /ipc\.asset\.(?:instance|composition|resource|registry-summary|create|update|delete|patch|edit|seed|publish|execute|run|scan|sync|repair|install|start|train|validate)/i);
   });
 
-  it("allows read-only desktop and thin-client Asset Library pages with no mutation helpers", () => {
+  it("allows Asset Library pages to expose only the four controlled mutation actions", () => {
     const rendererSourceWithoutDesktopApi = sourceFilesUnder("apps/desktop/src/renderer")
       .filter((file) => !file.path.replace(/\\/g, "/").endsWith("src/renderer/lib/desktopApi.ts"))
       .map((file) => `\n// ${file.path}\n${file.source}`)
@@ -114,9 +114,17 @@ describe("Asset Kernel public non-exposure boundaries", () => {
     assert.match(source, /\breadAssetDefinition\b/);
     assert.match(source, /\blistAssetResourceBackedViews\b/);
     assert.match(source, /\breadAssetResourceBackedView\b/);
+    assert.match(source, /\bregisterResourceBackedViewAsAsset\b/);
+    assert.match(source, /\bfinalizeGeneratedOutputAsAsset\b/);
+    assert.match(source, /\bimportExternalRepositoryObjectAsAsset\b/);
+    assert.match(source, /\blocalizeExternalRepositoryObjectAsAsset\b/);
+    assert.match(source, /\bRegister as asset\b/);
+    assert.match(source, /\bFinalize and register\b/);
+    assert.match(source, /\bImport external object\b/);
+    assert.match(source, /\bLocalize external object\b/);
     assert.match(sharedAssetLibrarySource, /readDetail\(definition,\s*\{\s*\}\)/);
     assert.match(sharedAssetLibrarySource, /readDetail\(selectedDefinition,\s*\{\s*includeValidation:\s*true\s*\}\)/);
-    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|publishAsset|scanResources|executeAsset|runAsset|syncAssets|repairAsset|installAsset|startAsset|trainAsset|registerResourceBackedViewAsAsset|finalizeGeneratedOutputAsAsset|importExternalRepositoryObjectAsAsset|localizeExternalRepositoryObjectAsAsset)\b/i);
+    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|publishAsset|scanResources|executeAsset|runAsset|syncAssets|repairAsset|installAsset|startAsset|trainAsset|bulkAsset|deleteAsset|editAsset|seedAsset)\b/i);
     assert.doesNotMatch(source, /\b(?:listAssetInstances|readAssetInstance|listAssetCompositions|readAssetComposition|readAssetRegistrySummary)\b/i);
   });
 
@@ -226,7 +234,7 @@ describe("Asset Kernel public non-exposure boundaries", () => {
     assert.doesNotMatch(source, /\b(?:RegisterAssetDefinitionUseCase|UpdateAssetDefinitionUseCase|CreateAssetInstanceUseCase|CreateAssetCompositionUseCase|BuiltInAssetDefinitionSeedingService)\b/);
   });
 
-  it("keeps desktop renderer Asset Library files on the read-only client boundary", () => {
+  it("keeps desktop renderer Asset Library files on the controlled client boundary", () => {
     const source = combinedSource("apps/desktop/src/renderer/features/asset-library");
 
     assert.match(source, /\bcreateDesktopAssetLibraryClient\b/);
@@ -236,10 +244,14 @@ describe("Asset Kernel public non-exposure boundaries", () => {
     assert.doesNotMatch(source, /from\s+["'][^"']*modules\/hosts[^"']*["']/i);
     assert.doesNotMatch(source, /from\s+["'][^"']*adapters\/persistence[^"']*["']/i);
     assert.doesNotMatch(source, /from\s+["'][^"']*ipc-electron[^"']*["']/i);
-    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|publishAsset|scanResources|executeAsset|runAsset|syncAssets|repairAsset|installAsset|startAsset|trainAsset)\b/i);
+    assert.match(source, /\bregisterResourceBackedViewAsAsset\b/);
+    assert.match(source, /\bfinalizeGeneratedOutputAsAsset\b/);
+    assert.match(source, /\bimportExternalRepositoryObjectAsAsset\b/);
+    assert.match(source, /\blocalizeExternalRepositoryObjectAsAsset\b/);
+    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|publishAsset|scanResources|executeAsset|runAsset|syncAssets|repairAsset|installAsset|startAsset|trainAsset|bulkAsset|deleteAsset|editAsset|seedAsset)\b/i);
   });
 
-  it("keeps thin-client Asset Library files on the server API read-only client boundary", () => {
+  it("keeps thin-client Asset Library files on the server API controlled client boundary", () => {
     const source = combinedSource("apps/thin-client/src/features/asset-library");
 
     assert.match(source, /\bcreateApiAssetLibraryClient\b/);
@@ -250,6 +262,10 @@ describe("Asset Kernel public non-exposure boundaries", () => {
     assert.doesNotMatch(source, /from\s+["'][^"']*adapters\/persistence[^"']*["']/i);
     assert.doesNotMatch(source, /from\s+["'][^"']*api-express[^"']*["']/i);
     assert.doesNotMatch(source, /from\s+["'][^"']*(?:preload|ipc-electron|electron|desktop)[^"']*["']/i);
-    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|publishAsset|scanResources|executeAsset|runAsset|syncAssets|repairAsset|installAsset|startAsset|trainAsset)\b/i);
+    assert.match(source, /\bregisterResourceBackedViewAsAsset\b/);
+    assert.match(source, /\bfinalizeGeneratedOutputAsAsset\b/);
+    assert.match(source, /\bimportExternalRepositoryObjectAsAsset\b/);
+    assert.match(source, /\blocalizeExternalRepositoryObjectAsAsset\b/);
+    assert.doesNotMatch(source, /\b(?:createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|registerAssetDefinition|seedBuiltInAssetDefinitions|importAsset|finalizeAsset|publishAsset|scanResources|executeAsset|runAsset|syncAssets|repairAsset|installAsset|startAsset|trainAsset|bulkAsset|deleteAsset|editAsset|seedAsset)\b/i);
   });
 });

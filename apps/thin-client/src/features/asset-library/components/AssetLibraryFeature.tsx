@@ -1,8 +1,16 @@
+import { useState } from "react";
+
 import type { AssetLibraryClient } from "../../../../../../modules/ui/shared/asset-library";
 import {
+  AssetMutationConfirmationDialog,
+  buildAssetLibraryMutationCommand,
+  describeAssetMutationResult,
+  getAssetLibraryMutationActions,
   getAssetLibraryFamilyLabel,
   getAssetLibraryLifecycleStatusLabel,
   getAssetLibraryTypeLabel,
+  type AssetLibraryMutationAction,
+  type AssetLibraryMutationDisplay,
   type AssetLibraryResourceBackedViewCard,
   type AssetLibraryResourceBackedViewDetail,
 } from "../../../../../../modules/ui/shared/asset-library";
@@ -17,6 +25,34 @@ interface AssetLibraryFeatureProps {
 
 export function AssetLibraryFeature({ client }: AssetLibraryFeatureProps) {
   const state = useAssetLibraryFeature(client);
+  const [pendingAction, setPendingAction] = useState<AssetLibraryMutationAction | undefined>();
+  const [isMutating, setIsMutating] = useState(false);
+  const [mutationDisplay, setMutationDisplay] = useState<AssetLibraryMutationDisplay | undefined>();
+
+  async function confirmMutation() {
+    if (!pendingAction || !state.selectedResourceBackedViewDetail) return;
+    setIsMutating(true);
+    setMutationDisplay(undefined);
+    const command = buildAssetLibraryMutationCommand({
+      action: pendingAction,
+      view: state.selectedResourceBackedViewDetail,
+      userConfirmed: true,
+      thinClientSafe: true,
+    });
+    const result = await callMutationClient(state, pendingAction, command);
+    if (result.ok === true) {
+      const display = describeAssetMutationResult(result.value);
+      setMutationDisplay(display);
+      setPendingAction(undefined);
+      if (result.value.ok === true) {
+        await state.refresh();
+        await state.selectResourceBackedView(state.selectedResourceBackedViewDetail);
+      }
+    } else {
+      setMutationDisplay({ tone: "error", message: result.error.message || "Unable to complete this asset action." });
+    }
+    setIsMutating(false);
+  }
 
   return (
     <section className="asset-library-feature ui-stack ui-stack--lg">
@@ -86,10 +122,27 @@ export function AssetLibraryFeature({ client }: AssetLibraryFeatureProps) {
               detail={state.selectedResourceBackedViewDetail}
               isLoading={state.isLoadingDetail}
               error={state.detailError}
+              mutationDisplay={mutationDisplay}
+              isMutating={isMutating}
+              onChooseAction={(action) => {
+                setMutationDisplay(undefined);
+                setPendingAction(action);
+              }}
             />
           </>
         )}
       </div>
+      {pendingAction && state.selectedResourceBackedViewDetail ? (
+        <AssetMutationConfirmationDialog
+          action={pendingAction}
+          view={state.selectedResourceBackedViewDetail}
+          isPending={isMutating}
+          onCancel={() => setPendingAction(undefined)}
+          onConfirm={() => {
+            void confirmMutation();
+          }}
+        />
+      ) : null}
     </section>
   );
 }
@@ -148,14 +201,21 @@ function ResourceBackedViewDetailPanel({
   detail,
   isLoading,
   error,
+  mutationDisplay,
+  isMutating,
+  onChooseAction,
 }: {
   readonly detail?: AssetLibraryResourceBackedViewDetail;
   readonly isLoading: boolean;
   readonly error?: string;
+  readonly mutationDisplay?: AssetLibraryMutationDisplay;
+  readonly isMutating: boolean;
+  readonly onChooseAction: (action: AssetLibraryMutationAction) => void;
 }) {
   if (isLoading) return <section className="ui-panel" role="status">Loading resource view...</section>;
   if (error) return <section className="ui-panel" role="alert">{error}</section>;
   if (!detail) return <section className="ui-panel asset-library-empty"><h2>Select a resource view.</h2></section>;
+  const actions = getAssetLibraryMutationActions(detail);
   return (
     <section className="ui-panel asset-library-detail" aria-label="Resource view detail">
       <h2>{detail.displayName}</h2>
@@ -168,7 +228,38 @@ function ResourceBackedViewDetailPanel({
         {detail.sourceKind ? <><dt>Source</dt><dd>{detail.sourceKind}</dd></> : null}
         {detail.resourceBackingSummary?.resourceKind ? <><dt>Backing</dt><dd>{detail.resourceBackingSummary.resourceKind}</dd></> : null}
       </dl>
+      {actions.length > 0 ? (
+        <div className="asset-library-actions" aria-label="Resource view actions">
+          {actions.map((action) => (
+            <button key={action.id} type="button" className="ui-button ui-button--primary" onClick={() => onChooseAction(action)} disabled={isMutating || Boolean(action.disabledReason)}>
+              {action.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {mutationDisplay ? (
+        <div className="ui-status" role={mutationDisplay.tone === "error" ? "alert" : "status"}>
+          {mutationDisplay.message}
+          {mutationDisplay.details?.length ? (
+            <details>
+              <summary>Review details</summary>
+              <ul>{mutationDisplay.details.map((detailMessage) => <li key={detailMessage}>{detailMessage}</li>)}</ul>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
       {detail.diagnostics?.length ? <div className="ui-status" role="status">{detail.diagnostics.join(" ")}</div> : null}
     </section>
   );
+}
+
+async function callMutationClient(
+  state: ReturnType<typeof useAssetLibraryFeature>,
+  action: AssetLibraryMutationAction,
+  command: ReturnType<typeof buildAssetLibraryMutationCommand>,
+) {
+  if (action.id === "finalize-generated-output") return state.client.finalizeGeneratedOutputAsAsset(command as any);
+  if (action.id === "import-external-object") return state.client.importExternalRepositoryObjectAsAsset(command as any);
+  if (action.id === "localize-external-object") return state.client.localizeExternalRepositoryObjectAsAsset(command as any);
+  return state.client.registerResourceBackedViewAsAsset(command as any);
 }

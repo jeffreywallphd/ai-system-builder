@@ -106,6 +106,10 @@ function createClient(overrides: Partial<AssetLibraryClient> = {}): AssetLibrary
     readAssetDefinitionVersion: vi.fn().mockResolvedValue({ ok: true, value: detailWithoutValidation }),
     listAssetResourceBackedViews: vi.fn().mockResolvedValue({ ok: true, value: { items: [resourceViewCard] } }),
     readAssetResourceBackedView: vi.fn().mockResolvedValue({ ok: true, value: resourceViewDetail }),
+    registerResourceBackedViewAsAsset: vi.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.register-resource-backed-view", status: "created" } }),
+    finalizeGeneratedOutputAsAsset: vi.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.finalize-generated-output", status: "created" } }),
+    importExternalRepositoryObjectAsAsset: vi.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.import-external-repository-object", status: "created" } }),
+    localizeExternalRepositoryObjectAsAsset: vi.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.localize-external-repository-object", status: "created" } }),
     ...overrides,
   };
 }
@@ -183,7 +187,54 @@ describe("AssetLibraryFeature", () => {
       { viewId: "asset-view.generated-output.internal.1" },
       { expand: ["metadata", "resourceBackings"] },
     );
-    expect(container.textContent).not.toMatch(/Register asset|Import asset|Finalize asset|Scan resources/i);
+    expect(container.textContent).toContain("Finalize and register");
+    expect(container.textContent).not.toMatch(/Create asset|Edit asset|Delete asset|Seed built-ins|Scan resources/i);
+  });
+
+  it("requires confirmation and calls the finalize mutation with a safe command", async () => {
+    const client = createClient();
+    const { container } = await render(client);
+    const resourceTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Resource views") as HTMLButtonElement;
+
+    await act(async () => resourceTab.click());
+    await flush();
+    const cardButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Generated output")) as HTMLButtonElement;
+    await act(async () => cardButton.click());
+    await flush();
+
+    const actionButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Finalize and register") as HTMLButtonElement;
+    await act(async () => actionButton.click());
+    await flush();
+
+    expect(container.textContent).toContain("Finalize this output?");
+    expect(container.textContent).toContain("Local storage");
+    expect(client.finalizeGeneratedOutputAsAsset).not.toHaveBeenCalled();
+
+    const dialog = container.querySelector("[role='dialog']") as HTMLElement;
+    const confirmButton = Array.from(dialog.querySelectorAll("button")).find((button) => button.textContent === "Finalize and register") as HTMLButtonElement;
+    await act(async () => confirmButton.click());
+    await flush();
+
+    expect(client.finalizeGeneratedOutputAsAsset).toHaveBeenCalledWith({
+      operation: "asset.finalize-generated-output",
+      viewId: "asset-view.generated-output.internal.1",
+      approval: {
+        userConfirmed: true,
+        confirmationKind: "finalize-generated-output",
+        allowNetworkAccess: false,
+        allowCredentialUse: false,
+        allowFilesystemWrite: true,
+        allowPartialCompletion: true,
+      },
+      actor: {
+        initiatedBy: "human",
+        automationSafe: false,
+      },
+    });
+    expect(JSON.stringify((client.finalizeGeneratedOutputAsAsset as any).mock.calls[0][0])).not.toMatch(/metadata|C:\\|Bearer|base64|workflow|prompt/i);
+    expect(container.textContent).toContain("Asset registered.");
+    expect(client.listAssetResourceBackedViews).toHaveBeenCalled();
+    expect(client.readAssetResourceBackedView).toHaveBeenCalledTimes(2);
   });
 
   it("renders empty states for no registered definitions and filtered misses", async () => {
@@ -344,7 +395,7 @@ describe("AssetLibraryFeature", () => {
     await flush();
 
     const text = container.textContent ?? "";
-    expect(text).not.toMatch(/Create asset|Edit asset|Delete asset|Register asset|Seed built-ins|Import asset|Finalize asset|Scan resources|Execute workflow/i);
+    expect(text).not.toMatch(/Create asset|Edit asset|Delete asset|Seed built-ins|Scan resources|Execute workflow/i);
     expect(text).not.toContain("C:\\Users\\name\\secret");
     expect(text).not.toContain("Bearer abc");
   });
