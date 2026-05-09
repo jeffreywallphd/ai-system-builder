@@ -85,6 +85,7 @@ export interface AssetDefinitionCard {
   readonly systemDefault?: boolean;
   readonly installedPack?: boolean;
   readonly importedPack?: boolean;
+  readonly workspacePack?: boolean;
   readonly workspaceOverride?: boolean;
   readonly organizationOverride?: boolean;
   readonly userOverride?: boolean;

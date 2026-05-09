@@ -303,11 +303,19 @@ describe("asset library mappers", () => {
     const result = mapAssetDefinitionListResult({
       items: [
         {
+          definitionId: "workspace.pack",
+          version: "1.0.0",
+          displayName: "Workspace Pack",
+          sourceLayer: "workspace-pack",
+          sourcePackId: "workspace.ui",
+        },
+        {
           definitionId: "workspace.override",
           version: "1.0.0",
           displayName: "Workspace Override",
           sourceLayer: "workspace-pack",
           sourcePackId: "workspace.ui",
+          overridesDefinitionRef: { kind: "asset-definition-version", id: "builtin.ui.container", version: "1.0.0" },
         },
         {
           definitionId: "organization.override",
@@ -346,6 +354,7 @@ describe("asset library mappers", () => {
     });
 
     expect(result.items.map(getAssetSourceBadge)).toEqual([
+      "Workspace pack",
       "Workspace override",
       "Organization override",
       "User override",
@@ -353,6 +362,31 @@ describe("asset library mappers", () => {
       "Installed pack",
       "Custom",
     ]);
+    expect(result.items[0]?.workspacePack).toBe(true);
+    expect(result.items[0]?.workspaceOverride).toBeUndefined();
+    expect(result.items[1]?.workspaceOverride).toBe(true);
+  });
+
+  it("displays workspace-pack override relationships as read-only metadata", () => {
+    const detail = mapAssetDefinitionDetail({
+      definition: {
+        definitionId: "workspace.override",
+        version: "1.0.0",
+        displayName: "Workspace Override",
+        metadata: {
+          sourceLayer: "workspace-pack",
+          sourcePackId: "workspace.ui",
+          overridesDefinitionRef: { kind: "asset-definition-version", id: "builtin.ui.container", version: "1.0.0" },
+        },
+      },
+    });
+
+    expect(detail.sourceBadgeLabel).toBe("Workspace override");
+    expect(detail.overridesDefinitionRef).toEqual({ kind: "asset-definition-version", id: "builtin.ui.container", version: "1.0.0" });
+    expect(JSON.stringify(detail)).not.toContain("Edit override");
+    expect(JSON.stringify(detail)).not.toContain("Create override");
+    expect(JSON.stringify(detail)).not.toContain("Delete override");
+    expect(JSON.stringify(detail)).not.toContain("Resolve asset");
   });
 
   it("groups and filters definitions by pack, category, and source layer", () => {

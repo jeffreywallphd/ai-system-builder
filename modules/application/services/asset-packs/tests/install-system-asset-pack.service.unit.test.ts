@@ -28,7 +28,7 @@ class MemoryDefinitionRepository implements AssetDefinitionRepositoryPort {
     const version = reference.version;
     if (version) return cloneOrUndefined(this.definitions.get(`${reference.id}@${version}`));
     const matches = [...this.definitions.values()].filter((definition) => definition.definitionId === reference.id);
-    return cloneOrUndefined(matches.at(-1));
+    return cloneOrUndefined(matches[matches.length - 1]);
   }
 
   public async listDefinitions(_query: AssetDefinitionListQuery = {}) {
@@ -157,7 +157,7 @@ describe("InstallSystemAssetPackService", () => {
     assert.match(JSON.stringify(second.diagnostics), /definition-already-installed/);
   });
 
-  it("does not overwrite existing user or custom definitions with the same ID and version", async () => {
+  it("fails on existing user or custom definitions with the same ID and version", async () => {
     const repository = new MemoryDefinitionRepository();
     const entry = singleEntryManifest().assets[0];
     assert.ok(entry);
@@ -176,13 +176,45 @@ describe("InstallSystemAssetPackService", () => {
     });
     const saved = await repository.getDefinition(entry.definitionRef);
 
-    assert.equal(result.status, "installed-with-skips");
-    assert.equal(result.skippedEntryCount, 1);
+    assert.equal(result.status, "failed");
+    assert.equal(result.failedEntryCount, 1);
+    assert.equal(result.skippedEntryCount, 0);
     assert.equal(repository.saveCount, 0);
     assert.equal(saved?.displayName, "User Modified Definition");
     assert.match(messages(result), /conflicts with the system pack entry/i);
+    assert.equal(result.issues.some((issue) => issue.severity === "error"), true);
     assert.match(JSON.stringify(result.diagnostics), /definition-conflict-not-overwritten/);
     assert.doesNotMatch(JSON.stringify(result), /(?:C:\\|\/tmp|token|secret|providerPayload|stack|base64|bytes|command)/i);
+  });
+
+  it("does not save later entries after a user or custom conflict", async () => {
+    const repository = new MemoryDefinitionRepository();
+    const manifest = {
+      ...SYSTEM_FOUNDATION_PACK_MANIFEST,
+      assets: SYSTEM_FOUNDATION_PACK_MANIFEST.assets.slice(0, 2),
+      categories: Array.from(new Set(SYSTEM_FOUNDATION_PACK_MANIFEST.assets.slice(0, 2).map((entry) => entry.category))),
+    };
+    const conflictingEntry = manifest.assets[0]!;
+    const laterEntry = manifest.assets[1]!;
+    await repository.saveDefinition({
+      ...conflictingEntry.definition,
+      displayName: "User Modified Definition",
+      metadata: { userOwned: true },
+      provenance: { sourceKind: "human-authored", authorship: "human-authored" },
+    });
+    repository.saveCount = 0;
+
+    const result = await service(repository).install({
+      manifest,
+      expectedPackId: SYSTEM_FOUNDATION_PACK_ID,
+      now,
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.failedEntryCount, 1);
+    assert.equal(repository.saveCount, 0);
+    assert.equal((await repository.getDefinition(conflictingEntry.definitionRef))?.displayName, "User Modified Definition");
+    assert.equal(await repository.getDefinition(laterEntry.definitionRef), undefined);
   });
 
   it("skips existing system-owned same-pack definitions by default", async () => {
@@ -234,7 +266,8 @@ describe("InstallSystemAssetPackService", () => {
       now,
     });
 
-    assert.equal(skipped.status, "installed-with-skips");
+    assert.equal(skipped.status, "failed");
+    assert.equal(skipped.failedEntryCount, 1);
     assert.equal(repository.saveCount, 1);
     assert.equal(refreshed.status, "installed");
     assert.equal((await repository.getDefinition(changed.assets[0]!.definitionRef))?.displayName, "Refreshed Definition");

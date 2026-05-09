@@ -492,17 +492,41 @@ describe("AssetRegistryReadFacade definition reads", () => {
   it("filters definitions by search text, type, family, lifecycle, and built-in/custom flags", async () => {
     const builtInSeed = BUILT_IN_ASSET_DEFINITION_CATALOG[0]!;
     const builtIn = { ...builtInSeed.definition, metadata: { builtInSeed: { seedId: builtInSeed.seedId, seedVersion: builtInSeed.seedVersion, fingerprint: "abc", managedBy: "asset-kernel", lastSeededAt: "2026-01-01T00:00:00.000Z" } } };
+    const systemFoundation = validDefinition({
+      definitionId: "builtin.system.foundation.fixture",
+      displayName: "System Foundation Fixture",
+      metadata: {
+        sourcePackId: "system.foundation",
+        sourceLayer: "system-default",
+        sourceKind: "system",
+        trustStatus: "system-trusted",
+        assetPackInstall: {
+          packId: "system.foundation",
+          packVersion: "1.0.0",
+          sourceKind: "system",
+          sourceLayer: "system-default",
+          trustStatus: "system-trusted",
+        },
+      },
+    });
     const repo = new FakeDefinitionRepository([
       validDefinition(),
       validDefinition({ definitionId: "definition.beta", assetType: "dataset", assetFamily: "resource-backed", displayName: "Beta Dataset", lifecycleStatus: "published" }),
       builtIn,
+      systemFoundation,
     ]);
     const facade = createFacade({ definitionRepository: repo });
 
     assert.deepEqual((await facade.listDefinitionCards({ searchText: "beta" })).items.map((item) => item.definitionId), ["definition.beta"]);
     assert.deepEqual((await facade.listDefinitionCards({ assetTypes: ["dataset"], assetFamilies: ["resource-backed"], lifecycleStatuses: ["published"] })).items.map((item) => item.definitionId), ["definition.beta"]);
-    assert.equal((await facade.listDefinitionCards({ includeBuiltIns: true, includeCustom: false })).items[0]?.builtIn, true);
-    assert.equal((await facade.listDefinitionCards({ includeBuiltIns: false })).items.some((item) => item.builtIn), false);
+    assert.deepEqual(
+      (await facade.listDefinitionCards({ includeBuiltIns: true, includeCustom: false })).items.map((item) => item.definitionId).sort(),
+      [String(builtIn.definitionId), "builtin.system.foundation.fixture"].sort(),
+    );
+    assert.equal((await facade.listDefinitionCards({ includeBuiltIns: false })).items.some((item) => item.definitionId === "builtin.system.foundation.fixture"), false);
+    assert.equal((await facade.listDefinitionCards({ includeCustom: true, includeBuiltIns: false })).items.some((item) => item.definitionId === "builtin.system.foundation.fixture"), false);
+    assert.equal((await facade.readDefinitionDetail({ kind: "asset-definition-version", id: normalizeAssetId("builtin.system.foundation.fixture"), version: "1.0.0" }))?.builtIn, true);
+    assert.equal((await facade.listDefinitionCards({ includeBuiltIns: false })).items.some((item) => item.definitionId === "definition.alpha"), true);
   });
 
   it("marks persisted built-ins without seeding or overwriting definitions", async () => {

@@ -462,7 +462,27 @@ function isBuiltInDefinition(definition: AssetDefinition): boolean {
   ) {
     return true;
   }
+  if (isSystemFoundationSystemDefaultDefinition(definition)) {
+    return true;
+  }
   return builtInDefinitionKeys.has(definitionKey(String(definition.definitionId), String(definition.version)));
+}
+
+function isSystemFoundationSystemDefaultDefinition(definition: AssetDefinition): boolean {
+  const metadata = isRecord(definition.metadata) ? definition.metadata : {};
+  const installMetadata = isRecord(metadata.assetPackInstall) ? metadata.assetPackInstall : {};
+  const sourcePackId = safeIdentifier(metadata.sourcePackId) ?? safeIdentifier(installMetadata.packId);
+  if (sourcePackId !== SYSTEM_FOUNDATION_PACK_ID) return false;
+
+  const sourceKind = safeSourceKind(metadata.sourceKind) ?? safeSourceKind(installMetadata.sourceKind);
+  const sourceLayer = safeSourceLayer(metadata.sourceLayer) ?? safeSourceLayer(installMetadata.sourceLayer);
+  const trustStatus = safeTrustStatus(metadata.trustStatus) ?? safeTrustStatus(installMetadata.trustStatus);
+
+  return (
+    (sourceKind === undefined || sourceKind === "system") &&
+    (sourceLayer === undefined || sourceLayer === "system-default") &&
+    (trustStatus === undefined || trustStatus === "system-trusted")
+  );
 }
 
 function definitionRef(definition: AssetDefinition): AssetReference {
@@ -532,10 +552,19 @@ function safeDefinitionSourceMetadata(definition: AssetDefinition): Partial<Asse
     ...(categoryId ? { packCategoryId: categoryId } : {}),
     ...(categoryId && SYSTEM_FOUNDATION_CATEGORY_LABELS[categoryId] ? { packCategoryDisplayName: SYSTEM_FOUNDATION_CATEGORY_LABELS[categoryId] } : {}),
     ...(packTags.length ? { packTags } : {}),
-    ...(sourcePackId === SYSTEM_FOUNDATION_PACK_ID || (sourceLayer === "system-default" && sourceKind === "system" && trustStatus === "system-trusted") ? { systemDefault: true } : {}),
+    ...(
+      (sourcePackId === SYSTEM_FOUNDATION_PACK_ID &&
+        sourceKind === "system" &&
+        (sourceLayer === undefined || sourceLayer === "system-default") &&
+        trustStatus === "system-trusted") ||
+      (sourceLayer === "system-default" && sourceKind === "system" && trustStatus === "system-trusted")
+        ? { systemDefault: true }
+        : {}
+    ),
     ...(sourceLayer === "installed-pack" ? { installedPack: true } : {}),
     ...(sourceLayer === "imported-pack" ? { importedPack: true } : {}),
-    ...(sourceLayer === "workspace-pack" ? { workspaceOverride: true } : {}),
+    ...(sourceLayer === "workspace-pack" ? { workspacePack: true } : {}),
+    ...(sourceLayer === "workspace-pack" && overridesDefinitionRef ? { workspaceOverride: true } : {}),
     ...(sourceLayer === "organization-override" ? { organizationOverride: true } : {}),
     ...(sourceLayer === "user-override" ? { userOverride: true } : {}),
     ...(overridesDefinitionRef ? { overridesDefinitionRef } : {}),
