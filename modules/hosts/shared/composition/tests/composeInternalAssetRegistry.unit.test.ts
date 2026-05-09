@@ -10,6 +10,7 @@ import type { AssetResourceBackedViewListQuery, AssetResourceBackedViewListResul
 import { BuiltInAssetDefinitionSeedingService } from "../../../../application/services/asset/built-in-asset-definition-seeding.service";
 import { AssetRegistryReadFacade, AssetRegistryReadFacadeError } from "../../../../application/services/asset/asset-registry-read-facade.service";
 import { BUILT_IN_ASSET_DEFINITION_CATALOG } from "../../../../application/services/asset/built-ins";
+import { SYSTEM_FOUNDATION_PACK_MANIFEST } from "../../../../application/services/asset-packs";
 import { composeInternalAssetRegistry } from "../composeInternalAssetRegistry";
 
 const definitionRef: AssetReference = { kind: "asset-definition-version", id: "definition.internal", version: "1.0.0" } as AssetReference;
@@ -85,6 +86,8 @@ describe("composeInternalAssetRegistry", () => {
     assert.equal(composition.readFacade instanceof AssetRegistryReadFacade, true);
     assert.equal(typeof composition.assetKernel.repositories.definitionRepository.listDefinitions, "function");
     assert.equal(typeof composition.assetKernel.useCases.registerAssetDefinition.execute, "function");
+    assert.equal(typeof composition.assetPackInstaller.install, "function");
+    assert.equal(typeof composition.installSystemFoundationPack.install, "function");
     assert.deepEqual(composition.diagnostics, {
       storeKind: "asset-kernel-local-store",
       schemaVersion: 1,
@@ -138,6 +141,21 @@ describe("composeInternalAssetRegistry", () => {
     assert.equal(result.createdCount, 2);
     const cards = await composition.readFacade.listDefinitionCards({ includeBuiltIns: true, includeCustom: false });
     assert.deepEqual(cards.items.map((card) => card.builtIn), [true, true]);
+  });
+
+  it("does not install the system foundation pack during helper composition", async () => {
+    const composition = composeInternalAssetRegistry({ rootDirectory: await tempRoot(), now: () => "2026-05-09T00:00:00.000Z" });
+
+    assert.equal((await composition.assetKernel.repositories.definitionRepository.listDefinitions()).definitions.length, 0);
+
+    const result = await composition.installSystemFoundationPack.install({
+      mode: "validate-only",
+      now: () => new Date("2026-05-09T00:00:00.000Z"),
+    });
+
+    assert.equal(result.status, "validated");
+    assert.equal(result.checkedEntryCount, SYSTEM_FOUNDATION_PACK_MANIFEST.assets.length);
+    assert.equal((await composition.assetKernel.repositories.definitionRepository.listDefinitions()).definitions.length, 0);
   });
 
   it("returns empty resource-backed results when no provider seam is supplied", async () => {

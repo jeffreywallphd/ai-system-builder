@@ -74,7 +74,7 @@
 
 
 
-- Server `registerApi` composes the internal Asset Registry through `composeInternalAssetRegistry` using `storageRootDirectory`, which initializes `<storageRootDirectory>/asset-kernel/` and exposes only a host-internal getter for private composition/tests. It also passes the Phase 3 safe resource-backed provider aggregate built from already-composed artifact metadata, finalized image descriptor, and persisted model read seams. It must not use `runtimeRootDirectory` for Asset Kernel records or provider reads and must not add asset API routes, thin-client clients, automatic built-in seeding, resource scans, provider/network calls, resource-byte reads, or runtime start/probe/install behavior for the Asset Kernel.
+- Server `registerApi` composes the internal Asset Registry through `composeInternalAssetRegistry` using `storageRootDirectory`, which initializes `<storageRootDirectory>/asset-kernel/` and exposes only a host-internal getter for private composition/tests. It also passes the Phase 3 safe resource-backed provider aggregate built from already-composed artifact metadata, finalized image descriptor, and persisted model read seams. The internal registry may expose an explicit application-side `system.foundation` installer seam, but server startup must not invoke it. It must not use `runtimeRootDirectory` for Asset Kernel records or provider reads and must not add asset API routes, thin-client clients, automatic built-in or system-pack seeding, resource scans, provider/network calls, resource-byte reads, or runtime start/probe/install behavior for the Asset Kernel.
 
 ## Current implementation checkpoint (server host)
 

@@ -2,4 +2,6 @@ export * from "./asset-pack-manifest-builder.service";
 export * from "./asset-pack-validation.service";
 export * from "./asset-pack-quality-gates.service";
 export * from "./asset-resolution-planning.service";
+export * from "./install-system-asset-pack.service";
+export * from "./install-system-foundation-pack.service";
 export * from "./system-packs";
