@@ -79,6 +79,9 @@ export class RegisterResourceBackedViewAsAssetInstanceUseCase {
     const guardFailure = validateRegisterResourceBackedViewMutationGuard(command);
     if (guardFailure) return failureResult(guardFailure);
 
+    const idGeneratorFailure = this.validateInstanceIdGenerator();
+    if (idGeneratorFailure) return failureResult(idGeneratorFailure);
+
     try {
       const detail = await this.dependencies.assetRegistryRead.readResourceBackedViewDetail(command.viewId, {
         includeMetadata: true,
@@ -315,7 +318,14 @@ export class RegisterResourceBackedViewAsAssetInstanceUseCase {
   }
 
   private generateInstanceId(): string {
-    return this.dependencies.generateInstanceId?.() ?? `asset-instance.registered.${Math.random().toString(36).slice(2)}`;
+    return this.dependencies.generateInstanceId!();
+  }
+
+  private validateInstanceIdGenerator(): AssetMutationFailure | undefined {
+    if (this.dependencies.generateInstanceId) return undefined;
+    return failure("unavailable", "Asset instance ID generation is not available for resource-backed view registration.", [
+      diagnostic("error", "asset-instance-id-generator-unavailable", "Mutation use cases require an injected safe instance ID generator before any Asset Kernel instance can be saved."),
+    ]);
   }
 }
 

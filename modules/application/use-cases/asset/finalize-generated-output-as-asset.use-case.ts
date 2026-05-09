@@ -83,6 +83,12 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
   }
 
   public async execute(command: FinalizeGeneratedOutputCommand): Promise<AssetMutationResult> {
+    const guardFailure = validateFinalizeGeneratedOutputMutationGuard(command);
+    if (guardFailure) return failureResult(guardFailure);
+
+    const idGeneratorFailure = this.validateInstanceIdGenerator();
+    if (idGeneratorFailure) return failureResult(idGeneratorFailure);
+
     try {
       const sourceDetail = await this.readSource(command);
       if (!sourceDetail) {
@@ -108,9 +114,6 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
 
       const preDuplicate = await this.findDuplicate([sourceIdentity]);
       if (preDuplicate.result) return preDuplicate.result;
-
-      const guardFailure = validateFinalizeGeneratedOutputMutationGuard(command);
-      if (guardFailure) return failureResult(guardFailure, sourceIdentity);
 
       const targetResult = await this.resolveTargetDefinition(command);
       if (targetResult.ok === false) return failureResult(targetResult.failure, sourceIdentity);
@@ -372,7 +375,14 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
   }
 
   private generateInstanceId(): string {
-    return this.dependencies.generateInstanceId?.() ?? `asset-instance.finalized-image.${Math.random().toString(36).slice(2)}`;
+    return this.dependencies.generateInstanceId!();
+  }
+
+  private validateInstanceIdGenerator(): AssetMutationFailure | undefined {
+    if (this.dependencies.generateInstanceId) return undefined;
+    return failure("unavailable", "Asset instance ID generation is not available for generated output finalization.", [
+      diagnostic("error", "asset-instance-id-generator-unavailable", "Mutation use cases require an injected safe instance ID generator before any Asset Kernel instance can be saved."),
+    ]);
   }
 }
 
@@ -612,7 +622,13 @@ function safeText(value: unknown): string | undefined {
 
 function safeIdentityPart(value: string, fallbackPrefix: string): string {
   const sanitized = sanitizeAssetStringValue(value);
-  if (sanitized && /^[a-z0-9_.:-]{1,180}$/i.test(sanitized) && !/[\\/]/.test(sanitized) && !/^https?:/i.test(sanitized)) {
+  if (
+    sanitized &&
+    /^[a-z0-9_.:-]{1,180}$/i.test(sanitized) &&
+    !/[\\/]/.test(sanitized) &&
+    !/^https?:/i.test(sanitized) &&
+    !/(?:prompt|negativeprompt|workflow|bearer|token|secret|password|credential|auth|base64|data:image|raw|payload|command|stack|process\.env|signed|presigned|hf:|huggingface)/i.test(sanitized)
+  ) {
     return sanitized.trim().toLowerCase().replace(/[^a-z0-9_.:-]+/g, "-").replace(/^-+|-+$/g, "");
   }
   return `${fallbackPrefix}.${stableHash(value)}`;
