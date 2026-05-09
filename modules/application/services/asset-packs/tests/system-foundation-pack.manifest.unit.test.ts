@@ -6,6 +6,7 @@ import {
   SYSTEM_FOUNDATION_PACK_CATEGORY_IDS,
   SYSTEM_FOUNDATION_PACK_MANIFEST,
   SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
+  FORM_PRIMITIVE_ENTRIES,
   UI_STRUCTURAL_PRIMITIVE_ENTRIES,
 } from "../system-packs";
 
@@ -22,14 +23,29 @@ describe("system foundation pack manifest", () => {
     assert.equal(SYSTEM_FOUNDATION_PACK_MANIFEST.trustStatus, "system-trusted");
   });
 
-  it("contains the expected categories and UI structural primitive assets", () => {
+  it("contains the expected categories, UI structural primitive assets, and form primitive assets", () => {
     assert.deepEqual(
       SYSTEM_FOUNDATION_PACK_MANIFEST.categories,
       SYSTEM_FOUNDATION_PACK_CATEGORY_IDS,
     );
     assert.deepEqual(
       SYSTEM_FOUNDATION_PACK_MANIFEST.assets.map((entry) => entry.entryId),
-      UI_STRUCTURAL_PRIMITIVE_ENTRIES.map((entry) => entry.entryId),
+      [
+        ...UI_STRUCTURAL_PRIMITIVE_ENTRIES,
+        ...FORM_PRIMITIVE_ENTRIES,
+      ].map((entry) => entry.entryId),
+    );
+    assert.equal(
+      UI_STRUCTURAL_PRIMITIVE_ENTRIES.every((entry) =>
+        SYSTEM_FOUNDATION_PACK_MANIFEST.assets.includes(entry),
+      ),
+      true,
+    );
+    assert.equal(
+      FORM_PRIMITIVE_ENTRIES.every((entry) =>
+        SYSTEM_FOUNDATION_PACK_MANIFEST.assets.includes(entry),
+      ),
+      true,
     );
     assert.deepEqual(SYSTEM_FOUNDATION_PACK_MANIFEST.dependencies, []);
     assert.deepEqual(SYSTEM_FOUNDATION_PACK_MANIFEST.overrideRules, []);
@@ -41,9 +57,9 @@ describe("system foundation pack manifest", () => {
     const fingerprints = new Set<string>();
 
     for (const entry of SYSTEM_FOUNDATION_PACK_MANIFEST.assets) {
-      assert.equal(entry.category, "ui-structure");
+      assert.ok(["ui-structure", "forms-fields"].includes(entry.category));
       assert.equal(entry.sourceLayer, SYSTEM_FOUNDATION_PACK_SOURCE_LAYER);
-      assert.match(entry.entryId, /^system\.foundation\.ui\.[a-z0-9.-]+$/);
+      assert.match(entry.entryId, /^system\.foundation\.(?:ui|form)\.[a-z0-9.-]+$/);
       assert.match(entry.fingerprint, /^fnv1a:[a-f0-9]{8}$/);
       assert.equal(entryIds.has(entry.entryId), false, entry.entryId);
       assert.equal(refKeys.has(`${entry.definitionRef.id}@${entry.definitionRef.version}`), false);
@@ -72,14 +88,16 @@ describe("system foundation pack manifest", () => {
       "local path",
       "renderer implementation",
       "workflow json",
+      "form submission execution",
+      "validation engine execution",
+      "file upload/storage writes",
       "installstatus",
-      "activate",
-      "disable",
       "marketplace",
       "package manager",
       "installstatus",
     ]) {
       assert.equal(output.includes(forbidden), false, forbidden);
     }
+    assert.doesNotMatch(output, /\bactivate\b|\bdisable\b/);
   });
 });
