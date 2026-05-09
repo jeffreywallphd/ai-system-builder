@@ -166,6 +166,8 @@ Phase 3 Prompt 8 plus scope reconciliation stabilizes this state for final provi
 
 Phase 4 Prompt 7 adds host wiring for four approved controlled asset mutation workflows through narrow use-case dependencies only: register resource-backed view, finalize generated output, import external repository object, and localize external repository object. Server API and desktop IPC/preload wrappers remain transport glue; they do not receive host composition objects, repositories, providers, storage/runtime adapters, token stores, or UI objects. Host registration must not execute mutation use cases or perform provider/network/storage/runtime/finalization/localization work at startup, and no general asset editor, built-in seeding, provider browse/download, runtime execution, scan, or byte/content route is introduced.
 
+Phase 5 Prompt 11 asset-pack serialization remains application-local and in-memory. Hosts should not wire these helpers into startup import/export behavior, file pickers, API routes, IPC channels, preload methods, renderer buttons, package registries, marketplace clients, archive readers/writers, signing keys, active-pack activation, or override editing workflows.
+
 Phase 4 Prompt 8 adds host-specific Asset Library UI actions only through the existing public API/preload clients. Desktop renderer and thin-client UI may show confirmation-driven actions for the same four workflows, but they must not import application use cases/services, host composition, persistence/storage adapters, provider clients, route handlers, runtime adapters, or token stores directly. Asset Library browsing remains read-only and side-effect-free until a user confirms one of those approved actions.
 
 ### Current host parity for repo-backed artifact workflows
