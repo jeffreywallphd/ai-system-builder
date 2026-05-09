@@ -104,4 +104,71 @@ describe("asset source identity service", () => {
     assert.equal(result.ok, false);
     assert.equal(result.validationIssues?.[0]?.category, "identity");
   });
+
+  it("derives distinct safe identities for artifact, image, generated output, model, dataset, and external object views", () => {
+    const service = new AssetSourceIdentityService();
+    const cases: Array<Partial<AssetResourceBackedView>> = [
+      { viewKind: "artifact", assetType: "data-source", resourceBacking: { backingId: "artifact.one", resourceKind: "artifact", ref: { kind: "artifact", id: "artifact.one" as AssetReference["id"] } } },
+      { viewKind: "image-asset", assetType: "image", resourceBacking: { backingId: "image.one", resourceKind: "image", ref: { kind: "artifact", id: "artifact.image" as AssetReference["id"] } } },
+      { viewKind: "generated-output", assetType: "image", generatedOutput: { outputId: "generated.one", producedAssetType: "image" }, resourceBacking: { backingId: "generated.one", resourceKind: "generated-output", ref: { outputId: "generated.one" } } },
+      { viewKind: "model", assetType: "model", resourceBacking: { backingId: "model.one", resourceKind: "model", ref: { kind: "resource", id: "model.one" as AssetReference["id"] } } },
+      { viewKind: "dataset", assetType: "dataset", resourceBacking: { backingId: "dataset.one", resourceKind: "dataset", ref: { kind: "resource", id: "dataset.one" as AssetReference["id"] } } },
+      { viewKind: "external-repository-object", assetType: "model", resourceBacking: { backingId: "external.one", resourceKind: "external-repository-object", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "model.bin" } } },
+    ];
+
+    const identities = cases.map((overrides, index) => service.deriveFromResourceBackedView(view({
+      viewId: `view.${index}`,
+      ...overrides,
+    })).sourceIdentity!);
+
+    assert.deepEqual(identities.map((identity) => identity.sourceSystem), [
+      "artifact",
+      "image-asset",
+      "generated-output",
+      "model",
+      "dataset",
+      "external-repository-object",
+    ]);
+    assert.equal(new Set(identities.map((identity) => identity.deduplicationKey)).size, identities.length);
+    assert.doesNotMatch(JSON.stringify(identities), /model\.bin|token|https?:|C:\\|base64|prompt/i);
+  });
+
+  it("derives distinct finalized and imported/localized internal backing identities", () => {
+    const service = new AssetSourceIdentityService();
+    const generated = service.deriveFromResourceBackedView(view({
+      viewKind: "generated-output",
+      assetType: "image",
+      generatedOutput: { outputId: "generated.one", producedAssetType: "image" },
+      resourceBacking: { backingId: "generated.one", resourceKind: "generated-output", ref: { outputId: "generated.one" } },
+    })).sourceIdentity!;
+    const finalized = service.deriveFromFinalizedGeneratedImage({
+      imageAssetId: "image.one",
+      backingArtifactId: "artifact.one",
+      displayName: "Safe image",
+    }, generated);
+    const external = service.deriveFromResourceBackedView(view({
+      viewKind: "external-repository-object",
+      assetType: "dataset",
+      resourceBacking: { backingId: "external.dataset", resourceKind: "external-repository-object", ref: { provider: "huggingface", repositoryId: "owner/repo", objectPath: "data.csv" } },
+    })).sourceIdentity!;
+    const imported = service.deriveFromImportedOrLocalizedExternalObject({
+      operation: "import",
+      sourceIdentity: external,
+      resourceRefs: [{ kind: "artifact", id: "artifact.imported" as AssetReference["id"] }],
+      backings: [{ backingId: "artifact.imported", resourceKind: "artifact", ref: { kind: "artifact", id: "artifact.imported" as AssetReference["id"] } }],
+    });
+    const localized = service.deriveFromImportedOrLocalizedExternalObject({
+      operation: "localize",
+      sourceIdentity: external,
+      resourceRefs: [{ kind: "artifact", id: "artifact.imported" as AssetReference["id"] }],
+      backings: [{ backingId: "artifact.imported", resourceKind: "artifact", ref: { kind: "artifact", id: "artifact.imported" as AssetReference["id"] } }],
+    });
+
+    assert.equal(finalized.sourceSystem, "image-asset");
+    assert.equal(imported.sourceKind, "dataset");
+    assert.notEqual(generated.deduplicationKey, finalized.deduplicationKey);
+    assert.notEqual(external.deduplicationKey, imported.deduplicationKey);
+    assert.notEqual(imported.deduplicationKey, localized.deduplicationKey);
+    assert.doesNotMatch(JSON.stringify({ finalized, imported, localized }), /data.csv|C:\\|token|base64|prompt/i);
+  });
 });

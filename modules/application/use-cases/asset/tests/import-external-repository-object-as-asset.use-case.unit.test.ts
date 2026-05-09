@@ -19,7 +19,7 @@ import type {
   ExternalRepositoryObjectLocalizationResult,
 } from "../../../ports/asset";
 import type { AssetRegistryReadOptions, AssetRegistryResourceBackedViewDetail } from "../../../services/asset";
-import { BUILT_IN_ASSET_DEFINITIONS } from "../../../services/asset";
+import { AssetSourceIdentityService, BUILT_IN_ASSET_DEFINITIONS } from "../../../services/asset";
 import { ImportExternalRepositoryObjectAsAssetUseCase } from "..";
 
 class FakeDefinitionRepository implements AssetDefinitionRepositoryPort {
@@ -81,6 +81,14 @@ class FakeExternalObjectPort implements ExternalRepositoryObjectLocalizationPort
   }
 }
 
+class CountingSourceIdentityService extends AssetSourceIdentityService {
+  public calls = 0;
+  public override deriveFromResourceBackedView(view: AssetResourceBackedView) {
+    this.calls += 1;
+    return super.deriveFromResourceBackedView(view);
+  }
+}
+
 function command(overrides: Partial<ImportExternalRepositoryObjectCommand> = {}): ImportExternalRepositoryObjectCommand {
   return {
     operation: "asset.import-external-repository-object",
@@ -91,6 +99,7 @@ function command(overrides: Partial<ImportExternalRepositoryObjectCommand> = {})
       confirmationKind: "import-external-object",
       allowNetworkAccess: true,
       allowCredentialUse: true,
+      allowFilesystemWrite: true,
       allowPartialCompletion: true,
     },
     actor: { initiatedBy: "human", actorRef: "user.1", actorDisplayName: "User One" },
@@ -194,15 +203,31 @@ describe("ImportExternalRepositoryObjectAsAssetUseCase", () => {
   it("runs guard failures before source reads, duplicate lookups, definition lookups, port calls, or saves", async () => {
     const read = new FakeReadPort();
     read.details.set("view.external", { view: externalView() });
-    const { useCase, instances, definitions, port } = makeUseCase(read);
+    const definitions = new FakeDefinitionRepository();
+    const instances = new FakeInstanceRepository();
+    const port = new FakeExternalObjectPort();
+    const sourceIdentityService = new CountingSourceIdentityService();
+    let generatedIds = 0;
+    const useCase = new ImportExternalRepositoryObjectAsAssetUseCase({
+      assetRegistryRead: read,
+      externalObjectLocalizer: port,
+      definitionRepository: definitions,
+      instanceRepository: instances,
+      sourceIdentityService,
+      now: () => "2026-05-08T12:00:00.000Z",
+      generateInstanceId: () => {
+        generatedIds += 1;
+        return `imported.${generatedIds}`;
+      },
+    });
 
     const failures = [
-      command({ approval: { userConfirmed: false, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowPartialCompletion: true } }),
-      command({ approval: { userConfirmed: true, confirmationKind: "localize-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowPartialCompletion: true } }),
-      command({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowCredentialUse: true, allowPartialCompletion: true } }),
-      command({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowPartialCompletion: true } }),
-      command({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true } }),
-      command({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowPartialCompletion: true, allowFilesystemWrite: true } }),
+      command({ approval: { userConfirmed: false, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowFilesystemWrite: true, allowPartialCompletion: true } }),
+      command({ approval: { userConfirmed: true, confirmationKind: "localize-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowFilesystemWrite: true, allowPartialCompletion: true } }),
+      command({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowCredentialUse: true, allowFilesystemWrite: true, allowPartialCompletion: true } }),
+      command({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowFilesystemWrite: true, allowPartialCompletion: true } }),
+      command({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowPartialCompletion: true } }),
+      command({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowFilesystemWrite: true } }),
     ];
 
     for (const failingCommand of failures) {
@@ -210,9 +235,11 @@ describe("ImportExternalRepositoryObjectAsAssetUseCase", () => {
       assert.equal(result.ok, false);
     }
     assert.equal(read.readCalls.length, 0);
+    assert.equal(sourceIdentityService.calls, 0);
     assert.equal(instances.listCalls, 0);
     assert.equal(definitions.getCalls, 0);
-    assert.equal(port?.calls.length, 0);
+    assert.equal(port.calls.length, 0);
+    assert.equal(generatedIds, 0);
     assert.equal(instances.saved.length, 0);
   });
 

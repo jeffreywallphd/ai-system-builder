@@ -48,7 +48,7 @@ const generatedIdentity: AssetSourceIdentity = {
 const finalizeCommand: FinalizeGeneratedOutputCommand = {
   operation: "asset.finalize-generated-output",
   viewId: "view.generated",
-  approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, confirmationTextVersion: "1" },
+  approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowPartialCompletion: true, confirmationTextVersion: "1" },
   actor: { initiatedBy: "human", actorRef: "user.1", actorDisplayName: "User One" },
   context: { idempotencyKey: "idem.safe" },
 };
@@ -75,7 +75,7 @@ const generatedView: AssetResourceBackedView = {
 const importCommand: ImportExternalRepositoryObjectCommand = {
   operation: "asset.import-external-repository-object",
   viewId: "view.external",
-  approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowPartialCompletion: true },
+  approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowFilesystemWrite: true, allowPartialCompletion: true },
   actor: { initiatedBy: "human", actorRef: "user.1", actorDisplayName: "User One" },
   context: { idempotencyKey: "idem.safe" },
 };

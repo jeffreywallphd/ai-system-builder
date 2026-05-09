@@ -17,10 +17,11 @@ import type {
   AssetInstanceRepositoryPort,
 } from "../../../ports/asset";
 import type { AssetRegistryReadOptions, AssetRegistryResourceBackedViewDetail } from "../../../services/asset";
-import { BUILT_IN_ASSET_DEFINITIONS } from "../../../services/asset";
+import { AssetSourceIdentityService, BUILT_IN_ASSET_DEFINITIONS } from "../../../services/asset";
 
 class FakeDefinitionRepository implements AssetDefinitionRepositoryPort {
   public readonly definitions = new Map<string, AssetDefinition>();
+  public getCalls = 0;
   public constructor(definitions: readonly AssetDefinition[] = BUILT_IN_ASSET_DEFINITIONS) {
     for (const definition of definitions) this.definitions.set(key(definitionRef(definition)), definition);
   }
@@ -29,6 +30,7 @@ class FakeDefinitionRepository implements AssetDefinitionRepositoryPort {
     return definition;
   }
   public async getDefinition(reference: AssetReference): Promise<AssetDefinition | undefined> {
+    this.getCalls += 1;
     return this.definitions.get(key(reference)) ?? this.definitions.get(`${reference.id}@`);
   }
   public async listDefinitions(_query?: AssetDefinitionListQuery) {
@@ -62,6 +64,14 @@ class FakeReadPort {
   public async readResourceBackedViewDetail(viewId: string, options?: AssetRegistryReadOptions): Promise<AssetRegistryResourceBackedViewDetail | undefined> {
     this.readCalls.push({ viewId, options });
     return this.details.get(viewId);
+  }
+}
+
+class CountingSourceIdentityService extends AssetSourceIdentityService {
+  public calls = 0;
+  public override deriveFromResourceBackedView(view: AssetResourceBackedView) {
+    this.calls += 1;
+    return super.deriveFromResourceBackedView(view);
   }
 }
 
@@ -217,13 +227,30 @@ describe("RegisterResourceBackedViewAsAssetInstanceUseCase", () => {
   it("returns guard failures before source reads, duplicate reads, or saves", async () => {
     const read = new FakeReadPort();
     read.details.set("view.artifact", { view: artifactView() });
-    const { useCase, instances } = makeUseCase(read);
+    const definitions = new FakeDefinitionRepository();
+    const instances = new FakeInstanceRepository();
+    const sourceIdentityService = new CountingSourceIdentityService();
+    let generatedIds = 0;
+    const useCase = new RegisterResourceBackedViewAsAssetInstanceUseCase({
+      assetRegistryRead: read,
+      definitionRepository: definitions,
+      instanceRepository: instances,
+      sourceIdentityService,
+      now: () => "2026-05-08T12:00:00.000Z",
+      generateInstanceId: () => {
+        generatedIds += 1;
+        return `registered.${generatedIds}`;
+      },
+    });
 
     assert.equal((await useCase.execute(command({ approval: { userConfirmed: false, confirmationKind: "register-resource-backed-view" } }))).failure?.code, "approval-required");
     assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "register-resource-backed-view", allowFilesystemWrite: true } }))).failure?.code, "validation");
 
     assert.equal(read.readCalls.length, 0);
+    assert.equal(sourceIdentityService.calls, 0);
     assert.equal(instances.listCalls, 0);
+    assert.equal(definitions.getCalls, 0);
+    assert.equal(generatedIds, 0);
     assert.equal(instances.saved.length, 0);
   });
 

@@ -21,11 +21,12 @@ import type {
   AssetInstanceRepositoryPort,
 } from "../../../ports/asset";
 import type { AssetRegistryReadOptions, AssetRegistryResourceBackedViewDetail } from "../../../services/asset";
-import { BUILT_IN_ASSET_DEFINITIONS } from "../../../services/asset";
+import { AssetSourceIdentityService, BUILT_IN_ASSET_DEFINITIONS } from "../../../services/asset";
 import { FinalizeGeneratedOutputAsAssetUseCase } from "..";
 
 class FakeDefinitionRepository implements AssetDefinitionRepositoryPort {
   public readonly definitions = new Map<string, AssetDefinition>();
+  public getCalls = 0;
   public constructor(definitions: readonly AssetDefinition[] = BUILT_IN_ASSET_DEFINITIONS) {
     for (const definition of definitions) this.definitions.set(key(definitionRef(definition)), definition);
   }
@@ -34,6 +35,7 @@ class FakeDefinitionRepository implements AssetDefinitionRepositoryPort {
     return definition;
   }
   public async getDefinition(reference: AssetReference): Promise<AssetDefinition | undefined> {
+    this.getCalls += 1;
     return this.definitions.get(key(reference)) ?? this.definitions.get(`${reference.id}@`);
   }
   public async listDefinitions(_query?: AssetDefinitionListQuery) {
@@ -85,11 +87,19 @@ class FakeFinalizer implements FinalizeGeneratedOutputPort {
   }
 }
 
+class CountingSourceIdentityService extends AssetSourceIdentityService {
+  public calls = 0;
+  public override deriveFromResourceBackedView(view: AssetResourceBackedView) {
+    this.calls += 1;
+    return super.deriveFromResourceBackedView(view);
+  }
+}
+
 function command(overrides: Partial<FinalizeGeneratedOutputCommand> = {}): FinalizeGeneratedOutputCommand {
   return {
     operation: "asset.finalize-generated-output",
     viewId: "view.generated",
-    approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true },
+    approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowPartialCompletion: true },
     actor: { initiatedBy: "human", actorRef: "user.1", actorDisplayName: "User One" },
     context: { requestId: "request.1", correlationId: "correlation.1", idempotencyKey: "idem.1" },
     ...overrides,
@@ -240,11 +250,12 @@ describe("FinalizeGeneratedOutputAsAssetUseCase", () => {
     read.details.set("view.generated", { view: generatedView() });
     const { useCase, finalizer, instances } = makeUseCase(read);
 
-    assert.equal((await useCase.execute(command({ approval: { userConfirmed: false, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true } }))).failure?.code, "approval-required");
-    assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "register-resource-backed-view", allowFilesystemWrite: true } }))).failure?.code, "validation");
+    assert.equal((await useCase.execute(command({ approval: { userConfirmed: false, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowPartialCompletion: true } }))).failure?.code, "approval-required");
+    assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "register-resource-backed-view", allowFilesystemWrite: true, allowPartialCompletion: true } }))).failure?.code, "validation");
     assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output" } }))).failure?.code, "permission");
-    assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowNetworkAccess: true } }))).failure?.code, "validation");
-    assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowCredentialUse: true } }))).failure?.code, "validation");
+    assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true } }))).failure?.code, "permission");
+    assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowPartialCompletion: true, allowNetworkAccess: true } }))).failure?.code, "validation");
+    assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowPartialCompletion: true, allowCredentialUse: true } }))).failure?.code, "validation");
     assert.equal(finalizer?.calls.length, 0);
     assert.equal(read.readCalls.length, 0);
     assert.equal(instances.listCalls, 0);
@@ -253,23 +264,43 @@ describe("FinalizeGeneratedOutputAsAssetUseCase", () => {
 
   it("does not read sources, repositories, or finalization ports when the command guard fails", async () => {
     const guardFailures = [
-      command({ approval: { userConfirmed: false, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true } }),
-      command({ approval: { userConfirmed: true, confirmationKind: "register-resource-backed-view", allowFilesystemWrite: true } }),
+      command({ approval: { userConfirmed: false, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowPartialCompletion: true } }),
+      command({ approval: { userConfirmed: true, confirmationKind: "register-resource-backed-view", allowFilesystemWrite: true, allowPartialCompletion: true } }),
       command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output" } }),
-      command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowNetworkAccess: true } }),
-      command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowCredentialUse: true } }),
+      command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true } }),
+      command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowPartialCompletion: true, allowNetworkAccess: true } }),
+      command({ approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowPartialCompletion: true, allowCredentialUse: true } }),
     ];
 
     for (const failingCommand of guardFailures) {
       const read = new FakeReadPort();
       read.details.set("view.generated", { view: generatedView() });
-      const { useCase, finalizer, instances } = makeUseCase(read);
+      const definitions = new FakeDefinitionRepository();
+      const instances = new FakeInstanceRepository();
+      const finalizer = new FakeFinalizer();
+      const sourceIdentityService = new CountingSourceIdentityService();
+      let generatedIds = 0;
+      const useCase = new FinalizeGeneratedOutputAsAssetUseCase({
+        assetRegistryRead: read,
+        generatedOutputFinalizer: finalizer,
+        definitionRepository: definitions,
+        instanceRepository: instances,
+        sourceIdentityService,
+        now: () => "2026-05-08T12:00:00.000Z",
+        generateInstanceId: () => {
+          generatedIds += 1;
+          return `finalized.${generatedIds}`;
+        },
+      });
       const result = await useCase.execute(failingCommand);
 
       assert.equal(result.ok, false);
       assert.equal(read.readCalls.length, 0);
-      assert.equal(finalizer?.calls.length, 0);
+      assert.equal(sourceIdentityService.calls, 0);
+      assert.equal(finalizer.calls.length, 0);
       assert.equal(instances.listCalls, 0);
+      assert.equal(definitions.getCalls, 0);
+      assert.equal(generatedIds, 0);
       assert.equal(instances.saved.length, 0);
     }
   });
