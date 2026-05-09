@@ -128,8 +128,8 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
       const finalized = await this.finalize(command, sourceView, generatedOutputId);
       if (!finalized.ok) return failureResult(finalizationFailure(finalized), sourceIdentity);
 
-      const finalizedSourceIdentity = finalizedImageSourceIdentity(finalized.finalizedImage, sourceIdentity);
-      const postDuplicate = await this.findDuplicate([sourceIdentity, finalizedSourceIdentity]);
+      const finalizedSourceIdentity = this.sourceIdentityService.deriveFromFinalizedGeneratedImage(finalized.finalizedImage, sourceIdentity);
+      const postDuplicate = await this.findDuplicate([sourceIdentity, finalizedSourceIdentity], targetResult.definitionRef);
       if (postDuplicate.result) return postDuplicate.result;
 
       const createdAt = this.now();
@@ -286,6 +286,7 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
 
   private async findDuplicate(
     identities: readonly AssetSourceIdentity[],
+    targetDefinitionRef?: AssetReference,
   ): Promise<{ readonly result?: AssetMutationResult; readonly diagnostics: readonly AssetMutationDiagnostic[] }> {
     const diagnostics = [
       diagnostic("info", "asset-finalization-duplicate-search-bounded", "Duplicate source identity search used a bounded instance repository list scan.", {
@@ -294,8 +295,25 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
     ];
     const keys = new Set(identities.map((identity) => identity.deduplicationKey));
     const list = await this.dependencies.instanceRepository.listInstances({ limit: this.duplicateSearchLimit });
-    const existing = list.instances.find((instance) => storedDeduplicationKeys(instance).some((key) => keys.has(key)));
-    if (!existing) return { diagnostics };
+    const matching = list.instances.filter((instance) => storedDeduplicationKeys(instance).some((key) => keys.has(key)));
+    if (matching.length === 0) return { diagnostics };
+
+    const existing = targetDefinitionRef
+      ? matching.find((instance) => sameDefinitionRef(instance.definitionRef, targetDefinitionRef))
+      : matching[0];
+    if (!existing) {
+      return {
+        diagnostics,
+        result: failureResult(failure("conflict", "The same source identity is already registered against a different target definition.", [
+          diagnostic("error", "asset-finalization-source-identity-conflict", "Duplicate source identity matched an incompatible existing instance.", {
+            existingInstanceId: safeText(matching[0]?.instanceId),
+            existingDefinitionId: safeText(matching[0]?.definitionRef.id),
+            targetDefinitionId: safeText(targetDefinitionRef?.id),
+          }),
+          ...diagnostics,
+        ]), identities[0]),
+      };
+    }
 
     return {
       diagnostics,
@@ -512,45 +530,6 @@ function resourceRefsFor(finalizedImage: FinalizedGeneratedImageDescriptor): rea
   ];
 }
 
-function finalizedImageSourceIdentity(
-  finalizedImage: FinalizedGeneratedImageDescriptor,
-  sourceIdentity: AssetSourceIdentity,
-): AssetSourceIdentity {
-  const safeImageId = safeIdentityPart(finalizedImage.imageAssetId, "image-asset");
-  const safeArtifactId = safeIdentityPart(finalizedImage.backingArtifactId, "artifact");
-  const sourceFingerprint = stableHash(JSON.stringify(sanitizeAssetViewValue({
-    imageAssetId: safeImageId,
-    artifactId: safeArtifactId,
-    source: "generated",
-  })));
-  return {
-    sourceKind: "image-asset",
-    sourceViewId: sourceIdentity.sourceViewId,
-    sourceViewKind: "image-asset",
-    sourceAssetType: "image",
-    sourceResourceKind: "image",
-    sourceSystem: "image-asset",
-    sourceId: safeImageId,
-    sourceFingerprint,
-    backingRefs: [
-      {
-        backingId: `image.finalized.${stableHash(`${safeImageId}|${safeArtifactId}`)}`,
-        resourceKind: "image",
-        ref: { kind: "artifact", id: normalizeAssetId(`artifact.${safeArtifactId}`) },
-        role: "primary",
-        displayName: safeText(finalizedImage.displayName),
-        contentType: safeText(finalizedImage.mediaType),
-        createdAt: safeText(finalizedImage.createdAt),
-        metadata: sanitizeAssetMetadata({
-          imageAssetId: safeImageId,
-          artifactId: safeArtifactId,
-        }),
-      },
-    ],
-    deduplicationKey: `asset-source.image-asset.${stableHash(["image-asset", safeImageId, safeArtifactId, sourceFingerprint].join("|"))}`,
-  };
-}
-
 function hasUnsupportedDiagnostics(view: AssetResourceBackedView): boolean {
   return (view.diagnostics ?? []).some((item) => /(unsupported|not-wired|source-unavailable|not-available)/i.test(item.code));
 }
@@ -616,31 +595,12 @@ function isDefinitionReference(reference: AssetReference): boolean {
   return reference.kind === "asset-definition" || reference.kind === "asset-definition-version";
 }
 
+function sameDefinitionRef(left: AssetReference, right: AssetReference): boolean {
+  return left.id === right.id && (left.version ?? "") === (right.version ?? "");
+}
+
 function safeText(value: unknown): string | undefined {
   return typeof value === "string" ? sanitizeAssetStringValue(value) : undefined;
-}
-
-function safeIdentityPart(value: string, fallbackPrefix: string): string {
-  const sanitized = sanitizeAssetStringValue(value);
-  if (
-    sanitized &&
-    /^[a-z0-9_.:-]{1,180}$/i.test(sanitized) &&
-    !/[\\/]/.test(sanitized) &&
-    !/^https?:/i.test(sanitized) &&
-    !/(?:prompt|negativeprompt|workflow|bearer|token|secret|password|credential|auth|base64|data:image|raw|payload|command|stack|process\.env|signed|presigned|hf:|huggingface)/i.test(sanitized)
-  ) {
-    return sanitized.trim().toLowerCase().replace(/[^a-z0-9_.:-]+/g, "-").replace(/^-+|-+$/g, "");
-  }
-  return `${fallbackPrefix}.${stableHash(value)}`;
-}
-
-function stableHash(value: string): string {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(36);
 }
 
 function failure(

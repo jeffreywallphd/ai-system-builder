@@ -1,5 +1,6 @@
 import type {
   AssetMetadata,
+  AssetReference,
   AssetResourceBackedView,
   AssetResourceBacking,
   AssetSourceIdentity,
@@ -7,6 +8,7 @@ import type {
   AssetSourceSystem,
   AssetValidationIssue,
 } from "../../../contracts/asset";
+import { normalizeAssetId } from "../../../contracts/asset";
 import { sanitizeAssetStringValue, sanitizeAssetViewValue } from "./asset-safe-metadata";
 
 export interface AssetSourceIdentityResult {
@@ -14,6 +16,21 @@ export interface AssetSourceIdentityResult {
   readonly sourceIdentity?: AssetSourceIdentity;
   readonly diagnostics?: readonly { readonly code: string; readonly message: string; readonly metadata?: AssetMetadata }[];
   readonly validationIssues?: readonly AssetValidationIssue[];
+}
+
+export interface FinalizedGeneratedImageIdentityInput {
+  readonly imageAssetId: string;
+  readonly backingArtifactId: string;
+  readonly displayName?: string;
+  readonly mediaType?: string;
+  readonly createdAt?: string;
+}
+
+export interface ImportedOrLocalizedExternalObjectIdentityInput {
+  readonly operation: "import" | "localize";
+  readonly sourceIdentity: AssetSourceIdentity;
+  readonly resourceRefs: readonly AssetReference[];
+  readonly backings: readonly AssetResourceBacking[];
 }
 
 export class AssetSourceIdentityService {
@@ -59,6 +76,76 @@ export class AssetSourceIdentityService {
     };
 
     return { ok: true, sourceIdentity };
+  }
+
+  public deriveFromFinalizedGeneratedImage(
+    finalizedImage: FinalizedGeneratedImageIdentityInput,
+    sourceIdentity: AssetSourceIdentity,
+  ): AssetSourceIdentity {
+    const safeImageId = safeIdentityPart(finalizedImage.imageAssetId, "image-asset");
+    const safeArtifactId = safeIdentityPart(finalizedImage.backingArtifactId, "artifact");
+    const sourceFingerprint = stableHash(JSON.stringify(sanitizeAssetViewValue({
+      imageAssetId: safeImageId,
+      artifactId: safeArtifactId,
+      source: "generated",
+    })));
+    return {
+      sourceKind: "image-asset",
+      sourceViewId: sourceIdentity.sourceViewId,
+      sourceViewKind: "image-asset",
+      sourceAssetType: "image",
+      sourceResourceKind: "image",
+      sourceSystem: "image-asset",
+      sourceId: safeImageId,
+      sourceFingerprint,
+      backingRefs: [
+        {
+          backingId: `image.finalized.${stableHash(`${safeImageId}|${safeArtifactId}`)}`,
+          resourceKind: "image",
+          ref: { kind: "artifact", id: normalizeAssetId(`artifact.${safeArtifactId}`) },
+          role: "primary",
+          displayName: sanitizeAssetStringValue(finalizedImage.displayName),
+          contentType: sanitizeAssetStringValue(finalizedImage.mediaType),
+          createdAt: sanitizeAssetStringValue(finalizedImage.createdAt),
+          metadata: sanitizeAssetViewValue({
+            imageAssetId: safeImageId,
+            artifactId: safeArtifactId,
+          }) as AssetMetadata,
+        },
+      ],
+      deduplicationKey: `asset-source.image-asset.${stableHash(["image-asset", safeImageId, safeArtifactId, sourceFingerprint].join("|"))}`,
+    };
+  }
+
+  public deriveFromImportedOrLocalizedExternalObject(
+    input: ImportedOrLocalizedExternalObjectIdentityInput,
+  ): AssetSourceIdentity {
+    const seed = input.resourceRefs.map((ref) => `${ref.kind}:${safeIdentityPart(ref.id, "resource")}:${sanitizeAssetStringValue(ref.version) ?? ""}`).join("|")
+      || input.backings.map((backing) => safeIdentityPart(backing.backingId, "backing")).join("|");
+    const sourceFingerprint = stableHash(JSON.stringify(sanitizeAssetViewValue({
+      operation: input.operation,
+      seed,
+      source: input.sourceIdentity.deduplicationKey,
+    })));
+    const sourceKind = input.sourceIdentity.sourceAssetType === "model"
+      ? "model"
+      : input.sourceIdentity.sourceAssetType === "dataset"
+        ? "dataset"
+        : input.sourceIdentity.sourceAssetType === "image"
+          ? "image-asset"
+          : "artifact";
+    return {
+      sourceKind,
+      sourceViewId: input.sourceIdentity.sourceViewId,
+      sourceViewKind: input.sourceIdentity.sourceViewKind,
+      sourceAssetType: input.sourceIdentity.sourceAssetType,
+      sourceResourceKind: input.sourceIdentity.sourceResourceKind,
+      sourceSystem: sourceKind === "image-asset" ? "image-asset" : sourceKind,
+      sourceId: `${input.operation}.${stableHash(seed)}`,
+      sourceFingerprint,
+      backingRefs: input.backings,
+      deduplicationKey: `asset-source.${sourceKind}.${stableHash([input.operation, seed, sourceFingerprint].join("|"))}`,
+    };
   }
 }
 

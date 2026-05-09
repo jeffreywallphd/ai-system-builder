@@ -16,16 +16,18 @@ import type {
   ExternalRepositoryObjectLocalizationResult,
 } from "../../../ports/asset";
 import type { AssetRegistryReadOptions, AssetRegistryResourceBackedViewDetail } from "../../../services/asset";
-import { BUILT_IN_ASSET_DEFINITIONS } from "../../../services/asset";
+import { AssetSourceIdentityService, BUILT_IN_ASSET_DEFINITIONS } from "../../../services/asset";
 import { LocalizeExternalRepositoryObjectAsAssetUseCase } from "..";
 
 class FakeDefinitionRepository implements AssetDefinitionRepositoryPort {
   public readonly definitions = new Map<string, AssetDefinition>();
+  public getCalls = 0;
   public constructor(definitions: readonly AssetDefinition[] = BUILT_IN_ASSET_DEFINITIONS) {
     for (const definition of definitions) this.definitions.set(`${definition.definitionId}@${definition.version}`, definition);
   }
   public async saveDefinition(definition: AssetDefinition): Promise<AssetDefinition> { return definition; }
   public async getDefinition(reference: AssetReference): Promise<AssetDefinition | undefined> {
+    this.getCalls += 1;
     return this.definitions.get(`${reference.id}@${reference.version ?? ""}`) ?? this.definitions.get(`${reference.id}@1.0.0`);
   }
   public async listDefinitions(_query?: AssetDefinitionListQuery) { return { definitions: [...this.definitions.values()] }; }
@@ -77,6 +79,14 @@ class FakeExternalObjectPort implements ExternalRepositoryObjectLocalizationPort
   public async processExternalRepositoryObject(request: ExternalRepositoryObjectLocalizationRequest): Promise<ExternalRepositoryObjectLocalizationResult> {
     this.calls.push(request);
     return this.result;
+  }
+}
+
+class CountingSourceIdentityService extends AssetSourceIdentityService {
+  public calls = 0;
+  public override deriveFromResourceBackedView(view: AssetResourceBackedView) {
+    this.calls += 1;
+    return super.deriveFromResourceBackedView(view);
   }
 }
 
@@ -152,15 +162,34 @@ describe("LocalizeExternalRepositoryObjectAsAssetUseCase", () => {
   it("requires localization-specific approval before source reads or port calls", async () => {
     const read = new FakeReadPort();
     read.details.set("view.external", { view: externalView() });
-    const { useCase, instances, port } = makeUseCase(read);
+    const definitions = new FakeDefinitionRepository();
+    const instances = new FakeInstanceRepository();
+    const port = new FakeExternalObjectPort();
+    const sourceIdentityService = new CountingSourceIdentityService();
+    let generatedIds = 0;
+    const useCase = new LocalizeExternalRepositoryObjectAsAssetUseCase({
+      assetRegistryRead: read,
+      externalObjectLocalizer: port,
+      definitionRepository: definitions,
+      instanceRepository: instances,
+      sourceIdentityService,
+      now: () => "2026-05-08T12:00:00.000Z",
+      generateInstanceId: () => {
+        generatedIds += 1;
+        return `localized.${generatedIds}`;
+      },
+    });
 
     assert.equal((await useCase.execute(command({ approval: { userConfirmed: false, confirmationKind: "localize-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowFilesystemWrite: true, allowPartialCompletion: true } }))).failure?.code, "approval-required");
     assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "import-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowFilesystemWrite: true, allowPartialCompletion: true } }))).failure?.code, "validation");
     assert.equal((await useCase.execute(command({ approval: { userConfirmed: true, confirmationKind: "localize-external-object", allowNetworkAccess: true, allowCredentialUse: true, allowPartialCompletion: true } }))).failure?.code, "permission");
 
     assert.equal(read.readCalls.length, 0);
+    assert.equal(sourceIdentityService.calls, 0);
     assert.equal(instances.listCalls, 0);
+    assert.equal(definitions.getCalls, 0);
     assert.equal(port.calls.length, 0);
+    assert.equal(generatedIds, 0);
   });
 
   it("returns existing on duplicate retry without re-localizing", async () => {

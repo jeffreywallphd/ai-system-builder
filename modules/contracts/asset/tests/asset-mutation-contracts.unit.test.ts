@@ -96,6 +96,7 @@ function finalizeCommand(): FinalizeGeneratedOutputCommand {
     approval: {
       ...approval,
       confirmationKind: "finalize-generated-output",
+      allowPartialCompletion: true,
     },
     actor: {
       ...actor,
@@ -121,6 +122,8 @@ function importCommand(): ImportExternalRepositoryObjectCommand {
       confirmationKind: "import-external-object",
       allowNetworkAccess: true,
       allowCredentialUse: true,
+      allowFilesystemWrite: true,
+      allowPartialCompletion: true,
     },
     actor,
     context,
@@ -142,6 +145,7 @@ function localizeCommand(): LocalizeExternalRepositoryObjectCommand {
       allowNetworkAccess: true,
       allowFilesystemWrite: true,
       allowCredentialUse: true,
+      allowPartialCompletion: true,
     },
     actor,
     context,

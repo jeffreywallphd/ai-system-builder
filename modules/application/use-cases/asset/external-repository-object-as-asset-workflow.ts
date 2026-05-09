@@ -152,8 +152,13 @@ export class ExternalRepositoryObjectAsAssetWorkflow<TCommand extends ExternalRe
         ], undefined, safePartialDetails({ sourceIdentity, portResult })), sourceIdentity);
       }
 
-      const importedIdentity = internalSourceIdentity(safeInternal, sourceIdentity, this.options.portOperation);
-      const postDuplicate = await this.findDuplicate([sourceIdentity, importedIdentity]);
+      const importedIdentity = this.sourceIdentityService.deriveFromImportedOrLocalizedExternalObject({
+        operation: this.options.portOperation,
+        sourceIdentity,
+        resourceRefs: safeInternal.resourceRefs,
+        backings: safeInternal.backings,
+      });
+      const postDuplicate = await this.findDuplicate([sourceIdentity, importedIdentity], target.definitionRef);
       if (postDuplicate.result) return postDuplicate.result;
 
       const createdAt = this.now();
@@ -350,6 +355,7 @@ export class ExternalRepositoryObjectAsAssetWorkflow<TCommand extends ExternalRe
 
   private async findDuplicate(
     identities: readonly AssetSourceIdentity[],
+    targetDefinitionRef?: AssetReference,
   ): Promise<{ readonly result?: AssetMutationResult; readonly diagnostics: readonly AssetMutationDiagnostic[] }> {
     const diagnostics = [
       diagnostic("info", "asset-external-object-duplicate-search-bounded", "Duplicate source identity search used a bounded instance repository list scan.", {
@@ -358,8 +364,25 @@ export class ExternalRepositoryObjectAsAssetWorkflow<TCommand extends ExternalRe
     ];
     const keys = new Set(identities.map((identity) => identity.deduplicationKey));
     const list = await this.dependencies.instanceRepository.listInstances({ limit: this.duplicateSearchLimit });
-    const existing = list.instances.find((instance) => storedDeduplicationKeys(instance).some((key) => keys.has(key)));
-    if (!existing) return { diagnostics };
+    const matching = list.instances.filter((instance) => storedDeduplicationKeys(instance).some((key) => keys.has(key)));
+    if (matching.length === 0) return { diagnostics };
+
+    const existing = targetDefinitionRef
+      ? matching.find((instance) => sameDefinitionRef(instance.definitionRef, targetDefinitionRef))
+      : matching[0];
+    if (!existing) {
+      return {
+        diagnostics,
+        result: this.failureResult(this.failure("conflict", "The same source identity is already registered against a different target definition.", [
+          diagnostic("error", "asset-external-object-source-identity-conflict", "Duplicate source identity matched an incompatible existing instance.", {
+            existingInstanceId: safeText(matching[0]?.instanceId),
+            existingDefinitionId: safeText(matching[0]?.definitionRef.id),
+            targetDefinitionId: safeText(targetDefinitionRef?.id),
+          }),
+          ...diagnostics,
+        ]), identities[0]),
+      };
+    }
 
     return {
       diagnostics,
@@ -638,39 +661,6 @@ function safeInternalState(result: Extract<ExternalRepositoryObjectLocalizationR
   };
 }
 
-function internalSourceIdentity(
-  internal: SafeInternalState,
-  sourceIdentity: AssetSourceIdentity,
-  operation: "import" | "localize",
-): AssetSourceIdentity {
-  const seed = internal.resourceRefs.map((ref) => `${ref.kind}:${safeIdentityPart(ref.id, "resource")}:${safeText(ref.version) ?? ""}`).join("|")
-    || internal.backings.map((backing) => safeIdentityPart(backing.backingId, "backing")).join("|");
-  const sourceFingerprint = stableHash(JSON.stringify(sanitizeAssetViewValue({
-    operation,
-    seed,
-    source: sourceIdentity.deduplicationKey,
-  })));
-  const sourceKind = sourceIdentity.sourceAssetType === "model"
-    ? "model"
-    : sourceIdentity.sourceAssetType === "dataset"
-      ? "dataset"
-      : sourceIdentity.sourceAssetType === "image"
-        ? "image-asset"
-        : "artifact";
-  return {
-    sourceKind,
-    sourceViewId: sourceIdentity.sourceViewId,
-    sourceViewKind: sourceIdentity.sourceViewKind,
-    sourceAssetType: sourceIdentity.sourceAssetType,
-    sourceResourceKind: sourceIdentity.sourceResourceKind,
-    sourceSystem: sourceKind === "image-asset" ? "image-asset" : sourceKind,
-    sourceId: `${operation}.${stableHash(seed)}`,
-    sourceFingerprint,
-    backingRefs: internal.backings,
-    deduplicationKey: `asset-source.${sourceKind}.${stableHash([operation, seed, sourceFingerprint].join("|"))}`,
-  };
-}
-
 function storedDeduplicationKeys(instance: AssetInstance): readonly string[] {
   const metadata = instance.metadata as Record<string, unknown> | undefined;
   const external = metadata?.externalRepositoryObject;
@@ -775,6 +765,10 @@ function isDefinitionReference(reference: AssetReference): boolean {
   return reference.kind === "asset-definition" || reference.kind === "asset-definition-version";
 }
 
+function sameDefinitionRef(left: AssetReference, right: AssetReference): boolean {
+  return left.id === right.id && (left.version ?? "") === (right.version ?? "");
+}
+
 function isSafeInternalReference(reference: AssetReference | undefined): reference is AssetReference {
   if (!reference || reference.kind === "external-repository-object") return false;
   const id = safeText(reference.id);
@@ -864,29 +858,6 @@ function safeContentType(value: unknown): string | undefined {
 
 function safeText(value: unknown): string | undefined {
   return typeof value === "string" ? sanitizeAssetStringValue(value) : undefined;
-}
-
-function safeIdentityPart(value: string, fallbackPrefix: string): string {
-  const sanitized = sanitizeAssetStringValue(value);
-  if (
-    sanitized &&
-    /^[a-z0-9_.:-]{1,180}$/i.test(sanitized) &&
-    !/[\\/]/.test(sanitized) &&
-    !/^https?:/i.test(sanitized) &&
-    !/(?:prompt|negativeprompt|workflow|bearer|token|secret|password|credential|auth|base64|data:image|raw|payload|command|stack|process\.env|signed|presigned|hf:|huggingface)/i.test(sanitized)
-  ) {
-    return sanitized.trim().toLowerCase().replace(/[^a-z0-9_.:-]+/g, "-").replace(/^-+|-+$/g, "");
-  }
-  return `${fallbackPrefix}.${stableHash(value)}`;
-}
-
-function stableHash(value: string): string {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(36);
 }
 
 function diagnostic(
