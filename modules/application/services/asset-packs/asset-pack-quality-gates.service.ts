@@ -240,14 +240,19 @@ function validateRuntimeRequirements(
     ]);
   }
   if (
-    SHELL_CATEGORY_IDS.has(entry.category) &&
-    /\b(?:execute|execution|run workflow|start runtime)\b/i.test(
-      JSON.stringify(entry.definition),
-    )
+    SHELL_CATEGORY_IDS.has(entry.category)
   ) {
-    addIssue(issues, "error", "composition", "Shell primitives must not imply execution behavior.", [
-      "definition",
-    ]);
+    walk(entry.definition, ["definition"], (current, path) => {
+      if (typeof current.value !== "string") return;
+      if (
+        /\b(?:execute|execution|run workflow|start runtime|task runner|workflow engine|scheduler)\b/i.test(
+          current.value,
+        ) &&
+        !isSafeNonGoalExecutionText(current.value)
+      ) {
+        addIssue(issues, "error", "composition", "Shell primitives must not imply execution behavior.", path);
+      }
+    });
   }
 }
 
