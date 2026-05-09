@@ -91,6 +91,7 @@ const resourceViewCard: AssetLibraryResourceBackedViewCard = {
   assetFamily: "resource-backed",
   assetFamilyLabel: "Resource Backed",
   lifecycleStatusLabel: "Not registered",
+  sourceKind: "generated-output",
   registrationStatusLabel: "Not finalized or registered",
 };
 
@@ -235,6 +236,144 @@ describe("AssetLibraryFeature", () => {
     expect(container.textContent).toContain("Asset registered.");
     expect(client.listAssetResourceBackedViews).toHaveBeenCalled();
     expect(client.readAssetResourceBackedView).toHaveBeenCalledTimes(2);
+  });
+
+  it("routes register and localize actions to their matching client methods", async () => {
+    const registerView = {
+      ...resourceViewCard,
+      id: "asset-view.artifact.internal.1",
+      viewId: "asset-view.artifact.internal.1",
+      displayName: "Artifact view",
+      viewKind: "artifact" as const,
+      viewKindLabel: "Artifact",
+      assetTypeLabel: "Unknown type",
+      assetFamilyLabel: "Unknown family",
+      registrationStatusLabel: "Read-only view",
+      sourceKind: "artifact-browser",
+    };
+    const registerClient = createClient({
+      listAssetResourceBackedViews: vi.fn().mockResolvedValue({ ok: true, value: { items: [registerView] } }),
+      readAssetResourceBackedView: vi.fn().mockResolvedValue({ ok: true, value: registerView }),
+    });
+    const registerRender = await render(registerClient);
+    const registerTab = Array.from(registerRender.container.querySelectorAll("button")).find((button) => button.textContent === "Resource views") as HTMLButtonElement;
+    await act(async () => registerTab.click());
+    await flush();
+    await act(async () => (Array.from(registerRender.container.querySelectorAll("button")).find((button) => button.textContent?.includes("Artifact view")) as HTMLButtonElement).click());
+    await flush();
+    await act(async () => (Array.from(registerRender.container.querySelectorAll("button")).find((button) => button.textContent === "Register as asset") as HTMLButtonElement).click());
+    await flush();
+    await act(async () => (Array.from((registerRender.container.querySelector("[role='dialog']") as HTMLElement).querySelectorAll("button")).find((button) => button.textContent === "Register asset") as HTMLButtonElement).click());
+    await flush();
+
+    expect(registerClient.registerResourceBackedViewAsAsset).toHaveBeenCalledWith(expect.objectContaining({
+      operation: "asset.register-resource-backed-view",
+      viewId: "asset-view.artifact.internal.1",
+    }));
+    expect(registerClient.finalizeGeneratedOutputAsAsset).not.toHaveBeenCalled();
+    expect(registerClient.importExternalRepositoryObjectAsAsset).not.toHaveBeenCalled();
+    expect(registerClient.localizeExternalRepositoryObjectAsAsset).not.toHaveBeenCalled();
+
+    await act(async () => mountedRoot?.unmount());
+    mountedContainer?.remove();
+    mountedRoot = undefined;
+    mountedContainer = undefined;
+
+    const externalView = {
+      ...resourceViewCard,
+      id: "asset-view.external-repository-object.internal.1",
+      viewId: "asset-view.external-repository-object.internal.1",
+      displayName: "External object",
+      viewKind: "external-repository-object" as const,
+      viewKindLabel: "External Repository Object",
+      assetType: "data-source" as const,
+      assetTypeLabel: "Data Source",
+      registrationStatusLabel: "Not imported or registered",
+      sourceKind: "external-repository",
+      metadata: { provider: "huggingface", repository: "safe/repo", objectLabel: "safe-object" },
+    };
+    const localizeClient = createClient({
+      listAssetResourceBackedViews: vi.fn().mockResolvedValue({ ok: true, value: { items: [externalView] } }),
+      readAssetResourceBackedView: vi.fn().mockResolvedValue({ ok: true, value: externalView }),
+    });
+    const localizeRender = await render(localizeClient);
+    const localizeTab = Array.from(localizeRender.container.querySelectorAll("button")).find((button) => button.textContent === "Resource views") as HTMLButtonElement;
+    await act(async () => localizeTab.click());
+    await flush();
+    await act(async () => (Array.from(localizeRender.container.querySelectorAll("button")).find((button) => button.textContent?.includes("External object")) as HTMLButtonElement).click());
+    await flush();
+    await act(async () => (Array.from(localizeRender.container.querySelectorAll("button")).find((button) => button.textContent === "Localize external object") as HTMLButtonElement).click());
+    await flush();
+    await act(async () => (Array.from((localizeRender.container.querySelector("[role='dialog']") as HTMLElement).querySelectorAll("button")).find((button) => button.textContent === "Localize object") as HTMLButtonElement).click());
+    await flush();
+
+    expect(localizeClient.localizeExternalRepositoryObjectAsAsset).toHaveBeenCalledWith(expect.objectContaining({
+      operation: "asset.localize-external-repository-object",
+      viewId: "asset-view.external-repository-object.internal.1",
+    }));
+    expect(localizeClient.registerResourceBackedViewAsAsset).not.toHaveBeenCalled();
+    expect(localizeClient.finalizeGeneratedOutputAsAsset).not.toHaveBeenCalled();
+  });
+
+  it("does not render unsafe resource view diagnostics or mutation details", async () => {
+    const client = createClient({
+      listAssetResourceBackedViews: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          items: [{
+            ...resourceViewCard,
+            diagnostics: ["Safe list diagnostic.", "C:\\Users\\name\\secret token workflowJson prompt"],
+          }],
+          diagnostics: [
+            { severity: "info", code: "safe", message: "Safe aggregate diagnostic." },
+            { severity: "warning", code: "unsafe", message: "/tmp/secret Bearer token data:image base64 raw provider payload command line process.env" },
+          ],
+        },
+      }),
+      readAssetResourceBackedView: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          ...resourceViewDetail,
+          diagnostics: ["Safe detail diagnostic."],
+        },
+      }),
+      finalizeGeneratedOutputAsAsset: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          ok: false,
+          operation: "asset.finalize-generated-output",
+          failure: {
+            code: "internal",
+            message: "raw",
+            operation: "asset.finalize-generated-output",
+            diagnostics: [{ severity: "error", code: "unsafe", message: "Bearer token C:\\Users\\secret workflowJson prompt stack" }],
+          },
+        },
+      }),
+    });
+    const { container } = await render(client);
+    const resourceTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Resource views") as HTMLButtonElement;
+
+    await act(async () => resourceTab.click());
+    await flush();
+    const cardButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Generated output")) as HTMLButtonElement;
+    await act(async () => cardButton.click());
+    await flush();
+
+    expect(container.textContent).toContain("Safe aggregate diagnostic.");
+    expect(container.textContent).toContain("Safe list diagnostic.");
+    expect(container.textContent).toContain("Safe detail diagnostic.");
+
+    const actionButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Finalize and register") as HTMLButtonElement;
+    await act(async () => actionButton.click());
+    await flush();
+    const dialog = container.querySelector("[role='dialog']") as HTMLElement;
+    const confirmButton = Array.from(dialog.querySelectorAll("button")).find((button) => button.textContent === "Finalize and register") as HTMLButtonElement;
+    await act(async () => confirmButton.click());
+    await flush();
+
+    expect(container.textContent).toContain("Something went wrong while completing this action.");
+    expect(container.textContent ?? "").not.toMatch(/C:\\|\/tmp|\/home|Bearer|token|secret|password|apiKey|signedUrl|access_token|base64|data:image|raw provider payload|workflowJson|prompt|stack|command line|process\.env/i);
   });
 
   it("renders empty states for no registered definitions and filtered misses", async () => {

@@ -14,8 +14,11 @@ const unsafeValues = [
   "C:\\Users\\name\\secret.txt",
   "/tmp/private/file",
   "/home/user/.cache/token",
+  "/Users/name/private/file",
   "Bearer abc123",
   "apiKey=abc123",
+  "signedUrl",
+  "access_token",
   "token",
   "password",
   "secret",
@@ -25,8 +28,12 @@ const unsafeValues = [
   "process.env",
   "base64",
   "data:image/png;base64,AAAA",
+  "workflowJson",
+  "prompt",
+  "command line",
   "bytes",
   "blobs",
+  "raw provider payload",
   "raw provider payloads",
   "https://example.invalid/object?X-Amz-Signature=abc",
   "https://example.invalid/object?token=abc",
@@ -340,6 +347,50 @@ describe("asset library mappers", () => {
     expect(JSON.stringify(detail)).not.toContain("task-123");
     expect(JSON.stringify(detail)).not.toContain("X-Amz-Signature");
     expect(JSON.stringify(detail)).not.toContain("bytes");
+  });
+
+  it("sanitizes resource-backed view diagnostics while preserving safe messages", () => {
+    const unsafeDiagnostics = unsafeValues.map((message, index) => ({
+      severity: "warning",
+      code: `unsafe-${index}`,
+      message,
+    }));
+    const result = mapAssetResourceBackedViewListResult({
+      diagnostics: [
+        { severity: "info", code: "safe", message: "Provider is not configured for this host." },
+        ...unsafeDiagnostics,
+      ],
+      items: [{
+        viewId: "asset-view.artifact.safe",
+        viewKind: "artifact",
+        displayName: "Safe artifact",
+        sourceKind: "artifact-browser",
+        diagnostics: [
+          { severity: "info", code: "safe-card", message: "Safe descriptor-only diagnostic." },
+          ...unsafeDiagnostics,
+        ],
+      }],
+    });
+    const detail = mapAssetResourceBackedViewDetail({
+      view: {
+        viewId: "asset-view.artifact.safe",
+        viewKind: "artifact",
+        displayName: "Safe artifact",
+        sourceKind: "artifact-browser",
+        diagnostics: [
+          { severity: "info", code: "safe-detail", message: "Safe detail diagnostic." },
+          ...unsafeDiagnostics,
+        ],
+      },
+    });
+    const serialized = JSON.stringify({ result, detail });
+
+    expect(result.diagnostics).toEqual([{ severity: "info", code: "safe", message: "Provider is not configured for this host." }]);
+    expect(result.items[0]?.diagnostics).toEqual(["Safe descriptor-only diagnostic."]);
+    expect(detail.diagnostics).toEqual(["Safe detail diagnostic."]);
+    for (const unsafe of unsafeValues) {
+      expect(serialized.includes(unsafe)).toBe(false);
+    }
   });
 
   it("normalizes safe client errors without exposing internal detail", () => {

@@ -9,7 +9,9 @@ import {
   getAssetLibraryFamilyLabel,
   getAssetLibraryLifecycleStatusLabel,
   getAssetLibraryTypeLabel,
+  sanitizeAssetLibraryDisplayText,
   type AssetLibraryMutationAction,
+  type AssetLibraryMutationCommand,
   type AssetLibraryMutationDisplay,
   type AssetLibraryResourceBackedViewCard,
   type AssetLibraryResourceBackedViewDetail,
@@ -38,7 +40,7 @@ export function AssetLibraryFeature({ client }: AssetLibraryFeatureProps) {
       view: state.selectedResourceBackedViewDetail,
       userConfirmed: true,
     });
-    const result = await callMutationClient(state, pendingAction, command);
+    const result = await callMutationClient(state, command);
     if (result.ok === true) {
       const display = describeAssetMutationResult(result.value);
       setMutationDisplay(display);
@@ -188,7 +190,7 @@ function ResourceBackedViewList({
               <span>{getAssetLibraryLifecycleStatusLabel(view)}</span>
               <span>{view.registrationStatusLabel}</span>
             </span>
-            {view.diagnostics?.length ? <span className="asset-definition-card__updated">{view.diagnostics.join(" ")}</span> : null}
+            {safeDiagnosticMessages(view.diagnostics).length ? <span className="asset-definition-card__updated">{safeDiagnosticMessages(view.diagnostics).join(" ")}</span> : null}
           </button>
         );
       })}
@@ -247,18 +249,35 @@ function ResourceBackedViewDetailPanel({
           ) : null}
         </div>
       ) : null}
-      {detail.diagnostics?.length ? <div className="ui-status" role="status">{detail.diagnostics.join(" ")}</div> : null}
+      {safeDiagnosticMessages(detail.diagnostics).length ? <div className="ui-status" role="status">{safeDiagnosticMessages(detail.diagnostics).join(" ")}</div> : null}
     </section>
   );
 }
 
 async function callMutationClient(
   state: ReturnType<typeof useAssetLibraryFeature>,
-  action: AssetLibraryMutationAction,
-  command: ReturnType<typeof buildAssetLibraryMutationCommand>,
+  command: AssetLibraryMutationCommand,
 ) {
-  if (action.id === "finalize-generated-output") return state.client.finalizeGeneratedOutputAsAsset(command as any);
-  if (action.id === "import-external-object") return state.client.importExternalRepositoryObjectAsAsset(command as any);
-  if (action.id === "localize-external-object") return state.client.localizeExternalRepositoryObjectAsAsset(command as any);
-  return state.client.registerResourceBackedViewAsAsset(command as any);
+  switch (command.operation) {
+    case "asset.register-resource-backed-view":
+      return state.client.registerResourceBackedViewAsAsset(command);
+    case "asset.finalize-generated-output":
+      return state.client.finalizeGeneratedOutputAsAsset(command);
+    case "asset.import-external-repository-object":
+      return state.client.importExternalRepositoryObjectAsAsset(command);
+    case "asset.localize-external-repository-object":
+      return state.client.localizeExternalRepositoryObjectAsAsset(command);
+    default:
+      return assertNever(command);
+  }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unsupported asset mutation command: ${JSON.stringify(value)}`);
+}
+
+function safeDiagnosticMessages(value: readonly string[] | undefined): readonly string[] {
+  return (value ?? [])
+    .map((message) => sanitizeAssetLibraryDisplayText(message))
+    .filter((message): message is string => typeof message === "string");
 }
