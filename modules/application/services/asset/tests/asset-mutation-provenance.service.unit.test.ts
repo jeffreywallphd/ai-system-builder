@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { AssetReference, AssetResourceBackedView, AssetSourceIdentity, RegisterResourceBackedViewCommand } from "../../../../contracts/asset";
+import type { AssetReference, AssetResourceBackedView, AssetSourceIdentity, FinalizeGeneratedOutputCommand, RegisterResourceBackedViewCommand } from "../../../../contracts/asset";
 import { AssetMutationProvenanceService } from "../asset-mutation-provenance.service";
 
 const sourceIdentity: AssetSourceIdentity = {
@@ -36,6 +36,42 @@ const view: AssetResourceBackedView = {
   metadata: { prompt: "raw prompt", ok: "safe" },
 };
 
+const generatedIdentity: AssetSourceIdentity = {
+  sourceKind: "generated-output",
+  sourceViewId: "view.generated",
+  sourceViewKind: "generated-output",
+  sourceSystem: "generated-output",
+  sourceId: "generated.safe",
+  deduplicationKey: "asset-source.generated-output.safe",
+};
+
+const finalizeCommand: FinalizeGeneratedOutputCommand = {
+  operation: "asset.finalize-generated-output",
+  viewId: "view.generated",
+  approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, confirmationTextVersion: "1" },
+  actor: { initiatedBy: "human", actorRef: "user.1", actorDisplayName: "User One" },
+  context: { idempotencyKey: "idem.safe" },
+};
+
+const generatedView: AssetResourceBackedView = {
+  viewId: "view.generated",
+  viewKind: "generated-output",
+  displayName: "Generated",
+  generatedOutput: {
+    outputId: "generated.safe",
+    runtimeCapabilityId: "image-generation",
+    producedAssetType: "image",
+    metadata: { prompt: "raw prompt" },
+  },
+  resourceBacking: {
+    backingId: "generated.safe",
+    resourceKind: "generated-output",
+    ref: { outputId: "generated.safe", producedAssetType: "image" },
+    metadata: { workflow: "raw workflow", ok: "safe" },
+  },
+  metadata: { prompt: "raw prompt", workflow: "raw workflow", ok: "safe" },
+};
+
 describe("asset mutation provenance service", () => {
   it("creates sanitized mutation provenance and asset provenance", () => {
     const provenance = new AssetMutationProvenanceService().createForResourceBackedRegistration({
@@ -48,5 +84,24 @@ describe("asset mutation provenance service", () => {
     assert.equal(provenance.actor.initiatedBy, "ai-assisted");
     assert.equal(provenance.createdProvenance?.authorship, "mixed");
     assert.doesNotMatch(JSON.stringify(provenance), /secret|raw prompt|base64|bytes|blob|workflow|stack|C:\\/i);
+  });
+
+  it("creates sanitized generated-output finalization provenance", () => {
+    const provenance = new AssetMutationProvenanceService().createForGeneratedOutputFinalization({
+      command: finalizeCommand,
+      sourceIdentity: generatedIdentity,
+      sourceView: generatedView,
+      createdAt: "2026-05-08T12:00:00.000Z",
+      finalizedImage: {
+        imageAssetId: "image.safe",
+        backingArtifactId: "artifact.safe",
+        model: "safe-model",
+        engine: "comfyui",
+      },
+    });
+    assert.equal(provenance.operation, "asset.finalize-generated-output");
+    assert.equal(provenance.createdProvenance?.sourceKind, "runtime-generated");
+    assert.equal(provenance.createdProvenance?.authorship, "ai-generated");
+    assert.doesNotMatch(JSON.stringify(provenance), /secret|raw prompt|raw workflow|base64|bytes|blob|stack|C:\\/i);
   });
 });
