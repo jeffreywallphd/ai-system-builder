@@ -15,22 +15,32 @@ import type {
   ReadArtifactDetailCommand,
   ReadArtifactDetailUseCaseResult,
 } from "./artifact-browser-read.types";
+import { resolveArtifactWorkspaceContext } from "./artifact-workspace-context";
+import type { WorkspaceRepository } from "../ports/workspace";
 
 export interface ReadArtifactDetailUseCaseDependencies {
   artifactBrowserMetadataRead: ArtifactBrowserMetadataReadPort;
+  workspaceRepository?: Pick<WorkspaceRepository, "readWorkspace">;
 }
 
 export class ReadArtifactDetailUseCase {
+  private readonly workspaceRepository?: Pick<WorkspaceRepository, "readWorkspace">;
   private readonly artifactBrowserMetadataRead: ArtifactBrowserMetadataReadPort;
 
   public constructor(dependencies: ReadArtifactDetailUseCaseDependencies) {
     this.artifactBrowserMetadataRead = dependencies.artifactBrowserMetadataRead;
+    this.workspaceRepository = dependencies.workspaceRepository;
   }
 
   public async execute<TMetadata extends StorageObjectMetadata = StorageObjectMetadata>(
     command: ReadArtifactDetailCommand,
     context: ArtifactBrowserCommandContext = {},
   ): Promise<ReadArtifactDetailUseCaseResult<ContractErrorDetails, TMetadata>> {
+    const workspaceContext = await resolveArtifactWorkspaceContext(context, this.workspaceRepository);
+    if (!workspaceContext.ok) {
+      return workspaceContext;
+    }
+
     let locator;
 
     try {

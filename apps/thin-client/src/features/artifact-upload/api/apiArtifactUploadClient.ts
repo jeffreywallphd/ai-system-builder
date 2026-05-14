@@ -5,6 +5,7 @@ export interface ThinClientArtifactUploadInput {
   mediaType: string;
   bytes: Uint8Array;
   source?: string;
+  workspaceId?: string;
 }
 
 export interface ThinClientArtifactUploadAcceptedTypePolicy {
@@ -140,6 +141,9 @@ function createUploadFormData(input: ThinClientArtifactUploadInput): FormData {
 
   formData.append("file", file);
   formData.append("source", input.source ?? DEFAULT_UPLOAD_SOURCE);
+  if (input.workspaceId) {
+    formData.append("workspaceId", input.workspaceId);
+  }
 
   return formData;
 }

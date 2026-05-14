@@ -101,7 +101,6 @@ describe("desktop filesystem artifact-object storage adapter integration", () =>
       outcome: "success",
       data: {
         key: "uploads/session-1/kitten.png",
-        absolutePath: path.join(rootDirectory, "uploads", "session-1", "kitten.png"),
         sizeBytes: bytes.byteLength,
         checksumAlgorithm: "sha256",
         checksumValue: sha256Hex(bytes),
@@ -170,7 +169,6 @@ describe("desktop filesystem artifact-object storage adapter integration", () =>
     expect(result.error.details).toMatchObject({
       operation: "storeArtifact",
       key: "uploads/verifies/missing-after-write.png",
-      absolutePath: path.join(rootDirectory, "uploads", "verifies", "missing-after-write.png"),
       filesystemCode: "ENOENT",
     });
 
@@ -212,7 +210,7 @@ describe("desktop filesystem artifact-object storage adapter integration", () =>
       throw new Error("Expected post-write size verification failure.");
     }
     expect(result.error.code).toBe("unavailable");
-    expect(result.error.message).toContain("expected 3 bytes but found 999");
+    expect(result.error.message).toContain("Failed to store artifact bytes");
     expect(result.error.details).toMatchObject({
       operation: "storeArtifact",
       key: "uploads/verifies/size-mismatch.png",

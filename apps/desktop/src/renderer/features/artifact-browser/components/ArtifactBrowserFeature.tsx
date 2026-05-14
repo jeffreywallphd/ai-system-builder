@@ -16,6 +16,8 @@ import { copyArtifactMediaBytesToArrayBuffer } from "../helpers/artifactMediaByt
 
 export interface ArtifactBrowserFeatureProps {
   client?: DesktopArtifactBrowserClient;
+  workspaceId?: string;
+  workspaceName?: string;
 }
 
 const HUGGING_FACE_SETTINGS_KEYS = ["huggingface.token", "huggingface.defaultNamespace"] as const;
@@ -52,7 +54,7 @@ function PublishedBackingPanel(
   );
 }
 
-export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) {
+export function ArtifactBrowserFeature({ client, workspaceId, workspaceName }: ArtifactBrowserFeatureProps) {
   const settings = useApplicationSettings({ keys: useMemo(() => ["huggingface.defaultNamespace"], []) });
   const [downloadState, setDownloadState] = useState<{ status: "idle" | "error"; message?: string }>({
     status: "idle",
@@ -98,7 +100,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     setMediaType,
     togglePublishForm,
     readArtifactMedia,
-  } = useArtifactBrowserFeature(client);
+  } = useArtifactBrowserFeature(client, workspaceId);
   const backingState = deriveArtifactBackingState(detail, content);
   const defaultNamespace = settings.valuesByKey.get("huggingface.defaultNamespace")?.value;
 
@@ -171,6 +173,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
       <header className="ui-grid ui-grid--two">
         <h2 className="ui-panel__title">Artifact Browser</h2>
+        <p>Workspace: {workspaceName ?? workspaceId ?? "No active workspace"}</p>
         <button className="ui-button" type="button" onClick={() => void refreshArtifacts()}>
           Refresh
         </button>

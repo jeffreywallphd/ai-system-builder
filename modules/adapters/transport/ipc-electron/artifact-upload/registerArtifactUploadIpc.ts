@@ -28,6 +28,7 @@ export interface StoreArtifactUploadUseCasePort {
     context?: {
       requestId?: string;
       correlationId?: string;
+      workspaceId?: string;
     },
   ) => Promise<StoreArtifactUploadUseCaseResult>;
   getAcceptedUploadPolicy: () => ArtifactUploadAcceptedTypePolicy;
@@ -52,6 +53,7 @@ export function mapIpcRequestPayload(
     },
     commandContext: {
       source: payload.boundary.source,
+      workspaceId: payload.workspaceId,
     },
   };
 }
@@ -95,6 +97,7 @@ export function createDesktopArtifactUploadIpcHandler(
       {
         requestId: request.requestId,
         correlationId: request.correlationId,
+        workspaceId: request.payload.workspaceId,
       },
     );
 

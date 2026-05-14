@@ -11,6 +11,7 @@ import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowser
 interface UseArtifactBrowserArtifactsParams {
   client: DesktopArtifactBrowserClient;
   setViewState: (value: ArtifactBrowserViewState) => void;
+  workspaceId?: string;
 }
 
 export interface UseArtifactBrowserArtifactsResult {
@@ -28,6 +29,7 @@ export interface UseArtifactBrowserArtifactsResult {
 export function useArtifactBrowserArtifacts({
   client,
   setViewState,
+  workspaceId,
 }: UseArtifactBrowserArtifactsParams): UseArtifactBrowserArtifactsResult {
   const [items, setItems] = useState<DesktopArtifactBrowseItem[]>([]);
   const [unregisteredItems, setUnregisteredItems] = useState<DesktopUnregisteredArtifactBrowseItem[]>([]);
@@ -38,8 +40,8 @@ export function useArtifactBrowserArtifacts({
     setViewState({ status: "loading", message: "Loading artifacts..." });
     try {
       const [browseItems, unregistered] = await Promise.all([
-        client.browseArtifacts(selectedArtifactFamily === "all" ? {} : { artifactFamily: selectedArtifactFamily }),
-        client.browseUnregisteredArtifacts?.() ?? Promise.resolve([]),
+        workspaceId ? client.browseArtifacts(selectedArtifactFamily === "all" ? { workspaceId } : { artifactFamily: selectedArtifactFamily, workspaceId }) : Promise.resolve([]),
+        workspaceId ? (client.browseUnregisteredArtifacts?.({ workspaceId }) ?? Promise.resolve([])) : Promise.resolve([]),
       ]);
 
       const filteredByStorage = browseItems.filter((item) => {
@@ -65,7 +67,7 @@ export function useArtifactBrowserArtifacts({
         message: error instanceof Error ? error.message : "Failed to load artifacts.",
       });
     }
-  }, [client, selectedArtifactFamily, selectedStorageFilter, setViewState]);
+  }, [client, selectedArtifactFamily, selectedStorageFilter, setViewState, workspaceId]);
 
   const uploadedItems = items.filter((item) => item.storageKey.startsWith("uploads/"));
   const generatedItems = items.filter((item) => item.storageKey.startsWith("generated/"));

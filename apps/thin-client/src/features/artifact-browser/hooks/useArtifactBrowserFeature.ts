@@ -154,7 +154,7 @@ export function useArtifactBrowserFeature(
         return undefined;
       }
 
-      const artifactDetail = await artifactClient.readArtifactDetail({ storageKey: selectedStorageKey });
+      const artifactDetail = await artifactClient.readArtifactDetail({ storageKey: selectedStorageKey }, { workspaceId });
       setDetail(artifactDetail);
       return artifactDetail;
     },
@@ -163,7 +163,7 @@ export function useArtifactBrowserFeature(
   async function refreshArtifacts(): Promise<void> {
     setViewState({ status: "loading", message: "Loading data artifacts..." });
     try {
-      const browseItems = await artifactClient.browseArtifacts();
+      const browseItems = workspaceId ? await artifactClient.browseArtifacts({ workspaceId }) : [];
       setItems(browseItems);
       setViewState({
         status: "success",
@@ -179,7 +179,7 @@ export function useArtifactBrowserFeature(
 
   useEffect(() => {
     void refreshArtifacts();
-  }, [artifactClient]);
+  }, [artifactClient, workspaceId]);
 
   async function selectArtifact(storageKey: string): Promise<void> {
     setSelectedStorageKey(storageKey);
@@ -187,12 +187,12 @@ export function useArtifactBrowserFeature(
 
     try {
       const locator = { storageKey };
-      const artifactDetail = await artifactClient.readArtifactDetail(locator);
+      const artifactDetail = await artifactClient.readArtifactDetail(locator, { workspaceId });
       setDetail(artifactDetail);
       publishLogic.setPublishedBackingFromDetail(artifactDetail);
 
       try {
-        const contentDescriptor = await artifactClient.readArtifactContent(locator);
+        const contentDescriptor = await artifactClient.readArtifactContent(locator, { workspaceId });
         setContent(contentDescriptor);
         if (contentDescriptor.mediaType?.startsWith("image/")) {
           setImageViewUrl(artifactClient.createArtifactMediaViewUrl(locator));

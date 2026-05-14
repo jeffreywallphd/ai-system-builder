@@ -537,16 +537,20 @@ export function composeServerHost(
         storage,
         logging: loggingPort,
         now: options.now,
+        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
       });
 
       const browseArtifacts = new BrowseArtifactsUseCase({
         artifactBrowserMetadataRead: artifactBrowserRead,
+        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
       });
       const readArtifactDetail = new ReadArtifactDetailUseCase({
         artifactBrowserMetadataRead: artifactBrowserRead,
+        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
       });
       const readArtifactContent = new ReadArtifactContentUseCase({
         artifactBrowserContentRead: artifactBrowserRead,
+        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
       });
 
       const hasArtifactInRepo = new HasArtifactInRepoUseCase({
@@ -600,6 +604,7 @@ export function composeServerHost(
         artifactCatalogDelete: artifactCatalog,
         storage,
         artifactBindingStorage: artifactBindings,
+        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
       });
 
       const resolvedRuntimeDeviceMode = runtimeDeviceMode;

@@ -20,7 +20,8 @@ export interface UseArtifactSelectionContentResult {
 
 export function useArtifactSelectionContent(
   client: DesktopArtifactBrowserClient,
-  setViewState: (value: ArtifactBrowserViewState) => void
+  setViewState: (value: ArtifactBrowserViewState) => void,
+  workspaceId?: string,
 ): UseArtifactSelectionContentResult {
   const [selectedStorageKey, setSelectedStorageKey] = useState<string | undefined>(undefined);
   const [detail, setDetail] = useState<DesktopArtifactDetail | undefined>(undefined);
@@ -57,18 +58,18 @@ export function useArtifactSelectionContent(
 
     try {
       const locator = { storageKey };
-      const artifactDetail = await client.readArtifactDetail(locator);
+      const artifactDetail = await client.readArtifactDetail(locator, { workspaceId });
 
       setDetail(artifactDetail);
 
       try {
-        const contentDescriptor = await client.readArtifactContent(locator);
+        const contentDescriptor = await client.readArtifactContent(locator, { workspaceId });
         setContent(contentDescriptor);
         setHtmlPreview(undefined);
 
         if (contentDescriptor.mediaType?.startsWith("image/")) {
           try {
-            const nextImageViewUrl = await client.createArtifactMediaViewUrl(locator);
+            const nextImageViewUrl = await client.createArtifactMediaViewUrl(locator, { workspaceId });
             setManagedImageViewUrl(nextImageViewUrl);
           } catch {
             setManagedImageViewUrl(undefined);
@@ -77,7 +78,7 @@ export function useArtifactSelectionContent(
           setManagedImageViewUrl(undefined);
           if (contentDescriptor.availability === "available" && contentDescriptor.mediaType === "text/html") {
             try {
-              const media = await client.readArtifactMedia(locator);
+              const media = await client.readArtifactMedia(locator, { workspaceId });
               setHtmlPreview(decodeHtmlArtifactPreview(media.bytes));
             } catch {
               setHtmlPreview(undefined);
@@ -98,7 +99,7 @@ export function useArtifactSelectionContent(
         message: error instanceof Error ? error.message : "Failed to load artifact detail.",
       });
     }
-  }, [clearSelectedArtifact, client, setManagedImageViewUrl, setViewState]);
+  }, [clearSelectedArtifact, client, setManagedImageViewUrl, setViewState, workspaceId]);
 
   useEffect(() => () => {
     if (activeImageViewUrl.current) {

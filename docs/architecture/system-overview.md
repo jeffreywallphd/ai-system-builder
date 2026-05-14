@@ -277,3 +277,7 @@ Workspace creation may offer `system.foundation@1.0.0` activation by reference v
 ## Phase 6 workspace activation availability checkpoint
 
 Workspace foundations now include internal application use cases for listing, reading, and narrowly toggling workspace system-pack activation references. System packs remain system-owned; workspace records only determine availability by reference. The known activation registry is limited to `system.foundation@1.0.0`, diagnostics are sanitized, and no host/API/IPC/preload/UI pack-management surface, Asset Library filtering, resource persistence scoping, installer call, pack copy, collaboration, marketplace, workflow, runtime, provider, or network behavior is introduced.
+
+## Phase 6 artifact workspace isolation
+
+Workspace foundations now include artifact and upload isolation: workspace pages and transports must send an explicit workspace id for artifact browse, read, and upload operations. Workspace A artifacts must not appear in Workspace B, and missing workspace context must fail safely instead of returning global artifacts.

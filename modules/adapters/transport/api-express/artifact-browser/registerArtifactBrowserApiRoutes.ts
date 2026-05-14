@@ -34,11 +34,13 @@ import {
 
 interface ArtifactBrowseApiRequestBody {
   artifactFamily?: string;
+  workspaceId?: string;
   source?: string;
 }
 
 interface ArtifactReadApiRequestBody {
   locator: { storageKey: string };
+  workspaceId?: string;
   source?: string;
 }
 
@@ -108,7 +110,7 @@ function normalizeSource(value: string | undefined): string {
 
 function mapArtifactBrowserApiRequestContext(
   request: ExpressRequestLike,
-): { requestId?: string; correlationId?: string } {
+): { requestId?: string; correlationId?: string; workspaceId?: string } {
   return {
     requestId: getRequestHeader(request.headers, "x-request-id"),
     correlationId: getRequestHeader(request.headers, "x-correlation-id"),
@@ -143,6 +145,7 @@ export function mapArtifactBrowseApiRequestToCommand(
       artifactFamily: requestBody.artifactFamily
         ? normalizeArtifactFamily(requestBody.artifactFamily)
         : undefined,
+      workspaceId: requestBody.workspaceId as never,
       boundary: {
         host: "server",
         source: normalizeSource(requestBody.source),
@@ -151,6 +154,7 @@ export function mapArtifactBrowseApiRequestToCommand(
     context,
   );
 
+  context.workspaceId = apiRequest.payload.workspaceId;
   return {
     artifactFamily: apiRequest.payload.artifactFamily,
   };
@@ -163,6 +167,7 @@ export function mapArtifactReadApiRequestToCommand(
   const apiRequest = createApiArtifactReadRequest(
     {
       locator: requestBody.locator,
+      workspaceId: requestBody.workspaceId as never,
       boundary: {
         host: "server",
         source: normalizeSource(requestBody.source),
@@ -171,6 +176,7 @@ export function mapArtifactReadApiRequestToCommand(
     context,
   );
 
+  context.workspaceId = apiRequest.payload.workspaceId;
   return { locator: apiRequest.payload.locator };
 }
 
@@ -181,6 +187,7 @@ export function mapArtifactContentReadApiRequestToCommand(
   const apiRequest = createApiArtifactContentReadRequest(
     {
       locator: requestBody.locator,
+      workspaceId: requestBody.workspaceId as never,
       boundary: {
         host: "server",
         source: normalizeSource(requestBody.source),
@@ -189,6 +196,7 @@ export function mapArtifactContentReadApiRequestToCommand(
     context,
   );
 
+  context.workspaceId = apiRequest.payload.workspaceId;
   return { locator: apiRequest.payload.locator };
 }
 
@@ -199,6 +207,7 @@ export function mapArtifactRegisteredDeleteApiRequestToCommand(
   const apiRequest = createApiArtifactRegisteredDeleteRequest(
     {
       storageKey: requestBody.locator.storageKey,
+      workspaceId: requestBody.workspaceId as never,
       boundary: {
         host: "server",
         source: normalizeSource(requestBody.source),
@@ -207,6 +216,7 @@ export function mapArtifactRegisteredDeleteApiRequestToCommand(
     context,
   );
 
+  context.workspaceId = apiRequest.payload.workspaceId;
   return { storageKey: apiRequest.payload.storageKey };
 }
 

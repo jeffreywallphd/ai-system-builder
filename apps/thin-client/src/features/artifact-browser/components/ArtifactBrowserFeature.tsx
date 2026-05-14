@@ -12,6 +12,8 @@ import { useArtifactBrowserFeature } from "../hooks/useArtifactBrowserFeature";
 
 export interface ArtifactBrowserFeatureProps {
   client?: ArtifactBrowserApiClient;
+  workspaceId?: string;
+  workspaceName?: string;
 }
 
 function PublishedBackingPanel(
@@ -46,7 +48,7 @@ function PublishedBackingPanel(
   );
 }
 
-export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) {
+export function ArtifactBrowserFeature({ client, workspaceId, workspaceName }: ArtifactBrowserFeatureProps) {
   const {
     items,
     selectedStorageKey,
@@ -98,7 +100,7 @@ export function ArtifactBrowserFeature({ client }: ArtifactBrowserFeatureProps) 
     setRegisterRevision,
     setRegisterMediaType,
     toggleRegisterForm,
-  } = useArtifactBrowserFeature(client);
+  } = useArtifactBrowserFeature(client, workspaceId);
 
   const backingState = deriveArtifactBackingState(detail, content);
 

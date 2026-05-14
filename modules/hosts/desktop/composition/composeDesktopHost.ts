@@ -935,16 +935,20 @@ export function composeDesktopHost(
         storage,
         logging: loggingPort,
         now: options.now,
+        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
       });
 
       const browseArtifacts = new BrowseArtifactsUseCase({
         artifactBrowserMetadataRead: artifactBrowserRead,
+        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
       });
       const readArtifactDetail = new ReadArtifactDetailUseCase({
         artifactBrowserMetadataRead: artifactBrowserRead,
+        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
       });
       const readArtifactContent = new ReadArtifactContentUseCase({
         artifactBrowserContentRead: artifactBrowserRead,
+        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
       });
       const browseUnregisteredArtifacts = new BrowseUnregisteredArtifactsUseCase({
         artifactBrowserUnregistered: artifactBrowserRead,
@@ -960,6 +964,7 @@ export function composeDesktopHost(
         artifactCatalogDelete: artifactCatalog,
         storage,
         artifactBindingStorage: artifactBindings,
+        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
       });
       const publishArtifactToRepo = new PublishArtifactToRepoUseCase({
         artifactStorage: storage,

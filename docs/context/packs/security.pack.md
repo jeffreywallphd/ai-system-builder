@@ -198,3 +198,7 @@ Active workspace selection is a convenience preference and routing context, not 
 ## Phase 6 Prompt 6 workspace activation diagnostics
 
 Workspace system pack activation diagnostics must remain safe: unknown packs, invalid provenance, inactive/failed records, duplicate records, not-found records, and repository failures should be reported with stable codes and generic messages. Do not echo raw local paths, URLs, secrets/tokens/auth values, stack traces, raw JSON/provider payloads, command lines, env values, bytes, or base64. Active workspace selection remains context, not authorization; collaboration and public pack management remain deferred.
+
+## Phase 6 Prompt 8 artifact workspace scoping
+
+Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.
