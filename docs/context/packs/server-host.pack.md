@@ -141,3 +141,7 @@ Phase 5 Prompt 9 allows the thin-client Asset Library to display sanitized pack/
 Phase 5 Prompt 10 adds only a pure application-side asset resolver. Server API and thin-client surfaces must not expose resolver routes or raw resolver result payloads, override editing, pack activation/priority controls, active-pack persistence, install/import/export behavior, scans, provider/network/runtime/filesystem calls, composition authoring, or execution behavior for that resolver.
 
 Phase 5 Prompt 11 adds only pure in-memory application serialization/fingerprint helpers and fixtures. Server API and thin-client surfaces must not expose pack import/export routes, upload/download routes, file/archive/signature handling, marketplace/registry clients, user pack install/activation, override editing, host startup import/export behavior, filesystem scans, provider/network/runtime calls, or byte/content reads.
+
+## Phase 6 Prompt 5 active workspace gating
+
+Thin-client/server-host surfaces should treat active workspace selection as request/UI context and not as authorization. Workspace-scoped pages must not render global resource records without an active workspace. API-level resource filtering and persistence scoping remain deferred; future endpoints must require explicit workspace context rather than reading application-service global state.

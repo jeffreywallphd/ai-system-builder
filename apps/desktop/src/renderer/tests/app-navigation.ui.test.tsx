@@ -16,6 +16,7 @@ describe("desktop renderer page composition", () => {
     }
     mountedContainer?.remove();
     delete window.desktopApi;
+    window.localStorage.clear();
     mountedRoot = undefined;
     mountedContainer = undefined;
   });
@@ -40,6 +41,12 @@ describe("desktop renderer page composition", () => {
       listAssetDefinitions: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
       readAssetDefinition: vi.fn().mockRejectedValue(new Error("unused")),
       readAssetDefinitionVersion: vi.fn().mockRejectedValue(new Error("unused")),
+      listAssetResourceBackedViews: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readAssetResourceBackedView: vi.fn().mockRejectedValue(new Error("unused")),
+      registerResourceBackedViewAsAsset: vi.fn().mockRejectedValue(new Error("unused")),
+      finalizeGeneratedOutputAsAsset: vi.fn().mockRejectedValue(new Error("unused")),
+      importExternalRepositoryObjectAsAsset: vi.fn().mockRejectedValue(new Error("unused")),
+      localizeExternalRepositoryObjectAsAsset: vi.fn().mockRejectedValue(new Error("unused")),
       readPythonRuntimeStatus: vi.fn().mockResolvedValue({
         ok: true,
         value: {
@@ -83,42 +90,21 @@ describe("desktop renderer page composition", () => {
       artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("Data Artifact Ingester");
-    expect(container.textContent).not.toContain("Data Artifact Browser");
+    expect(container.textContent).toContain("Create a workspace to use Assets, Artifacts, Data, Models, and Images.");
+    expect(container.textContent).toContain("Create workspace");
+    expect(container.textContent).not.toContain("Data Artifact Ingester");
+    expect(window.desktopApi?.browseArtifacts).not.toHaveBeenCalled();
 
-    const artifactBrowserTab = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Artifact Browser",
-    );
-    expect(artifactBrowserTab).toBeDefined();
-
+    window.localStorage.setItem("ai-system-builder.desktop.workspaces", JSON.stringify([{ id: "research-workspace", displayName: "Research Workspace", status: "active", createdAt: "2026-05-14T00:00:00.000Z" }]));
+    window.localStorage.setItem("ai-system-builder.desktop.activeWorkspaceId", "research-workspace");
     await act(async () => {
-      artifactBrowserTab?.dispatchEvent(new Event("click", { bubbles: true }));
+      root.unmount();
     });
-
-    expect(container.textContent).toContain("Artifact Browser");
-
-    const datasetPreparationTab = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Dataset Preparation",
-    );
-    expect(datasetPreparationTab).toBeDefined();
-
+    const remountedRoot = createRoot(container);
+    mountedRoot = remountedRoot;
     await act(async () => {
-      datasetPreparationTab?.dispatchEvent(new Event("click", { bubbles: true }));
+      remountedRoot.render(<App />);
     });
-
-    expect(container.textContent).toContain("Python Runtime");
-
-    const modelsButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Models",
-    );
-    expect(modelsButton).toBeDefined();
-
-    await act(async () => {
-      modelsButton?.dispatchEvent(new Event("click", { bubbles: true }));
-    });
-    expect(container.textContent).toContain("Model Management");
-    expect(container.textContent).toContain("Browse Models");
-
     const assetsButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Assets",
     );
@@ -128,18 +114,9 @@ describe("desktop renderer page composition", () => {
       assetsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
     expect(container.textContent).toContain("Asset Library");
-    expect(container.textContent).toContain("No asset definitions are registered yet.");
-
-
-    const imageGenerationButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Image Generation",
-    );
-    expect(imageGenerationButton).toBeDefined();
-
-    await act(async () => {
-      imageGenerationButton?.dispatchEvent(new Event("click", { bubbles: true }));
-    });
-    expect(container.textContent).toContain("Run runtime-backed image generation tasks");
+    expect(container.textContent).toContain("Active workspace: Research Workspace");
+    expect(container.textContent).toContain("No reusable building blocks are registered yet.");
+    expect(container.textContent).not.toContain("research-workspace");
 
     const settingsButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Settings",

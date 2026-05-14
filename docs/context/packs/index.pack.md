@@ -129,3 +129,7 @@ Only use these when needed. Do not overload the context window with uncessary in
 - Pack-backed `system.foundation` definitions are system defaults/built-ins for read-facade filtering and Asset Library display.
 - `workspace-pack` is a workspace pack source label, not a workspace override unless explicit override metadata exists.
 - User/custom system-pack install conflicts fail without overwrite; resolver full outputs remain internal; fingerprinting is not validation or import approval.
+
+## Phase 6 Prompt 5 workspace gating index note
+
+Active workspace context and workspace-required route/page gating now belong in desktop/thin-client prompt context. Treat active workspace as host/UI/request context, not application-service global mutable state. Gating prevents unscoped global resource display; Asset Library effective views and artifact/data/model/image persistence scoping remain later Phase 6 work.

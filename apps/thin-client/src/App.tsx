@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { AppShell } from "./components/layout/AppShell";
 import { AssetLibraryPage } from "./pages/AssetLibraryPage";
@@ -6,11 +6,13 @@ import { ArtifactsPage } from "./pages/ArtifactsPage";
 import { HomePage } from "./pages/HomePage";
 import { ImageGenerationPage } from "./pages/ImageGenerationPage";
 import { ModelsPage } from "./pages/ModelsPage";
+import { ActiveWorkspaceProvider, WorkspaceGate, type WorkspaceUiRecord } from "./features/workspace";
 import { SecurityPage } from "./pages/SecurityPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import {
   resolveThinClientPage,
   thinClientPageDefinitions,
+  thinClientPageRequiresWorkspace,
   type ThinClientPageKey,
 } from "./routes/thinClientPages";
 
@@ -21,14 +23,16 @@ function navigateToPage(page: ThinClientPageKey): void {
 
 export function App() {
   const [activePage, setActivePage] = useState<ThinClientPageKey>(resolveThinClientPage(window.location.pathname));
-  const content = useMemo(() => {
+  const renderContent = (workspace?: WorkspaceUiRecord) => {
     if (activePage === "artifacts") {
-      return <ArtifactsPage />;
+      return <ArtifactsPage workspaceId={workspace?.id} workspaceName={workspace?.displayName} />;
     }
 
     if (activePage === "image-generation") {
       return (
         <ImageGenerationPage
+          workspaceId={workspace?.id}
+          workspaceName={workspace?.displayName}
           onNavigateToArtifacts={() => { navigateToPage("artifacts"); setActivePage("artifacts"); }}
           onNavigateToModels={() => { navigateToPage("models"); setActivePage("models"); }}
         />
@@ -36,11 +40,11 @@ export function App() {
     }
 
     if (activePage === "assets") {
-      return <AssetLibraryPage />;
+      return <AssetLibraryPage workspaceId={workspace?.id} workspaceName={workspace?.displayName} />;
     }
 
     if (activePage === "models") {
-      return <ModelsPage />;
+      return <ModelsPage workspaceId={workspace?.id} workspaceName={workspace?.displayName} />;
     }
 
     if (activePage === "security") {
@@ -55,9 +59,17 @@ export function App() {
       navigateToPage("artifacts");
       setActivePage("artifacts");
     }} />;
-  }, [activePage]);
+  };
+
+  const activePageDefinition = thinClientPageDefinitions.find((page) => page.key === activePage);
+  const gatedContent = thinClientPageRequiresWorkspace(activePage) ? (
+    <WorkspaceGate pageLabel={activePageDefinition?.label ?? activePage}>
+      {(workspace) => renderContent(workspace)}
+    </WorkspaceGate>
+  ) : renderContent();
 
   return (
+    <ActiveWorkspaceProvider>
     <AppShell
       activePage={activePage}
       pages={thinClientPageDefinitions}
@@ -66,8 +78,9 @@ export function App() {
         setActivePage(nextPage);
       }}
     >
-      {content}
+      {gatedContent}
     </AppShell>
+    </ActiveWorkspaceProvider>
   );
 }
 

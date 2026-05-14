@@ -34,3 +34,7 @@
 - `docs/architecture/module-dependency-rules.md`
 - `docs/architecture/runtime-model.md`
 - `docs/adr/ADR-0013-host-owned-runtime-execution-and-feature-placement.md`
+
+## Phase 6 Prompt 5 workspace boundary
+
+Workspace UI gating may use host/renderer active selection state. If IPC/preload workspace operations are added, keep them workspace-only (list/create/read selection/save selection/clear selection), sanitize diagnostics, avoid raw paths, and do not expose system pack installer, pack import/export/install, collaboration, permission, or resource-scoping channels.

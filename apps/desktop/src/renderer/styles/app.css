@@ -29,3 +29,15 @@
   white-space: nowrap;
 }
 
+
+.workspace-gate,
+.workspace-banner {
+  border: 1px solid var(--ui-color-border, #d8dee9);
+}
+
+.workspace-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
