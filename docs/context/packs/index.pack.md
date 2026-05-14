@@ -85,6 +85,8 @@
 - Phase 5 Prompt 12 stabilizes the final Phase 5 baseline and hands off to Phase 6. `system.foundation` is the canonical versioned, system-trusted default system pack; defaults are pack entries proven by trusted metadata/installer markers, primitives are semantic/non-executing definitions, install/seeding is explicit/internal/idempotent/non-destructive, host startup does not auto-install packs, resolver behavior is pure and non-mutating, serialization/fingerprinting is pure in-memory readiness only, and Asset Library pack/source/category visibility is read-only. Phase 6 should focus on controlled asset authoring, non-destructive override management, resolver preview/conflict diagnostics, and composition planning without workflow/runtime execution or provider/network/storage side effects.
 - Prompt builders must add only targeted companion packs (not all packs by default).
 
+- Phase 6 Prompt 2 adds the passive `modules/contracts/workspace` family for workspace identity/status/roles, actor/member placeholders, path-free storage descriptors, system-pack activation references, records, create commands, active selection, and explicit request context. These contracts prepare workspace-scoped assets/resources but do not implement persistence, UI/page gating, active global state, system-pack copying, permission engines, invites, sync, or remote auth.
+
 ## Canonical Source Docs
 
 Only use these when needed. Do not overload the context window with uncessary information.

@@ -60,6 +60,8 @@
 - Keep provider import semantics and provider publication semantics explicit; do not flatten them into local blob put/get assumptions.
 - For app-layer seams, pass request metadata through `ApplicationRequestContext` and keep storage request payload contracts focused on storage semantics.
 
+- Phase 6 Prompt 2 adds workspace storage descriptor contracts only. `WorkspaceStorageRootDescriptor` is path-free UI/public vocabulary; do not add workspace repositories, migrations, directory creation, active-selection persistence, activation storage behavior, or resource scoping until later Phase 6 prompts.
+
 ## Canonical Source Docs
 
 - `docs/adr/ADR-0004-persistence-and-storage-separation.md` — decision rationale for separating persistence and storage.

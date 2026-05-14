@@ -263,3 +263,7 @@ Desktop renderer artifact-browser publish/re-check UX should call the preload-ba
 ## Security architecture posture
 
 Security is cross-cutting and layered rather than a monolithic module. The first implementation target is **HTTPS + LAN pairing bearer token** (`lan-https-token`). Transport security remains adapter-based and swappable, while authorization policy is shared but enforced at both transport and application/resource boundaries. Storage and runtime security concerns remain separate from transport security and are enforced in their own adapter/application seams. ADR-0015 is the canonical security architecture reference.
+
+## Phase 6 workspace contract vocabulary
+
+Phase 6 has introduced a passive `modules/contracts/workspace` contract family for workspace identity, lifecycle status, future actor/member role metadata, storage-root descriptors, system-pack activation references, workspace records, creation commands, active-selection read models, and explicit workspace request context. These contracts prepare later workspace-scoped assets and resource-backed views, but they do not implement persistence, workspace creation, page gating, Asset Library effective views, resource scoping, active workspace global state, collaboration permissions, invites, sharing, sync, remote auth, or multi-user runtime behavior. Workspace system-pack activation records reference system packs such as `system.foundation@1.0.0` by pack id/version only and do not copy or embed system pack definitions.

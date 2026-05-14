@@ -70,6 +70,8 @@
 - Avoid over-mocking internal details; mock boundaries deliberately.
 - If regression coverage is not added for a bug fix, document clear rationale.
 
+- Phase 6 Prompt 2 workspace contract tests belong under `modules/contracts/workspace/tests`; cover workspace ID unsafe/path/URL rejection, status/role vocabularies, passive actor/member metadata, path-free storage descriptors, `system.foundation@1.0.0` activation by reference only, serializable records/create/selection/context fixtures, barrel exports, and no permission/invite/sync/remote-auth behavior.
+
 ## Canonical Source Docs
 
 - `docs/standards/testing-standards.md` — repository-wide testing strategy and anti-patterns.

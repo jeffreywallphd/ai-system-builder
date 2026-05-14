@@ -186,3 +186,7 @@ Phase 4 Prompt 8 adds host-specific Asset Library UI actions only through the ex
 ## Host security composition guidance
 
 Hosts choose concrete security modes through composition. Server host owns server security configuration and API transport security setup. Desktop host will later own configured remote-server credential handling, and thin-client relies on server APIs through secure fetch behavior. Development no-auth mode must be explicit and noisy. Future remote desktop execution must route through secure API client adapters behind desktop IPC boundaries. See ADR-0015.
+
+## Workspace contracts and host boundaries
+
+Phase 6 workspace contracts are shared DTO/type vocabulary only. Hosts must not treat their existence as permission to add workspace API routes, IPC channels, preload methods, renderer/thin-client UI, startup workspace creation, active workspace global state, workspace directory creation, system-pack activation/copy behavior, Asset Library scoping, collaboration permissions, invites, sync, or remote auth. Later Phase 6 work may wire explicit workspace persistence and selection through host boundaries; until then, workspace request context remains an explicit contract rather than implicit host state.
