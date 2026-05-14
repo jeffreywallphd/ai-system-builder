@@ -56,6 +56,7 @@ function queryStringForList(query: AssetLibraryQuery): string {
   if (query.builtIn) params.set("builtIn", query.builtIn);
   if (query.limit !== undefined) params.set("limit", String(query.limit));
   if (query.cursor) params.set("cursor", query.cursor);
+  if (query.workspaceId) params.set("workspaceId", query.workspaceId);
   const serialized = params.toString();
   return serialized ? `?${serialized}` : "";
 }
@@ -69,6 +70,7 @@ function queryStringForResourceBackedList(query: AssetLibraryResourceBackedViewQ
   appendCsv(params, "viewKind", query.viewKinds);
   if (query.limit !== undefined) params.set("limit", String(query.limit));
   if (query.cursor) params.set("cursor", query.cursor);
+  if (query.workspaceId) params.set("workspaceId", query.workspaceId);
   const serialized = params.toString();
   return serialized ? `?${serialized}` : "";
 }
@@ -77,6 +79,7 @@ function queryStringForDetail(options: AssetLibraryDetailOptions): string {
   const params = new URLSearchParams();
   appendCsv(params, "expand", options.expand as readonly AssetLibraryDefinitionExpansion[] | undefined);
   appendBoolean(params, "includeValidation", options.includeValidation);
+  if (options.workspaceId) params.set("workspaceId", options.workspaceId);
   const serialized = params.toString();
   return serialized ? `?${serialized}` : "";
 }
@@ -85,6 +88,7 @@ function queryStringForResourceBackedDetail(options: AssetLibraryResourceBackedV
   const params = new URLSearchParams();
   appendCsv(params, "expand", options.expand as readonly AssetLibraryResourceBackedViewExpansion[] | undefined);
   appendBoolean(params, "includeValidation", options.includeValidation);
+  if (options.workspaceId) params.set("workspaceId", options.workspaceId);
   const serialized = params.toString();
   return serialized ? `?${serialized}` : "";
 }

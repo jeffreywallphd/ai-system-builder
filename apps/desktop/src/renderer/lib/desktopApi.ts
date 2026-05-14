@@ -327,6 +327,7 @@ export interface DesktopAssetDefinitionsListInput {
   limit?: number;
   cursor?: string;
   includeMetadata?: boolean;
+  workspaceId?: string;
 }
 
 export interface DesktopAssetResourceBackedViewsListInput {
@@ -338,6 +339,7 @@ export interface DesktopAssetResourceBackedViewsListInput {
   limit?: number;
   cursor?: string;
   includeMetadata?: boolean;
+  workspaceId?: string;
 }
 
 export interface DesktopAssetDefinitionReadInput {
@@ -345,6 +347,7 @@ export interface DesktopAssetDefinitionReadInput {
   version?: string;
   expand?: readonly DesktopAssetDefinitionExpansion[];
   includeValidation?: boolean;
+  workspaceId?: string;
 }
 
 export type DesktopAssetResourceBackedViewExpansion =
@@ -356,6 +359,7 @@ export interface DesktopAssetResourceBackedViewReadInput {
   viewId: string;
   expand?: readonly DesktopAssetResourceBackedViewExpansion[];
   includeValidation?: boolean;
+  workspaceId?: string;
 }
 
 export type DesktopAssetDefinitionVersionReadInput = Required<Pick<DesktopAssetDefinitionReadInput, "definitionId" | "version">> & Omit<DesktopAssetDefinitionReadInput, "definitionId" | "version">;

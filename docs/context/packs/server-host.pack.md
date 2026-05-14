@@ -149,3 +149,8 @@ Thin-client/server-host surfaces should treat active workspace selection as requ
 ## Phase 6 Prompt 6 workspace activation server boundary
 
 Workspace system pack activation availability is internal application-layer behavior only. Server host prompts should not expose new API routes, call system-pack installers, copy system definitions, add Asset Library effective-view filtering, scope artifact/data/model/image persistence, or add public pack management/collaboration behavior for this checkpoint unless a later prompt explicitly asks for host wiring.
+
+## Workspace-aware Asset Registry API reads
+
+Server Asset Registry API read routes accept workspace context (query/header) and delegate to the workspace effective-view read facade. Missing workspace context must not fall back to global definitions; `system.foundation@1.0.0` is visible only through active workspace system-pack activation records. Artifact/data/model/image persistence scoping and user-library reuse remain later work.
+

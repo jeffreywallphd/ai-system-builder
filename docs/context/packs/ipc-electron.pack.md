@@ -42,3 +42,8 @@ Workspace UI gating may use host/renderer active selection state. If IPC/preload
 ## Phase 6 Prompt 6 workspace activation IPC boundary
 
 Workspace system pack activation availability does not add Electron IPC or preload surface in this checkpoint. Keep activation read/list/status behavior internal to application use cases until a later prompt explicitly scopes transport exposure.
+
+## Workspace-aware Asset Library reads
+
+Desktop Asset Registry IPC/preload read payloads carry `workspaceId` for Asset Library list/detail/resource-backed reads. Missing or invalid workspace context must fail safely and must not call a global fallback read. IPC remains read-only for Asset Registry reads and must not expose pack install/import/export, activation-management, override-editing, or system-pack installer behavior.
+

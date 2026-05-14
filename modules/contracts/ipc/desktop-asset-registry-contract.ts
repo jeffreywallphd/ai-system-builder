@@ -75,6 +75,7 @@ export interface DesktopAssetDefinitionsListRequestPayload {
   readonly limit?: number;
   readonly cursor?: string;
   readonly includeMetadata?: boolean;
+  readonly workspaceId?: string;
   readonly boundary: DesktopAssetRegistryBoundaryContext;
 }
 
@@ -87,6 +88,7 @@ export interface DesktopAssetResourceBackedViewsListRequestPayload {
   readonly limit?: number;
   readonly cursor?: string;
   readonly includeMetadata?: boolean;
+  readonly workspaceId?: string;
   readonly boundary: DesktopAssetRegistryBoundaryContext;
 }
 
@@ -108,6 +110,7 @@ export interface DesktopAssetDefinitionReadRequestPayload {
   readonly version?: string;
   readonly expand?: readonly DesktopAssetDefinitionExpansion[];
   readonly includeValidation?: boolean;
+  readonly workspaceId?: string;
   readonly boundary: DesktopAssetRegistryBoundaryContext;
 }
 
@@ -115,6 +118,7 @@ export interface DesktopAssetResourceBackedViewReadRequestPayload {
   readonly viewId: string;
   readonly expand?: readonly DesktopAssetResourceBackedViewExpansion[];
   readonly includeValidation?: boolean;
+  readonly workspaceId?: string;
   readonly boundary: DesktopAssetRegistryBoundaryContext;
 }
 

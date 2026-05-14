@@ -19,3 +19,4 @@ export * from "./built-ins";
 
 export * from "./asset-registry-read-facade.types";
 export * from "./asset-registry-read-facade.service";
+export * from "./workspace-asset-registry-read-facade.service";

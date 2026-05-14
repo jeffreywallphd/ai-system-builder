@@ -23,6 +23,7 @@ export interface AssetLibraryQuery {
   readonly builtIn?: AssetLibraryBuiltInFilter;
   readonly limit?: number;
   readonly cursor?: string;
+  readonly workspaceId?: string;
 }
 
 export interface AssetLibraryResourceBackedViewQuery {
@@ -33,6 +34,7 @@ export interface AssetLibraryResourceBackedViewQuery {
   readonly viewKinds?: readonly AssetResourceBackedViewKind[];
   readonly limit?: number;
   readonly cursor?: string;
+  readonly workspaceId?: string;
 }
 
 export interface AssetLibraryDefinitionLocator {
@@ -47,6 +49,7 @@ export type AssetLibraryDefinitionVersionLocator = Required<
 export interface AssetLibraryDetailOptions {
   readonly includeValidation?: boolean;
   readonly expand?: readonly AssetLibraryDefinitionExpansion[];
+  readonly workspaceId?: string;
 }
 
 export type AssetLibraryResourceBackedViewExpansion =
@@ -57,4 +60,5 @@ export type AssetLibraryResourceBackedViewExpansion =
 export interface AssetLibraryResourceBackedViewDetailOptions {
   readonly includeValidation?: boolean;
   readonly expand?: readonly AssetLibraryResourceBackedViewExpansion[];
+  readonly workspaceId?: string;
 }

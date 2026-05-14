@@ -1219,7 +1219,7 @@ export function composeDesktopHost(
           readPythonRuntimeStatus,
         },
         runtimeReadiness,
-        assetRegistryRead: internalAssetRegistry.readFacade,
+        assetRegistryRead: internalAssetRegistry.workspaceReadFacade,
         assetMutationUseCases,
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
         setHuggingFaceToken: (token) => tokenConfigStore.setToken(token),

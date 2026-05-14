@@ -15,7 +15,7 @@ export type {
   AssetLibraryFilterValue,
 };
 
-export function useAssetLibraryFeature(client?: AssetLibraryClient): AssetLibraryFeatureState {
+export function useAssetLibraryFeature(client?: AssetLibraryClient, workspaceId?: string): AssetLibraryFeatureState {
   const defaultClient = useMemo(() => client ?? createDesktopAssetLibraryClient(), [client]);
-  return useAssetLibraryDefinitionBrowser(defaultClient);
+  return useAssetLibraryDefinitionBrowser(defaultClient, workspaceId);
 }

@@ -78,6 +78,7 @@ export interface ApiAssetDefinitionsListRequestPayload {
   readonly limit?: number;
   readonly cursor?: string;
   readonly includeMetadata?: boolean;
+  readonly workspaceId?: string;
 }
 
 export interface ApiAssetDefinitionReadRequestPayload {
@@ -85,6 +86,7 @@ export interface ApiAssetDefinitionReadRequestPayload {
   readonly version?: string;
   readonly expand?: readonly ApiAssetDefinitionExpansion[];
   readonly includeValidation?: boolean;
+  readonly workspaceId?: string;
 }
 
 export type ApiAssetDefinitionExpansion =
@@ -104,6 +106,7 @@ export interface ApiAssetResourceBackedViewsListRequestPayload {
   readonly limit?: number;
   readonly cursor?: string;
   readonly includeMetadata?: boolean;
+  readonly workspaceId?: string;
 }
 
 export type ApiAssetResourceBackedViewExpansion =
@@ -115,6 +118,7 @@ export interface ApiAssetResourceBackedViewReadRequestPayload {
   readonly viewId: string;
   readonly expand?: readonly ApiAssetResourceBackedViewExpansion[];
   readonly includeValidation?: boolean;
+  readonly workspaceId?: string;
 }
 
 export type ApiAssetDefinitionsListRequest = ApiRequest<

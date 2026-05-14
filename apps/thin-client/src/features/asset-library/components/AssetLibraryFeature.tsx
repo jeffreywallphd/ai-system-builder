@@ -23,10 +23,12 @@ import { useAssetLibraryFeature } from "../hooks/useAssetLibraryFeature";
 
 interface AssetLibraryFeatureProps {
   readonly client?: AssetLibraryClient;
+  readonly workspaceId?: string;
+  readonly workspaceName?: string;
 }
 
-export function AssetLibraryFeature({ client }: AssetLibraryFeatureProps) {
-  const state = useAssetLibraryFeature(client);
+export function AssetLibraryFeature({ client, workspaceId, workspaceName }: AssetLibraryFeatureProps) {
+  const state = useAssetLibraryFeature(client, workspaceId);
   const [pendingAction, setPendingAction] = useState<AssetLibraryMutationAction | undefined>();
   const [isMutating, setIsMutating] = useState(false);
   const [mutationDisplay, setMutationDisplay] = useState<AssetLibraryMutationDisplay | undefined>();
@@ -59,6 +61,8 @@ export function AssetLibraryFeature({ client }: AssetLibraryFeatureProps) {
 
   return (
     <section className="asset-library-feature ui-stack ui-stack--lg">
+      {workspaceName ? <div className="ui-status" role="status">Workspace: {workspaceName}</div> : null}
+
       <AssetLibraryFilters
         filters={state.filters}
         onSearchTextChange={state.setSearchText}

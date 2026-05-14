@@ -10,7 +10,7 @@ export function AssetLibraryPage({ workspaceId, workspaceName }: WorkspaceScoped
     <section className="ui-stack ui-stack--sm" data-workspace-id={workspaceId} data-workspace-name={workspaceName}>
       <h1>Asset Library</h1>
       <p>Browse reusable building blocks available in this workspace.</p>
-      <AssetLibraryFeature />
+      <AssetLibraryFeature workspaceId={workspaceId} workspaceName={workspaceName} />
     </section>
   );
 }

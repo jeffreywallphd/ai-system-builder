@@ -983,7 +983,7 @@ export function composeServerHost(
         modelManagementLogger,
         restartServer: options.restartServer,
         runtimeReadiness,
-        assetRegistryRead: internalAssetRegistry.readFacade,
+        assetRegistryRead: internalAssetRegistry.workspaceReadFacade,
         assetMutationUseCases,
       });
     },
