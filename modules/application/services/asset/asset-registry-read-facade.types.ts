@@ -1,4 +1,7 @@
 import type {
+  WorkspaceId,
+} from "../../../contracts/workspace";
+import type {
   AssetBinding,
   AssetComposition,
   AssetCompositionType,
@@ -36,6 +39,7 @@ export interface AssetRegistryListQuery {
   readonly includeMetadata?: boolean;
   readonly limit?: number;
   readonly cursor?: string;
+  readonly workspaceId?: WorkspaceId | string;
 }
 
 export interface AssetRegistryReadOptions {
@@ -46,6 +50,7 @@ export interface AssetRegistryReadOptions {
   readonly includeRequirements?: boolean;
   readonly includeResourceBackings?: boolean;
   readonly includeMetadata?: boolean;
+  readonly workspaceId?: WorkspaceId | string;
 }
 
 export interface AssetRegistryListDiagnostic {

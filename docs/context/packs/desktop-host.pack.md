@@ -103,3 +103,8 @@ Desktop renderer routes that show workspace-owned resources must declare workspa
 ## Phase 6 Prompt 6 workspace activation host boundary
 
 Workspace system pack activation availability is internal application-layer behavior only. Desktop host prompts should not expose new IPC/preload methods, renderer UI, startup installers, system-pack copying, Asset Library effective-view filtering, resource persistence scoping, collaboration, or public pack management for this checkpoint unless a later prompt explicitly asks for host wiring.
+
+## Workspace Asset Library read wiring
+
+Desktop host composition wires public Asset Registry reads through the workspace effective-view facade. The renderer Asset Library uses the active workspace label/id from the gated workspace shell and passes the workspace id through preload/IPC. Hosts must not auto-seed, auto-activate, copy system pack definitions, or call system pack installers for this read path.
+

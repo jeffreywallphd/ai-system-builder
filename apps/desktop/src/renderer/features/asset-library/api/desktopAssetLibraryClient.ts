@@ -30,16 +30,16 @@ import type {
 interface DesktopAssetLibraryApiBridge {
   listAssetDefinitions?: (input?: AssetLibraryQuery, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
   readAssetDefinition?: (
-    input: { definitionId: string; version?: string; expand?: AssetLibraryDetailOptions["expand"]; includeValidation?: boolean },
+    input: { definitionId: string; version?: string; expand?: AssetLibraryDetailOptions["expand"]; includeValidation?: boolean; workspaceId?: string },
     context?: { requestId?: string; correlationId?: string },
   ) => Promise<unknown>;
   readAssetDefinitionVersion?: (
-    input: { definitionId: string; version: string; expand?: AssetLibraryDetailOptions["expand"]; includeValidation?: boolean },
+    input: { definitionId: string; version: string; expand?: AssetLibraryDetailOptions["expand"]; includeValidation?: boolean; workspaceId?: string },
     context?: { requestId?: string; correlationId?: string },
   ) => Promise<unknown>;
   listAssetResourceBackedViews?: (input?: AssetLibraryResourceBackedViewQuery, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
   readAssetResourceBackedView?: (
-    input: { viewId: string; expand?: AssetLibraryResourceBackedViewDetailOptions["expand"]; includeValidation?: boolean },
+    input: { viewId: string; expand?: AssetLibraryResourceBackedViewDetailOptions["expand"]; includeValidation?: boolean; workspaceId?: string },
     context?: { requestId?: string; correlationId?: string },
   ) => Promise<unknown>;
   registerResourceBackedViewAsAsset?: (command: RegisterResourceBackedViewCommand, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
@@ -126,6 +126,7 @@ export function createDesktopAssetLibraryClient(): AssetLibraryClient {
           definitionId: input.definitionId,
           ...(options.expand ? { expand: options.expand } : {}),
           ...(options.includeValidation !== undefined ? { includeValidation: options.includeValidation } : {}),
+          ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}),
         }),
         mapAssetDefinitionDetail,
         "Unable to read asset definition.",
@@ -139,6 +140,7 @@ export function createDesktopAssetLibraryClient(): AssetLibraryClient {
           version: input.version,
           ...(options.expand ? { expand: options.expand } : {}),
           ...(options.includeValidation !== undefined ? { includeValidation: options.includeValidation } : {}),
+          ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}),
         }),
         mapAssetDefinitionDetail,
         "Unable to read asset definition version.",
@@ -159,6 +161,7 @@ export function createDesktopAssetLibraryClient(): AssetLibraryClient {
           viewId: input.viewId,
           ...(options.expand ? { expand: options.expand } : {}),
           ...(options.includeValidation !== undefined ? { includeValidation: options.includeValidation } : {}),
+          ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}),
         }),
         mapAssetResourceBackedViewDetail,
         "Unable to read asset resource-backed view.",

@@ -208,3 +208,12 @@ Phase 2C Prompt 8 stabilizes the definition public baseline without adding mutat
 ## Phase 6 Prompt 6 workspace system pack activation availability
 
 Workspace system pack activation read/list/status use cases now live in the application workspace use-case layer. They read activation records by workspace id, validate known system-pack references, and return deterministic active system pack metadata for future effective-view callers. The only known activation is `system.foundation@1.0.0`, and activation remains by reference only. Do not copy manifests, asset entries, or definitions into workspace storage; do not call the Phase 5 installer; do not implement Asset Library effective-view filtering until Prompt 7; do not scope artifact/data/model/image persistence until Prompts 8-9; and keep public pack import/export/install/override management and collaboration deferred.
+
+## Phase 6 workspace effective view
+
+- Asset Registry reads for the Asset Library are workspace-aware: list/detail/resource-backed read requests require explicit workspace context and must not fall back to global assets.
+- The Phase 6 effective view includes activated system-pack definitions only when strict system-default provenance matches the workspace active pack reference; `system.foundation@1.0.0` appears only for workspaces where that pack is active.
+- Detail reads must verify that the requested definition is in the workspace effective view before returning detail data.
+- Resource-backed descriptors remain deferred for workspace pages until artifact/data/model/image persistence scoping lands in Prompts 8-9.
+- Do not add pack install/import/export UI, public activation management, override editing, user asset authoring, user-library reuse, or cross-workspace copy/link behavior in this phase.
+
