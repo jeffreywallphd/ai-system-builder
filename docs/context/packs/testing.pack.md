@@ -89,3 +89,4 @@
 
 - Typical set: `index` + `testing`.
 - Add one scope-specific pack (`runtime`, `desktop-host`, `server-host`, or `architecture`) based on impacted boundaries.
+- Phase 6 Prompt 3 workspace persistence tests belong under `modules/application/ports/workspace/tests` and `modules/adapters/persistence/workspace/tests`; cover record/index save-read-update-archive behavior, active selection preference save/read/clear without existence checks, system-pack activation reference persistence for `system.foundation@1.0.0`, workspace A/B isolation, deterministic sorting, unsafe ID rejection before path construction, display names not used as paths, sanitized corrupt/invalid JSON errors, no artifact/image/model/data directory creation, and boundaries excluding UI/API/IPC/preload/host/runtime/provider/system-pack-installer imports.

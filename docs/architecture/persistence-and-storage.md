@@ -71,6 +71,13 @@ This keeps Postgres as the default adapter direction without coupling applicatio
 
 The local adapter persists records and references only. It must not embed raw file/blob bytes, generated model/image/dataset payload bytes, secrets, environment values, local filesystem handles, or adapter-native paths in asset records or public errors. Durable resource-backed asset mapping persistence and explicit persistence-to-storage linkage remain deferred beyond this checkpoint.
 
+
+### Workspace local persistence checkpoint
+
+Phase 6 Prompt 3 adds workspace application repository ports and local file-backed persistence adapters for workspace records/indexes, active workspace selection, and workspace system-pack activation records. The local layout is under a host-supplied storage root at `workspaces/index.json`, `workspaces/active-workspace.json`, `workspaces/<workspaceId>/workspace.json`, and `workspaces/<workspaceId>/activations/system-packs.json`. This adapter stores records and references only: active workspace selection is a persisted preference/read model rather than global application-service state, and system-pack activations reference packs by id/version such as `system.foundation@1.0.0` without installing, copying, embedding, or mutating pack manifests, assets, or definitions.
+
+Workspace persistence must continue to avoid raw local path leakage in public errors/read models and must not create artifact, image, model, dataset, or other workspace resource storage directories until later Phase 6 storage/scoping work defines those boundaries. No workspace creation use case, page gating, API/IPC/preload/UI surface, or host composition wiring exists at this checkpoint.
+
 ## What belongs in persistence
 
 Examples:
