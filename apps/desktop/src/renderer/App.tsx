@@ -9,37 +9,49 @@ import { ModelsPage } from "./pages/ModelsPage";
 import { ImageGenerationPage } from "./pages/ImageGenerationPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SystemPage } from "./pages/SystemPage";
-import { desktopPageDefinitions, type DesktopPageKey } from "./routes/desktopPages";
+import { ActiveWorkspaceProvider, WorkspaceGate, type WorkspaceUiRecord } from "./features/workspace";
+import { desktopPageDefinitions, desktopPageRequiresWorkspace, type DesktopPageKey } from "./routes/desktopPages";
 
 export function App() {
   const { activePage, setActivePage } = useDesktopPage();
   const [artifactRefreshToken, setArtifactRefreshToken] = useState(0);
 
-  const desktopPageContentMap: Record<DesktopPageKey, ReactNode> = {
+  const renderDesktopPageContent = (workspace?: WorkspaceUiRecord): Record<DesktopPageKey, ReactNode> => ({
     home: <HomePage onGoToArtifacts={() => setActivePage("artifacts")} />,
     artifacts: (
       <ArtifactsPage
+        workspaceId={workspace?.id}
+        workspaceName={workspace?.displayName}
         refreshToken={artifactRefreshToken}
         onUploaded={() => {
           setArtifactRefreshToken((current) => current + 1);
         }}
       />
     ),
-    assets: <AssetLibraryPage />,
-    models: <ModelsPage />,
-    "image-generation": <ImageGenerationPage />,
+    assets: <AssetLibraryPage workspaceId={workspace?.id} workspaceName={workspace?.displayName} />,
+    models: <ModelsPage workspaceId={workspace?.id} workspaceName={workspace?.displayName} />,
+    "image-generation": <ImageGenerationPage workspaceId={workspace?.id} workspaceName={workspace?.displayName} />,
     settings: <SettingsPage />,
     system: <SystemPage />,
-  };
+  });
+
+  const activePageDefinition = desktopPageDefinitions.find((page) => page.key === activePage);
+  const content = desktopPageRequiresWorkspace(activePage) ? (
+    <WorkspaceGate pageLabel={activePageDefinition?.label ?? activePage}>
+      {(workspace) => renderDesktopPageContent(workspace)[activePage]}
+    </WorkspaceGate>
+  ) : renderDesktopPageContent()[activePage];
 
   return (
+    <ActiveWorkspaceProvider>
     <AppShell
       activePage={activePage}
       onNavigate={setActivePage}
       pages={desktopPageDefinitions}
     >
-      {desktopPageContentMap[activePage]}
+      {content}
     </AppShell>
+    </ActiveWorkspaceProvider>
   );
 }
 

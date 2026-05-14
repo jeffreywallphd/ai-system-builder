@@ -95,3 +95,7 @@
 - Include `asset-kernel.pack.md` when desktop work exposes or composes assets, asset-backed pages/components, generated outputs as reusable assets, or resource-backed previews.
 - Desktop IPC/preload and renderer models must wrap shared asset contracts; they must not define desktop-specific asset semantics.
 - Desktop host composition wires concrete runtime/readiness/storage providers for asset requirements; assets remain declarative.
+
+## Phase 6 Prompt 5 active workspace gating
+
+Desktop renderer routes that show workspace-owned resources must declare workspace requirements and render a workspace-required create/select state when no active workspace is selected. The active workspace is renderer/host context only, must display the workspace display name rather than raw paths or ids as the primary label, and must be passed explicitly to later workspace-scoped clients. This gating must not expose pack installers/import/export UI or implement resource persistence scoping.

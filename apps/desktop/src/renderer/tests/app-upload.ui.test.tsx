@@ -36,6 +36,7 @@ describe("desktop renderer artifact workflow page", () => {
     delete window.desktopApi;
     mountedRoot = undefined;
     mountedContainer = undefined;
+    window.localStorage.clear();
   });
 
   it("uploads and refreshes artifact listing on the dedicated Artifacts page", async () => {
@@ -172,6 +173,16 @@ describe("desktop renderer artifact workflow page", () => {
     const artifactsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Data");
     await act(async () => {
       artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    const nameInput = container.querySelector("input[placeholder=\"My Project\"]") as HTMLInputElement | null;
+    await act(async () => {
+      nameInput!.value = "Upload Workspace";
+      nameInput!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const createWorkspaceButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Create workspace");
+    await act(async () => {
+      createWorkspaceButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
     const input = container.querySelector("input[type='file']") as HTMLInputElement | null;

@@ -325,3 +325,7 @@ Storage keys are opaque identifiers, not raw paths. Filesystem storage adapters 
 ## Workspace contract vocabulary and storage descriptors
 
 Phase 6 introduces passive workspace contracts and application workspace creation foundations. `WorkspaceStorageRootDescriptor` names storage ownership by descriptor fields such as kind, storage id, and label; it is not a public raw filesystem path contract. Workspace creation may store a host-managed descriptor and may explicitly persist active workspace selection through the selection repository, but it does not create resource directories or scope artifacts/images/models/data. Workspace system-pack activation records are reference-only summaries of system pack id/version and do not install, copy, or embed system pack definitions into workspace storage; the Phase 5 installer remains separate and is not used for workspace activation.
+
+### Active workspace selection boundary (Phase 6 Prompt 5)
+
+Active workspace selection is a persisted host/UI preference or request-context value used to gate workspace-scoped pages. It is not a persistence authorization boundary and is not application-service global mutable state. Workspace-scoped persistence for assets, artifacts/data, models, images, and generated outputs is intentionally not introduced by the page-gating work; those storage and filtering boundaries remain scheduled for later Phase 6 prompts.

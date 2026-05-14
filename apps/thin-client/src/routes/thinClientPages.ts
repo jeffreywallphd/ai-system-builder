@@ -4,17 +4,22 @@ export interface ThinClientPageDefinition {
   key: ThinClientPageKey;
   label: string;
   path: string;
+  requiresWorkspace?: boolean;
 }
 
 export const thinClientPageDefinitions: readonly ThinClientPageDefinition[] = [
   { key: "home", label: "Home", path: "/" },
-  { key: "artifacts", label: "Artifacts", path: "/artifacts" },
-  { key: "assets", label: "Assets", path: "/assets" },
-  { key: "image-generation", label: "Image Generation", path: "/image-generation" },
-  { key: "models", label: "Models", path: "/models" },
+  { key: "artifacts", label: "Artifacts", path: "/artifacts", requiresWorkspace: true },
+  { key: "assets", label: "Assets", path: "/assets", requiresWorkspace: true },
+  { key: "image-generation", label: "Image Generation", path: "/image-generation", requiresWorkspace: true },
+  { key: "models", label: "Models", path: "/models", requiresWorkspace: true },
   { key: "security", label: "Security", path: "/security" },
   { key: "settings", label: "Settings", path: "/settings" },
 ];
+
+export function thinClientPageRequiresWorkspace(pageKey: ThinClientPageKey): boolean {
+  return thinClientPageDefinitions.some((page) => page.key === pageKey && page.requiresWorkspace === true);
+}
 
 export function resolveThinClientPage(pathname: string): ThinClientPageKey {
   if (pathname === "/artifacts") return "artifacts";
