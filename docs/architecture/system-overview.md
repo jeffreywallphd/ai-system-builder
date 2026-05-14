@@ -273,3 +273,7 @@ Phase 6 has introduced a passive `modules/contracts/workspace` contract family f
 Workspace-scoped UI surfaces are unavailable without an active workspace. Asset, artifact/data, model, image-generation, generated-output, and other resource-backed pages must show a workspace-required call to action rather than empty global records when no workspace is active. Global-safe pages such as home, settings, security diagnostics, and system/about-style views may remain available when they do not expose workspace-owned resources.
 
 Workspace creation may offer `system.foundation@1.0.0` activation by reference via the user-facing “Include System Foundation assets” choice. This does not expose the system pack installer, copy system pack definitions, add pack import/export/install UI, or implement Asset Library effective-view filtering or resource persistence scoping.
+
+## Phase 6 workspace activation availability checkpoint
+
+Workspace foundations now include internal application use cases for listing, reading, and narrowly toggling workspace system-pack activation references. System packs remain system-owned; workspace records only determine availability by reference. The known activation registry is limited to `system.foundation@1.0.0`, diagnostics are sanitized, and no host/API/IPC/preload/UI pack-management surface, Asset Library filtering, resource persistence scoping, installer call, pack copy, collaboration, marketplace, workflow, runtime, provider, or network behavior is introduced.

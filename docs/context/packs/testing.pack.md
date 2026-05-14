@@ -94,3 +94,7 @@
 ## Phase 6 Prompt 5 workspace gating tests
 
 Tests for workspace-gated UI should prove route metadata marks resource-backed pages as workspace-required, gated pages do not render feature components or call feature clients without an active workspace, global-safe pages remain accessible, active workspace labels use display names rather than raw ids/paths, and create/select workspace CTAs are present. Tests must not claim Asset Library effective-view filtering or artifact/data/model/image persistence scoping before later prompts implement those behaviors.
+
+## Phase 6 Prompt 6 workspace activation tests
+
+Workspace activation tests should cover active `system.foundation@1.0.0`, no activations, inactive/failed records, unknown id/version, invalid source/layer/trust metadata, deterministic ordering, duplicates, sanitized diagnostics, repository failure safety, reference-only helper behavior, status updates for existing known records only, no missing-record creation, no Phase 5 installer calls, and boundaries excluding adapters/hosts/apps/UI/API/IPC/preload/runtime/provider/filesystem/resource-scoping imports.
