@@ -12,18 +12,11 @@ import type {
   WorkspaceSystemPackActivationRepository,
 } from "../../ports/workspace";
 import {
-  SYSTEM_FOUNDATION_PACK_ID,
-  SYSTEM_FOUNDATION_PACK_SOURCE_KIND,
-  SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
-  SYSTEM_FOUNDATION_PACK_TRUST_STATUS,
-  SYSTEM_FOUNDATION_PACK_VERSION,
-} from "../../services/asset-packs/system-packs/system-foundation-pack.constants";
-import {
-  buildSystemFoundationActivationId,
   defaultGenerateWorkspaceId,
   normalizeWorkspaceDescription,
   normalizeWorkspaceDisplayName,
 } from "./workspace-create-policy";
+import { createSystemFoundationWorkspaceActivation } from "./workspace-system-pack-activation-policy";
 import type {
   WorkspaceUseCaseDiagnostic,
   WorkspaceUseCaseIssue,
@@ -116,7 +109,7 @@ export class CreateWorkspaceUseCase {
       },
     };
     const activations = includeSystemFoundationAssets
-      ? [this.buildSystemFoundationActivation(workspaceId, createdAt, input.command.createdByActorRef)]
+      ? [createSystemFoundationWorkspaceActivation(workspaceId, createdAt, input.command.createdByActorRef)]
       : [];
 
     if (includeSystemFoundationAssets) {
@@ -213,24 +206,5 @@ export class CreateWorkspaceUseCase {
       diagnostics.push(workspaceDiagnostic("workspace-id-generation-failed", "error", "Workspace id generation failed."));
       return undefined;
     }
-  }
-
-  private buildSystemFoundationActivation(
-    workspaceId: WorkspaceId,
-    activatedAt: string,
-    activatedByActorRef: CreateWorkspaceCommand["createdByActorRef"],
-  ): WorkspaceSystemPackActivation {
-    return {
-      activationId: buildSystemFoundationActivationId(workspaceId),
-      workspaceId,
-      packId: SYSTEM_FOUNDATION_PACK_ID,
-      packVersion: SYSTEM_FOUNDATION_PACK_VERSION,
-      sourceKind: SYSTEM_FOUNDATION_PACK_SOURCE_KIND as "system",
-      sourceLayer: SYSTEM_FOUNDATION_PACK_SOURCE_LAYER as "system-default",
-      trustStatus: SYSTEM_FOUNDATION_PACK_TRUST_STATUS as "system-trusted",
-      status: "active",
-      activatedAt,
-      ...(activatedByActorRef ? { activatedByActorRef } : {}),
-    };
   }
 }

@@ -99,3 +99,7 @@
 ## Phase 6 Prompt 5 active workspace gating
 
 Desktop renderer routes that show workspace-owned resources must declare workspace requirements and render a workspace-required create/select state when no active workspace is selected. The active workspace is renderer/host context only, must display the workspace display name rather than raw paths or ids as the primary label, and must be passed explicitly to later workspace-scoped clients. This gating must not expose pack installers/import/export UI or implement resource persistence scoping.
+
+## Phase 6 Prompt 6 workspace activation host boundary
+
+Workspace system pack activation availability is internal application-layer behavior only. Desktop host prompts should not expose new IPC/preload methods, renderer UI, startup installers, system-pack copying, Asset Library effective-view filtering, resource persistence scoping, collaboration, or public pack management for this checkpoint unless a later prompt explicitly asks for host wiring.

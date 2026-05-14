@@ -145,3 +145,7 @@ Phase 5 Prompt 11 adds only pure in-memory application serialization/fingerprint
 ## Phase 6 Prompt 5 active workspace gating
 
 Thin-client/server-host surfaces should treat active workspace selection as request/UI context and not as authorization. Workspace-scoped pages must not render global resource records without an active workspace. API-level resource filtering and persistence scoping remain deferred; future endpoints must require explicit workspace context rather than reading application-service global state.
+
+## Phase 6 Prompt 6 workspace activation server boundary
+
+Workspace system pack activation availability is internal application-layer behavior only. Server host prompts should not expose new API routes, call system-pack installers, copy system definitions, add Asset Library effective-view filtering, scope artifact/data/model/image persistence, or add public pack management/collaboration behavior for this checkpoint unless a later prompt explicitly asks for host wiring.

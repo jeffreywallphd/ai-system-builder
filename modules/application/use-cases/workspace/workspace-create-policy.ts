@@ -47,7 +47,3 @@ export function defaultGenerateWorkspaceId(): WorkspaceId {
 
   return createWorkspaceId(`workspace.${randomValue}`);
 }
-
-export function buildSystemFoundationActivationId(workspaceId: WorkspaceId): string {
-  return `activation.system-foundation.${workspaceId}`;
-}

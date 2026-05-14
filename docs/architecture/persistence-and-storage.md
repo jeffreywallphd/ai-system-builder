@@ -329,3 +329,7 @@ Phase 6 introduces passive workspace contracts and application workspace creatio
 ### Active workspace selection boundary (Phase 6 Prompt 5)
 
 Active workspace selection is a persisted host/UI preference or request-context value used to gate workspace-scoped pages. It is not a persistence authorization boundary and is not application-service global mutable state. Workspace-scoped persistence for assets, artifacts/data, models, images, and generated outputs is intentionally not introduced by the page-gating work; those storage and filtering boundaries remain scheduled for later Phase 6 prompts.
+
+## Workspace system pack activation availability (Phase 6 Prompt 6)
+
+Workspace system-pack activation storage remains a reference-record store only. The application-layer activation read/list/status use cases consume `WorkspaceSystemPackActivationRepository` records, recognize only the known `system.foundation@1.0.0` reference, and return sanitized diagnostics plus a compact active-system-pack availability result. They do not write Asset Kernel definitions, copy manifests/assets into workspace directories, create resource-scoped artifact/data/model/image storage, call the Phase 5 installer, or scan filesystem pack directories. Public pack import/export/install/override behavior, collaboration, and Asset Library effective-view filtering remain deferred.

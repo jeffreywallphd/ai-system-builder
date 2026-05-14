@@ -194,3 +194,7 @@ Phase 2C Prompt 8 extends the same sanitization baseline across API, IPC, preloa
 ## Phase 6 Prompt 5 workspace gating security notes
 
 Active workspace selection is a convenience preference and routing context, not an authorization grant. Workspace-required pages must not display global asset/artifact/data/model/image records when no workspace is selected, and user-facing workspace labels must avoid raw paths. Collaboration, permissions, sharing, sync, and remote auth remain deferred.
+
+## Phase 6 Prompt 6 workspace activation diagnostics
+
+Workspace system pack activation diagnostics must remain safe: unknown packs, invalid provenance, inactive/failed records, duplicate records, not-found records, and repository failures should be reported with stable codes and generic messages. Do not echo raw local paths, URLs, secrets/tokens/auth values, stack traces, raw JSON/provider payloads, command lines, env values, bytes, or base64. Active workspace selection remains context, not authorization; collaboration and public pack management remain deferred.
