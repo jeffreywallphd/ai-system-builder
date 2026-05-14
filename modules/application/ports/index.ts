@@ -23,3 +23,4 @@ export * from "./runtime-installer";
 export * from "./security";
 
 export * from "./asset";
+export * from "./workspace";

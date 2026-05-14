@@ -45,6 +45,11 @@ Routing rule for feature prompts:
 - If the task relates to runtime installer, auto install, ComfyUI install, sidecar install, or Git runtime install, include `docs/context/packs/runtime-installer.pack.md`.
 - Keep routing minimum-sufficient; do not include unrelated packs or full-repo context by default.
 
+
+## Phase 6 Prompt 3: workspace repository ports and local persistence
+
+For workspace persistence prompts, include `index`, `asset-kernel`, `persistence-storage`, `security`, `testing`, `desktop-host`, `server-host`, and `ipc-electron`, plus canonical Asset Kernel, system overview, module dependency, persistence/storage, host docs, and ADR-0016/ADR-0005. Scope is application ports under `modules/application/ports/workspace` and local file-backed persistence under `modules/adapters/persistence/workspace` for workspace records/indexes, active workspace selection preference, and workspace system-pack activation records. Active selection is a persisted preference/read model only, not global application-service state or authorization. System-pack activation persistence stores references by pack id/version only and must not call installers or copy/embed system pack manifests/assets/definitions. Do not add workspace creation use cases, API routes, IPC handlers, preload methods, UI, host wiring, page gating, Asset Library filtering, artifact/data/model/image scoping, resource storage directories, collaboration permissions, invites, sharing, sync, remote auth, user-library behavior, cross-workspace reuse, marketplace/package registry behavior, workflow execution, runtime/provider/network behavior, or public path leakage.
+
 ## Selection Rules
 
 - Start with `index.pack.md`, then add only packs materially relevant to the task.
