@@ -7,6 +7,7 @@ import type {
 import type { ArtifactObjectStoragePort } from "../../../../application/ports/storage";
 import { createContractError, createFailureResult, createSuccessResult } from "../../../../contracts/shared";
 import { normalizeStorageArtifactKey } from "../../../../contracts/storage";
+import { isWorkspaceId } from "../../../../contracts/workspace";
 
 export interface CreateFilesystemArtifactContentRetrievalAdapterOptions {
   storage: Pick<ArtifactObjectStoragePort, "retrieveArtifact">;
@@ -23,7 +24,7 @@ export function createFilesystemArtifactContentRetrievalAdapter(
     ) {
       const storageKey = normalizeStorageArtifactKey(request.storageKey);
       const [catalogResult, retrieveResult] = await Promise.all([
-        options.artifactCatalogRead.readArtifactCatalogRecord({ storageKey }, context),
+        options.artifactCatalogRead.readArtifactCatalogRecord({ workspaceId: isWorkspaceId(context.workspaceId) ? context.workspaceId : "", storageKey }, context),
         options.storage.retrieveArtifact(
           {
             key: storageKey,

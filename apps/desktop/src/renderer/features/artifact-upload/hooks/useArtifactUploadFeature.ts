@@ -42,11 +42,12 @@ export interface UseArtifactUploadFeatureResult {
 export function useArtifactUploadFeature(
   client?: ArtifactUploadClient,
   onUploadComplete?: () => void,
+  workspaceId?: string,
 ): UseArtifactUploadFeatureResult {
   const uploadClient = useArtifactUploadClient(client);
   const [acceptedFileTypes, setAcceptedFileTypes] = useState<string>("*");
 
-  const fileUpload = useFileArtifactUpload(uploadClient, onUploadComplete, { persistState: client === undefined });
+  const fileUpload = useFileArtifactUpload(uploadClient, onUploadComplete, { persistState: client === undefined, workspaceId });
   const websiteIngestion = useWebsiteArtifactIngestion(uploadClient, onUploadComplete);
 
   useEffect(() => {

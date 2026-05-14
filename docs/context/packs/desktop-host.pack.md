@@ -108,3 +108,7 @@ Workspace system pack activation availability is internal application-layer beha
 
 Desktop host composition wires public Asset Registry reads through the workspace effective-view facade. The renderer Asset Library uses the active workspace label/id from the gated workspace shell and passes the workspace id through preload/IPC. Hosts must not auto-seed, auto-activate, copy system pack definitions, or call system pack installers for this read path.
 
+
+## Phase 6 Prompt 8 artifact workspace scoping
+
+Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.

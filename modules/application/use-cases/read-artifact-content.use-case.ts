@@ -13,22 +13,32 @@ import type {
   ReadArtifactContentCommand,
   ReadArtifactContentUseCaseResult,
 } from "./artifact-browser-read.types";
+import { resolveArtifactWorkspaceContext } from "./artifact-workspace-context";
+import type { WorkspaceRepository } from "../ports/workspace";
 
 export interface ReadArtifactContentUseCaseDependencies {
   artifactBrowserContentRead: ArtifactBrowserContentReadPort;
+  workspaceRepository?: Pick<WorkspaceRepository, "readWorkspace">;
 }
 
 export class ReadArtifactContentUseCase {
+  private readonly workspaceRepository?: Pick<WorkspaceRepository, "readWorkspace">;
   private readonly artifactBrowserContentRead: ArtifactBrowserContentReadPort;
 
   public constructor(dependencies: ReadArtifactContentUseCaseDependencies) {
     this.artifactBrowserContentRead = dependencies.artifactBrowserContentRead;
+    this.workspaceRepository = dependencies.workspaceRepository;
   }
 
   public async execute(
     command: ReadArtifactContentCommand,
     context: ArtifactBrowserCommandContext = {},
   ): Promise<ReadArtifactContentUseCaseResult> {
+    const workspaceContext = await resolveArtifactWorkspaceContext(context, this.workspaceRepository);
+    if (!workspaceContext.ok) {
+      return workspaceContext;
+    }
+
     let locator;
 
     try {

@@ -200,3 +200,7 @@ The active workspace selection preference is not an authorization grant and must
 ### Workspace system pack activation availability (Phase 6 Prompt 6)
 
 Hosts may later call the application-layer workspace system pack activation use cases with explicit workspace context to determine which system-owned packs are active for a workspace. This checkpoint does not add host wiring, API routes, IPC/preload methods, public pack management UI, or global mutable active-workspace application state. Availability is reference-only for the known `system.foundation@1.0.0` pack and does not call the Phase 5 installer or copy system definitions. Asset Library effective-view filtering remains Prompt 7, artifact/data/model/image scoping remains Prompts 8-9, and collaboration remains deferred.
+
+## Phase 6 artifact workspace context
+
+Desktop and server hosts forward request/UI workspace ids into artifact browse, read, upload, and artifact-backed resource-view seams. Hosts only compose dependencies and transports; they must not create hidden/default workspaces, auto-migrate legacy global artifacts, or implement workspace filtering rules outside the application/persistence seams.

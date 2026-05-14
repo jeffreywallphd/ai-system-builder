@@ -571,3 +571,7 @@ Workspace UI gates now use host/server workspace create/list/select operations b
 
 Resource-backed descriptors are intentionally deferred in the workspace Asset Library until artifact, data, model, and image persistence scoping is implemented in later Phase 6 prompts. System packs remain system-owned and activated by reference only; this read path does not install, copy, import/export packs, edit overrides, author user assets, or implement user-library/cross-workspace reuse.
 
+
+## Phase 6 artifact-backed resource views
+
+Artifact-backed resource view providers now require explicit workspace context and must browse artifact descriptors only through workspace-scoped artifact read seams. Missing workspace context returns safe empty/diagnostic provider results instead of global descriptors. Non-artifact resource-backed view scoping, including image/generated-output/dataset/model/runtime-output resources, remains deferred.

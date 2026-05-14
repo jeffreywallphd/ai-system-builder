@@ -28,6 +28,7 @@ function createCommandContext(
 ): StoreArtifactUploadCommandContext {
   return {
     source: "desktop.renderer.artifact-upload.form",
+    workspaceId: "workspace-a",
     ...overrides,
   };
 }
@@ -51,6 +52,22 @@ function createLoggingPort(log?: ReturnType<typeof testDouble.fn<LoggingPort["lo
 }
 
 describe("StoreArtifactUploadUseCase", () => {
+  it("requires workspace context before writing upload bytes", async () => {
+    const storeArtifact = testDouble.fn<ArtifactStoragePort["storeArtifact"]>();
+    const useCase = new StoreArtifactUploadUseCase({
+      storage: createStoragePort({ storeArtifact }),
+      logging: createLoggingPort(),
+    });
+
+    const result = await useCase.execute(createCommand(), createCommandContext({ workspaceId: undefined }));
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("Expected workspace-required failure.");
+    expect(result.error.code).toBe("validation");
+    expect(result.error.details).toMatchObject({ code: "workspace-required" });
+    expect(storeArtifact).not.toHaveBeenCalled();
+  });
+
   it("stores a valid artifact upload through the storage port and returns a descriptor result", async () => {
     const storeArtifact = testDouble.fn<ArtifactStoragePort["storeArtifact"]>().mockResolvedValue(
       createStoreArtifactSuccessResult({

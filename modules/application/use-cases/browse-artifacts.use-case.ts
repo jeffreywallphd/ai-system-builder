@@ -10,22 +10,32 @@ import type {
   BrowseArtifactsCommand,
   BrowseArtifactsUseCaseResult,
 } from "./artifact-browser-read.types";
+import { resolveArtifactWorkspaceContext } from "./artifact-workspace-context";
+import type { WorkspaceRepository } from "../ports/workspace";
 
 export interface BrowseArtifactsUseCaseDependencies {
   artifactBrowserMetadataRead: ArtifactBrowserMetadataReadPort;
+  workspaceRepository?: Pick<WorkspaceRepository, "readWorkspace">;
 }
 
 export class BrowseArtifactsUseCase {
+  private readonly workspaceRepository?: Pick<WorkspaceRepository, "readWorkspace">;
   private readonly artifactBrowserMetadataRead: ArtifactBrowserMetadataReadPort;
 
   public constructor(dependencies: BrowseArtifactsUseCaseDependencies) {
     this.artifactBrowserMetadataRead = dependencies.artifactBrowserMetadataRead;
+    this.workspaceRepository = dependencies.workspaceRepository;
   }
 
   public async execute(
     command: BrowseArtifactsCommand,
     context: ArtifactBrowserCommandContext = {},
   ): Promise<BrowseArtifactsUseCaseResult> {
+    const workspaceContext = await resolveArtifactWorkspaceContext(context, this.workspaceRepository);
+    if (!workspaceContext.ok) {
+      return workspaceContext;
+    }
+
     try {
       const result = await this.artifactBrowserMetadataRead.browseArtifacts(
         {

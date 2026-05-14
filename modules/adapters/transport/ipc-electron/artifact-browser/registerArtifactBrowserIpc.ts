@@ -265,19 +265,23 @@ export function mapDesktopArtifactRequestContext(
     | DesktopArtifactUnregisteredRegisterRequest
     | DesktopArtifactUnregisteredDeleteRequest
     | DesktopArtifactRegisteredDeleteRequest,
-): { requestId?: string; correlationId?: string } {
+): { requestId?: string; correlationId?: string; workspaceId?: string } {
+  const payload = request.payload as { workspaceId?: string } | undefined;
   return {
     requestId: request.requestId,
     correlationId: request.correlationId,
+    workspaceId: payload?.workspaceId,
   };
 }
 
 function mapDesktopHuggingFaceBrowseRequestContext(
   request: DesktopHuggingFaceNamespaceDatasetsBrowseRequest | DesktopHuggingFaceDatasetParquetFilesBrowseRequest,
-): { requestId?: string; correlationId?: string } {
+): { requestId?: string; correlationId?: string; workspaceId?: string } {
+  const payload = request.payload as { workspaceId?: string } | undefined;
   return {
     requestId: request.requestId,
     correlationId: request.correlationId,
+    workspaceId: payload?.workspaceId,
   };
 }
 

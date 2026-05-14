@@ -367,6 +367,7 @@ export interface IpcRendererInvokePort {
 }
 
 export interface DesktopArtifactUploadBridgeInput {
+  workspaceId?: string;
   fileName: string;
   mediaType: string;
   bytes: Uint8Array;
@@ -380,6 +381,7 @@ export interface DesktopArtifactUploadBridgeContext {
   requestId?: string;
   correlationId?: string;
   idempotencyKey?: string;
+  workspaceId?: string;
 }
 
 export type DesktopAssetDefinitionsListBridgeInput = Omit<DesktopAssetDefinitionsListRequest["payload"], "boundary">;
@@ -505,22 +507,23 @@ export interface DesktopPreloadApi {
   readComfyUiInstallStatus: (input?: { installRoot?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<any>;
   repairComfyUiInstall: (input?: { installRoot?: string; allowUpdate?: boolean; forceRepair?: boolean }, context?: DesktopArtifactUploadBridgeContext) => Promise<any>;
   browseArtifacts: (
-    input?: { artifactFamily?: ArtifactFamily },
+    input?: { artifactFamily?: ArtifactFamily; workspaceId?: string },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactBrowseResponse>;
   browseUnregisteredArtifacts: (
+    input?: { workspaceId?: string },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactUnregisteredBrowseResponse>;
   registerUnregisteredArtifact: (
-    input: { storageKey: string },
+    input: { storageKey: string; workspaceId?: string },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactUnregisteredRegisterResponse>;
   deleteUnregisteredArtifact: (
-    input: { storageKey: string },
+    input: { storageKey: string; workspaceId?: string },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactUnregisteredDeleteResponse>;
   deleteRegisteredArtifact: (
-    input: { storageKey: string },
+    input: { storageKey: string; workspaceId?: string },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopArtifactRegisteredDeleteResponse>;
   readArtifactDetail: (
@@ -805,6 +808,7 @@ export function createDesktopPreloadApi(
           fileName: input.fileName,
           mediaType: input.mediaType,
           bytes: input.bytes,
+          workspaceId: input.workspaceId ?? context.workspaceId ?? "",
           boundary: {
             host: "desktop",
             source: uploadSource,
@@ -1286,6 +1290,7 @@ export function createDesktopPreloadApi(
       const request: DesktopArtifactBrowseRequest = createDesktopArtifactBrowseRequest(
         {
           artifactFamily: input.artifactFamily,
+          workspaceId: input.workspaceId ?? context.workspaceId ?? "",
           boundary: {
             host: "desktop",
             source: artifactSource,
@@ -1305,7 +1310,7 @@ export function createDesktopPreloadApi(
       });
     },
 
-    async browseUnregisteredArtifacts(context = {}) {
+    async browseUnregisteredArtifacts(_input = {}, context = {}) {
       const request = createDesktopArtifactUnregisteredBrowseRequest({
         boundary: { host: "desktop", source: artifactSource },
       }, context);
@@ -1359,6 +1364,7 @@ export function createDesktopPreloadApi(
     async deleteRegisteredArtifact(input, context = {}) {
       const request = createDesktopArtifactRegisteredDeleteRequest({
         storageKey: input.storageKey,
+        workspaceId: input.workspaceId ?? context.workspaceId ?? "",
         boundary: { host: "desktop", source: artifactSource },
       }, context);
       const response = await dependencies.ipcRenderer.invoke(
@@ -1377,6 +1383,7 @@ export function createDesktopPreloadApi(
       const request: DesktopArtifactReadRequest = createDesktopArtifactReadRequest(
         {
           locator,
+          workspaceId: context.workspaceId ?? "",
           boundary: {
             host: "desktop",
             source: artifactSource,
@@ -1400,6 +1407,7 @@ export function createDesktopPreloadApi(
       const request: DesktopArtifactContentReadRequest = createDesktopArtifactContentReadRequest(
         {
           locator,
+          workspaceId: context.workspaceId ?? "",
           boundary: {
             host: "desktop",
             source: artifactSource,
@@ -1423,6 +1431,7 @@ export function createDesktopPreloadApi(
       const request: DesktopArtifactMediaViewRequest = createDesktopArtifactMediaViewRequest(
         {
           storageKey: locator.storageKey,
+          workspaceId: context.workspaceId ?? "",
           boundary: {
             host: "desktop",
             source: artifactSource,

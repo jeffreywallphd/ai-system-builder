@@ -333,3 +333,9 @@ Active workspace selection is a persisted host/UI preference or request-context 
 ## Workspace system pack activation availability (Phase 6 Prompt 6)
 
 Workspace system-pack activation storage remains a reference-record store only. The application-layer activation read/list/status use cases consume `WorkspaceSystemPackActivationRepository` records, recognize only the known `system.foundation@1.0.0` reference, and return sanitized diagnostics plus a compact active-system-pack availability result. They do not write Asset Kernel definitions, copy manifests/assets into workspace directories, create resource-scoped artifact/data/model/image storage, call the Phase 5 installer, or scan filesystem pack directories. Public pack import/export/install/override behavior, collaboration, and Asset Library effective-view filtering remain deferred.
+
+## Phase 6 workspace-scoped artifacts and uploads
+
+Artifact catalog browse, artifact detail/content reads, and upload/store flows are workspace-scoped. Callers must provide an explicit workspace id; missing or invalid workspace context fails safely and must not fall back to legacy global artifact catalog records. New uploaded artifact records carry workspace ownership, and upload-generated storage keys use a workspace namespace under `workspaces/<workspaceId>/artifacts/files/` rather than display names or raw host paths. Legacy unscoped artifact records are not auto-migrated or shown in workspace-scoped artifact pages; any future import/migration must be explicit.
+
+This checkpoint intentionally scopes artifacts and uploaded files only. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred to later prompts.

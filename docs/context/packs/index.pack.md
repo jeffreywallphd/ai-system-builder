@@ -137,3 +137,7 @@ Active workspace context and workspace-required route/page gating now belong in 
 ## Phase 6 Prompt 6 workspace activation availability index note
 
 Workspace system pack activation read/list/status behavior is now an internal application-layer capability. Active system pack availability is determined by workspace activation/reference records, currently recognizing only `system.foundation@1.0.0`; activation remains reference-only and does not copy/install system pack definitions or call the Phase 5 installer. Asset Library effective-view filtering remains Prompt 7, artifact/data/model/image persistence scoping remains Prompts 8-9, and public pack import/export/install/override management plus collaboration remain deferred.
+
+## Phase 6 Prompt 8 artifact workspace scoping
+
+Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.

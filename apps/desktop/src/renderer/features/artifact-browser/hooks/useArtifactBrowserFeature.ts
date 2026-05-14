@@ -109,17 +109,20 @@ export interface UseArtifactBrowserFeatureResult {
 
 export function useArtifactBrowserFeature(
   client?: DesktopArtifactBrowserClient,
+  workspaceId?: string,
 ): UseArtifactBrowserFeatureResult {
   const artifactClient = useArtifactBrowserClient(client);
   const [viewState, setViewState] = useState<ArtifactBrowserViewState>({ status: "idle" });
   const artifacts = useArtifactBrowserArtifacts({
     client: artifactClient,
     setViewState,
+    workspaceId,
   });
 
   const selection = useArtifactSelectionContent(
     artifactClient,
     setViewState,
+    workspaceId,
   );
 
   const publishLogic = useArtifactBrowserPublishLogic<DesktopArtifactDetail>({
@@ -130,17 +133,19 @@ export function useArtifactBrowserFeature(
         return undefined;
       }
 
-      return artifactClient.readArtifactDetail({ storageKey: selection.selectedStorageKey });
+      return artifactClient.readArtifactDetail({ storageKey: selection.selectedStorageKey }, { workspaceId });
     },
   });
 
   const mutations = useArtifactBrowserMutations({
     client: artifactClient,
+    workspaceId,
     refreshArtifacts: artifacts.refreshArtifacts,
     setViewState,
   });
   const deleteFlow = useArtifactDeleteFlow({
     client: artifactClient,
+    workspaceId,
     refreshArtifacts: artifacts.refreshArtifacts,
     clearSelectedArtifact: selection.clearSelectedArtifact,
     setViewState,
@@ -162,7 +167,7 @@ export function useArtifactBrowserFeature(
     void artifactClient.getHuggingFaceTokenStatus().then(huggingFace.setHuggingFaceTokenStatus).catch(() => {
       huggingFace.setHuggingFaceTokenStatus({ configured: false });
     });
-  }, [artifactClient, artifacts.refreshArtifacts]);
+  }, [artifactClient, artifacts.refreshArtifacts, workspaceId]);
 
   async function publishArtifactToHuggingFace(input?: {
     repository: string;

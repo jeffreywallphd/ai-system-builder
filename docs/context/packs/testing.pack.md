@@ -98,3 +98,7 @@ Tests for workspace-gated UI should prove route metadata marks resource-backed p
 ## Phase 6 Prompt 6 workspace activation tests
 
 Workspace activation tests should cover active `system.foundation@1.0.0`, no activations, inactive/failed records, unknown id/version, invalid source/layer/trust metadata, deterministic ordering, duplicates, sanitized diagnostics, repository failure safety, reference-only helper behavior, status updates for existing known records only, no missing-record creation, no Phase 5 installer calls, and boundaries excluding adapters/hosts/apps/UI/API/IPC/preload/runtime/provider/filesystem/resource-scoping imports.
+
+## Phase 6 Prompt 8 artifact workspace scoping
+
+Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.

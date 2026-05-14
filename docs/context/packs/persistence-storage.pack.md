@@ -141,3 +141,7 @@
 ## Phase 6 Prompt 6 workspace activation persistence boundary
 
 The workspace activation availability use cases consume persisted activation reference records through `WorkspaceSystemPackActivationRepository` only. They produce compact active-pack availability and safe diagnostics, recognize only `system.foundation@1.0.0`, and may update only existing known activation status between active/inactive. They must not create resource directories, copy/install system pack definitions, write Asset Kernel definition records, call system-pack installers, expose raw persistence errors, or add artifact/data/model/image scoping. Asset Library effective-view filtering and public pack management remain later work.
+
+## Phase 6 Prompt 8 artifact workspace scoping
+
+Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.

@@ -12,6 +12,7 @@ export interface StoreArtifactUploadCommand {
 
 export interface StoreArtifactUploadCommandContext {
   source: string;
+  workspaceId?: string;
 }
 
 export type StoreArtifactUploadUseCaseResult<

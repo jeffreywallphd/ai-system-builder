@@ -29,6 +29,7 @@ import {
   type StoreArtifactRequest,
   type StoreArtifactResult,
 } from "../../../../contracts/storage";
+import { createWorkspaceId, isWorkspaceId } from "../../../../contracts/workspace";
 
 const STORAGE_COMPONENT = "adapters.storage.filesystem";
 const DEFAULT_STORAGE_HOST = "desktop";
@@ -268,11 +269,13 @@ export function createFilesystemArtifactObjectStorageAdapter(
   function createGeneratedKey(input: {
     mediaType: string | undefined;
     originalFileName: string | undefined;
+    workspaceId?: string;
   }): string {
     const compactTimestamp = now().replace(/[-:.TZ]/g, "");
     const extension = extensionFromOriginalFileName(input.originalFileName) ?? extensionForMediaType(input.mediaType);
+    const uploadPath = `uploads/${compactTimestamp}-${randomSuffix()}.${extension}`;
     return normalizeStorageArtifactKey(
-      `uploads/${compactTimestamp}-${randomSuffix()}.${extension}`,
+      input.workspaceId ? `workspaces/${createWorkspaceId(input.workspaceId)}/artifacts/files/${uploadPath}` : uploadPath,
     );
   }
 
@@ -309,6 +312,7 @@ export function createFilesystemArtifactObjectStorageAdapter(
           : createGeneratedKey({
             mediaType: request.descriptor.mediaType,
             originalFileName,
+            workspaceId: context.workspaceId,
           });
         const extension = extensionFromOriginalFileName(originalFileName) ?? path.extname(key).replace(/^\./, "");
         attemptedKey = key;
@@ -335,8 +339,12 @@ export function createFilesystemArtifactObjectStorageAdapter(
         }
 
         if (options.artifactCatalogAppend) {
+          if (!isWorkspaceId(context.workspaceId)) {
+            throw new StorageAdapterValidationError("Workspace id is required for artifact catalog writes.");
+          }
           const appendResult = await options.artifactCatalogAppend.appendArtifactCatalogRecord({
             record: {
+              workspaceId: context.workspaceId,
               storageKey: key,
               artifactFamily: resolveArtifactFamily({
                 mediaType: request.descriptor.mediaType,
@@ -353,6 +361,7 @@ export function createFilesystemArtifactObjectStorageAdapter(
           }, {
             requestId: requestContext.requestId,
             correlationId: requestContext.correlationId,
+            workspaceId: context.workspaceId,
           });
 
           if (!appendResult.ok) {
@@ -371,7 +380,6 @@ export function createFilesystemArtifactObjectStorageAdapter(
           outcome: "success",
           data: {
             key,
-            absolutePath,
             sizeBytes: bytes.byteLength,
             mediaType: request.descriptor.mediaType,
             checksumAlgorithm: checksum.algorithm,
@@ -393,7 +401,7 @@ export function createFilesystemArtifactObjectStorageAdapter(
         const code = toErrorCode(error);
         const message = code === "conflict"
           ? "Storage artifact already exists and overwrite is disabled."
-          : `Failed to store artifact bytes: ${toErrorMessage(error)}`;
+          : "Failed to store artifact bytes.";
 
         await logBoundaryEvent({
           level: "error",
@@ -410,7 +418,6 @@ export function createFilesystemArtifactObjectStorageAdapter(
             errorMessage: message,
             details: {
               key: attemptedKey,
-              absolutePath: attemptedAbsolutePath,
               filesystemCode: isFsError(error) ? (error.code ?? "unknown") : "unknown",
             },
           },
@@ -422,7 +429,6 @@ export function createFilesystemArtifactObjectStorageAdapter(
             details: {
               operation: "storeArtifact",
               key: attemptedKey,
-              absolutePath: attemptedAbsolutePath,
               filesystemCode: isFsError(error) ? error.code : undefined,
             },
           }),

@@ -9,6 +9,7 @@ export interface MultipartArtifactUploadFile {
 export interface ParsedMultipartArtifactUploadRequest {
   file: MultipartArtifactUploadFile;
   source?: string;
+  workspaceId?: string;
 }
 
 interface MultipartRequestLike {
@@ -57,6 +58,7 @@ export async function parseMultipartArtifactUploadRequest(
 
     let parsedFile: MultipartArtifactUploadFile | undefined;
     let parsedSource: string | undefined;
+    let parsedWorkspaceId: string | undefined;
 
     parser.on("file", (fieldName, stream, fileInfo) => {
       if (fieldName !== "file") {
@@ -82,6 +84,9 @@ export async function parseMultipartArtifactUploadRequest(
       if (fieldName === "source") {
         parsedSource = value;
       }
+      if (fieldName === "workspaceId") {
+        parsedWorkspaceId = value;
+      }
     });
 
     parser.on("error", reject);
@@ -96,6 +101,7 @@ export async function parseMultipartArtifactUploadRequest(
       resolve({
         file: parsedFile,
         source: parsedSource,
+        workspaceId: parsedWorkspaceId,
       });
     });
 

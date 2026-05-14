@@ -10,6 +10,7 @@ import {
   type AcceptedArtifactUploadPolicy,
 } from "../../domain";
 import type { LoggingPort } from "../ports/logging";
+import type { WorkspaceRepository } from "../ports/workspace";
 import type { ArtifactStoragePort } from "../ports/storage";
 import type {
   StoreArtifactUploadCommand,
@@ -18,12 +19,14 @@ import type {
 } from "./store-artifact-upload.types";
 import { mapStoreArtifactUploadToRegisterStagedArtifactResult } from "./artifact-upload/mapStoreArtifactUploadToRegisterStagedArtifactResult";
 import { mapAcceptedArtifactUploadPolicyToContract } from "./artifact-upload/mapAcceptedArtifactUploadPolicyToContract";
+import { resolveArtifactWorkspaceContext } from "./artifact-workspace-context";
 
 export interface StoreArtifactUploadUseCaseDependencies {
   storage: ArtifactStoragePort;
   logging: LoggingPort;
   acceptedUploadPolicy?: AcceptedArtifactUploadPolicy;
   now?: () => string;
+  workspaceRepository?: Pick<WorkspaceRepository, "readWorkspace">;
 }
 
 const STORE_ARTIFACT_UPLOAD_USE_CASE = "StoreArtifactUploadUseCase";
@@ -81,12 +84,14 @@ export class StoreArtifactUploadUseCase {
   private readonly logging: LoggingPort;
   private readonly now: () => string;
   private readonly acceptedUploadPolicy: AcceptedArtifactUploadPolicy;
+  private readonly workspaceRepository?: Pick<WorkspaceRepository, "readWorkspace">;
 
   public constructor(dependencies: StoreArtifactUploadUseCaseDependencies) {
     this.storage = dependencies.storage;
     this.logging = dependencies.logging;
     this.now = dependencies.now ?? (() => new Date().toISOString());
     this.acceptedUploadPolicy = dependencies.acceptedUploadPolicy ?? createDefaultAcceptedArtifactUploadPolicy();
+    this.workspaceRepository = dependencies.workspaceRepository;
   }
 
   public getAcceptedUploadPolicy(): ArtifactUploadAcceptedTypePolicy {
@@ -99,8 +104,15 @@ export class StoreArtifactUploadUseCase {
     context: {
       requestId?: string;
       correlationId?: string;
+      workspaceId?: string;
     } = {},
   ): Promise<StoreArtifactUploadUseCaseResult> {
+    const effectiveContext = { ...context, workspaceId: context.workspaceId ?? commandContext.workspaceId };
+    const workspaceContext = await resolveArtifactWorkspaceContext(effectiveContext, this.workspaceRepository);
+    if (!workspaceContext.ok) {
+      return mapStoreArtifactUploadToRegisterStagedArtifactResult(workspaceContext, effectiveContext);
+    }
+
     const startedAt = Date.now();
     const candidate = createArtifactIntakeCandidate({
       fileName: command.fileName,
@@ -159,7 +171,7 @@ export class StoreArtifactUploadUseCase {
             },
           },
         }),
-        context,
+        effectiveContext,
       );
 
       if (!storeResult.ok) {
@@ -191,7 +203,7 @@ export class StoreArtifactUploadUseCase {
           sourceKind: "upload",
           originalName: candidate.fileName,
         },
-        context,
+        effectiveContext,
       );
 
       await this.logging.log({

@@ -154,3 +154,7 @@ Workspace system pack activation availability is internal application-layer beha
 
 Server Asset Registry API read routes accept workspace context (query/header) and delegate to the workspace effective-view read facade. Missing workspace context must not fall back to global definitions; `system.foundation@1.0.0` is visible only through active workspace system-pack activation records. Artifact/data/model/image persistence scoping and user-library reuse remain later work.
 
+
+## Phase 6 Prompt 8 artifact workspace scoping
+
+Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.

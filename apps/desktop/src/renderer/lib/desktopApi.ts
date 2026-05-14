@@ -55,6 +55,7 @@ import type {
 import type { ActiveWorkspaceSelection, CreateWorkspaceCommand } from "../../../../../modules/contracts/workspace";
 
 export interface DesktopArtifactUploadInput {
+  workspaceId?: string;
   fileName: string;
   mediaType: string;
   bytes: Uint8Array;
@@ -308,6 +309,7 @@ export interface DesktopBridgeRequestContext {
   requestId?: string;
   correlationId?: string;
   idempotencyKey?: string;
+  workspaceId?: string;
 }
 
 export type DesktopAssetBuiltInFilter = "all" | "built-in" | "custom";
@@ -439,14 +441,14 @@ interface DesktopApiBridge {
   finalizeImageGenerationIfCompleted?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readComfyUiInstallStatus?: (input?: { installRoot?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   repairComfyUiInstall?: (input?: { installRoot?: string; allowUpdate?: boolean; forceRepair?: boolean }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
-  browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
-  browseUnregisteredArtifacts?: () => Promise<unknown>;
-  registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
-  deleteUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
-  deleteRegisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
-  readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
-  readArtifactContentDescriptor: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
-  readArtifactViewerMedia: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
+  browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily; workspaceId?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  browseUnregisteredArtifacts?: (input?: { workspaceId?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  registerUnregisteredArtifact?: (input: { storageKey: string; workspaceId?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  deleteUnregisteredArtifact?: (input: { storageKey: string; workspaceId?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  deleteRegisteredArtifact?: (input: { storageKey: string; workspaceId?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readArtifactDetail: (locator: DesktopArtifactBrowserLocator, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readArtifactContentDescriptor: (locator: DesktopArtifactBrowserLocator, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readArtifactViewerMedia: (locator: DesktopArtifactBrowserLocator, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   publishArtifactToRepo: (input: {
     artifactId: string;
     target: {

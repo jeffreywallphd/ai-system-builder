@@ -47,3 +47,7 @@ Workspace system pack activation availability does not add Electron IPC or prelo
 
 Desktop Asset Registry IPC/preload read payloads carry `workspaceId` for Asset Library list/detail/resource-backed reads. Missing or invalid workspace context must fail safely and must not call a global fallback read. IPC remains read-only for Asset Registry reads and must not expose pack install/import/export, activation-management, override-editing, or system-pack installer behavior.
 
+
+## Phase 6 Prompt 8 artifact workspace scoping
+
+Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.

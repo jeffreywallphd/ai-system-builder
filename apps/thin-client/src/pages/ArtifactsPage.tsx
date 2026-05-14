@@ -6,6 +6,7 @@ export interface WorkspaceScopedPageProps { workspaceId?: string; workspaceName?
 export function ArtifactsPage({ workspaceId, workspaceName }: WorkspaceScopedPageProps = {}) {
   return (
     <section className="ui-stack ui-stack--sm" data-workspace-id={workspaceId} data-workspace-name={workspaceName}>
+      <p>Active workspace: {workspaceName ?? workspaceId ?? "No active workspace"}</p>
       <TabbedPanel
         tabListAriaLabel="Artifact workspace panels"
         defaultTabId="ingestion"
@@ -13,12 +14,12 @@ export function ArtifactsPage({ workspaceId, workspaceName }: WorkspaceScopedPag
           {
             id: "ingestion",
             label: "Artifact Ingestion",
-            content: <ArtifactIngestionFeature />,
+            content: <ArtifactIngestionFeature workspaceId={workspaceId} workspaceName={workspaceName} />,
           },
           {
             id: "browser",
             label: "Artifact Browser",
-            content: <ArtifactBrowserFeature />,
+            content: <ArtifactBrowserFeature workspaceId={workspaceId} workspaceName={workspaceName} />,
           },
         ]}
       />

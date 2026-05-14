@@ -219,3 +219,7 @@ Workspace system pack activation read/list/status use cases now live in the appl
 - Resource-backed descriptors remain deferred for workspace pages until artifact/data/model/image persistence scoping lands in Prompts 8-9.
 - Do not add pack install/import/export UI, public activation management, override editing, user asset authoring, user-library reuse, or cross-workspace copy/link behavior in this phase.
 
+
+## Phase 6 Prompt 8 artifact workspace scoping
+
+Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.

@@ -88,9 +88,18 @@ function assertSafe(value: unknown): void {
 }
 
 describe("ArtifactResourceBackedViewProvider", () => {
+
+  it("requires workspace context and does not call artifact browse without it", async () => {
+    const browser = new FakeArtifactBrowserMetadataRead([]);
+    const result = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews();
+
+    assert.deepEqual(result.items, []);
+    assert.equal(browser.browseCalls, 0);
+    assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "workspace-required"), true);
+  });
   it("maps a safe artifact descriptor to a generic artifact resource-backed view", async () => {
     const browser = new FakeArtifactBrowserMetadataRead([safeArtifact({ artifactId: "artifact-alpha", originalName: "Source data.bin" })]);
-    const result = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews();
+    const result = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews({ workspaceId: "workspace-a" });
 
     const view = result.items[0]!;
     assert.equal(view.viewKind, "artifact");
@@ -109,7 +118,7 @@ describe("ArtifactResourceBackedViewProvider", () => {
       safeArtifact({ artifactId: "artifact-doc", artifactFamily: "document", mediaType: "application/pdf", originalName: "Requirements.pdf" }),
     ]);
 
-    const view = (await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews()).items[0]!;
+    const view = (await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews({ workspaceId: "workspace-a" })).items[0]!;
 
     assert.equal(view.viewKind, "document");
     assert.equal(view.assetType, "document");
@@ -123,7 +132,7 @@ describe("ArtifactResourceBackedViewProvider", () => {
       safeArtifact({ artifactId: "artifact-binary", artifactFamily: "binary", mediaType: "application/octet-stream", originalName: "unknown.bin" }),
     ]);
 
-    const view = (await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews()).items[0]!;
+    const view = (await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews({ workspaceId: "workspace-a" })).items[0]!;
 
     assert.equal(view.viewKind, "artifact");
     assert.equal(view.assetType, "data-source");
@@ -134,7 +143,7 @@ describe("ArtifactResourceBackedViewProvider", () => {
       safeArtifact({ artifactId: "artifact-json", mediaType: undefined, originalName: "metadata", metadata: { contentType: "application/json" } }),
     ]);
 
-    const view = (await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews()).items[0]!;
+    const view = (await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews({ workspaceId: "workspace-a" })).items[0]!;
 
     assert.equal(view.viewKind, "document");
     assert.equal(browser.readContentCalls, 0);
@@ -143,7 +152,7 @@ describe("ArtifactResourceBackedViewProvider", () => {
 
   it("does not call storage list/filesystem functions or create durable asset records", async () => {
     const browser = new FakeArtifactBrowserMetadataRead([safeArtifact()]);
-    await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews();
+    await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews({ workspaceId: "workspace-a" });
 
     assert.equal(browser.storageListCalls, 0);
     assert.equal(browser.createAssetInstanceCalls, 0);
@@ -155,7 +164,7 @@ describe("ArtifactResourceBackedViewProvider", () => {
       safeArtifact({ artifactId: "uploads/private/report.pdf", storageKey: "uploads/private/report.pdf", mediaType: "application/pdf", originalName: "report.pdf" }),
     ]);
 
-    const result = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews({ includeMetadata: true } as never);
+    const result = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews({ workspaceId: "workspace-a", includeMetadata: true } as never);
 
     assert.equal(result.items[0]?.viewKind, "document");
     assertSafe(result);
@@ -170,7 +179,7 @@ describe("ArtifactResourceBackedViewProvider", () => {
       }),
     ]);
 
-    const view = (await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews()).items[0]!;
+    const view = (await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews({ workspaceId: "workspace-a" })).items[0]!;
 
     assert.equal(view.displayName, "artifact-paths");
     assert.equal(view.metadata?.safe, "visible");
@@ -196,7 +205,7 @@ describe("ArtifactResourceBackedViewProvider", () => {
       }),
     ]);
 
-    const result = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews();
+    const result = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews({ workspaceId: "workspace-a" });
 
     assert.equal(result.items[0]?.metadata?.safe, "visible");
     assertSafe(result);
@@ -209,7 +218,7 @@ describe("ArtifactResourceBackedViewProvider", () => {
       safeArtifact({ artifactId: "artifact-3" }),
     ]);
 
-    const result = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser, maxListLimit: 2 }).listResourceBackedViews({ limit: 99 });
+    const result = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser, maxListLimit: 2 }).listResourceBackedViews({ workspaceId: "workspace-a", limit: 99 });
 
     assert.deepEqual(result.items.map((item) => item.sourceRef?.metadata?.artifactId), ["artifact-1", "artifact-2"]);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "artifact-resource-backed-view-limit-clamped"), true);
@@ -217,7 +226,7 @@ describe("ArtifactResourceBackedViewProvider", () => {
 
   it("safely reports unsupported cursor behavior", async () => {
     const browser = new FakeArtifactBrowserMetadataRead([safeArtifact()]);
-    const result = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews({ cursor: "cursor-1" });
+    const result = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser }).listResourceBackedViews({ workspaceId: "workspace-a", cursor: "cursor-1" });
 
     assert.equal(result.nextCursor, undefined);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "artifact-resource-backed-view-cursor-unsupported"), true);
@@ -232,23 +241,23 @@ describe("ArtifactResourceBackedViewProvider", () => {
     ]);
     const provider = new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser });
 
-    assert.deepEqual((await provider.listResourceBackedViews({ searchText: "notes" })).items.map((item) => item.viewKind), ["document"]);
-    assert.deepEqual((await provider.listResourceBackedViews({ assetTypes: ["document"] })).items.map((item) => item.viewKind), ["document"]);
-    assert.deepEqual((await provider.listResourceBackedViews({ assetFamilies: ["resource-backed"], viewKinds: ["artifact"] })).items.map((item) => item.displayName), ["Image.png"]);
-    assert.equal((await provider.listResourceBackedViews({ lifecycleStatuses: ["published"] })).diagnostics?.some((diagnostic) => diagnostic.code === "artifact-resource-backed-view-lifecycle-filter-unsupported"), true);
+    assert.deepEqual((await provider.listResourceBackedViews({ workspaceId: "workspace-a", searchText: "notes" })).items.map((item) => item.viewKind), ["document"]);
+    assert.deepEqual((await provider.listResourceBackedViews({ workspaceId: "workspace-a", assetTypes: ["document"] })).items.map((item) => item.viewKind), ["document"]);
+    assert.deepEqual((await provider.listResourceBackedViews({ workspaceId: "workspace-a", assetFamilies: ["resource-backed"], viewKinds: ["artifact"] })).items.map((item) => item.displayName), ["Image.png"]);
+    assert.equal((await provider.listResourceBackedViews({ workspaceId: "workspace-a", lifecycleStatuses: ["published"] })).diagnostics?.some((diagnostic) => diagnostic.code === "artifact-resource-backed-view-lifecycle-filter-unsupported"), true);
   });
 
   it("returns sanitized diagnostics when the artifact source is unavailable or fails", async () => {
-    const noSource = await new ArtifactResourceBackedViewProvider().listResourceBackedViews();
+    const noSource = await new ArtifactResourceBackedViewProvider().listResourceBackedViews({ workspaceId: "workspace-a" });
     assert.equal(noSource.diagnostics?.some((diagnostic) => diagnostic.code === "artifact-resource-backed-view-source-unavailable"), true);
 
     const failingResult = new FakeArtifactBrowserMetadataRead();
     failingResult.result = createFailureResult(createContractError("internal", "C:\\Users\\name\\secret token stack raw provider payload"));
-    const failed = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: failingResult }).listResourceBackedViews();
+    const failed = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: failingResult }).listResourceBackedViews({ workspaceId: "workspace-a" });
 
     const throwing = new FakeArtifactBrowserMetadataRead();
     throwing.throws = true;
-    const thrown = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: throwing }).listResourceBackedViews();
+    const thrown = await new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: throwing }).listResourceBackedViews({ workspaceId: "workspace-a" });
 
     assert.equal(failed.diagnostics?.some((diagnostic) => diagnostic.code === "artifact-resource-backed-view-source-failed"), true);
     assert.equal(thrown.diagnostics?.some((diagnostic) => diagnostic.code === "artifact-resource-backed-view-source-failed"), true);
@@ -258,12 +267,12 @@ describe("ArtifactResourceBackedViewProvider", () => {
   it("reads detail by bounded list fallback with an explicit limitation diagnostic and no byte reads", async () => {
     const browser = new FakeArtifactBrowserMetadataRead([safeArtifact({ artifactId: "artifact-read", originalName: "Readme.md", mediaType: "text/markdown" })]);
     const provider = new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser });
-    const listed = await provider.listResourceBackedViews();
-    const detail = await provider.readResourceBackedView(listed.items[0]!.viewId);
+    const listed = await provider.listResourceBackedViews({ workspaceId: "workspace-a" });
+    const detail = await provider.readResourceBackedView(listed.items[0]!.viewId, { workspaceId: "workspace-a" });
 
     assert.equal(detail?.viewKind, "document");
     assert.equal(detail?.diagnostics?.some((diagnostic) => diagnostic.code === "artifact-resource-backed-view-detail-list-fallback-limited"), true);
-    assert.equal(await provider.readResourceBackedView("missing"), undefined);
+    assert.equal(await provider.readResourceBackedView("missing", { workspaceId: "workspace-a" }), undefined);
     assert.equal(browser.readContentCalls, 0);
     assert.equal(browser.readDetailCalls, 0);
     assert.equal(browser.createAssetInstanceCalls, 0);
