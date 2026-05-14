@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { createWorkspaceId, type ActiveWorkspaceSelection, type WorkspaceId, type WorkspaceRecord, type WorkspaceSystemPackActivation } from "../../../../contracts/workspace";
+import { createWorkspaceId, isWorkspaceId, type ActiveWorkspaceSelection, type WorkspaceId, type WorkspaceRecord, type WorkspaceSystemPackActivation } from "../../../../contracts/workspace";
 import type { WorkspaceRepository, WorkspaceSelectionRepository, WorkspaceSystemPackActivationRepository } from "../../../ports/workspace";
 import { SYSTEM_FOUNDATION_PACK_ID, SYSTEM_FOUNDATION_PACK_VERSION } from "../../../services/asset-packs/system-packs/system-foundation-pack.constants";
-import { CreateWorkspaceUseCase, WORKSPACE_DISPLAY_NAME_MAX_LENGTH } from "..";
+import { CreateWorkspaceUseCase, WORKSPACE_DISPLAY_NAME_MAX_LENGTH, defaultGenerateWorkspaceId } from "..";
 
 const timestamp = "2026-05-14T12:00:00.000Z";
 const now = () => new Date(timestamp);
@@ -125,6 +125,21 @@ describe("CreateWorkspaceUseCase", () => {
     assert.equal(workspaceRepository.records.get(workspaceId)?.displayName, "My Image Tools");
   });
 
+
+  it("generates default workspace ids through the workspace id contract", async () => {
+    const generatedId = defaultGenerateWorkspaceId();
+    assert.equal(isWorkspaceId(generatedId), true);
+    assert.doesNotMatch(generatedId, /[\\/]|^[a-zA-Z]:|:\/\/|\s|\.\./);
+
+    const { useCase, workspaceRepository } = makeUseCase();
+    const result = await useCase.execute({ command: { displayName: "Default Generated Workspace" }, now });
+
+    assert.equal(result.status, "created");
+    assert.equal(isWorkspaceId(result.workspace?.workspaceId), true);
+    assert.notEqual(result.workspace?.workspaceId, result.workspace?.displayName);
+    assert.equal(workspaceRepository.records.has(result.workspace?.workspaceId as WorkspaceId), true);
+  });
+
   it("trims display names and descriptions", async () => {
     const { useCase } = makeUseCase();
     const result = await useCase.execute({ command: { displayName: "  Trimmed Workspace  ", description: "  A description  " }, now, generateWorkspaceId: () => workspaceId });
@@ -160,6 +175,12 @@ describe("CreateWorkspaceUseCase", () => {
     const unsafe = await makeUseCase().useCase.execute({ command: { displayName: "My Image Tools" }, now, generateWorkspaceId: () => "My Image Tools" as WorkspaceId });
     assert.equal(unsafe.status, "failed");
     assert.equal(unsafe.issues[0]?.code, "workspace-id-invalid");
+    assertSafeDiagnostics(unsafe);
+
+    const unsafePath = await makeUseCase().useCase.execute({ command: { displayName: "My Image Tools" }, now, generateWorkspaceId: () => "../private/SECRET_TOKEN" as WorkspaceId });
+    assert.equal(unsafePath.status, "failed");
+    assert.equal(unsafePath.issues[0]?.code, "workspace-id-invalid");
+    assertSafeDiagnostics(unsafePath);
 
     const safe = await makeUseCase().useCase.execute({ command: { displayName: "workspace.generated-01" }, now, generateWorkspaceId: () => otherWorkspaceId });
     assert.equal(safe.status, "created");
@@ -257,7 +278,13 @@ describe("CreateWorkspaceUseCase", () => {
     assert.equal(activationResult.status, "failed");
     assert.equal(activationResult.workspace?.workspaceId, workspaceId);
     assert.equal(activationFailure.workspaceRepository.records.has(workspaceId), true);
+    assert.equal(activationFailure.activationRepository.activations.length, 0);
+    assert.equal(activationFailure.selectionRepository.saveCalls, 0);
+    assert.equal(activationResult.activeSelection, undefined);
+    assert.deepEqual(activationResult.systemPackActivations, []);
     assert.equal(activationResult.issues.at(-1)?.code, "workspace-system-pack-activation-save-failed");
+    assert.equal(activationResult.diagnostics.some((diagnostic) => diagnostic.message.includes("Workspace exists") && diagnostic.message.includes("activation reference was not persisted")), true);
+    assert.notEqual(activationResult.issues.at(-1)?.code, workspaceResult.issues.at(-1)?.code);
     assertSafeDiagnostics(activationResult);
 
     const selectionFailure = makeUseCase();

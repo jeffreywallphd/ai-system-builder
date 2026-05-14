@@ -51,6 +51,42 @@ describe("createLocalWorkspaceRepository", () => {
     assert.equal(alphaFile.displayName, "Renamed Alpha");
   });
 
+
+  it("keeps save as create-or-replace and update as existing-record-only", async () => {
+    const rootDirectory = await makeTempRoot();
+    const repository = createLocalWorkspaceRepository({ rootDirectory });
+    const workspace = makeWorkspaceRecord();
+    const updated = { ...workspace, displayName: "Updated Workspace", updatedAt: "2026-05-14T02:00:00.000Z" };
+
+    await repository.saveWorkspace(workspace);
+    assert.deepEqual(await repository.readWorkspace(workspace.workspaceId), workspace);
+
+    await repository.saveWorkspace(updated);
+    assert.equal((await repository.readWorkspace(workspace.workspaceId))?.displayName, "Updated Workspace");
+
+    const updatedAgain = { ...updated, displayName: "Updated Through Update", updatedAt: "2026-05-14T03:00:00.000Z" };
+    await repository.updateWorkspace(updatedAgain);
+    assert.equal((await repository.readWorkspace(workspace.workspaceId))?.displayName, "Updated Through Update");
+    assert.equal((await repository.listWorkspaces()).length, 1);
+  });
+
+  it("does not create missing workspaces through update and reports sanitized missing-update errors", async () => {
+    const rootDirectory = await makeTempRoot();
+    const repository = createLocalWorkspaceRepository({ rootDirectory });
+    const missing = makeWorkspaceRecord({ displayName: "Missing Workspace" });
+
+    try {
+      await repository.updateWorkspace(missing);
+      assert.fail("Expected missing workspace update to fail.");
+    } catch (error) {
+      assert.equal((error as LocalWorkspacePersistenceError).code, "workspace-persistence-missing-record");
+      assertSanitizedErrorText(errorText(error), rootDirectory);
+    }
+
+    assert.equal(await repository.readWorkspace(missing.workspaceId), undefined);
+    assert.deepEqual(await repository.listWorkspaces(), []);
+  });
+
   it("isolates workspace records and does not use display names as filesystem paths", async () => {
     const rootDirectory = await makeTempRoot();
     const repository = createLocalWorkspaceRepository({ rootDirectory });

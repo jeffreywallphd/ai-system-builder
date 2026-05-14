@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import type { AssetPackId, AssetPackVersion } from "../../asset";
@@ -160,6 +162,28 @@ describe("workspace contracts", () => {
     }
   });
 
+
+  it("throws safe workspace id errors without echoing unsafe input", () => {
+    for (const invalid of [
+      "/tmp/workspace-secret",
+      "https://example.test/workspace?token=SECRET_TOKEN",
+      "ghp_1234567890abcdefSECRET",
+      "C:\\Users\\Alice\\workspace",
+      "workspace\u0000control\u0001heavy",
+    ]) {
+      try {
+        createWorkspaceId(invalid);
+        assert.fail(`Expected workspace id to be rejected: ${invalid}`);
+      } catch (error) {
+        const thrown = error as Error;
+        assert.match(thrown.message, /Workspace id must be/);
+        assert.doesNotMatch(thrown.message, /Received|\/tmp\/workspace-secret|example\.test|SECRET_TOKEN|ghp_|C:\\|Alice|workspace.*control/);
+        assert.equal(thrown.message.includes(invalid), false);
+        assert.equal(thrown.stack, undefined);
+      }
+    }
+  });
+
   it("defines only the intended status and lifecycle vocabulary", () => {
     assert.deepEqual(WORKSPACE_STATUSES, ["active", "archived", "deleting"]);
     assert.equal(isWorkspaceStatus("active"), true);
@@ -229,7 +253,27 @@ describe("workspace contracts", () => {
       "uri",
       "url",
     ]);
-    assertDoesNotIncludeAny(descriptor, ["/tmp", "c:\\", "file://"]);
+    assertDoesNotIncludeAny(descriptor, ["/tmp", "c:\\", "file://", "\\", "/"]);
+    assert.doesNotMatch(descriptor.storageId ?? "", /[\\/]|^[a-zA-Z]:|file:\/\//);
+    assert.doesNotMatch(descriptor.label ?? "", /[\\/]|^[a-zA-Z]:|file:\/\//);
+  });
+
+  it("does not export adapter-local workspace path helpers from contracts", () => {
+    const exportedSymbols = Object.keys(workspaceContracts);
+
+    for (const forbidden of [
+      "resolveWorkspaceIndexFile",
+      "resolveActiveWorkspaceSelectionFile",
+      "resolveWorkspaceRecordFile",
+      "resolveWorkspaceSystemPackActivationsFile",
+      "resolveWorkspaceDirectory",
+      "localWorkspacePersistencePaths",
+    ]) {
+      assert.equal(exportedSymbols.includes(forbidden), false, forbidden);
+    }
+
+    const contractIndex = readFileSync(join(process.cwd(), "modules/contracts/workspace/index.ts"), "utf8");
+    assert.doesNotMatch(contractIndex, /localWorkspacePersistencePaths|resolveWorkspace.*File|node:path/);
   });
 
   it("can represent system.foundation@1.0.0 as a workspace system pack activation by reference", () => {
