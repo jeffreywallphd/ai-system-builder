@@ -43,6 +43,10 @@ describe("workspace application ports", () => {
       updatedAt: "2026-05-14T00:00:00.000Z",
     };
     assert.equal(workspace.workspaceId, "workspace.port");
+
+    const source = read("modules/application/ports/workspace/workspace-repository.port.ts");
+    assert.match(source, /saveWorkspace is the create-or-replace\/upsert seam/);
+    assert.match(source, /updateWorkspace is[\s\S]*existing-record-only/);
   });
 
   it("exposes active selection as a persisted preference-only port", () => {
@@ -77,6 +81,10 @@ describe("workspace application ports", () => {
       "saveWorkspaceSystemPackActivation",
       "updateWorkspaceSystemPackActivation",
     ]);
+
+    const source = read("modules/application/ports/workspace/workspace-system-pack-activation-repository.port.ts");
+    assert.match(source, /saveWorkspaceSystemPackActivation is the create-or-replace\/upsert seam/);
+    assert.match(source, /updateWorkspaceSystemPackActivation is existing-activation-only/);
   });
 
   it("keeps workspace ports free of adapters, hosts, UI, API, IPC, preload, and runtime providers", () => {
@@ -88,5 +96,6 @@ describe("workspace application ports", () => {
     ].join("\n");
 
     assert.doesNotMatch(source, /from\s+["'][^"']*(?:adapters|hosts|apps|ui|api|ipc|preload|renderer|runtime\/.*adapter|provider-client|InstallSystemAssetPackService)[^"']*["']/i);
+    assert.doesNotMatch(source, /localWorkspacePersistencePaths|resolveWorkspace.*File|node:path/);
   });
 });

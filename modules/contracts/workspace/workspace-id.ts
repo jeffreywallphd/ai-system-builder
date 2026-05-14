@@ -10,9 +10,10 @@ const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
 const SHELL_METACHARACTER_PATTERN = /[;&|`$<>*?()[\]{}'"!#~]/;
 const URL_LIKE_PATTERN = /^[a-z][a-z0-9+.-]*:\/\//i;
 const DRIVE_QUALIFIED_PATTERN = /^[a-zA-Z]:/;
+const TOKEN_LIKE_PATTERN = /^(?:gh[pousr]_|github_pat_|sk-[a-zA-Z0-9]|xox[baprs]-|secret[_-]?|token[_-]?)/i;
 
-function invalidWorkspaceIdMessage(workspaceId: string): string {
-  return `Workspace id must be ${WORKSPACE_ID_FORMAT_DESCRIPTION}. Received "${workspaceId}".`;
+function invalidWorkspaceIdMessage(): string {
+  return `Workspace id must be ${WORKSPACE_ID_FORMAT_DESCRIPTION}.`;
 }
 
 function looksLikeUnsafePathUrlOrLocator(value: string): boolean {
@@ -23,6 +24,7 @@ function looksLikeUnsafePathUrlOrLocator(value: string): boolean {
     value.startsWith(".") ||
     URL_LIKE_PATTERN.test(value) ||
     DRIVE_QUALIFIED_PATTERN.test(value) ||
+    TOKEN_LIKE_PATTERN.test(value) ||
     CONTROL_CHARACTER_PATTERN.test(value) ||
     SHELL_METACHARACTER_PATTERN.test(value)
   );
@@ -48,7 +50,9 @@ export function createWorkspaceId(input: string): WorkspaceId {
   const normalized = input.trim();
 
   if (!isWorkspaceId(normalized)) {
-    throw new Error(invalidWorkspaceIdMessage(input));
+    const error = new Error(invalidWorkspaceIdMessage());
+    error.stack = undefined;
+    throw error;
   }
 
   return normalized as WorkspaceId;

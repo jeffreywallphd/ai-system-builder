@@ -9,7 +9,7 @@ export async function readJsonDocument<T>(filePath: string, fallback: T, readErr
     return cloneJson(JSON.parse(await readFile(filePath, "utf8")) as T);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return cloneJson(fallback);
+      return fallback === undefined ? fallback : cloneJson(fallback);
     }
 
     throw new LocalWorkspacePersistenceError(readErrorCode, { cause: error });

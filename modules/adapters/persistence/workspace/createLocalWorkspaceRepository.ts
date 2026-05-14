@@ -61,9 +61,14 @@ export function createLocalWorkspaceRepository(options: LocalWorkspaceRepository
 
     async updateWorkspace(workspace: WorkspaceRecord): Promise<void> {
       const validWorkspace = assertWorkspaceRecord(workspace);
-      await writeWorkspaceRecord(validWorkspace);
+      const existing = await this.readWorkspace(validWorkspace.workspaceId);
+      if (!existing) {
+        throw new LocalWorkspacePersistenceError("workspace-persistence-missing-record");
+      }
       const index = await readIndex();
-      await writeIndex(upsertWorkspace(index, validWorkspace));
+      const updatedIndex = replaceWorkspace(index, validWorkspace);
+      await writeWorkspaceRecord(validWorkspace);
+      await writeIndex(updatedIndex);
     },
 
     async archiveWorkspace(workspaceId: WorkspaceId, archivedAt: string): Promise<WorkspaceRecord | undefined> {
@@ -85,6 +90,16 @@ function upsertWorkspace(records: readonly WorkspaceRecord[], workspace: Workspa
     ...records.filter((record) => record.workspaceId !== workspace.workspaceId),
     cloneJson(workspace),
   ]);
+}
+
+function replaceWorkspace(records: readonly WorkspaceRecord[], workspace: WorkspaceRecord): WorkspaceRecord[] {
+  if (!records.some((record) => record.workspaceId === workspace.workspaceId)) {
+    throw new LocalWorkspacePersistenceError("workspace-persistence-missing-record");
+  }
+
+  return sortWorkspaces(records.map((record) => (
+    record.workspaceId === workspace.workspaceId ? cloneJson(workspace) : record
+  )));
 }
 
 function sortWorkspaces(records: readonly WorkspaceRecord[]): WorkspaceRecord[] {

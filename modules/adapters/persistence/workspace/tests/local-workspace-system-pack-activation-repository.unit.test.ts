@@ -70,6 +70,63 @@ describe("createLocalWorkspaceSystemPackActivationRepository", () => {
     assert.doesNotMatch(document, /manifest|definitions|assets|assetDefinitions|contents|bytes/i);
   });
 
+
+  it("keeps save as create-or-replace and update as existing-activation-only", async () => {
+    const rootDirectory = await makeTempRoot();
+    const repository = createLocalWorkspaceSystemPackActivationRepository({ rootDirectory });
+    const workspaceId = createWorkspaceId("workspace.alpha");
+    const activation = makeSystemFoundationActivation(workspaceId);
+    const replacement = { ...activation, status: "inactive" as const, diagnostics: [{ code: "replacement", severity: "info" as const, message: "Replaced by id." }] };
+
+    await repository.saveWorkspaceSystemPackActivation(activation);
+    await repository.saveWorkspaceSystemPackActivation(replacement);
+    assert.equal((await repository.listWorkspaceSystemPackActivations(workspaceId)).length, 1);
+    assert.equal((await repository.readWorkspaceSystemPackActivation(workspaceId, activation.activationId))?.status, "inactive");
+
+    const updated = { ...replacement, status: "failed" as const };
+    await repository.updateWorkspaceSystemPackActivation(updated);
+    assert.equal((await repository.readWorkspaceSystemPackActivation(workspaceId, activation.activationId))?.status, "failed");
+  });
+
+  it("does not create missing activations through update and reports sanitized missing-update errors", async () => {
+    const rootDirectory = await makeTempRoot();
+    const repository = createLocalWorkspaceSystemPackActivationRepository({ rootDirectory });
+    const workspaceId = createWorkspaceId("workspace.alpha");
+    const missing = makeSystemFoundationActivation(workspaceId, { activationId: "activation.missing" });
+
+    try {
+      await repository.updateWorkspaceSystemPackActivation(missing);
+      assert.fail("Expected missing activation update to fail.");
+    } catch (error) {
+      assert.equal((error as LocalWorkspacePersistenceError).code, "workspace-activation-persistence-missing-record");
+      assertSanitizedErrorText(`${(error as { code?: string }).code ?? ""} ${(error as Error).message}`, rootDirectory);
+    }
+
+    assert.equal(await repository.readWorkspaceSystemPackActivation(workspaceId, missing.activationId), undefined);
+    assert.deepEqual(await repository.listWorkspaceSystemPackActivations(workspaceId), []);
+  });
+
+  it("does not let one workspace update create or modify another workspace activation", async () => {
+    const rootDirectory = await makeTempRoot();
+    const repository = createLocalWorkspaceSystemPackActivationRepository({ rootDirectory });
+    const alphaId = createWorkspaceId("workspace.alpha");
+    const betaId = createWorkspaceId("workspace.beta");
+    const betaActivation = makeSystemFoundationActivation(betaId);
+
+    await repository.saveWorkspaceSystemPackActivation(betaActivation);
+
+    await assert.rejects(
+      repository.updateWorkspaceSystemPackActivation(makeSystemFoundationActivation(alphaId, {
+        activationId: betaActivation.activationId,
+        status: "failed",
+      })),
+      (error) => error instanceof LocalWorkspacePersistenceError && error.code === "workspace-activation-persistence-missing-record",
+    );
+
+    assert.equal(await repository.readWorkspaceSystemPackActivation(alphaId, betaActivation.activationId), undefined);
+    assert.equal((await repository.readWorkspaceSystemPackActivation(betaId, betaActivation.activationId))?.status, "active");
+  });
+
   it("round-trips inactive and failed activation statuses", async () => {
     const repository = createLocalWorkspaceSystemPackActivationRepository({ rootDirectory: await makeTempRoot() });
     const workspaceId = createWorkspaceId("workspace.alpha");

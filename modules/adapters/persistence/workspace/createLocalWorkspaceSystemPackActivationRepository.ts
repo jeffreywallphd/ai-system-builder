@@ -66,7 +66,7 @@ export function createLocalWorkspaceSystemPackActivationRepository(
     async updateWorkspaceSystemPackActivation(activation: WorkspaceSystemPackActivation): Promise<void> {
       const validActivation = assertActivation(activation, activation.workspaceId);
       const activations = await readWorkspaceActivations(validActivation.workspaceId);
-      await writeWorkspaceActivations(validActivation.workspaceId, upsertActivation(activations, validActivation));
+      await writeWorkspaceActivations(validActivation.workspaceId, replaceActivation(activations, validActivation));
     },
   };
 }
@@ -79,6 +79,19 @@ function upsertActivation(
     ...activations.filter((candidate) => candidate.activationId !== activation.activationId),
     cloneJson(activation),
   ]);
+}
+
+function replaceActivation(
+  activations: readonly WorkspaceSystemPackActivation[],
+  activation: WorkspaceSystemPackActivation,
+): WorkspaceSystemPackActivation[] {
+  if (!activations.some((candidate) => candidate.activationId === activation.activationId)) {
+    throw new LocalWorkspacePersistenceError("workspace-activation-persistence-missing-record");
+  }
+
+  return sortActivations(activations.map((candidate) => (
+    candidate.activationId === activation.activationId ? cloneJson(activation) : candidate
+  )));
 }
 
 function sortActivations(activations: readonly WorkspaceSystemPackActivation[]): WorkspaceSystemPackActivation[] {

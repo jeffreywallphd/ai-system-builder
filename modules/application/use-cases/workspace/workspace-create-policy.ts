@@ -1,4 +1,4 @@
-import type { WorkspaceId } from "../../../contracts/workspace";
+import { createWorkspaceId, type WorkspaceId } from "../../../contracts/workspace";
 
 export const WORKSPACE_DISPLAY_NAME_MAX_LENGTH = 120;
 
@@ -45,7 +45,7 @@ export function defaultGenerateWorkspaceId(): WorkspaceId {
     ? randomUUID().replaceAll("-", "")
     : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 14)}`;
 
-  return `workspace.${randomValue}` as WorkspaceId;
+  return createWorkspaceId(`workspace.${randomValue}`);
 }
 
 export function buildSystemFoundationActivationId(workspaceId: WorkspaceId): string {
