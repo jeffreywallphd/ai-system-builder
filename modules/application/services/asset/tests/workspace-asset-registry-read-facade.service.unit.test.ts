@@ -39,6 +39,7 @@ class FakeReadPort implements AssetRegistryDefinitionReadPort {
         description: "A system foundation button.",
         lifecycleStatus: "stable",
         provenance: { sourceKind: "system-generated" },
+        metadata: { sourcePackId: SYSTEM_FOUNDATION_PACK_ID, sourcePackVersion: SYSTEM_FOUNDATION_PACK_VERSION, sourceKind: "system", sourceLayer: "system-default", trustStatus: "system-trusted", systemDefault: true },
       },
     } as AssetDefinitionDetail;
   }
@@ -129,6 +130,16 @@ test("detail reads enforce effective view membership and cannot bypass missing a
   activations.activations.set(workspaceA, [activation(workspaceA, "active")]);
   const detail = await facade.readDefinitionDetail(foundationRef, { workspaceId: workspaceA });
   assert.equal(detail?.definition.displayName, "Foundation Button");
+});
+
+
+test("detail membership is deterministic for effective assets beyond arbitrary list pages", async () => {
+  const { facade, activations, readPort } = setup();
+  activations.activations.set(workspaceA, [activation(workspaceA, "active")]);
+  readPort.cards = Array.from({ length: 300 }, (_, index) => ({ ...customCard(), definitionId: `custom.global.${index}`, displayName: `Custom ${index}` }));
+  const detail = await facade.readDefinitionDetail(foundationRef, { workspaceId: workspaceA });
+  assert.equal(detail?.definition.displayName, "Foundation Button");
+  assert.equal(readPort.listCalls.some((query) => query.limit === 250), false);
 });
 
 test("resource-backed descriptors are deferred and do not leak global records", async () => {

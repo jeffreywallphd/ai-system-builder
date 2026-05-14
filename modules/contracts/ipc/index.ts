@@ -32,3 +32,5 @@ export * from "./desktop-model-management-contract";
 export * from "./desktop-image-generation-contract";
 
 export * from "./desktop-comfyui-runtime-contract";
+
+export * from "./desktop-workspace-contract";

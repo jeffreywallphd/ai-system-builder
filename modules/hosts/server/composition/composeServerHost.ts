@@ -984,6 +984,11 @@ export function composeServerHost(
         restartServer: options.restartServer,
         runtimeReadiness,
         assetRegistryRead: internalAssetRegistry.workspaceReadFacade,
+        workspaceServices: {
+          workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
+          workspaceSelectionRepository: internalAssetRegistry.workspaceRepositories.workspaceSelectionRepository,
+          createWorkspaceUseCase: internalAssetRegistry.workspaceUseCases.createWorkspace,
+        },
         assetMutationUseCases,
       });
     },

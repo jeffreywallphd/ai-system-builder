@@ -169,8 +169,8 @@ describe("composeServerHost", () => {
       runtimeRootDirectory,
     });
 
-    expect(app.post).toHaveBeenCalledTimes(37);
-    expect(app.get).toHaveBeenCalledTimes(10);
+    expect(app.post).toHaveBeenCalledTimes(40);
+    expect(app.get).toHaveBeenCalledTimes(12);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
       "/api/artifact/upload",
@@ -205,6 +205,9 @@ describe("composeServerHost", () => {
       "/api/application-settings/read",
       "/api/application-settings/update",
       "/api/application-settings/clear",
+      "/api/workspaces",
+      "/api/workspaces/active-selection",
+      "/api/workspaces/active-selection/clear",
       "/api/assets/register-resource-backed-view",
       "/api/assets/finalize-generated-output",
       "/api/assets/import-external-repository-object",
@@ -246,6 +249,8 @@ describe("composeServerHost", () => {
       "/api/artifact/upload/policy",
       "/api/artifact/media/view",
       "/api/config/huggingface-token",
+      "/api/workspaces",
+      "/api/workspaces/active-selection",
       "/api/assets/definitions",
       "/api/assets/resource-backed-views",
       "/api/assets/resource-backed-views/:viewId",
@@ -494,7 +499,7 @@ describe("server ComfyUI python/runtime resolution", () => {
       .find((event) => event.event === "runtime.comfyui.server.configuration");
     expect(comfyLog?.data).toMatchObject({
       pythonEnvironmentMode: "managed-venv",
-      basePythonCommand: "python",
+      basePythonCommand: "python3",
       launchPythonExecutableSource: "managed-venv",
       skipPythonSetup: false,
       skipPythonValidation: false,

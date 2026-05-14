@@ -1,136 +1,167 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
-export type WorkspaceUiStatus = "active" | "archived";
+import {
+  type ActiveWorkspaceSelection,
+  type WorkspaceRecord,
+} from "../../../../../../modules/contracts/workspace";
+import { parseApiEnvelope } from "../../../security/apiErrorEnvelope";
+import { secureFetch } from "../../../security/secureFetch";
+
+export type WorkspaceUiStatus = "active" | "archived" | "deleting";
 
 export interface WorkspaceUiRecord {
-  id: string;
-  displayName: string;
-  status: WorkspaceUiStatus;
-  includeSystemFoundationAssets?: boolean;
-  createdAt: string;
+  readonly id: string;
+  readonly displayName: string;
+  readonly status: WorkspaceUiStatus;
+  readonly includeSystemFoundationAssets?: boolean;
+  readonly createdAt: string;
 }
 
 export interface CreateWorkspaceInput {
-  name: string;
-  includeSystemFoundationAssets: boolean;
+  readonly name: string;
+  readonly includeSystemFoundationAssets: boolean;
+}
+
+export interface WorkspaceClient {
+  readonly listWorkspaces: () => Promise<readonly WorkspaceUiRecord[]>;
+  readonly createWorkspace: (input: CreateWorkspaceInput) => Promise<WorkspaceUiRecord>;
+  readonly readActiveWorkspaceSelection: () => Promise<ActiveWorkspaceSelection>;
+  readonly saveActiveWorkspaceSelection: (workspaceId: string) => Promise<void>;
+  readonly clearActiveWorkspaceSelection: () => Promise<void>;
 }
 
 export interface ActiveWorkspaceContextValue {
-  workspaces: readonly WorkspaceUiRecord[];
-  activeWorkspace?: WorkspaceUiRecord;
-  activeWorkspaceId?: string;
-  loading: boolean;
-  error?: string;
-  selectWorkspace: (workspaceId: string) => void;
-  clearActiveWorkspace: () => void;
-  createWorkspace: (input: CreateWorkspaceInput) => WorkspaceUiRecord;
-}
-
-export const THIN_CLIENT_WORKSPACE_STORAGE_KEY = "ai-system-builder.thin-client.workspaces";
-export const THIN_CLIENT_ACTIVE_WORKSPACE_STORAGE_KEY = "ai-system-builder.thin-client.activeWorkspaceId";
-
-function safeReadJson<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  const value = window.localStorage.getItem(key);
-  if (!value) return fallback;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function safeWriteJson<T>(key: string, value: T): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(key, JSON.stringify(value));
-}
-
-function createWorkspaceId(name: string, existing: readonly WorkspaceUiRecord[]): string {
-  const base = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40) || "workspace";
-  let candidate = base;
-  let suffix = 2;
-  const ids = new Set(existing.map((workspace) => workspace.id));
-  while (ids.has(candidate)) {
-    candidate = `${base}-${suffix}`;
-    suffix += 1;
-  }
-  return candidate;
+  readonly workspaces: readonly WorkspaceUiRecord[];
+  readonly activeWorkspace?: WorkspaceUiRecord;
+  readonly activeWorkspaceId?: string;
+  readonly loading: boolean;
+  readonly error?: string;
+  readonly selectWorkspace: (workspaceId: string) => Promise<void>;
+  readonly clearActiveWorkspace: () => Promise<void>;
+  readonly createWorkspace: (input: CreateWorkspaceInput) => Promise<WorkspaceUiRecord>;
+  readonly refreshWorkspaces: () => Promise<void>;
 }
 
 const ActiveWorkspaceContext = createContext<ActiveWorkspaceContextValue | undefined>(undefined);
 
-export function ActiveWorkspaceProvider({ children }: { children: ReactNode }) {
-  const [workspaces, setWorkspaces] = useState<WorkspaceUiRecord[]>(() => safeReadJson<WorkspaceUiRecord[]>(THIN_CLIENT_WORKSPACE_STORAGE_KEY, []));
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | undefined>(() => (typeof window === "undefined" ? undefined : window.localStorage.getItem(THIN_CLIENT_ACTIVE_WORKSPACE_STORAGE_KEY) ?? undefined));
-  const [error, setError] = useState<string | undefined>(undefined);
+export function ActiveWorkspaceProvider({
+  children,
+  client = createApiWorkspaceClient(),
+}: {
+  readonly children: ReactNode;
+  readonly client?: WorkspaceClient;
+}) {
+  const [workspaces, setWorkspaces] = useState<WorkspaceUiRecord[]>([]);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | undefined>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | undefined>();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [records, selection] = await Promise.all([
+        client.listWorkspaces(),
+        client.readActiveWorkspaceSelection(),
+      ]);
+      setWorkspaces([...records]);
+      setActiveWorkspaceId(selection.workspaceId);
+      setError(undefined);
+    } catch {
+      setError("Workspaces are unavailable. Try again later.");
+    } finally {
+      setLoading(false);
+    }
+  }, [client]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const activeWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === activeWorkspaceId && workspace.status === "active"),
     [activeWorkspaceId, workspaces],
   );
 
-  const persistWorkspaces = useCallback((nextWorkspaces: WorkspaceUiRecord[]) => {
-    setWorkspaces(nextWorkspaces);
-    safeWriteJson(THIN_CLIENT_WORKSPACE_STORAGE_KEY, nextWorkspaces);
-  }, []);
-
-  const selectWorkspace = useCallback((workspaceId: string) => {
+  const selectWorkspace = useCallback(async (workspaceId: string) => {
     const workspace = workspaces.find((candidate) => candidate.id === workspaceId);
-    if (!workspace) {
+    if (!workspace || workspace.status !== "active") {
       setError("That workspace is not available. Select another workspace or create a new one.");
       return;
     }
-    if (workspace.status === "archived") {
-      setError("That workspace is archived. Select another workspace or create a new one.");
-      return;
+
+    try {
+      await client.saveActiveWorkspaceSelection(workspace.id);
+      setActiveWorkspaceId(workspace.id);
+      setError(undefined);
+    } catch {
+      setError("Workspace selection could not be saved.");
     }
-    setError(undefined);
-    setActiveWorkspaceId(workspace.id);
-    if (typeof window !== "undefined") window.localStorage.setItem(THIN_CLIENT_ACTIVE_WORKSPACE_STORAGE_KEY, workspace.id);
-  }, [workspaces]);
+  }, [client, workspaces]);
 
-  const clearActiveWorkspace = useCallback(() => {
-    setError(undefined);
-    setActiveWorkspaceId(undefined);
-    if (typeof window !== "undefined") window.localStorage.removeItem(THIN_CLIENT_ACTIVE_WORKSPACE_STORAGE_KEY);
-  }, []);
+  const clearActiveWorkspace = useCallback(async () => {
+    try {
+      await client.clearActiveWorkspaceSelection();
+      setActiveWorkspaceId(undefined);
+      setError(undefined);
+    } catch {
+      setError("Workspace selection could not be cleared.");
+    }
+  }, [client]);
 
-  const createWorkspace = useCallback((input: CreateWorkspaceInput) => {
+  const createWorkspace = useCallback(async (input: CreateWorkspaceInput) => {
     const displayName = input.name.trim();
     if (!displayName) {
       setError("Enter a workspace name.");
       throw new Error("Enter a workspace name.");
     }
-    const workspace: WorkspaceUiRecord = {
-      id: createWorkspaceId(displayName, workspaces),
-      displayName,
-      status: "active",
-      includeSystemFoundationAssets: input.includeSystemFoundationAssets,
-      createdAt: new Date().toISOString(),
-    };
-    const nextWorkspaces = [...workspaces, workspace];
-    persistWorkspaces(nextWorkspaces);
-    setActiveWorkspaceId(workspace.id);
-    if (typeof window !== "undefined") window.localStorage.setItem(THIN_CLIENT_ACTIVE_WORKSPACE_STORAGE_KEY, workspace.id);
-    setError(undefined);
-    return workspace;
-  }, [persistWorkspaces, workspaces]);
+
+    try {
+      const workspace = await client.createWorkspace({
+        name: displayName,
+        includeSystemFoundationAssets: input.includeSystemFoundationAssets,
+      });
+      const records = await client.listWorkspaces();
+      setWorkspaces([...records]);
+      setActiveWorkspaceId(workspace.id);
+      setError(undefined);
+      return workspace;
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "Workspace could not be created.");
+      throw err;
+    }
+  }, [client]);
 
   const value = useMemo<ActiveWorkspaceContextValue>(() => ({
     workspaces,
     activeWorkspace,
     activeWorkspaceId,
-    loading: false,
-    error: error ?? (activeWorkspaceId && !activeWorkspace ? "The selected workspace is unavailable. Select another workspace or create a new one." : undefined),
+    loading,
+    error: error ?? (activeWorkspaceId && !activeWorkspace
+      ? "The selected workspace is unavailable. Select another workspace or create a new one."
+      : undefined),
     selectWorkspace,
     clearActiveWorkspace,
     createWorkspace,
-  }), [activeWorkspace, activeWorkspaceId, clearActiveWorkspace, createWorkspace, error, selectWorkspace, workspaces]);
+    refreshWorkspaces: load,
+  }), [
+    activeWorkspace,
+    activeWorkspaceId,
+    clearActiveWorkspace,
+    createWorkspace,
+    error,
+    load,
+    loading,
+    selectWorkspace,
+    workspaces,
+  ]);
 
   return <ActiveWorkspaceContext.Provider value={value}>{children}</ActiveWorkspaceContext.Provider>;
 }
@@ -141,4 +172,108 @@ export function useActiveWorkspace(): ActiveWorkspaceContextValue {
     throw new Error("useActiveWorkspace must be used inside ActiveWorkspaceProvider.");
   }
   return context;
+}
+
+export function mapWorkspaceRecord(record: WorkspaceRecord): WorkspaceUiRecord {
+  return {
+    id: record.workspaceId,
+    displayName: record.displayName,
+    status: record.status,
+    includeSystemFoundationAssets: record.settings?.defaultIncludeSystemFoundationAssets,
+    createdAt: record.createdAt,
+  };
+}
+
+function createApiWorkspaceClient(): WorkspaceClient {
+  return {
+    async listWorkspaces() {
+      const envelope = await get("/api/workspaces");
+      if (!isOkEnvelope(envelope) || !isWorkspaceListValue(envelope.value)) {
+        throw new Error("Workspaces are unavailable.");
+      }
+      return envelope.value.workspaces.map(mapWorkspaceRecord);
+    },
+
+    async createWorkspace(input) {
+      const envelope = await post("/api/workspaces", {
+        command: {
+          displayName: input.name,
+          includeSystemFoundationAssets: input.includeSystemFoundationAssets,
+        },
+        selectAfterCreate: true,
+      });
+      if (!isOkEnvelope(envelope) || !isWorkspaceCreateValue(envelope.value)) {
+        throw new Error(errorMessage(envelope, "Workspace could not be created."));
+      }
+      return mapWorkspaceRecord(envelope.value.workspace);
+    },
+
+    async readActiveWorkspaceSelection() {
+      const envelope = await get("/api/workspaces/active-selection");
+      return isOkEnvelope(envelope) && isActiveWorkspaceSelection(envelope.value)
+        ? envelope.value
+        : {};
+    },
+
+    async saveActiveWorkspaceSelection(workspaceId) {
+      const envelope = await post("/api/workspaces/active-selection", {
+        selection: {
+          workspaceId: workspaceId as ActiveWorkspaceSelection["workspaceId"],
+          selectedAt: new Date().toISOString(),
+        },
+      });
+      if (!isOkEnvelope(envelope)) {
+        throw new Error(errorMessage(envelope, "Workspace selection could not be saved."));
+      }
+    },
+
+    async clearActiveWorkspaceSelection() {
+      const envelope = await post("/api/workspaces/active-selection/clear", {});
+      if (!isOkEnvelope(envelope)) {
+        throw new Error(errorMessage(envelope, "Workspace selection could not be cleared."));
+      }
+    },
+  };
+}
+
+async function get(endpoint: string): Promise<unknown> {
+  const response = await secureFetch(endpoint, { method: "GET" });
+  return parseApiEnvelope(await response.json());
+}
+
+async function post(endpoint: string, body: unknown): Promise<unknown> {
+  const response = await secureFetch(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return parseApiEnvelope(await response.json());
+}
+
+function isOkEnvelope(value: unknown): value is { readonly ok: true; readonly value: unknown } {
+  return typeof value === "object" && value !== null && (value as { readonly ok?: unknown }).ok === true;
+}
+
+function isWorkspaceListValue(value: unknown): value is { readonly workspaces: readonly WorkspaceRecord[] } {
+  return typeof value === "object"
+    && value !== null
+    && Array.isArray((value as { readonly workspaces?: unknown }).workspaces);
+}
+
+function isWorkspaceCreateValue(value: unknown): value is { readonly workspace: WorkspaceRecord } {
+  return typeof value === "object"
+    && value !== null
+    && typeof (value as { readonly workspace?: { readonly workspaceId?: unknown } }).workspace?.workspaceId === "string";
+}
+
+function isActiveWorkspaceSelection(value: unknown): value is ActiveWorkspaceSelection {
+  if (typeof value !== "object" || value === null) return false;
+  const workspaceId = (value as { readonly workspaceId?: unknown }).workspaceId;
+  return workspaceId === undefined || typeof workspaceId === "string";
+}
+
+function errorMessage(value: unknown, fallback: string): string {
+  if (typeof value !== "object" || value === null || !("error" in value)) return fallback;
+  const message = (value as { readonly error?: { readonly message?: unknown } }).error?.message;
+  return typeof message === "string" && message.trim().length > 0 ? message : fallback;
 }

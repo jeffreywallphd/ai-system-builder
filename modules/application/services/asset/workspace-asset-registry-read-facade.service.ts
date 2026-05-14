@@ -76,25 +76,20 @@ export class WorkspaceAssetRegistryReadFacade implements AssetRegistryDefinition
     const context = await this.resolveWorkspaceContext(options.workspaceId);
     if (!context.ok) throw new WorkspaceAssetRegistryReadFacadeError(context.diagnostic.code as WorkspaceAssetRegistryReadFailureCode, context.diagnostic.message);
 
-    const effective = await this.listDefinitionCards({
-      workspaceId: context.workspaceId,
-      includeBuiltIns: true,
-      includeCustom: true,
-      limit: 250,
-    });
-    const requestedId = String(ref.id);
-    const requestedVersion = ref.version ? String(ref.version) : undefined;
-    const visible = effective.items.some((card) => (
-      card.definitionId === requestedId && (!requestedVersion || card.version === requestedVersion)
-    ));
-    if (!visible) {
+    const activations = await this.readActiveSystemPacks(context.workspaceId);
+    if (!activations.ok) throw new WorkspaceAssetRegistryReadFacadeError(activations.diagnostic.code as WorkspaceAssetRegistryReadFailureCode, activations.diagnostic.message);
+
+    const detail = await this.dependencies.assetRegistryRead.readDefinitionDetail(ref, { ...options, includeMetadata: true });
+    if (!detail) return undefined;
+
+    if (!isDetailInWorkspaceEffectiveView(detail, activations.activeSystemPacks)) {
       throw new WorkspaceAssetRegistryReadFacadeError(
         "workspace-asset-not-in-effective-view",
         "Asset definition is not in the workspace effective asset view.",
       );
     }
 
-    return this.dependencies.assetRegistryRead.readDefinitionDetail(ref, options);
+    return detail;
   }
 
   public async listResourceBackedViewCards(query: AssetRegistryListQuery = {}): Promise<AssetRegistryListResult<AssetRegistryResourceBackedViewCard>> {
@@ -163,6 +158,25 @@ function isInWorkspaceEffectiveView(card: AssetDefinitionCard, activeSystemPacks
     card.sourceLayer === "system-default" &&
     card.trustStatus === "system-trusted" &&
     card.systemDefault === true
+  ));
+}
+
+function isDetailInWorkspaceEffectiveView(detail: AssetDefinitionDetail, activeSystemPacks: readonly ActiveSystemPackKey[]): boolean {
+  const metadata = (detail.definition.metadata ?? {}) as Record<string, unknown>;
+  const installMetadata = (typeof metadata.assetPackInstall === "object" && metadata.assetPackInstall !== null ? metadata.assetPackInstall : {}) as Record<string, unknown>;
+  const sourcePackId = typeof metadata.sourcePackId === "string" ? metadata.sourcePackId : installMetadata.packId;
+  const sourcePackVersion = typeof metadata.sourcePackVersion === "string" ? metadata.sourcePackVersion : installMetadata.packVersion;
+  const sourceKind = metadata.sourceKind ?? installMetadata.sourceKind;
+  const sourceLayer = metadata.sourceLayer ?? installMetadata.sourceLayer;
+  const trustStatus = metadata.trustStatus ?? installMetadata.trustStatus;
+  const hasTrustedInstallMarker = typeof installMetadata.entryId === "string" && typeof installMetadata.fingerprint === "string" && installMetadata.managedBy === "asset-kernel";
+  return activeSystemPacks.some((pack) => (
+    sourcePackId === pack.packId &&
+    sourcePackVersion === pack.packVersion &&
+    sourceKind === "system" &&
+    sourceLayer === "system-default" &&
+    trustStatus === "system-trusted" &&
+    (hasTrustedInstallMarker || metadata.systemDefault === true || detail.builtIn === true)
   ));
 }
 

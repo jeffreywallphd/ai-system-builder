@@ -32,6 +32,7 @@ import { registerComfyUiRuntimeIpc } from "./comfyui-runtime/registerComfyUiRunt
 import { registerRuntimeReadinessIpc, type RegisterRuntimeReadinessIpcDependencies } from "./runtime-readiness/registerRuntimeReadinessIpc";
 import { registerAssetRegistryIpc, type RegisterAssetRegistryIpcDependencies } from "./asset-registry/registerAssetRegistryIpc";
 import { registerAssetMutationIpc, type RegisterAssetMutationIpcDependencies } from "./asset-registry/registerAssetMutationIpc";
+import { registerWorkspaceIpc, type RegisterWorkspaceIpcDependencies } from "./workspace/registerWorkspaceIpc";
 import type { RuntimeInstallerPort } from "../../../application/ports/runtime-installer/runtime-installer.port";
 
 export interface RegisterElectronIpcDependencies {
@@ -40,6 +41,7 @@ export interface RegisterElectronIpcDependencies {
   runtimeReadiness: RegisterRuntimeReadinessIpcDependencies["runtimeReadiness"];
   assetRegistryRead?: RegisterAssetRegistryIpcDependencies["assetRegistryRead"];
   assetMutationUseCases?: Omit<RegisterAssetMutationIpcDependencies, "ipcMain">;
+  workspaceServices?: Omit<RegisterWorkspaceIpcDependencies, "ipcMain">;
   getHuggingFaceTokenStatus: RegisterArtifactBrowserIpcDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["clearHuggingFaceToken"];
@@ -95,6 +97,10 @@ export function registerElectronIpc(
     ipcMain: dependencies.ipcMain,
     storeArtifactUploadUseCase: dependencies.storeArtifactUploadUseCase,
   });
+
+  if (dependencies.workspaceServices) {
+    registerWorkspaceIpc({ ipcMain: dependencies.ipcMain, ...dependencies.workspaceServices });
+  }
 
   if (dependencies.assetRegistryRead) {
     registerAssetRegistryIpc({

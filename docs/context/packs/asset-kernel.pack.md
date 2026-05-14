@@ -213,7 +213,9 @@ Workspace system pack activation read/list/status use cases now live in the appl
 
 - Asset Registry reads for the Asset Library are workspace-aware: list/detail/resource-backed read requests require explicit workspace context and must not fall back to global assets.
 - The Phase 6 effective view includes activated system-pack definitions only when strict system-default provenance matches the workspace active pack reference; `system.foundation@1.0.0` appears only for workspaces where that pack is active.
-- Detail reads must verify that the requested definition is in the workspace effective view before returning detail data.
+- Detail reads must verify effective-view membership deterministically from the requested definition detail/source metadata and active workspace system-pack records, not from arbitrary page-size-limited list results.
+- Workspace UI gates and Asset Library requests use backend-resolvable workspace ids from persisted workspace records/active selection created through the workspace use case; renderer localStorage is not the authoritative workspace store and display names must not generate workspace ids.
+- The workspace creation checkbox for System Foundation creates a reference-only `system.foundation@1.0.0` activation record for that workspace.
 - Resource-backed descriptors remain deferred for workspace pages until artifact/data/model/image persistence scoping lands in Prompts 8-9.
 - Do not add pack install/import/export UI, public activation management, override editing, user asset authoring, user-library reuse, or cross-workspace copy/link behavior in this phase.
 

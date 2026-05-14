@@ -38,6 +38,16 @@ import {
   createDesktopPrepareTrainingDatasetTaskReadSuccessResponse,
   DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_CREATE_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_READ_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_SAVE_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_CLEAR_REQUEST_CHANNEL,
+  createDesktopWorkspaceListSuccessResponse,
+  createDesktopWorkspaceCreateSuccessResponse,
+  createDesktopWorkspaceSelectionReadSuccessResponse,
+  createDesktopWorkspaceSelectionSaveSuccessResponse,
+  createDesktopWorkspaceSelectionClearSuccessResponse,
   DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL,
@@ -124,6 +134,42 @@ describe("desktop preload exposedApi bridge", () => {
         boundary: { host: "desktop", source: "desktop.renderer.runtime-readiness" },
       },
     });
+  });
+
+
+  it("maps workspace list/create/selection bridge calls to minimal workspace IPC channels", async () => {
+    const workspace = {
+      workspaceId: "workspace.generated-preload",
+      displayName: "Preload Workspace",
+      status: "active",
+      createdAt: "2026-05-14T00:00:00.000Z",
+      updatedAt: "2026-05-14T00:00:00.000Z",
+    } as const;
+    const responses = [
+      createDesktopWorkspaceListSuccessResponse({ workspaces: [workspace] }),
+      createDesktopWorkspaceCreateSuccessResponse({ workspace, activeSelection: { workspaceId: workspace.workspaceId } as never }),
+      createDesktopWorkspaceSelectionReadSuccessResponse({ workspaceId: workspace.workspaceId } as never),
+      createDesktopWorkspaceSelectionSaveSuccessResponse({ workspaceId: workspace.workspaceId } as never),
+      createDesktopWorkspaceSelectionClearSuccessResponse({}),
+    ];
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => responses.shift());
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+    await api.listWorkspaces({ requestId: "workspace-list" });
+    await api.createWorkspace({ command: { displayName: "Preload Workspace", includeSystemFoundationAssets: true }, selectAfterCreate: true });
+    await api.readActiveWorkspaceSelection();
+    await api.saveActiveWorkspaceSelection({ workspaceId: workspace.workspaceId } as never);
+    await api.clearActiveWorkspaceSelection();
+
+    expect(invoke.mock.calls.map((call) => call[0])).toEqual([
+      DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_CREATE_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_SELECTION_READ_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_SELECTION_SAVE_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_SELECTION_CLEAR_REQUEST_CHANNEL.value,
+    ]);
+    expect(JSON.stringify(invoke.mock.calls)).not.toContain("installer");
+    expect(JSON.stringify(invoke.mock.calls)).not.toContain("import-pack");
   });
 
   it("maps asset definition list reads to the read-only asset registry request channel", async () => {

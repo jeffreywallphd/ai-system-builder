@@ -1220,6 +1220,11 @@ export function composeDesktopHost(
         },
         runtimeReadiness,
         assetRegistryRead: internalAssetRegistry.workspaceReadFacade,
+        workspaceServices: {
+          workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
+          workspaceSelectionRepository: internalAssetRegistry.workspaceRepositories.workspaceSelectionRepository,
+          createWorkspaceUseCase: internalAssetRegistry.workspaceUseCases.createWorkspace,
+        },
         assetMutationUseCases,
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
         setHuggingFaceToken: (token) => tokenConfigStore.setToken(token),

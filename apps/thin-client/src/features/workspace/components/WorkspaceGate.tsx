@@ -53,17 +53,18 @@ export function WorkspaceGate({ pageLabel, children }: WorkspaceGateProps) {
       ) : null}
       <form className="ui-stack ui-stack--sm" onSubmit={(event) => {
         event.preventDefault();
-        try {
-          workspace.createWorkspace({ name: workspaceName, includeSystemFoundationAssets: includeFoundation });
-          setWorkspaceName("");
-        } catch {
-          // The context exposes a safe user-facing error.
-        }
+        const form = event.currentTarget;
+        const formWorkspaceName = new FormData(form).get("workspaceName");
+        void workspace.createWorkspace({ name: typeof formWorkspaceName === "string" ? formWorkspaceName : workspaceName, includeSystemFoundationAssets: includeFoundation })
+          .then(() => setWorkspaceName(""))
+          .catch(() => {
+            // The context exposes a safe user-facing error.
+          });
       }}>
         <h3>Create workspace</h3>
         <label className="ui-field">
           <span>Workspace name</span>
-          <input value={workspaceName} onChange={(event) => setWorkspaceName(event.currentTarget.value)} placeholder="My Project" />
+          <input name="workspaceName" value={workspaceName} onChange={(event) => setWorkspaceName(event.currentTarget.value)} placeholder="My Project" />
         </label>
         <label className="ui-checkbox">
           <input type="checkbox" checked={includeFoundation} onChange={(event) => setIncludeFoundation(event.currentTarget.checked)} />
