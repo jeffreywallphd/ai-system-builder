@@ -24,7 +24,7 @@ const SAFE_MESSAGES: Record<LocalWorkspacePersistenceErrorCode, string> = {
 export class LocalWorkspacePersistenceError extends Error {
   public readonly code: LocalWorkspacePersistenceErrorCode;
 
-  public constructor(code: LocalWorkspacePersistenceErrorCode, _options?: ErrorOptions) {
+  public constructor(code: LocalWorkspacePersistenceErrorCode, _options?: unknown) {
     super(SAFE_MESSAGES[code]);
     this.name = "LocalWorkspacePersistenceError";
     this.code = code;

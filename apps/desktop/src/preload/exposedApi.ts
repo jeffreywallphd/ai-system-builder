@@ -136,6 +136,32 @@ import {
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_OPERATION,
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_RESPONSE_CHANNEL,
+
+  DESKTOP_WORKSPACE_LIST_OPERATION,
+  DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_LIST_RESPONSE_CHANNEL,
+  DESKTOP_WORKSPACE_CREATE_OPERATION,
+  DESKTOP_WORKSPACE_CREATE_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_CREATE_RESPONSE_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_READ_OPERATION,
+  DESKTOP_WORKSPACE_SELECTION_READ_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_READ_RESPONSE_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_SAVE_OPERATION,
+  DESKTOP_WORKSPACE_SELECTION_SAVE_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_SAVE_RESPONSE_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_CLEAR_OPERATION,
+  DESKTOP_WORKSPACE_SELECTION_CLEAR_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_CLEAR_RESPONSE_CHANNEL,
+  createDesktopWorkspaceListRequest,
+  createDesktopWorkspaceCreateRequest,
+  createDesktopWorkspaceSelectionReadRequest,
+  createDesktopWorkspaceSelectionSaveRequest,
+  createDesktopWorkspaceSelectionClearRequest,
+  type DesktopWorkspaceListResponse,
+  type DesktopWorkspaceCreateResponse,
+  type DesktopWorkspaceSelectionReadResponse,
+  type DesktopWorkspaceSelectionSaveResponse,
+  type DesktopWorkspaceSelectionClearResponse,
   DESKTOP_ASSET_DEFINITIONS_LIST_OPERATION,
   DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITIONS_LIST_RESPONSE_CHANNEL,
@@ -316,6 +342,7 @@ import {
   DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL,
   DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL,
 } from "../../../../modules/contracts/ipc";
+import type { ActiveWorkspaceSelection, CreateWorkspaceCommand } from "../../../../modules/contracts/workspace";
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
 import type { RuntimeCapabilityId } from "../../../../modules/contracts/runtime";
 import type {
@@ -422,6 +449,12 @@ export interface DesktopPreloadApi {
     input: { capabilityId: RuntimeCapabilityId },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopRuntimeCapabilityStatusReadResponse>;
+
+  listWorkspaces: (context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceListResponse>;
+  createWorkspace: (input: { command: CreateWorkspaceCommand; selectAfterCreate?: boolean }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceCreateResponse>;
+  readActiveWorkspaceSelection: (context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceSelectionReadResponse>;
+  saveActiveWorkspaceSelection: (selection: ActiveWorkspaceSelection, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceSelectionSaveResponse>;
+  clearActiveWorkspaceSelection: (context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceSelectionClearResponse>;
   listAssetDefinitions: (
     input?: DesktopAssetDefinitionsListBridgeInput,
     context?: DesktopArtifactUploadBridgeContext,
@@ -963,6 +996,32 @@ export function createDesktopPreloadApi(
         channel: DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_RESPONSE_CHANNEL.value,
         message: "Received invalid desktop runtime capability status IPC response envelope.",
       });
+    },
+
+
+    async listWorkspaces(context = {}) {
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL.value, createDesktopWorkspaceListRequest({}, context));
+      return assertDesktopEnvelopeResponse<DesktopWorkspaceListResponse>(response, { operation: DESKTOP_WORKSPACE_LIST_OPERATION, channel: DESKTOP_WORKSPACE_LIST_RESPONSE_CHANNEL.value, message: "Received invalid desktop workspace list IPC response envelope." });
+    },
+
+    async createWorkspace(input, context = {}) {
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_WORKSPACE_CREATE_REQUEST_CHANNEL.value, createDesktopWorkspaceCreateRequest(input, context));
+      return assertDesktopEnvelopeResponse<DesktopWorkspaceCreateResponse>(response, { operation: DESKTOP_WORKSPACE_CREATE_OPERATION, channel: DESKTOP_WORKSPACE_CREATE_RESPONSE_CHANNEL.value, message: "Received invalid desktop workspace create IPC response envelope." });
+    },
+
+    async readActiveWorkspaceSelection(context = {}) {
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_WORKSPACE_SELECTION_READ_REQUEST_CHANNEL.value, createDesktopWorkspaceSelectionReadRequest(context));
+      return assertDesktopEnvelopeResponse<DesktopWorkspaceSelectionReadResponse>(response, { operation: DESKTOP_WORKSPACE_SELECTION_READ_OPERATION, channel: DESKTOP_WORKSPACE_SELECTION_READ_RESPONSE_CHANNEL.value, message: "Received invalid desktop workspace selection read IPC response envelope." });
+    },
+
+    async saveActiveWorkspaceSelection(selection, context = {}) {
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_WORKSPACE_SELECTION_SAVE_REQUEST_CHANNEL.value, createDesktopWorkspaceSelectionSaveRequest({ selection }, context));
+      return assertDesktopEnvelopeResponse<DesktopWorkspaceSelectionSaveResponse>(response, { operation: DESKTOP_WORKSPACE_SELECTION_SAVE_OPERATION, channel: DESKTOP_WORKSPACE_SELECTION_SAVE_RESPONSE_CHANNEL.value, message: "Received invalid desktop workspace selection save IPC response envelope." });
+    },
+
+    async clearActiveWorkspaceSelection(context = {}) {
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_WORKSPACE_SELECTION_CLEAR_REQUEST_CHANNEL.value, createDesktopWorkspaceSelectionClearRequest(context));
+      return assertDesktopEnvelopeResponse<DesktopWorkspaceSelectionClearResponse>(response, { operation: DESKTOP_WORKSPACE_SELECTION_CLEAR_OPERATION, channel: DESKTOP_WORKSPACE_SELECTION_CLEAR_RESPONSE_CHANNEL.value, message: "Received invalid desktop workspace selection clear IPC response envelope." });
     },
 
     async listAssetDefinitions(input = {}, context = {}) {

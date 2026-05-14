@@ -128,6 +128,7 @@ export function AssetLibraryFeature({ client, workspaceId, workspaceName }: Asse
               }}
             />
             <ResourceBackedViewDetailPanel
+              workspaceScoped={Boolean(workspaceId)}
               detail={state.selectedResourceBackedViewDetail}
               isLoading={state.isLoadingDetail}
               error={state.detailError}
@@ -213,6 +214,7 @@ function ResourceBackedViewDetailPanel({
   mutationDisplay,
   isMutating,
   onChooseAction,
+  workspaceScoped,
 }: {
   readonly detail?: AssetLibraryResourceBackedViewDetail;
   readonly isLoading: boolean;
@@ -220,11 +222,12 @@ function ResourceBackedViewDetailPanel({
   readonly mutationDisplay?: AssetLibraryMutationDisplay;
   readonly isMutating: boolean;
   readonly onChooseAction: (action: AssetLibraryMutationAction) => void;
+  readonly workspaceScoped: boolean;
 }) {
   if (isLoading) return <section className="ui-panel" role="status">Loading resource view...</section>;
   if (error) return <section className="ui-panel" role="alert">{error}</section>;
   if (!detail) return <section className="ui-panel asset-library-empty"><h2>Select a resource view.</h2></section>;
-  const actions = getAssetLibraryMutationActions(detail);
+  const actions = workspaceScoped ? [] : getAssetLibraryMutationActions(detail);
   return (
     <section className="ui-panel asset-library-detail" aria-label="Resource view detail">
       <h2>{detail.displayName}</h2>
@@ -257,6 +260,7 @@ function ResourceBackedViewDetailPanel({
           ) : null}
         </div>
       ) : null}
+      {workspaceScoped ? <div className="ui-status" role="status">Resource-backed asset actions are deferred until workspace resource scoping is implemented.</div> : null}
       {safeDiagnosticMessages(detail.diagnostics).length ? <div className="ui-status" role="status">{safeDiagnosticMessages(detail.diagnostics).join(" ")}</div> : null}
     </section>
   );
