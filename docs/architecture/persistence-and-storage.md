@@ -314,3 +314,7 @@ See ADR-0013 and ADR-0012.
 ## Storage security guidance
 
 Storage keys are opaque identifiers, not raw paths. Filesystem storage adapters must enforce path canonicalization + containment under configured storage roots. Artifact content reads/writes should be authorization-aware. Secrets and credentials are not ordinary settings payloads. Optional encryption at rest should be introduced via a `DataProtectionPort` seam, and audit events should cover sensitive artifact operations. See ADR-0015.
+
+## Workspace contract vocabulary and storage descriptors
+
+Phase 6 introduces only passive workspace contracts. `WorkspaceStorageRootDescriptor` names storage ownership by descriptor fields such as kind, storage id, and label; it is not a public raw filesystem path contract. Future persistence or host adapters may map descriptors to local storage internally, but this prompt adds no workspace repositories, migrations, storage roots, directory creation, active-selection persistence, system-pack activation behavior, or resource scoping. Workspace system-pack activation records are reference-only summaries of system pack id/version and do not copy system pack definitions into workspace storage.
