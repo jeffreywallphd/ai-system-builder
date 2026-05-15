@@ -17,7 +17,7 @@ export interface CreateLocalArtifactStorageBindingAdapterOptions {
 
 type ArtifactStorageBindingLine =
   | ArtifactStorageBinding
-  | { artifactId: string; deletedAt: string };
+  | { workspaceId?: ArtifactStorageBinding["workspaceId"]; artifactId: string; deletedAt: string };
 
 function parseBindingLine(line: string): ArtifactStorageBindingLine | undefined {
   try {
@@ -32,6 +32,7 @@ function parseBindingLine(line: string): ArtifactStorageBindingLine | undefined 
       }
 
       return {
+        workspaceId: typeof parsed.workspaceId === "string" ? parsed.workspaceId as ArtifactStorageBinding["workspaceId"] : undefined,
         artifactId: parsed.artifactId.trim(),
         deletedAt: parsed.deletedAt,
       };
@@ -47,6 +48,7 @@ function parseBindingLine(line: string): ArtifactStorageBindingLine | undefined 
     }
 
     return normalizeArtifactStorageBinding({
+      workspaceId: typeof parsed.workspaceId === "string" ? parsed.workspaceId as ArtifactStorageBinding["workspaceId"] : undefined,
       artifactId: parsed.artifactId,
       role: parsed.role,
       backing: parsed.backing as ArtifactStorageBinding["backing"],
@@ -84,7 +86,8 @@ export function createLocalArtifactStorageBindingAdapter(
       }
 
       if ("deletedAt" in parsed) {
-        const existingKeys = keysByArtifactId.get(parsed.artifactId);
+        const tombstoneKey = parsed.workspaceId ? `${parsed.workspaceId}::${parsed.artifactId}` : parsed.artifactId;
+        const existingKeys = keysByArtifactId.get(tombstoneKey);
         if (!existingKeys) {
           continue;
         }
@@ -92,16 +95,17 @@ export function createLocalArtifactStorageBindingAdapter(
         for (const key of existingKeys) {
           latestByCompositeKey.delete(key);
         }
-        keysByArtifactId.delete(parsed.artifactId);
+        keysByArtifactId.delete(tombstoneKey);
         continue;
       }
 
-      const key = `${parsed.artifactId}::${parsed.role}::${parsed.backing.provider}::${parsed.backing.locator}`;
+      const artifactKey = parsed.workspaceId ? `${parsed.workspaceId}::${parsed.artifactId}` : parsed.artifactId;
+      const key = `${artifactKey}::${parsed.role}::${parsed.backing.provider}::${parsed.backing.locator}`;
       latestByCompositeKey.set(key, parsed);
-      let artifactKeys = keysByArtifactId.get(parsed.artifactId);
+      let artifactKeys = keysByArtifactId.get(artifactKey);
       if (!artifactKeys) {
         artifactKeys = new Set<string>();
-        keysByArtifactId.set(parsed.artifactId, artifactKeys);
+        keysByArtifactId.set(artifactKey, artifactKeys);
       }
       artifactKeys.add(key);
     }
@@ -137,7 +141,8 @@ export function createLocalArtifactStorageBindingAdapter(
         );
       }
 
-      const bindings = (await readBindings()).filter((entry) => entry.artifactId === artifactId);
+      const workspaceId = request.workspaceId?.trim();
+      const bindings = (await readBindings()).filter((entry) => entry.artifactId === artifactId && (!workspaceId || entry.workspaceId === workspaceId));
       return createSuccessResult({ bindings }, context);
     },
 
@@ -151,14 +156,15 @@ export function createLocalArtifactStorageBindingAdapter(
       }
 
       try {
+        const workspaceId = request.workspaceId?.trim();
         const bindings = await readBindings();
-        const exists = bindings.some((entry) => entry.artifactId === artifactId);
+        const exists = bindings.some((entry) => entry.artifactId === artifactId && (!workspaceId || entry.workspaceId === workspaceId));
         if (!exists) {
           return createSuccessResult({ deleted: false }, context);
         }
 
         await mkdir(path.dirname(bindingsPath), { recursive: true });
-        await appendFile(bindingsPath, `${JSON.stringify({ artifactId, deletedAt: new Date().toISOString() })}\n`, "utf8");
+        await appendFile(bindingsPath, `${JSON.stringify({ workspaceId, artifactId, deletedAt: new Date().toISOString() })}\n`, "utf8");
         return createSuccessResult({ deleted: true }, context);
       } catch (error) {
         return createFailureResult(

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ModelsFeature } from "../components/ModelsFeature";
 
@@ -137,6 +137,13 @@ describe("ModelsFeature", () => {
   let mountedRoot: Root | undefined;
   let mountedContainer: HTMLDivElement | undefined;
 
+  beforeEach(() => {
+    window.desktopApi = {
+      readPythonRuntimeStatus: vi.fn().mockResolvedValue({ ok: true, value: { supervisorStatus: "stopped", healthy: false, runtimeStatus: "stopped", capabilities: [], logs: [], loadedModels: [], activeTaskCount: 0 } }),
+      controlPythonRuntime: vi.fn().mockResolvedValue({ ok: true, value: { supervisorStatus: "stopped", healthy: false, runtimeStatus: "stopped", capabilities: [], logs: [], loadedModels: [], activeTaskCount: 0 } }),
+    } as never;
+  });
+
   afterEach(async () => {
     if (mountedRoot) {
       await act(async () => {
@@ -146,6 +153,7 @@ describe("ModelsFeature", () => {
     mountedContainer?.remove();
     mountedRoot = undefined;
     mountedContainer = undefined;
+    delete window.desktopApi;
   });
 
   it("shows browse result actions in two-column results without a details card", async () => {
@@ -157,7 +165,7 @@ describe("ModelsFeature", () => {
     mountedContainer = container;
 
     await act(async () => {
-      root.render(<ModelsFeature client={client as never} />);
+      root.render(<ModelsFeature client={client as never} workspaceId="workspace-a" />);
       await flushUi();
     });
 
@@ -192,7 +200,7 @@ describe("ModelsFeature", () => {
     mountedContainer = container;
 
     await act(async () => {
-      root.render(<ModelsFeature client={client as never} />);
+      root.render(<ModelsFeature client={client as never} workspaceId="workspace-a" />);
       await flushUi();
     });
 
@@ -218,7 +226,7 @@ describe("ModelsFeature", () => {
     mountedContainer = container;
 
     await act(async () => {
-      root.render(<ModelsFeature client={client as never} />);
+      root.render(<ModelsFeature client={client as never} workspaceId="workspace-a" />);
       await flushUi();
     });
 
@@ -244,7 +252,7 @@ describe("ModelsFeature", () => {
     mountedContainer = container;
 
     await act(async () => {
-      root.render(<ModelsFeature client={client as never} />);
+      root.render(<ModelsFeature client={client as never} workspaceId="workspace-a" />);
       await flushUi();
     });
 
@@ -274,7 +282,7 @@ describe("ModelsFeature", () => {
     mountedContainer = container;
 
     await act(async () => {
-      root.render(<ModelsFeature client={client as never} />);
+      root.render(<ModelsFeature client={client as never} workspaceId="workspace-a" />);
       await flushUi();
     });
 
@@ -304,7 +312,7 @@ describe("ModelsFeature", () => {
     mountedContainer = container;
 
     await act(async () => {
-      root.render(<ModelsFeature client={client as never} />);
+      root.render(<ModelsFeature client={client as never} workspaceId="workspace-a" />);
       await flushUi();
     });
 
@@ -324,6 +332,79 @@ describe("ModelsFeature", () => {
     expect(publishButton.disabled).toBe(true);
   });
 
+
+
+  it("passes active workspace id when validating a managed model", async () => {
+    const client = createClientDouble();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ModelsFeature client={client as never} workspaceId="workspace-a" />);
+      await flushUi();
+    });
+
+    const manageTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Manage Models");
+    await act(async () => {
+      manageTab?.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+    const detailsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Details") as HTMLButtonElement;
+    await act(async () => {
+      detailsButton.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+    const validateButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Validate") as HTMLButtonElement;
+    await act(async () => {
+      validateButton.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+
+    expect(client.validateModel).toHaveBeenCalledWith({ workspaceId: "workspace-a", modelRecordId: "saved-1" });
+  });
+
+  it("passes active workspace id when publishing a managed model and blocks without workspace", async () => {
+    const client = createValidModelClientDouble();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    mountedRoot = root;
+    mountedContainer = container;
+
+    await act(async () => {
+      root.render(<ModelsFeature client={client as never} workspaceId="workspace-a" />);
+      await flushUi();
+    });
+
+    const manageTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Manage Models");
+    await act(async () => {
+      manageTab?.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+    const detailsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Details") as HTMLButtonElement;
+    await act(async () => {
+      detailsButton.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+    const repositoryInput = container.querySelector("input[placeholder='owner/model-name']") as HTMLInputElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(repositoryInput, "owner/repo");
+      repositoryInput.dispatchEvent(new Event("input", { bubbles: true }));
+      repositoryInput.dispatchEvent(new Event("change", { bubbles: true }));
+      await flushUi();
+    });
+    const publishButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Publish") as HTMLButtonElement;
+    await act(async () => {
+      publishButton.dispatchEvent(new Event("click", { bubbles: true }));
+      await flushUi();
+    });
+
+    expect(client.publishModel).toHaveBeenCalledWith({ workspaceId: "workspace-a", modelRecordId: "generated-valid-1", repository: "owner/repo" });
+  });
+
   it("shows repository input before publish action", async () => {
     const client = createValidModelClientDouble();
     const container = document.createElement("div");
@@ -333,7 +414,7 @@ describe("ModelsFeature", () => {
     mountedContainer = container;
 
     await act(async () => {
-      root.render(<ModelsFeature client={client as never} />);
+      root.render(<ModelsFeature client={client as never} workspaceId="workspace-a" />);
       await flushUi();
     });
 

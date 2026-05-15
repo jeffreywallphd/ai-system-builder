@@ -30,10 +30,12 @@ describe("model family invariants", () => {
       "normalizeModelTrainingRequest",
       "normalizeModelTrainingResult",
       "normalizeModelValidationStatus",
+      "normalizePublishModelRequest",
       "normalizeModelValidationSummary",
       "normalizeRegisterDownloadedModelRequest",
       "normalizeRegisterGeneratedModelRequest",
       "normalizeSaveModelReferenceRequest",
+      "normalizeValidateModelRequest",
       "normalizeUpdateModelRecordRequest",
       "recommendModelInferenceMode",
     ].sort());

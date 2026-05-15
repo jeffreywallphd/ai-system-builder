@@ -62,7 +62,7 @@ describe("PublishModelUseCase", () => {
 
     let thrown: unknown;
     try {
-      await useCase.execute({ modelRecordId: "model-1", repository: "org/demo" });
+      await useCase.execute({ workspaceId: "workspace-a" as never, modelRecordId: "model-1", repository: "org/demo" });
     } catch (error) {
       thrown = error;
     }

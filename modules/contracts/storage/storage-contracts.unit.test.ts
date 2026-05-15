@@ -396,6 +396,7 @@ describe("storage contracts", () => {
 
   it("creates artifact storage bindings against thin shared backing references", () => {
     const binding = normalizeArtifactStorageBinding({
+      workspaceId: "workspace-a" as never,
       artifactId: " artifact-42 ",
       backing: {
         kind: " artifact-repo ",
@@ -408,6 +409,7 @@ describe("storage contracts", () => {
     });
 
     expect(binding).toEqual({
+      workspaceId: "workspace-a",
       artifactId: "artifact-42",
       backing: {
         kind: "artifact-repo",

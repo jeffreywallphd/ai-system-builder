@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ModelArtifactForm, ModelLifecycleStatus, ModelSource, ModelTaskTag } from "../../../../../../../modules/contracts/model";
+import { createWorkspaceId } from "../../../../../../../modules/contracts/workspace";
 import type { DesktopModelBrowseItem, DesktopModelDetailsResult, DesktopModelInventoryRecord } from "../../../lib/desktopApi";
 import type { DesktopModelsClient } from "../api/desktopModelsClient";
 import { useModelsClient } from "./useModelsClient";
@@ -141,7 +142,7 @@ export function useModelsFeature(client?: DesktopModelsClient, workspaceId?: str
     setManageState({ status: "loading", message: "Loading model inventory..." });
     try {
       const listed = workspaceId ? await modelClient.listModels({
-        workspaceId: workspaceId as never,
+        workspaceId: createWorkspaceId(workspaceId),
         source: normalizeOptionalSelect<ModelSource>(manageSource, ["huggingface", "local", "generated"]),
         lifecycleStatus: normalizeOptionalSelect<ModelLifecycleStatus>(manageLifecycleStatus, ["remote-reference", "saved-reference", "downloaded", "generated", "validated", "invalid"]),
         artifactForm: normalizeOptionalSelect<ModelArtifactForm>(manageArtifactForm, ["full-model", "adapter", "merged-model", "quantized-model", "checkpoint"]),
@@ -216,13 +217,14 @@ export function useModelsFeature(client?: DesktopModelsClient, workspaceId?: str
     }
     setManageState({ status: "loading", message: "Validating model..." });
     try {
-      const result = await modelClient.validateModel({ modelRecordId: selectedManagedModel.modelRecordId });
+      if (!workspaceId) { setManageState({ status: "error", message: "Select a workspace before validating models." }); return; }
+      const result = await modelClient.validateModel({ workspaceId, modelRecordId: selectedManagedModel.modelRecordId });
       setManageState({ status: result.status === "invalid" ? "error" : "success", message: `Validation ${result.status}.` });
       await refreshModels();
     } catch (error) {
       setManageState({ status: "error", message: error instanceof Error ? error.message : "Validation failed." });
     }
-  }, [modelClient, refreshModels, selectedManagedModel]);
+  }, [modelClient, refreshModels, selectedManagedModel, workspaceId]);
 
   const publishManagedModel = useCallback(async () => {
     if (!selectedManagedModel || publishRepository.trim().length === 0) {
@@ -230,13 +232,14 @@ export function useModelsFeature(client?: DesktopModelsClient, workspaceId?: str
     }
     setManageState({ status: "loading", message: "Publishing model..." });
     try {
-      const result = await modelClient.publishModel({ modelRecordId: selectedManagedModel.modelRecordId, repository: publishRepository.trim() });
+      if (!workspaceId) { setManageState({ status: "error", message: "Select a workspace before publishing models." }); return; }
+      const result = await modelClient.publishModel({ workspaceId, modelRecordId: selectedManagedModel.modelRecordId, repository: publishRepository.trim() });
       setManageState({ status: result.published ? "success" : "error", message: result.published ? "Model published." : "Publish failed." });
       await refreshModels();
     } catch (error) {
       setManageState({ status: "error", message: error instanceof Error ? error.message : "Publish failed." });
     }
-  }, [modelClient, publishRepository, refreshModels, selectedManagedModel]);
+  }, [modelClient, publishRepository, refreshModels, selectedManagedModel, workspaceId]);
 
   return {
     browseQuery,
