@@ -9,9 +9,11 @@ import { ModelsPage } from "./pages/ModelsPage";
 import { ImageGenerationPage } from "./pages/ImageGenerationPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SystemPage } from "./pages/SystemPage";
-import { ActiveWorkspaceProvider, WorkspaceGate, useActiveWorkspace, type WorkspaceUiRecord } from "./features/workspace";
+import { ActiveWorkspaceProvider, WorkspaceGate, WorkspaceRequiredSurface, useActiveWorkspace, type WorkspaceUiRecord } from "./features/workspace";
 import { desktopPageDefinitions, desktopPageRequiresWorkspace, type DesktopPageKey } from "./routes/desktopPages";
 import { resolveDesktopWorkspaceRouteBoundary } from "./routes/workspaceRouteBoundary";
+
+type DesktopWorkspacePageKey = Extract<DesktopPageKey, "artifacts" | "assets" | "models" | "image-generation">;
 
 export function App() {
   return (
@@ -28,17 +30,15 @@ function WorkspaceAwareDesktopApp() {
 
   const activePageDefinition = desktopPageDefinitions.find((page) => page.key === activePage);
   const routeRequiresWorkspace = desktopPageRequiresWorkspace(activePage);
-  const { visibleActivePage } = resolveDesktopWorkspaceRouteBoundary(activePage, workspace.status);
+  const routeBoundary = resolveDesktopWorkspaceRouteBoundary(activePage, workspace.status);
 
-  const renderDesktopPageContent = (page: DesktopPageKey, activeWorkspace?: WorkspaceUiRecord): ReactNode => {
+  const renderWorkspacePageContent = (page: DesktopWorkspacePageKey, activeWorkspace: WorkspaceUiRecord): ReactNode => {
     switch (page) {
-      case "home":
-        return <HomePage onGoToArtifacts={() => setActivePage("artifacts")} />;
       case "artifacts":
         return (
           <ArtifactsPage
-            workspaceId={activeWorkspace?.id}
-            workspaceName={activeWorkspace?.displayName}
+            workspaceId={activeWorkspace.id}
+            workspaceName={activeWorkspace.displayName}
             refreshToken={artifactRefreshToken}
             onUploaded={() => {
               setArtifactRefreshToken((current) => current + 1);
@@ -46,27 +46,38 @@ function WorkspaceAwareDesktopApp() {
           />
         );
       case "assets":
-        return <AssetLibraryPage workspaceId={activeWorkspace?.id} workspaceName={activeWorkspace?.displayName} />;
+        return <AssetLibraryPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
       case "models":
-        return <ModelsPage workspaceId={activeWorkspace?.id} workspaceName={activeWorkspace?.displayName} />;
+        return <ModelsPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
       case "image-generation":
-        return <ImageGenerationPage workspaceId={activeWorkspace?.id} workspaceName={activeWorkspace?.displayName} />;
+        return <ImageGenerationPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
+    }
+  };
+
+  const renderGlobalPageContent = (page: DesktopPageKey): ReactNode => {
+    switch (page) {
+      case "home":
+        return <HomePage onGoToArtifacts={() => setActivePage("artifacts")} />;
       case "settings":
         return <SettingsPage />;
       case "system":
         return <SystemPage />;
+      default:
+        return <WorkspaceRequiredSurface />;
     }
   };
 
-  const content = routeRequiresWorkspace ? (
+  const content = routeBoundary.blocked ? (
+    <WorkspaceRequiredSurface />
+  ) : routeRequiresWorkspace ? (
     <WorkspaceGate pageLabel={activePageDefinition?.label ?? activePage}>
-      {(activeWorkspace) => renderDesktopPageContent(activePage, activeWorkspace)}
+      {(activeWorkspace) => renderWorkspacePageContent(activePage as DesktopWorkspacePageKey, activeWorkspace)}
     </WorkspaceGate>
-  ) : renderDesktopPageContent(activePage);
+  ) : renderGlobalPageContent(activePage);
 
   return (
     <AppShell
-      activePage={visibleActivePage}
+      activePage={routeBoundary.visibleActivePage}
       onNavigate={setActivePage}
       pages={desktopPageDefinitions}
     >
