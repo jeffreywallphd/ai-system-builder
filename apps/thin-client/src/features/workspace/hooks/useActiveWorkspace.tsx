@@ -57,11 +57,12 @@ const ActiveWorkspaceContext = createContext<ActiveWorkspaceContextValue | undef
 
 export function ActiveWorkspaceProvider({
   children,
-  client = createApiWorkspaceClient(),
+  client,
 }: {
   readonly children: ReactNode;
   readonly client?: WorkspaceClient;
 }) {
+  const workspaceClient = useMemo(() => client ?? createApiWorkspaceClient(), [client]);
   const [workspaces, setWorkspaces] = useState<WorkspaceUiRecord[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
@@ -71,8 +72,8 @@ export function ActiveWorkspaceProvider({
     setLoading(true);
     try {
       const [records, selection] = await Promise.all([
-        client.listWorkspaces(),
-        client.readActiveWorkspaceSelection(),
+        workspaceClient.listWorkspaces(),
+        workspaceClient.readActiveWorkspaceSelection(),
       ]);
       setWorkspaces([...records]);
       setActiveWorkspaceId(selection.workspaceId);
@@ -82,7 +83,7 @@ export function ActiveWorkspaceProvider({
     } finally {
       setLoading(false);
     }
-  }, [client]);
+  }, [workspaceClient]);
 
   useEffect(() => {
     void load();
@@ -101,23 +102,23 @@ export function ActiveWorkspaceProvider({
     }
 
     try {
-      await client.saveActiveWorkspaceSelection(workspace.id);
+      await workspaceClient.saveActiveWorkspaceSelection(workspace.id);
       setActiveWorkspaceId(workspace.id);
       setError(undefined);
     } catch {
       setError("Workspace selection could not be saved.");
     }
-  }, [client, workspaces]);
+  }, [workspaceClient, workspaces]);
 
   const clearActiveWorkspace = useCallback(async () => {
     try {
-      await client.clearActiveWorkspaceSelection();
+      await workspaceClient.clearActiveWorkspaceSelection();
       setActiveWorkspaceId(undefined);
       setError(undefined);
     } catch {
       setError("Workspace selection could not be cleared.");
     }
-  }, [client]);
+  }, [workspaceClient]);
 
   const createWorkspace = useCallback(async (input: CreateWorkspaceInput) => {
     const displayName = input.name.trim();
@@ -127,11 +128,11 @@ export function ActiveWorkspaceProvider({
     }
 
     try {
-      const workspace = await client.createWorkspace({
+      const workspace = await workspaceClient.createWorkspace({
         name: displayName,
         includeSystemFoundationAssets: input.includeSystemFoundationAssets,
       });
-      const records = await client.listWorkspaces();
+      const records = await workspaceClient.listWorkspaces();
       setWorkspaces([...records]);
       setActiveWorkspaceId(workspace.id);
       setError(undefined);
@@ -140,7 +141,7 @@ export function ActiveWorkspaceProvider({
       setError(err instanceof Error && err.message === "Enter a workspace name." ? err.message : "Workspace could not be created.");
       throw err;
     }
-  }, [client]);
+  }, [workspaceClient]);
 
   const status = useMemo<ActiveWorkspaceReadinessStatus>(() => {
     if (loading) return "loading";
