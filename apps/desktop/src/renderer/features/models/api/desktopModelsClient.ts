@@ -12,6 +12,7 @@ import {
   type DesktopPublishModelResult,
 } from "../../../lib/desktopApi";
 import type { ListModelsRequest, ModelTaskTag } from "../../../../../../../modules/contracts/model";
+import { createWorkspaceId } from "../../../../../../../modules/contracts/workspace";
 
 interface PreloadEnvelope {
   ok: boolean;
@@ -46,14 +47,15 @@ export interface DesktopModelsClient {
   browseModels: (input: DesktopModelBrowseRequest) => Promise<{ models: DesktopModelBrowseItem[]; nextCursor?: string }>;
   getModelDetails: (input: { provider: "huggingface"; modelId: string }) => Promise<DesktopModelDetailsResult["model"]>;
   listModels: (input?: ListModelsRequest) => Promise<DesktopModelInventoryRecord[]>;
-  saveModelReference: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat" | "text-to-image"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown>; workspaceId?: string }) => Promise<DesktopModelInventoryRecord>;
-  downloadModel: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat" | "text-to-image"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown>; workspaceId?: string }) => Promise<DesktopDownloadModelResult>;
+  saveModelReference: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat" | "text-to-image"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown>; workspaceId: string }) => Promise<DesktopModelInventoryRecord>;
+  downloadModel: (input: { modelId: string; displayName?: string; inferenceMode?: "text2text" | "causal" | "chat" | "text-to-image"; taskTags?: ModelTaskTag[]; artifactForm?: "full-model" | "adapter" | "merged-model" | "checkpoint"; metadata?: Record<string, unknown>; workspaceId: string }) => Promise<DesktopDownloadModelResult>;
   updateModelRecord: (input: { modelRecordId: string; patch: Record<string, unknown> }) => Promise<DesktopModelInventoryRecord>;
-  deleteModelRecord: (input: { modelRecordId: string; deleteLocalFiles?: boolean; deleteBackingArtifacts?: boolean; workspaceId?: string }) => Promise<DesktopDeleteModelRecordResult>;
+  deleteModelRecord: (input: { modelRecordId: string; deleteLocalFiles?: boolean; deleteBackingArtifacts?: boolean; workspaceId: string }) => Promise<DesktopDeleteModelRecordResult>;
   trainModel: (input: DesktopModelTrainingRequest) => Promise<DesktopModelTrainingResult>;
   readModelTrainingStatus: (input: { runId: string }) => Promise<DesktopModelTrainingResult>;
-  validateModel: (input: { modelRecordId: string; modelPath?: string; expectedLoRA?: boolean }) => Promise<DesktopValidateModelResult>;
+  validateModel: (input: { workspaceId: string; modelRecordId: string; modelPath?: string; expectedLoRA?: boolean }) => Promise<DesktopValidateModelResult>;
   publishModel: (input: {
+    workspaceId: string;
     modelRecordId: string;
     repository: string;
     revision?: string;
@@ -108,7 +110,7 @@ export function createDesktopModelsClient(): DesktopModelsClient {
           taskTags: input.taskTags,
           artifactForm: input.artifactForm,
           metadata: input.metadata,
-          workspaceId: input.workspaceId as never,
+          workspaceId: createWorkspaceId(input.workspaceId),
         }),
         (value) => sanitizeModelRecord((value as { model: DesktopModelInventoryRecord }).model),
         "Failed to save model reference.",
@@ -127,7 +129,7 @@ export function createDesktopModelsClient(): DesktopModelsClient {
           taskTags: input.taskTags,
           artifactForm: input.artifactForm,
           metadata: input.metadata,
-          workspaceId: input.workspaceId as never,
+          workspaceId: createWorkspaceId(input.workspaceId),
         }),
         (value) => sanitizeDownloadResult(value as DesktopDownloadModelResult),
         "Failed to download model.",
@@ -148,7 +150,7 @@ export function createDesktopModelsClient(): DesktopModelsClient {
         throw new Error("Desktop preload model delete bridge is unavailable.");
       }
       return ensureSuccess(
-        await desktopApi.deleteModelRecord({ ...input, workspaceId: input.workspaceId as never }),
+        await desktopApi.deleteModelRecord({ ...input, workspaceId: createWorkspaceId(input.workspaceId) }),
         (value) => value as DesktopDeleteModelRecordResult,
         "Failed to delete model record.",
       );
@@ -178,7 +180,7 @@ export function createDesktopModelsClient(): DesktopModelsClient {
         throw new Error("Desktop preload model validation bridge is unavailable.");
       }
       return ensureSuccess(
-        await desktopApi.validateModel(input),
+        await desktopApi.validateModel({ ...input, workspaceId: createWorkspaceId(input.workspaceId) }),
         (value) => value as DesktopValidateModelResult,
         "Failed to validate model.",
       );
@@ -188,7 +190,7 @@ export function createDesktopModelsClient(): DesktopModelsClient {
         throw new Error("Desktop preload model publish bridge is unavailable.");
       }
       return ensureSuccess(
-        await desktopApi.publishModel(input),
+        await desktopApi.publishModel({ ...input, workspaceId: createWorkspaceId(input.workspaceId) }),
         (value) => value as DesktopPublishModelResult,
         "Failed to publish model.",
       );

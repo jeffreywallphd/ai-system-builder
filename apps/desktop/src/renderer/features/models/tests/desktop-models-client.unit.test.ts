@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi, afterEach } from "vitest";
 
 import { createDesktopModelsClient } from "../api/desktopModelsClient";
@@ -51,13 +52,13 @@ describe("desktop models client", () => {
     await client.browseModels({ provider: "huggingface", query: "org/model" });
     await client.getModelDetails({ provider: "huggingface", modelId: "org/model" });
     const listed = await client.listModels();
-    await client.saveModelReference({ modelId: "org/model", displayName: "Model" });
-    const download = await client.downloadModel({ modelId: "org/model", displayName: "Model" });
+    await client.saveModelReference({ workspaceId: "workspace-a", modelId: "org/model", displayName: "Model" });
+    const download = await client.downloadModel({ workspaceId: "workspace-a", modelId: "org/model", displayName: "Model" });
     expect(JSON.stringify({ listed, download })).not.toContain("/models/org/model");
     expect("localPath" in download.model).toBe(false);
     expect("localPath" in download.download).toBe(false);
     await client.updateModelRecord({ modelRecordId: "m1", patch: { validationStatus: "valid" } });
-    await client.deleteModelRecord({ modelRecordId: "m1" });
+    await client.deleteModelRecord({ workspaceId: "workspace-a", modelRecordId: "m1" });
     await client.trainModel({
       baseModel: { modelRecordId: "m1" },
       datasets: [{ artifactId: "dataset-1", splitRole: "train" }],
@@ -66,17 +67,17 @@ describe("desktop models client", () => {
       output: { outputModelName: "demo-adapter", destination: { local: { enabled: true } } },
     });
     await client.readModelTrainingStatus({ runId: "run-1" });
-    await client.validateModel({ modelRecordId: "m1" });
-    await client.publishModel({ modelRecordId: "m1", repository: "owner/repo" });
+    await client.validateModel({ workspaceId: "workspace-a", modelRecordId: "m1" });
+    await client.publishModel({ workspaceId: "workspace-a", modelRecordId: "m1", repository: "owner/repo" });
 
     expect(window.desktopApi.browseModels).toHaveBeenCalled();
     expect(window.desktopApi.getModelDetails).toHaveBeenCalledWith({ provider: "huggingface", modelId: "org/model" });
     expect(window.desktopApi.saveModelReference).toHaveBeenCalledWith(expect.objectContaining({ provider: "huggingface", modelId: "org/model" }));
     expect(window.desktopApi.downloadModel).toHaveBeenCalledWith(expect.objectContaining({ provider: "huggingface", modelId: "org/model" }));
-    expect(window.desktopApi.deleteModelRecord).toHaveBeenCalledWith({ modelRecordId: "m1" });
+    expect(window.desktopApi.deleteModelRecord).toHaveBeenCalledWith({ workspaceId: "workspace-a", modelRecordId: "m1" });
     expect(window.desktopApi.trainModel).toHaveBeenCalled();
     expect(window.desktopApi.readModelTrainingStatus).toHaveBeenCalledWith({ runId: "run-1" });
-    expect(window.desktopApi.validateModel).toHaveBeenCalled();
-    expect(window.desktopApi.publishModel).toHaveBeenCalled();
+    expect(window.desktopApi.validateModel).toHaveBeenCalledWith({ workspaceId: "workspace-a", modelRecordId: "m1" });
+    expect(window.desktopApi.publishModel).toHaveBeenCalledWith({ workspaceId: "workspace-a", modelRecordId: "m1", repository: "owner/repo" });
   });
 });

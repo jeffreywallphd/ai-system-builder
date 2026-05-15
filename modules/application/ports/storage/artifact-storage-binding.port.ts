@@ -1,16 +1,19 @@
 import type { ApplicationRequestContext } from "../application-request-context";
 import type { ContractResult } from "../../../contracts/shared";
 import type { ArtifactStorageBinding } from "../../../contracts/storage";
+import type { WorkspaceId } from "../../../contracts/workspace";
 
 export interface UpsertArtifactStorageBindingRequest {
   binding: ArtifactStorageBinding;
 }
 
 export interface ReadArtifactStorageBindingsRequest {
+  workspaceId?: WorkspaceId;
   artifactId: string;
 }
 
 export interface DeleteArtifactStorageBindingsRequest {
+  workspaceId?: WorkspaceId;
   artifactId: string;
 }
 

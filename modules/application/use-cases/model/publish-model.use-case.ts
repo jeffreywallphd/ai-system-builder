@@ -57,6 +57,7 @@ export class PublishModelUseCase {
       throw new Error(`Model publishing runtime result missing for request '${statusRecord.requestId}'.`);
     }
     const result = statusRecord.data as PublishModelResult;
+    const context = this.requestContext.get(requestId);
     const workspaceId = context?.request.workspaceId ?? statusRecord.workspaceId;
     if (!isWorkspaceId(workspaceId)) throw new Error("Workspace id is required for model publishing result finalization.");
     const model = await this.dependencies.modelRegistry.getModelRecord(workspaceId, result.modelRecordId);

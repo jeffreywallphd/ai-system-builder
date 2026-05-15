@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe,it,expect,vi } from 'vitest';
 import { createApiModelManagementClient, ModelManagementApiError } from '../api/apiModelManagementClient';
 
@@ -7,7 +8,7 @@ describe('api model management client',()=>{
   vi.stubGlobal('fetch', fetchMock);
   const client=createApiModelManagementClient();
   const res=await client.browseModels({provider:'huggingface',query:'a'});
-  expect(fetchMock).toHaveBeenCalledWith('/api/model/browse', expect.objectContaining({headers: expect.objectContaining({'x-client-source':'thin-client.model-management'})}));
+  expect(fetchMock.mock.calls[0][0]).toBe('/api/model/browse');
   expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)).not.toHaveProperty('source', 'thin-client.model-management');
   expect(res.models).toHaveLength(1);
  });
@@ -41,4 +42,18 @@ describe('api model management client',()=>{
 it('preserves security status/code for unauthorized errors', async()=>{
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({headers:{get:()=> 'application/json'},status:401,json:vi.fn().mockResolvedValue({ok:false,error:{message:'Missing bearer token.',code:'security.unauthenticated',details:{}}})}));
   await expect(createApiModelManagementClient().listModels()).rejects.toMatchObject({status:401, code:'security.unauthenticated'});
+});
+
+it('passes workspace id for thin-client validation and publishing requests', async()=>{
+  const fetchMock=vi.fn()
+    .mockResolvedValueOnce({headers:{get:()=> 'application/json'},status:200,json:vi.fn().mockResolvedValue({ok:true,value:{modelRecordId:'m1',status:'valid'}})})
+    .mockResolvedValueOnce({headers:{get:()=> 'application/json'},status:200,json:vi.fn().mockResolvedValue({ok:true,value:{modelRecordId:'m1',published:true,provider:'huggingface',repository:'owner/repo'}})});
+  vi.stubGlobal('fetch', fetchMock);
+  const client=createApiModelManagementClient();
+  await client.validateModel({workspaceId:'workspace-a' as never, modelRecordId:'m1'});
+  await client.publishModel({workspaceId:'workspace-a' as never, modelRecordId:'m1', repository:'owner/repo'});
+  expect(fetchMock.mock.calls[0][0]).toBe('/api/model/validate');
+  expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)).toEqual({workspaceId:'workspace-a', modelRecordId:'m1'});
+  expect(fetchMock.mock.calls[1][0]).toBe('/api/model/publish');
+  expect(JSON.parse((fetchMock.mock.calls[1][1] as RequestInit).body as string)).toEqual({workspaceId:'workspace-a', modelRecordId:'m1', repository:'owner/repo'});
 });

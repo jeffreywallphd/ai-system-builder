@@ -19,8 +19,8 @@ describe("createFilesystemGeneratedImagePersistenceAdapter", () => {
     expect(result.storageKey).toBe("workspaces/workspace-a/generated/images/x.png");
     expect((await stat(path.join(store, result.storageKey))).isFile()).toBe(true);
     await expect(stat(path.join(out, "x.png"))).rejects.toThrow();
-    expect(artifactCatalogAppend.appendArtifactCatalogRecord.mock.calls[0]?.[0]?.record).toMatchObject({ sourceKind: "generated", artifactFamily: "image" });
-    expect(artifactStorageBinding.upsertArtifactStorageBinding.mock.calls[0]?.[0]?.binding).toMatchObject({ artifactId: result.artifactId, role: "primary", backing: { kind: "artifact-object", provider: "filesystem", locator: result.storageKey, verification: { exists: true } } });
+    expect(artifactCatalogAppend.appendArtifactCatalogRecord.mock.calls[0]?.[0]?.record).toMatchObject({ workspaceId: "workspace-a", sourceKind: "generated", artifactFamily: "image" });
+    expect(artifactStorageBinding.upsertArtifactStorageBinding.mock.calls[0]?.[0]?.binding).toMatchObject({ workspaceId: "workspace-a", artifactId: result.artifactId, role: "primary", backing: { kind: "artifact-object", provider: "filesystem", locator: result.storageKey, verification: { exists: true } } });
   });
 
   it("rejects path traversal in filename and subfolder", async () => {
@@ -90,6 +90,26 @@ describe("createFilesystemGeneratedImagePersistenceAdapter", () => {
     const record = artifactCatalogAppend.appendArtifactCatalogRecord.mock.calls[0]?.[0]?.record;
     expect(record.storageKey.startsWith("workspaces/workspace-a/generated/images/")).toBe(true);
     expect(record.storageKey.startsWith("workspaces/workspace-b/generated/images/")).toBe(false);
+  });
+
+  it("sanitizes artifact binding failures without leaking raw paths", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "img-binding-fail-"));
+    const out = path.join(root, "comfy");
+    const store = path.join(root, "store");
+    await mkdir(out, { recursive: true });
+    await writeFile(path.join(out, "x.png"), "abc");
+    const rawPath = path.join(root, "secret", "bindings.ndjson");
+    const artifactStorageBinding = { upsertArtifactStorageBinding: testDouble.fn(async () => ({ ok: false as const, error: { code: "unavailable" as const, message: `failed ${rawPath}` } })) };
+    const adapter = createFilesystemGeneratedImagePersistenceAdapter({ comfyUiOutputRoot: out, artifactStorageRoot: store, artifactStorageBinding });
+
+    try {
+      await adapter.persistGeneratedImage({ output: { type: "image", engine: "comfyui", fileName: "x.png" }, workspaceId: "workspace-a", requestId: "req-1" });
+      throw new Error("Expected generated image persistence to fail.");
+    } catch (error) {
+      expect(error instanceof Error).toBe(true);
+      expect((error as Error).message).toBe("Failed to persist generated image primary binding.");
+      expect(JSON.stringify(error)).not.toContain(rawPath);
+    }
   });
 
 });

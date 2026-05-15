@@ -18,8 +18,10 @@ import {
   normalizeModelInferenceMode,
   normalizeModelInventoryRecord,
   normalizeModelValidationSummary,
+  normalizePublishModelRequest,
   normalizeRegisterDownloadedModelRequest,
   normalizeRegisterGeneratedModelRequest,
+  normalizeValidateModelRequest,
   recommendModelInferenceMode,
   type BrowseModelsResult,
   type ModelInferenceMode,
@@ -199,6 +201,22 @@ describe("model contracts", () => {
       errors: undefined,
     });
     expect(MODEL_VALIDATION_STATUSES).toEqual(["unknown", "valid", "invalid", "warning"]);
+  });
+
+
+  it("requires workspace id for model validation and publishing requests", () => {
+    expect(() => normalizeValidateModelRequest({ modelRecordId: "m1" } as never)).toThrow("workspaceId must be provided");
+    expect(() => normalizePublishModelRequest({ modelRecordId: "m1", repository: "owner/repo" } as never)).toThrow("workspaceId must be provided");
+
+    expect(normalizeValidateModelRequest({ workspaceId: "workspace-a" as never, modelRecordId: " m1 " })).toMatchObject({
+      workspaceId: "workspace-a",
+      modelRecordId: "m1",
+    });
+    expect(normalizePublishModelRequest({ workspaceId: "workspace-a" as never, modelRecordId: " m1 ", repository: " owner/repo " })).toMatchObject({
+      workspaceId: "workspace-a",
+      modelRecordId: "m1",
+      repository: "owner/repo",
+    });
   });
 
   it("supports inventory backing artifact links and generated/adapter lineage fields", () => {

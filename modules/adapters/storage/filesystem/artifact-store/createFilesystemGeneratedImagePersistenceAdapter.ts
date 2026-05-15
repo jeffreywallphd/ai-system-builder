@@ -81,7 +81,7 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
           if (!appendResult.ok) throw safeFailure("Failed to register generated image artifact.");
         }
         if (options.artifactStorageBinding) {
-          const bindingResult = await options.artifactStorageBinding.upsertArtifactStorageBinding({ binding: { artifactId, role: "primary", backing: { kind: "artifact-object", provider: "filesystem", locator: storageKey, verification: { exists: true, verifiedAt: createdAt } }, createdAt } });
+          const bindingResult = await options.artifactStorageBinding.upsertArtifactStorageBinding({ binding: { workspaceId: scopedWorkspaceId, artifactId, role: "primary", backing: { kind: "artifact-object", provider: "filesystem", locator: storageKey, verification: { exists: true, verifiedAt: createdAt } }, createdAt } });
           if (!bindingResult.ok) throw safeFailure("Failed to persist generated image primary binding.");
         }
         await options.logging?.log({ timestamp: new Date().toISOString(), level: "info", verbosity: "normal", component: "storage.filesystem", event: "generated_image_persist_succeeded", message: "Persisted generated image into workspace-scoped artifact storage.", data: { storageKey, artifactId } });
