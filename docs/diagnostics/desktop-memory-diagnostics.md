@@ -124,3 +124,26 @@ Expected milestone split:
 - First ComfyUI-backed image generation/runtime action: `desktop.host.comfyui-image-runtime-features.import.*` and `desktop.host.comfyui-image-runtime-features.compose.*` along with the relevant image/runtime-task feature milestones.
 - First Python runtime control or Python-backed runtime task: `desktop.host.python-runtime-foundation.import.*` and `desktop.host.python-runtime-foundation.compose.*`.
 - First task power lifecycle action: `desktop.host.power-blocker.compose.*`.
+
+## Prompt 5 renderer route-level page code splitting
+
+Prompt 5 moves desktop renderer page implementation modules behind route-level React lazy imports. The app shell, navigation metadata, active workspace provider, workspace gate, route boundary helper, and lightweight diagnostics helper remain part of the startup-loaded renderer path. Page implementation modules for Home, Data/Artifacts, Asset Library, Models, Image Generation, Settings, and System are requested only when their route is rendered.
+
+Renderer page lazy-load diagnostics are gated by `DESKTOP_MEMORY_DIAGNOSTICS=1` and emit these milestones:
+
+- `renderer.page.lazy-load.start`: a lazy page module request has started.
+- `renderer.page.lazy-load.resolved`: the lazy page module resolved and can render.
+- `renderer.page.lazy-load.failed`: the lazy page module request rejected.
+- `renderer.page.lazy-render.fallback`: the content-area page loading fallback rendered while a lazy page is pending.
+
+The lazy-load details intentionally stay small: active page key, visible active page when known, workspace status, and whether the route requires a workspace. Workspace-required routes still pass through the existing route boundary and workspace gate before rendering the lazy page component, so a blocked route can show the workspace-required surface without importing the feature page implementation.
+
+Lazy page import is not a backend feature composition signal. Backend feature composition should still occur only when the page's mounted components make their existing preload/IPC requests, not when the renderer registers a lazy page loader or resolves a page module.
+
+To compare Prompt 5 behavior, collect a before/after renderer startup baseline with:
+
+```bash
+DESKTOP_MEMORY_DIAGNOSTICS=1 npm run dev:desktop
+```
+
+On initial startup, expect `renderer.app.mounted`, `renderer.page.active.changed`, and lazy-load milestones only for the active page. Navigating to Models should add lazy-load milestones for Models but not Image Generation; navigating to Data/Artifacts should not load Models unless the user opens Models. Main-process deferred feature compose/import milestones should remain tied to the first feature IPC request rather than to renderer lazy page import.

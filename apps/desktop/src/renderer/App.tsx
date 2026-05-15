@@ -1,16 +1,11 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 
 import { AppShell } from "./components/layout/AppShell";
+import { DesktopPageLoadingFallback } from "./components/layout/DesktopPageLoadingFallback";
 import { useDesktopPage } from "./hooks/useDesktopPage";
-import { AssetLibraryPage } from "./pages/AssetLibraryPage";
-import { ArtifactsPage } from "./pages/ArtifactsPage";
-import { HomePage } from "./pages/HomePage";
-import { ModelsPage } from "./pages/ModelsPage";
-import { ImageGenerationPage } from "./pages/ImageGenerationPage";
-import { SettingsPage } from "./pages/SettingsPage";
-import { SystemPage } from "./pages/SystemPage";
 import { ActiveWorkspaceProvider, WorkspaceGate, WorkspaceRequiredSurface, useActiveWorkspace, type WorkspaceUiRecord } from "./features/workspace";
 import { desktopPageDefinitions, desktopPageRequiresWorkspace, type DesktopPageKey } from "./routes/desktopPages";
+import { desktopLazyPages, type DesktopLazyPageRegistry } from "./routes/lazyDesktopPages";
 import { resolveDesktopWorkspaceRouteBoundary } from "./routes/workspaceRouteBoundary";
 import { recordRendererMemorySnapshot } from "./diagnostics/rendererMemoryDiagnostics";
 
@@ -31,7 +26,11 @@ export function App() {
   );
 }
 
-function WorkspaceAwareDesktopApp() {
+export interface WorkspaceAwareDesktopAppProps {
+  readonly lazyPages?: DesktopLazyPageRegistry;
+}
+
+export function WorkspaceAwareDesktopApp({ lazyPages = desktopLazyPages }: WorkspaceAwareDesktopAppProps = {}) {
   const { activePage, setActivePage } = useDesktopPage();
   const workspace = useActiveWorkspace();
   const [artifactRefreshToken, setArtifactRefreshToken] = useState(0);
@@ -39,10 +38,19 @@ function WorkspaceAwareDesktopApp() {
   const activePageDefinition = desktopPageDefinitions.find((page) => page.key === activePage);
   const routeRequiresWorkspace = desktopPageRequiresWorkspace(activePage);
   const routeBoundary = resolveDesktopWorkspaceRouteBoundary(activePage, workspace.status);
+  const lazyPageFallback = (
+    <DesktopPageLoadingFallback
+      activePage={activePage}
+      visibleActivePage={routeBoundary.visibleActivePage}
+      workspaceStatus={workspace.status}
+      routeRequiresWorkspace={routeRequiresWorkspace}
+    />
+  );
 
   const renderWorkspacePageContent = (page: DesktopWorkspacePageKey, activeWorkspace: WorkspaceUiRecord): ReactNode => {
     switch (page) {
-      case "artifacts":
+      case "artifacts": {
+        const ArtifactsPage = lazyPages.artifacts;
         return (
           <ArtifactsPage
             workspaceId={activeWorkspace.id}
@@ -53,23 +61,36 @@ function WorkspaceAwareDesktopApp() {
             }}
           />
         );
-      case "assets":
+      }
+      case "assets": {
+        const AssetLibraryPage = lazyPages.assets;
         return <AssetLibraryPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
-      case "models":
+      }
+      case "models": {
+        const ModelsPage = lazyPages.models;
         return <ModelsPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
-      case "image-generation":
+      }
+      case "image-generation": {
+        const ImageGenerationPage = lazyPages["image-generation"];
         return <ImageGenerationPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
+      }
     }
   };
 
   const renderGlobalPageContent = (page: DesktopPageKey): ReactNode => {
     switch (page) {
-      case "home":
+      case "home": {
+        const HomePage = lazyPages.home;
         return <HomePage onGoToArtifacts={() => setActivePage("artifacts")} />;
-      case "settings":
+      }
+      case "settings": {
+        const SettingsPage = lazyPages.settings;
         return <SettingsPage />;
-      case "system":
+      }
+      case "system": {
+        const SystemPage = lazyPages.system;
         return <SystemPage />;
+      }
       default:
         return <WorkspaceRequiredSurface />;
     }
@@ -101,7 +122,7 @@ function WorkspaceAwareDesktopApp() {
       onNavigate={setActivePage}
       pages={desktopPageDefinitions}
     >
-      {content}
+      <Suspense fallback={lazyPageFallback}>{content}</Suspense>
     </AppShell>
   );
 }
