@@ -40,6 +40,7 @@ describe("desktop artifact upload ipc contract", () => {
         fileName: "  kitten.png  ",
         mediaType: " image/png ",
         bytes,
+        workspaceId: "workspace-a",
         boundary: {
           host: "desktop",
           source: "  desktop.renderer.artifact-upload.form  ",
@@ -58,6 +59,7 @@ describe("desktop artifact upload ipc contract", () => {
         fileName: "kitten.png",
         mediaType: "image/png",
         bytes,
+        workspaceId: "workspace-a",
         boundary: {
           host: "desktop",
           source: "desktop.renderer.artifact-upload.form",

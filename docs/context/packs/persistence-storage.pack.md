@@ -59,6 +59,10 @@
 - Keep persistence adapters and storage adapters as distinct responsibilities.
 - Keep provider import semantics and provider publication semantics explicit; do not flatten them into local blob put/get assumptions.
 - For app-layer seams, pass request metadata through `ApplicationRequestContext` and keep storage request payload contracts focused on storage semantics.
+- Workspace-scoped artifact content reads must validate the workspace/catalog record before retrieving bytes; byte reads must not run after missing workspace, wrong workspace, missing record, or catalog-unavailable failures. Missing artifact catalog files are empty catalogs, but non-`ENOENT` read failures are safe operational failures, not empty lists.
+- Public storage/catalog/generated-image failures must not include raw filesystem messages, absolute paths, storage roots, raw JSON lines, env/command values, stack traces, or resource contents. Safe details are limited to operation, filesystem error code, sanitized storage key when the key is already public contract vocabulary, and request/correlation ids.
+- Workspace-owned upload clients must require an active workspace id and include it in API/IPC/form-data requests; client hooks should block workspace-owned uploads before transport when no active workspace is available.
+- Normal model UI/API read models should not expose `localPath`, `validationReportPath`, or equivalent local filesystem diagnostics; keep those fields internal/admin-only unless explicitly documented and tested.
 
 - Phase 6 Prompt 2 adds workspace storage descriptor contracts only. `WorkspaceStorageRootDescriptor` is path-free UI/public vocabulary; do not add workspace repositories, migrations, directory creation, active-selection persistence, activation storage behavior, or resource scoping until later Phase 6 prompts.
 

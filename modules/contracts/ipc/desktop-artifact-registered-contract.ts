@@ -63,6 +63,7 @@ export function createDesktopArtifactRegisteredDeleteRequest(
     DESKTOP_ARTIFACT_REGISTERED_DELETE_REQUEST_CHANNEL,
     {
       storageKey: normalizeRequiredText(payload.storageKey, "storageKey"),
+      workspaceId: createWorkspaceId(payload.workspaceId),
       boundary: {
         host: "desktop",
         source: normalizeRequiredText(payload.boundary.source, "boundary.source"),

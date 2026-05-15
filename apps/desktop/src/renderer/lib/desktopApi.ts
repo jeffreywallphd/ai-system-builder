@@ -55,7 +55,7 @@ import type {
 import type { ActiveWorkspaceSelection, CreateWorkspaceCommand } from "../../../../../modules/contracts/workspace";
 
 export interface DesktopArtifactUploadInput {
-  workspaceId?: string;
+  workspaceId: string;
   fileName: string;
   mediaType: string;
   bytes: Uint8Array;

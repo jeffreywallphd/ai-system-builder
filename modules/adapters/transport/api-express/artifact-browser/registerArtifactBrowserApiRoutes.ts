@@ -138,7 +138,7 @@ function resolveStatusCode(
 
 export function mapArtifactBrowseApiRequestToCommand(
   requestBody: ArtifactBrowseApiRequestBody,
-  context: { requestId?: string; correlationId?: string },
+  context: { requestId?: string; correlationId?: string; workspaceId?: string },
 ): BrowseArtifactsCommand {
   const apiRequest = createApiArtifactBrowseRequest(
     {
@@ -162,7 +162,7 @@ export function mapArtifactBrowseApiRequestToCommand(
 
 export function mapArtifactReadApiRequestToCommand(
   requestBody: ArtifactReadApiRequestBody,
-  context: { requestId?: string; correlationId?: string },
+  context: { requestId?: string; correlationId?: string; workspaceId?: string },
 ): ReadArtifactDetailCommand {
   const apiRequest = createApiArtifactReadRequest(
     {
@@ -182,7 +182,7 @@ export function mapArtifactReadApiRequestToCommand(
 
 export function mapArtifactContentReadApiRequestToCommand(
   requestBody: ArtifactReadApiRequestBody,
-  context: { requestId?: string; correlationId?: string },
+  context: { requestId?: string; correlationId?: string; workspaceId?: string },
 ): ReadArtifactContentCommand {
   const apiRequest = createApiArtifactContentReadRequest(
     {
@@ -202,7 +202,7 @@ export function mapArtifactContentReadApiRequestToCommand(
 
 export function mapArtifactRegisteredDeleteApiRequestToCommand(
   requestBody: ArtifactReadApiRequestBody,
-  context: { requestId?: string; correlationId?: string },
+  context: { requestId?: string; correlationId?: string; workspaceId?: string },
 ): DeleteRegisteredArtifactCommand {
   const apiRequest = createApiArtifactRegisteredDeleteRequest(
     {
@@ -235,7 +235,7 @@ export function mapArtifactMediaViewApiRequest(
 
 export function mapBrowseArtifactsResultToApiResponse(
   result: BrowseArtifactsUseCaseResult,
-  context: { requestId?: string; correlationId?: string },
+  context: { requestId?: string; correlationId?: string; workspaceId?: string },
 ): ApiArtifactBrowseResponse {
   if (result.ok) {
     return createApiArtifactBrowseSuccessResponse(result.value, {
@@ -259,7 +259,7 @@ export function mapBrowseArtifactsResultToApiResponse(
 
 export function mapReadArtifactDetailResultToApiResponse(
   result: ReadArtifactDetailUseCaseResult,
-  context: { requestId?: string; correlationId?: string },
+  context: { requestId?: string; correlationId?: string; workspaceId?: string },
 ): ApiArtifactReadResponse {
   if (result.ok) {
     return createApiArtifactReadSuccessResponse(result.value, {
@@ -283,7 +283,7 @@ export function mapReadArtifactDetailResultToApiResponse(
 
 export function mapReadArtifactContentResultToApiResponse(
   result: ReadArtifactContentUseCaseResult,
-  context: { requestId?: string; correlationId?: string },
+  context: { requestId?: string; correlationId?: string; workspaceId?: string },
 ): ApiArtifactContentReadResponse {
   if (result.ok) {
     return createApiArtifactContentReadSuccessResponse(result.value, {

@@ -73,6 +73,7 @@ function normalizeDesktopArtifactMediaViewPayload(
 ): DesktopArtifactMediaViewRequestPayload {
   return {
     storageKey: normalizeRequiredTextField(payload.storageKey, "storageKey"),
+    workspaceId: createWorkspaceId(payload.workspaceId),
     boundary: {
       host: "desktop",
       source: normalizeRequiredTextField(payload.boundary.source, "boundary.source"),

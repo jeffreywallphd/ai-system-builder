@@ -6,8 +6,28 @@ import type { LoggingPort } from "../../../../application/ports/logging";
 import type { GeneratedImagePersistencePort } from "../../../../application/ports/image";
 import type { ArtifactCatalogAppendPort } from "../../../../application/ports/artifact-catalog";
 import type { ArtifactStorageBindingPort } from "../../../../application/ports/storage";
-import { isWorkspaceId } from "../../../../contracts/workspace";
+import { normalizeStorageArtifactKey } from "../../../../contracts/storage";
+import { createWorkspaceId } from "../../../../contracts/workspace";
 import { SystemArtifactIdFactory } from "../../../../domain/artifact";
+
+class GeneratedImagePersistenceSafeError extends Error {}
+
+function toSafeGeneratedImageError(error: unknown): Error {
+  if (error instanceof GeneratedImagePersistenceSafeError) {
+    return error;
+  }
+
+  if (error instanceof Error && error.message.startsWith("Workspace id must be")) {
+    error.stack = undefined;
+    return error;
+  }
+
+  return new Error("Failed to persist generated image.");
+}
+
+function safeFailure(message: string): GeneratedImagePersistenceSafeError {
+  return new GeneratedImagePersistenceSafeError(message);
+}
 
 export function createFilesystemGeneratedImagePersistenceAdapter(options: {
   comfyUiOutputRoot: string;
@@ -24,49 +44,52 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
 
   return {
     async persistGeneratedImage({ output, workspaceId }) {
-      if (!isWorkspaceId(workspaceId)) throw new Error("Workspace id is required for generated image persistence.");
-      const artifactId = artifactIdFactory.createArtifactId().toString();
-      const desiredFileName = sanitizeFileName(output.fileName) ?? "generated-image.png";
-      const storageKey = await reserveGeneratedImageStorageKey(storageRoot, workspaceId, desiredFileName);
-      const destinationPath = path.join(storageRoot, storageKey);
-      await mkdir(path.dirname(destinationPath), { recursive: true });
+      try {
+        const scopedWorkspaceId = createWorkspaceId(workspaceId);
+        const sourcePath = resolveContainedOutputPath(outputRoot, output.subfolder, output.fileName);
+        const artifactId = artifactIdFactory.createArtifactId().toString();
+        const desiredFileName = sanitizeFileName(output.fileName) ?? "generated-image.png";
+        const storageKey = await reserveGeneratedImageStorageKey(storageRoot, scopedWorkspaceId, desiredFileName);
+        const destinationPath = path.join(storageRoot, storageKey);
+        await mkdir(path.dirname(destinationPath), { recursive: true });
 
-      if (output.contentBase64 && output.contentBase64.trim()) {
-        await options.logging?.log({ timestamp: new Date().toISOString(), level: "info", verbosity: "normal", component: "storage.filesystem", event: "generated_image_inline_content_persisted", message: `Persisting generated image from inline output content for ${output.fileName}.` });
-        await writeFile(destinationPath, Buffer.from(output.contentBase64, "base64"));
-        const sourcePath = resolveContainedOutputPath(outputRoot, output.subfolder, output.fileName);
-        await rm(sourcePath, { force: true }).catch(() => undefined);
-      } else {
-        const sourcePath = resolveContainedOutputPath(outputRoot, output.subfolder, output.fileName);
-        try {
-          await rename(sourcePath, destinationPath);
-        } catch (error) {
-          const err = error as NodeJS.ErrnoException;
-          if (err.code !== "EXDEV") throw error;
-          await options.logging?.log({ timestamp: new Date().toISOString(), level: "warn", verbosity: "normal", component: "storage.filesystem", event: "generated_image_move_fallback", message: "Cross-device rename failed, using copy-delete fallback." });
-          await copyFile(sourcePath, destinationPath);
-          await rm(sourcePath);
+        if (output.contentBase64 && output.contentBase64.trim()) {
+          await options.logging?.log({ timestamp: new Date().toISOString(), level: "info", verbosity: "normal", component: "storage.filesystem", event: "generated_image_inline_content_persisted", message: "Persisting generated image from inline output content." });
+          await writeFile(destinationPath, Buffer.from(output.contentBase64, "base64"));
+          await rm(sourcePath, { force: true }).catch(() => undefined);
+        } else {
+          try {
+            await rename(sourcePath, destinationPath);
+          } catch (error) {
+            const err = error as NodeJS.ErrnoException;
+            if (err.code !== "EXDEV") throw error;
+            await options.logging?.log({ timestamp: new Date().toISOString(), level: "warn", verbosity: "normal", component: "storage.filesystem", event: "generated_image_move_fallback", message: "Cross-device rename failed, using copy-delete fallback." });
+            await copyFile(sourcePath, destinationPath);
+            await rm(sourcePath);
+          }
+          await stat(sourcePath).then(() => { throw safeFailure("Generated image source still exists after finalization."); }, () => undefined);
+          await options.logging?.log({ timestamp: new Date().toISOString(), level: "info", verbosity: "normal", component: "storage.filesystem", event: "generated_image_output_deleted", message: "Deleted ComfyUI output after persistence." });
         }
-        await stat(sourcePath).then(() => { throw new Error("Generated image source still exists after finalization."); }, () => undefined);
-        await options.logging?.log({ timestamp: new Date().toISOString(), level: "info", verbosity: "normal", component: "storage.filesystem", event: "generated_image_output_deleted", message: `Deleted ComfyUI output after persistence for ${output.fileName}.` });
-      }
 
-      const [destinationStats, destinationBytes] = await Promise.all([stat(destinationPath), readFile(destinationPath)]);
-      if (!destinationStats.isFile()) throw new Error("Generated image destination is not a file.");
+        const [destinationStats, destinationBytes] = await Promise.all([stat(destinationPath), readFile(destinationPath)]);
+        if (!destinationStats.isFile()) throw safeFailure("Generated image destination is not a file.");
 
-      const checksum = { algorithm: "sha256" as const, value: createHash("sha256").update(destinationBytes).digest("hex") };
-      const createdAt = now();
-      if (options.artifactCatalogAppend) {
-        const appendResult = await options.artifactCatalogAppend.appendArtifactCatalogRecord({ record: { workspaceId, storageKey, artifactFamily: "image", mediaType: "image/png", sizeBytes: destinationStats.size, sourceKind: "generated", originalName: output.fileName, createdAt, checksum } });
-        if (!appendResult.ok) throw new Error(`Failed to register generated image artifact: ${appendResult.error.message}`);
-      }
-      if (options.artifactStorageBinding) {
-        const bindingResult = await options.artifactStorageBinding.upsertArtifactStorageBinding({ workspaceId, binding: { artifactId, role: "primary", backing: { kind: "artifact-object", provider: "filesystem", locator: storageKey, verification: { exists: true, verifiedAt: createdAt } }, createdAt } });
-        if (!bindingResult.ok) throw new Error(`Failed to persist generated image primary binding: ${bindingResult.error.message}`);
-      }
-      await options.logging?.log({ timestamp: new Date().toISOString(), level: "info", verbosity: "normal", component: "storage.filesystem", event: "generated_image_persist_succeeded", message: `Persisted generated image ${output.fileName} as ${storageKey} (${artifactId}).` });
+        const checksum = { algorithm: "sha256" as const, value: createHash("sha256").update(destinationBytes).digest("hex") };
+        const createdAt = now();
+        if (options.artifactCatalogAppend) {
+          const appendResult = await options.artifactCatalogAppend.appendArtifactCatalogRecord({ record: { workspaceId: scopedWorkspaceId, storageKey, artifactFamily: "image", mediaType: "image/png", sizeBytes: destinationStats.size, sourceKind: "generated", originalName: output.fileName, createdAt, checksum } });
+          if (!appendResult.ok) throw safeFailure("Failed to register generated image artifact.");
+        }
+        if (options.artifactStorageBinding) {
+          const bindingResult = await options.artifactStorageBinding.upsertArtifactStorageBinding({ binding: { artifactId, role: "primary", backing: { kind: "artifact-object", provider: "filesystem", locator: storageKey, verification: { exists: true, verifiedAt: createdAt } }, createdAt } });
+          if (!bindingResult.ok) throw safeFailure("Failed to persist generated image primary binding.");
+        }
+        await options.logging?.log({ timestamp: new Date().toISOString(), level: "info", verbosity: "normal", component: "storage.filesystem", event: "generated_image_persist_succeeded", message: "Persisted generated image into workspace-scoped artifact storage.", data: { storageKey, artifactId } });
 
-      return { artifactId, storageKey, mediaType: "image/png", sizeBytes: destinationStats.size, checksum, originalFileName: output.fileName };
+        return { artifactId, storageKey, mediaType: "image/png", sizeBytes: destinationStats.size, checksum, originalFileName: output.fileName };
+      } catch (error) {
+        throw toSafeGeneratedImageError(error);
+      }
     },
   };
 }
@@ -74,7 +97,7 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
 function resolveContainedOutputPath(outputRoot: string, subfolder: string | undefined, fileName: string): string {
   const sourcePath = path.resolve(outputRoot, subfolder ?? "", fileName);
   const relativeOutput = path.relative(outputRoot, sourcePath);
-  if (relativeOutput.startsWith("..") || path.isAbsolute(relativeOutput)) throw new Error("ComfyUI output path traversal rejected.");
+  if (relativeOutput.startsWith("..") || path.isAbsolute(relativeOutput)) throw safeFailure("Generated image output path is invalid.");
   return sourcePath;
 }
 
@@ -95,13 +118,17 @@ async function reserveGeneratedImageStorageKey(storageRoot: string, workspaceId:
   let next = 0;
   while (next < 10_000) {
     const candidate = next === 0 ? `${base}${ext}` : `${base}-${next + 1}${ext}`;
-    const storageKey = `workspaces/${workspaceId}/generated/images/${candidate}`;
+    const storageKey = normalizeStorageArtifactKey(`workspaces/${createWorkspaceId(workspaceId)}/generated/images/${candidate}`);
     try {
       await access(path.join(storageRoot, storageKey), constants.F_OK);
       next += 1;
-    } catch {
-      return storageKey;
+    } catch (error) {
+      const fsError = error as NodeJS.ErrnoException;
+      if (fsError.code === "ENOENT") {
+        return storageKey;
+      }
+      throw error;
     }
   }
-  throw new Error("Unable to reserve generated image file name.");
+  throw safeFailure("Unable to reserve generated image file name.");
 }

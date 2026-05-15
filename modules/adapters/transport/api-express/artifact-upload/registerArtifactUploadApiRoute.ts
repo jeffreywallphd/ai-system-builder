@@ -232,11 +232,7 @@ export function registerArtifactUploadApiRoute(
     const result = await dependencies.storeArtifactUploadUseCase.execute(
       mapping.command,
       mapping.commandContext,
-      {
-        requestId,
-        correlationId,
-        workspaceId: mapping.commandContext.workspaceId,
-      },
+      { requestId, correlationId, workspaceId: mapping.commandContext.workspaceId } as { requestId?: string; correlationId?: string; workspaceId?: string },
     );
 
     const apiResponse = mapStoreArtifactUploadResultToApiResponse(result, {

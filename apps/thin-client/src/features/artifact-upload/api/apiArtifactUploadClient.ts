@@ -5,7 +5,7 @@ export interface ThinClientArtifactUploadInput {
   mediaType: string;
   bytes: Uint8Array;
   source?: string;
-  workspaceId?: string;
+  workspaceId: string;
 }
 
 export interface ThinClientArtifactUploadAcceptedTypePolicy {
@@ -141,9 +141,7 @@ function createUploadFormData(input: ThinClientArtifactUploadInput): FormData {
 
   formData.append("file", file);
   formData.append("source", input.source ?? DEFAULT_UPLOAD_SOURCE);
-  if (input.workspaceId) {
-    formData.append("workspaceId", input.workspaceId);
-  }
+  formData.append("workspaceId", input.workspaceId);
 
   return formData;
 }
@@ -157,6 +155,10 @@ export function createApiArtifactUploadClient(
 
   return {
     async uploadArtifact(input: ThinClientArtifactUploadInput): Promise<ThinClientArtifactUploadResult> {
+      if (!input.workspaceId?.trim()) {
+        return { ok: false, error: { code: "validation", message: "Workspace id is required for artifact upload." } };
+      }
+
       const response = await secureFetch(uploadUrl, {
         method: "POST",
         body: createUploadFormData(input),

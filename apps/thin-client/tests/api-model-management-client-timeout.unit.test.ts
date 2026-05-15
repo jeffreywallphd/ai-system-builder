@@ -34,7 +34,10 @@ describe("api model management client request timeouts", () => {
     });
 
     expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), MODEL_MANAGEMENT_DOWNLOAD_REQUEST_TIMEOUT_MS);
-    await result;
+    const resolved = await result;
+    expect(JSON.stringify(resolved)).not.toContain("/models/sdxl");
+    expect("localPath" in resolved.model).toBe(false);
+    expect("localPath" in resolved.download).toBe(false);
   });
 
   it("keeps short request timeouts short for list operations", async () => {
