@@ -36,3 +36,4 @@ Use one of: `proposed`, `accepted`, `superseded`, `deprecated`.
 - ADR-0014: Runtime Installer Architecture
 - ADR-0015: Security Architecture and Policy Boundaries (canonical security architecture boundaries across host, transport, storage, runtime, and policy layering)
 - ADR-0016: Asset Kernel Terminology and Architecture Baseline (accepted Phase 2A Asset Kernel vocabulary and sequence refining ADR-0005)
+- ADR-0017: User Library and Cross-Workspace Asset Reuse (accepted Phase 7 ownership/reuse baseline for user-library assets, explicit promote/link/copy/import relationships, provenance, and propagation constraints)
