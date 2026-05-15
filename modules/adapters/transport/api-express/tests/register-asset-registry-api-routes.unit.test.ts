@@ -80,7 +80,7 @@ describe("registerAssetRegistryApiRoutes", () => {
     const { res, status, json } = response();
     await handlers.get("/api/assets/definitions")({
       headers: { "x-request-id": "r1", "x-correlation-id": "c1" },
-      query: { q: "flow", assetType: "workflow,tool", assetFamily: "behavioral", lifecycleStatus: "published", builtIn: "built-in", limit: "10", cursor: "abc-123", includeMetadata: "true" },
+      query: { workspaceId: "workspace.alpha", q: "flow", assetType: "workflow,tool", assetFamily: "behavioral", lifecycleStatus: "published", builtIn: "built-in", limit: "10", cursor: "abc-123", includeMetadata: "true" },
     }, res);
 
     expect(listDefinitionCards).toHaveBeenCalledWith({
@@ -91,6 +91,7 @@ describe("registerAssetRegistryApiRoutes", () => {
       includeBuiltIns: undefined,
       includeCustom: false,
       includeMetadata: true,
+      workspaceId: "workspace.alpha",
       limit: 10,
       cursor: "abc-123",
     });
@@ -104,11 +105,11 @@ describe("registerAssetRegistryApiRoutes", () => {
     registerAssetRegistryApiRoutes({ app, assetRegistryRead: { listDefinitionCards: testDouble.fn(), readDefinitionDetail } as any });
 
     const { res, status, json } = response();
-    await handlers.get("/api/assets/definitions/:definitionId")({ params: { definitionId: "builtin.workflow" }, query: { version: "1.0.0", expand: "aiContext,metadata,ports", includeValidation: "true" }, headers: {} }, res);
+    await handlers.get("/api/assets/definitions/:definitionId")({ params: { definitionId: "builtin.workflow" }, query: { workspaceId: "workspace.alpha", version: "1.0.0", expand: "aiContext,metadata,ports", includeValidation: "true" }, headers: {} }, res);
 
     expect(readDefinitionDetail).toHaveBeenCalledWith(
       { kind: "asset-definition", id: "builtin.workflow", version: "1.0.0" },
-      { includeValidation: true, includeAiContext: true, includeConfigurationSchema: false, includePorts: true, includeRequirements: false, includeMetadata: true },
+      { includeValidation: true, includeAiContext: true, includeConfigurationSchema: false, includePorts: true, includeRequirements: false, includeMetadata: true, workspaceId: "workspace.alpha" },
     );
     expect(status).toHaveBeenCalledWith(200);
     expect(json.mock.calls[0]?.[0]).toMatchObject({ ok: true, operation: "asset.definition-read", value: { builtIn: true } });
@@ -120,9 +121,10 @@ describe("registerAssetRegistryApiRoutes", () => {
     registerAssetRegistryApiRoutes({ app, assetRegistryRead: { listDefinitionCards: testDouble.fn(), readDefinitionDetail } as any });
     const { res, status, json } = response();
 
-    await handlers.get("/api/assets/definitions/:definitionId/versions/:version")({ params: { definitionId: "builtin.workflow", version: "2.0.0" }, query: {}, headers: {} }, res);
+    await handlers.get("/api/assets/definitions/:definitionId/versions/:version")({ params: { definitionId: "builtin.workflow", version: "2.0.0" }, query: { workspaceId: "workspace.alpha" }, headers: {} }, res);
 
-    expect(readDefinitionDetail).toHaveBeenCalledWith({ kind: "asset-definition", id: "builtin.workflow", version: "2.0.0" }, expect.any(Object));
+    expect(readDefinitionDetail.mock.calls[0]?.[0]).toEqual({ kind: "asset-definition", id: "builtin.workflow", version: "2.0.0" });
+    expect(readDefinitionDetail.mock.calls[0]?.[1]).toMatchObject({ workspaceId: "workspace.alpha" });
     expect(status).toHaveBeenCalledWith(200);
     expect(json.mock.calls[0]?.[0]).toMatchObject({ ok: true, operation: "asset.definition-version-read" });
   });
@@ -146,7 +148,7 @@ describe("registerAssetRegistryApiRoutes", () => {
 
     await handlers.get("/api/assets/resource-backed-views")({
       headers: { "x-request-id": "r-view", "x-correlation-id": "c-view" },
-      query: { q: "generated", viewKind: "generated-output", limit: "10", includeMetadata: "true" },
+      query: { workspaceId: "workspace.alpha", q: "generated", viewKind: "generated-output", limit: "10", includeMetadata: "true" },
     }, res);
 
     expect(listResourceBackedViewCards).toHaveBeenCalledWith({
@@ -156,6 +158,7 @@ describe("registerAssetRegistryApiRoutes", () => {
       lifecycleStatuses: undefined,
       viewKinds: ["generated-output"],
       includeMetadata: true,
+      workspaceId: "workspace.alpha",
       limit: 10,
       cursor: undefined,
     });
@@ -196,12 +199,12 @@ describe("registerAssetRegistryApiRoutes", () => {
     const first = response();
     await handlers.get("/api/assets/resource-backed-views/:viewId")({
       params: { viewId: "asset-view.external-repository-object.internal.1" },
-      query: { expand: "metadata,resourceBackings" },
+      query: { workspaceId: "workspace.alpha", expand: "metadata,resourceBackings" },
       headers: {},
     }, first.res);
     expect(readResourceBackedViewDetail).toHaveBeenCalledWith(
       "asset-view.external-repository-object.internal.1",
-      { includeValidation: false, includeMetadata: true, includeResourceBackings: true },
+      { includeValidation: false, includeMetadata: true, includeResourceBackings: true, workspaceId: "workspace.alpha" },
     );
     expect(first.status).toHaveBeenCalledWith(200);
     expectNoUnsafePayloadValues(first.json.mock.calls[0]?.[0]);
@@ -209,7 +212,7 @@ describe("registerAssetRegistryApiRoutes", () => {
     const second = response();
     await handlers.get("/api/assets/resource-backed-views/:viewId")({
       params: { viewId: "missing-view" },
-      query: {},
+      query: { workspaceId: "workspace.alpha" },
       headers: {},
     }, second.res);
     expect(second.status).toHaveBeenCalledWith(404);
@@ -224,13 +227,13 @@ describe("registerAssetRegistryApiRoutes", () => {
 
     await handlers.get("/api/assets/definitions/:definitionId")({
       params: { definitionId: "builtin.workflow" },
-      query: { expand: "aiContext,metadata" },
+      query: { workspaceId: "workspace.alpha", expand: "aiContext,metadata" },
       headers: {},
     }, res);
 
     expect(readDefinitionDetail).toHaveBeenCalledWith(
       { kind: "asset-definition", id: "builtin.workflow" },
-      { includeValidation: undefined, includeAiContext: true, includeConfigurationSchema: false, includePorts: false, includeRequirements: false, includeMetadata: true },
+      { includeValidation: undefined, includeAiContext: true, includeConfigurationSchema: false, includePorts: false, includeRequirements: false, includeMetadata: true, workspaceId: "workspace.alpha" },
     );
   });
 
@@ -239,10 +242,40 @@ describe("registerAssetRegistryApiRoutes", () => {
     registerAssetRegistryApiRoutes({ app, assetRegistryRead: { listDefinitionCards: testDouble.fn(), readDefinitionDetail: testDouble.fn(async () => undefined) } as any });
     const { res, status, json } = response();
 
-    await handlers.get("/api/assets/definitions/:definitionId")({ params: { definitionId: "missing" }, query: {}, headers: {} }, res);
+    await handlers.get("/api/assets/definitions/:definitionId")({ params: { definitionId: "missing" }, query: { workspaceId: "workspace.alpha" }, headers: {} }, res);
 
     expect(status).toHaveBeenCalledWith(404);
     expect(json.mock.calls[0]?.[0]).toMatchObject({ ok: false, error: { code: "not-found" } });
+  });
+
+
+  it("requires workspace context on all Asset Registry read routes before calling the facade", async () => {
+    const { app, handlers } = appAndHandlers();
+    const listDefinitionCards = testDouble.fn();
+    const readDefinitionDetail = testDouble.fn();
+    const listResourceBackedViewCards = testDouble.fn();
+    const readResourceBackedViewDetail = testDouble.fn();
+    registerAssetRegistryApiRoutes({ app, assetRegistryRead: { listDefinitionCards, readDefinitionDetail, listResourceBackedViewCards, readResourceBackedViewDetail } as any });
+
+    const cases = [
+      ["/api/assets/definitions", { query: {}, headers: {} }],
+      ["/api/assets/definitions/:definitionId", { params: { definitionId: "builtin.workflow" }, query: {}, headers: {} }],
+      ["/api/assets/definitions/:definitionId/versions/:version", { params: { definitionId: "builtin.workflow", version: "1.0.0" }, query: {}, headers: {} }],
+      ["/api/assets/resource-backed-views", { query: {}, headers: {} }],
+      ["/api/assets/resource-backed-views/:viewId", { params: { viewId: "asset-view.generated-output.internal.1" }, query: {}, headers: {} }],
+    ] as const;
+
+    for (const [route, request] of cases) {
+      const { res, status, json } = response();
+      await handlers.get(route)(request, res);
+      expect(status).toHaveBeenCalledWith(400);
+      expect(json.mock.calls[0]?.[0]).toMatchObject({ ok: false, error: { code: "validation", message: "Workspace id is required for Asset Library reads." } });
+    }
+
+    expect(listDefinitionCards).not.toHaveBeenCalled();
+    expect(readDefinitionDetail).not.toHaveBeenCalled();
+    expect(listResourceBackedViewCards).not.toHaveBeenCalled();
+    expect(readResourceBackedViewDetail).not.toHaveBeenCalled();
   });
 
   it("rejects invalid public query parameters with validation failures", async () => {
@@ -286,7 +319,7 @@ describe("registerAssetRegistryApiRoutes", () => {
     registerAssetRegistryApiRoutes({ app, assetRegistryRead: { listDefinitionCards: testDouble.fn(async () => { throw new Error("raw exception /tmp/root Bearer token secret apiKey password stack command base64 blob provider payload"); }), readDefinitionDetail: testDouble.fn() } as any });
     const { res, status, json } = response();
 
-    await handlers.get("/api/assets/definitions")({ query: {}, headers: { "x-request-id": "r-fail" } }, res);
+    await handlers.get("/api/assets/definitions")({ query: { workspaceId: "workspace.alpha" }, headers: { "x-request-id": "r-fail" } }, res);
 
     expect(status).toHaveBeenCalledWith(500);
     expect(JSON.stringify(json.mock.calls[0]?.[0])).toContain("Unable to read asset definitions.");
@@ -300,7 +333,7 @@ describe("registerAssetRegistryApiRoutes", () => {
     registerAssetRegistryApiRoutes({ app, assetRegistryRead: { listDefinitionCards, readDefinitionDetail: testDouble.fn(), noScan } as any });
     const { res } = response();
 
-    await handlers.get("/api/assets/definitions")({ query: {}, headers: {} }, res);
+    await handlers.get("/api/assets/definitions")({ query: { workspaceId: "workspace.alpha" }, headers: {} }, res);
 
     expect(listDefinitionCards).toHaveBeenCalledTimes(1);
     expect(noScan).not.toHaveBeenCalled();
@@ -341,7 +374,7 @@ describe("registerAssetRegistryApiRoutes", () => {
     });
     const { res, json } = response();
 
-    await handlers.get("/api/assets/definitions/:definitionId")({ params: { definitionId: "builtin.workflow" }, query: { expand: "metadata" }, headers: {} }, res);
+    await handlers.get("/api/assets/definitions/:definitionId")({ params: { definitionId: "builtin.workflow" }, query: { workspaceId: "workspace.alpha", expand: "metadata" }, headers: {} }, res);
 
     expect(JSON.stringify(json.mock.calls[0]?.[0])).toContain("safe");
     expectNoUnsafePayloadValues(json.mock.calls[0]?.[0]);
