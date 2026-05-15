@@ -7,6 +7,7 @@ import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-elect
 import { composeDesktopHost } from "../composeDesktopHost";
 import {
   DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL,
   DESKTOP_COMFYUI_INSTALL_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_IMAGE_GENERATION_START_REQUEST_CHANNEL,
   DESKTOP_MODEL_LIST_REQUEST_CHANNEL,
@@ -14,6 +15,7 @@ import {
   DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL,
   DESKTOP_WORKSPACE_SELECTION_READ_REQUEST_CHANNEL,
   createDesktopArtifactBrowseRequest,
+  createDesktopAssetDefinitionsListRequest,
   createDesktopComfyUiInstallStatusRequest,
   createDesktopImageGenerationStartRequest,
   createDesktopModelListRequest,
@@ -89,15 +91,26 @@ async function captureMemoryMilestones<T>(run: () => T | Promise<T>): Promise<{ 
 }
 
 const deferredMilestones = [
+  "desktop.host.artifact-features.import.before",
   "desktop.host.artifact-features.compose.before",
+  "desktop.host.artifact-remote-features.import.before",
+  "desktop.host.artifact-remote-features.compose.before",
+  "desktop.host.asset-features.import.before",
   "desktop.host.asset-features.compose.before",
+  "desktop.host.model-features.import.before",
   "desktop.host.model-features.compose.before",
+  "desktop.host.image-generation-features.import.before",
   "desktop.host.image-generation-features.compose.before",
+  "desktop.host.ingestion-features.import.before",
   "desktop.host.ingestion-features.compose.before",
+  "desktop.host.dataset-preparation-features.import.before",
   "desktop.host.dataset-preparation-features.compose.before",
-  "desktop.host.huggingface-features.compose.before",
+  "desktop.host.comfyui-features.import.before",
   "desktop.host.comfyui-features.compose.before",
+  "desktop.host.runtime-task-features.import.before",
   "desktop.host.runtime-task-features.compose.before",
+  "desktop.host.python-runtime-foundation.import.before",
+  "desktop.host.python-runtime-foundation.compose.before",
 ];
 
 describe("desktop startup lazy composition contract", () => {
@@ -165,6 +178,12 @@ describe("desktop startup lazy composition contract", () => {
       })));
     expect(artifactMilestones).toContain("desktop.host.artifact-features.compose.before");
     expect(artifactMilestones).not.toContain("desktop.host.huggingface-features.compose.before");
+
+    const { milestones: assetMilestones } = await captureMemoryMilestones(() => harness.invoke(DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL.value, createDesktopAssetDefinitionsListRequest({
+      boundary: { host: "desktop", source: "test" },
+    })));
+    expect(assetMilestones).toContain("desktop.host.asset-features.compose.before");
+    expect(assetMilestones).not.toContain("desktop.host.model-features.compose.before");
 
     const { milestones: imageMilestones } = await captureMemoryMilestones(() => harness.invoke(DESKTOP_IMAGE_GENERATION_START_REQUEST_CHANNEL.value, createDesktopImageGenerationStartRequest({ prompt: "cat" })));
     expect(imageMilestones).toContain("desktop.host.image-generation-features.compose.before");

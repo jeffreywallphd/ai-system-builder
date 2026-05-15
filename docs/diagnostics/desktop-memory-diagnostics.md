@@ -49,3 +49,24 @@ The following feature milestones should **not** appear during initial startup or
 To compare Prompt 1 and Prompt 2 memory deltas, collect the same startup path with `DESKTOP_MEMORY_DIAGNOSTICS=1 npm run dev:desktop` before and after the change. Compare adjacent deltas for `desktop.host.compose.before` → `desktop.host.compose.after`, `desktop.ipc.register.before` → `desktop.ipc.register.after`, and `desktop.host.ipc-registration.lazy-handlers.before` → `desktop.host.ipc-registration.lazy-handlers.after`. Prompt 2 should move most Tier 2/Tier 3 memory growth out of those startup pairs and into the first-request feature milestones.
 
 A regression is likely if startup logs show any deferred feature milestone before the renderer makes the corresponding feature IPC request, or if `desktop.host.ipc-registration.lazy-handlers.*` is followed by Tier 2/Tier 3 composition milestones during registration. GPU probing, Python runtime startup/probing, ComfyUI startup, and power suspension blockers should remain absent from startup diagnostics and should occur only for explicit runtime actions that require them.
+
+## Prompt 3 feature-module import laziness
+
+Prompt 2 made many desktop feature constructors lazy, but constructor laziness alone did not guarantee that Electron main avoided loading those feature modules. Prompt 3 extends the startup contract so `composeDesktopHost.ts` keeps only the Tier 0/Tier 1 shell statically imported and dynamically imports explicit feature composers on first matching IPC use.
+
+Dynamic import milestones use `desktop.host.<feature>.import.before` and `desktop.host.<feature>.import.after`. Feature object construction milestones use `desktop.host.<feature>.compose.before` and `desktop.host.<feature>.compose.after`. During initial startup, workspace shell registration, settings/token calls, runtime readiness reads, and IPC handler registration, these deferred import/compose milestones should be absent for artifact, artifact-remote/Hugging Face, asset, model, image-generation, ComfyUI, ingestion, dataset-preparation, runtime-task, and Python runtime foundation features.
+
+The following should appear only after the first feature request:
+
+- `desktop.host.artifact-features.import.*` / `desktop.host.artifact-features.compose.*` for artifact browser/upload/content operations.
+- `desktop.host.artifact-remote-features.import.*` / `desktop.host.artifact-remote-features.compose.*` for Hugging Face artifact remote operations.
+- `desktop.host.asset-features.import.*` / `desktop.host.asset-features.compose.*` for asset registry and mutation operations.
+- `desktop.host.model-features.import.*` / `desktop.host.model-features.compose.*` for model management operations.
+- `desktop.host.image-generation-features.import.*` / `desktop.host.image-generation-features.compose.*` for image generation operations.
+- `desktop.host.comfyui-features.import.*` / `desktop.host.comfyui-features.compose.*` for ComfyUI install/status/repair or ComfyUI-backed generation operations.
+- `desktop.host.ingestion-features.import.*` / `desktop.host.ingestion-features.compose.*` for website ingestion operations.
+- `desktop.host.dataset-preparation-features.import.*` / `desktop.host.dataset-preparation-features.compose.*` for dataset preparation operations.
+- `desktop.host.runtime-task-features.import.*` / `desktop.host.runtime-task-features.compose.*` for runtime-backed task execution.
+- `desktop.host.python-runtime-foundation.import.*` / `desktop.host.python-runtime-foundation.compose.*` for explicit Python runtime control or runtime-task paths.
+
+A startup regression is likely if any deferred feature import or compose milestone appears before the renderer invokes that feature's IPC channel. A source-boundary regression is likely if `modules/hosts/desktop/composition/composeDesktopHost.ts` regains static imports of deferred implementation modules such as filesystem artifact storage, Hugging Face artifact/model adapters, model use cases, image-generation use cases, ComfyUI runtime/installer adapters, asset resource-backed view composition, website ingestion, dataset preparation, Python task registry, or power lifecycle implementations. ComfyUI install-root resolution, GPU detection (`nvidia-smi`), Python start/probe/task activity, and ComfyUI start/probe activity should remain absent from startup and registration diagnostics.
