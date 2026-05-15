@@ -53,6 +53,7 @@ import {
 } from "../../../application/use-cases";
 import { GenerateImageUseCase } from "../../../application/use-cases/image-generation/generate-image.use-case";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
+import { recordDesktopMemorySnapshot } from "../diagnostics";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
 import { DefaultModelDefaultResolver } from "../../../application/services/settings";
 import type { ApplicationSecretsPort, ApplicationSettingsPort, ModelDefaultResolverPort } from "../../../application/ports/settings";
@@ -444,6 +445,16 @@ export { createDesktopRuntimeReadinessService, type CreateDesktopRuntimeReadines
 export function composeDesktopHost(
   options: ComposeDesktopHostOptions = {},
 ): DesktopHostComposition {
+  const recordHostMemorySnapshot = (milestone: string, detail?: Record<string, unknown>) => {
+    recordDesktopMemorySnapshot({
+      milestone,
+      component: "desktop-host-composition",
+      detail,
+    });
+  };
+
+  recordHostMemorySnapshot("desktop.host.compose.enter");
+
   const loggingConfig = createLoggingConfig({
     verbosity: options.logging?.verbosity,
     fallbackVerbosity: options.logging?.fallbackVerbosity,
@@ -458,6 +469,7 @@ export function composeDesktopHost(
     sink: options.logSink,
     now: options.now,
   });
+  recordHostMemorySnapshot("desktop.host.logging.ready");
   const now = options.now ?? (() => new Date().toISOString());
   const runtimeLogs: DesktopPythonRuntimeLogEntry[] = [];
   let lastObservedRuntimeHealthSnapshot:
@@ -493,6 +505,10 @@ export function composeDesktopHost(
     filePath: options.artifactRepo?.huggingFaceTokenConfigFilePath ?? "/tmp/ai-system-builder/desktop/hugging-face-token.json",
     fallbackToken: options.artifactRepo?.huggingFaceAccessToken,
   });
+  recordHostMemorySnapshot("desktop.host.token-config.ready", {
+    tokenConfigured: Boolean(options.artifactRepo?.huggingFaceAccessToken?.trim()),
+    tokenConfigPathConfigured: Boolean(options.artifactRepo?.huggingFaceTokenConfigFilePath?.trim()),
+  });
   const pythonRuntimeEndpoint = resolvePythonRuntimeHostAndPort();
   const pythonRuntimeBaseUrl = resolvePythonRuntimeBaseUrl();
   const configuredPythonRuntimeStartupTimeoutMs = Number(process.env.PYTHON_RUNTIME_STARTUP_TIMEOUT_MS);
@@ -507,6 +523,7 @@ export function composeDesktopHost(
     ...(process.env.HF_HUB_DISABLE_XET ? { HF_HUB_DISABLE_XET: process.env.HF_HUB_DISABLE_XET } : {}),
     HF_HUB_DISABLE_SYMLINKS_WARNING: process.env.HF_HUB_DISABLE_SYMLINKS_WARNING ?? "1",
   };
+  recordHostMemorySnapshot("desktop.host.python-runtime-foundation.before");
   const pythonRuntimeFoundation = createPythonRuntimeAdapterFoundation({
     client: {
       baseUrl: pythonRuntimeBaseUrl,
@@ -551,6 +568,10 @@ export function composeDesktopHost(
       },
     },
   });
+  recordHostMemorySnapshot("desktop.host.python-runtime-foundation.after", {
+    baseUrlConfigured: Boolean(pythonRuntimeBaseUrl),
+  });
+
   const readPythonRuntimeStatus = async (): Promise<DesktopPythonRuntimeStatusPayload> => {
     const supervisorStatus = pythonRuntimeFoundation.supervisor.getStatus();
     let healthy = false;
@@ -615,6 +636,9 @@ export function composeDesktopHost(
   const applicationSettings = createLocalApplicationSettingsAdapter({
     filePath: options.settings?.localSettingsFilePath ?? "/tmp/ai-system-builder/desktop/application-settings.json",
   });
+  recordHostMemorySnapshot("desktop.host.settings.ready", {
+    settingsPathConfigured: Boolean(options.settings?.localSettingsFilePath?.trim()),
+  });
   const baseApplicationSecrets = createInMemorySecretsAdapter();
   const applicationSecrets: ApplicationSecretsPort = {
     async setSecret(key, value) {
@@ -663,12 +687,15 @@ export function composeDesktopHost(
 
   const powerSuspensionBlocker = createElectronPowerSuspensionBlocker();
   const taskPowerLifecycle = new TaskPowerLifecycleService(powerSuspensionBlocker);
+  recordHostMemorySnapshot("desktop.host.power-lifecycle.ready");
   const pythonRuntimeTaskRegistry = createPythonRuntimeTaskRegistryAdapter({ ...pythonRuntimeFoundation.runtimePort }, {
     ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
   });
   const comfyUiBaseUrl = process.env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
 
   let internalAssetRegistry: InternalAssetRegistryComposition | undefined;
+
+  recordHostMemorySnapshot("desktop.host.compose.return");
 
   return {
     loggingPort,
@@ -740,6 +767,12 @@ export function composeDesktopHost(
       return internalAssetRegistry;
     },
     registerArtifactUploadIpc(registerOptions) {
+      recordHostMemorySnapshot("desktop.host.ipc-registration.enter", {
+        hasRuntimeRootDirectory: Boolean(registerOptions.runtimeRootDirectory),
+        hasStorageRootDirectory: Boolean(registerOptions.storageRootDirectory),
+      });
+
+      recordHostMemorySnapshot("desktop.host.comfyui-config.before");
       const comfyUiInstallRoot = resolveComfyUiInstallRoot(process.env, registerOptions.runtimeRootDirectory);
       const comfyUiBasePythonCommand = process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3");
       const comfyUiPythonEnvironmentMode = resolveComfyUiPythonEnvironmentMode(process.env);
@@ -756,6 +789,10 @@ export function composeDesktopHost(
           ? configuredComfyUiInstallCommandTimeoutMs
           : COMFYUI_INSTALL_COMMAND_TIMEOUT_MS_DEFAULT;
       const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort });
+      recordHostMemorySnapshot("desktop.host.comfyui-config.after", {
+        pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
+        skipPythonSetup: comfyUiSkipPythonSetup,
+      });
       const createConfiguredComfyUiInstaller = async (runtimeDeviceMode?: ComfyUiRuntimeDeviceMode) => {
         const comfyUiInstaller = createComfyUiRuntimeInstaller({
           gitInstaller: gitRuntimeInstaller,
@@ -850,6 +887,7 @@ export function composeDesktopHost(
           return activeRuntimeDeviceMode ?? "cpu";
         },
       };
+      recordHostMemorySnapshot("desktop.host.runtime-readiness.before");
       const runtimeReadiness = createDesktopRuntimeReadinessService({
         readPythonSupervisorState: () => pythonRuntimeFoundation.supervisor.getStatus(),
         async readComfyUiLifecycleState() {
@@ -867,6 +905,7 @@ export function composeDesktopHost(
         },
         now,
       });
+      recordHostMemorySnapshot("desktop.host.runtime-readiness.after");
       const runtimeCapabilityGuard = new RuntimeCapabilityGuardService(runtimeReadiness);
       let latentReferenceStorage: Pick<ArtifactObjectStoragePort, "retrieveArtifact"> | undefined;
       const comfyUiRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
@@ -894,6 +933,7 @@ export function composeDesktopHost(
       });
       const runtimeTaskRegistry = createDesktopRuntimeTaskRegistry({ pythonRuntimeTaskRegistry, imageRuntimeTaskRegistry: comfyUiRuntimeTaskRegistry });
 
+      recordHostMemorySnapshot("desktop.host.storage-composition.before");
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
       });
@@ -931,11 +971,19 @@ export function composeDesktopHost(
         storage,
         artifactCatalogRead: artifactCatalog,
       });
+      recordHostMemorySnapshot("desktop.host.storage-composition.after");
+      recordHostMemorySnapshot("desktop.host.workspace-foundation.before");
+      const reusedExistingWorkspaceFoundation = internalAssetRegistry !== undefined;
       const workspaceFoundation = internalAssetRegistry ?? composeInternalAssetRegistry({
         rootDirectory: registerOptions.storageRootDirectory,
         now: options.now,
       });
       internalAssetRegistry = workspaceFoundation;
+      recordHostMemorySnapshot("desktop.host.workspace-foundation.after", {
+        reusedExistingRegistry: reusedExistingWorkspaceFoundation,
+      });
+
+      recordHostMemorySnapshot("desktop.host.artifact-usecases.before");
       const storeArtifactUploadUseCase = new StoreArtifactUploadUseCase({
         storage,
         logging: loggingPort,
@@ -1011,6 +1059,7 @@ export function composeDesktopHost(
         logging: loggingPort,
         now: options.now,
       });
+      recordHostMemorySnapshot("desktop.host.artifact-usecases.after");
 
       const websiteHtmlAcquisition = createWebsiteHtmlAcquisitionPort();
       const ingestWebsitePage = new IngestWebsitePageUseCase({
@@ -1031,6 +1080,7 @@ export function composeDesktopHost(
         taskPowerLifecycle,
         runtimeCapabilityGuard,
       });
+      recordHostMemorySnapshot("desktop.host.settings-usecases.before");
       const listSettingsDefinitions = new ListSettingsDefinitionsUseCase({
         settings: applicationSettings,
       });
@@ -1049,6 +1099,7 @@ export function composeDesktopHost(
       const resolveModelDefault = new ResolveModelDefaultUseCase({
         modelDefaultResolver,
       });
+      recordHostMemorySnapshot("desktop.host.settings-usecases.after");
       const modelRegistry = createLocalModelRegistryAdapter({
         filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`,
         now,
@@ -1057,6 +1108,7 @@ export function composeDesktopHost(
         filePath: join(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
         now,
       });
+      recordHostMemorySnapshot("desktop.host.asset-registry-resource-views.before");
       internalAssetRegistry = composeInternalAssetRegistry({
         rootDirectory: registerOptions.storageRootDirectory,
         now,
@@ -1098,6 +1150,9 @@ export function composeDesktopHost(
           generateInstanceId: generateAssetInstanceId,
         }),
       };
+      recordHostMemorySnapshot("desktop.host.asset-registry-resource-views.after");
+
+      recordHostMemorySnapshot("desktop.host.model-usecases.before");
       const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({
         accessTokenProvider: () => tokenConfigStore.getToken(),
       });
@@ -1173,6 +1228,9 @@ export function composeDesktopHost(
         runtimeTaskRegistry,
         runtimeCapabilityGuard,
       });
+      recordHostMemorySnapshot("desktop.host.model-usecases.after");
+
+      recordHostMemorySnapshot("desktop.host.image-generation-usecases.before");
       const localModelCheckpointResolver = createLocalModelCheckpointResolverAdapter({
         modelRegistry,
         comfyUiCheckpointDirectory: join(comfyUiInstallRoot, "models", "checkpoints"),
@@ -1201,7 +1259,9 @@ export function composeDesktopHost(
           now,
         }),
       });
+      recordHostMemorySnapshot("desktop.host.image-generation-usecases.after");
 
+      recordHostMemorySnapshot("desktop.host.register-electron-ipc.before");
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
         pythonRuntime: {
@@ -1278,6 +1338,8 @@ export function composeDesktopHost(
         comfyUiInstaller,
         comfyUiInstallRoot,
       });
+      recordHostMemorySnapshot("desktop.host.register-electron-ipc.after");
+      recordHostMemorySnapshot("desktop.host.ipc-registration.return");
     },
   };
 }

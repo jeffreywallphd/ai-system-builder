@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { AppShell } from "./components/layout/AppShell";
 import { useDesktopPage } from "./hooks/useDesktopPage";
@@ -12,10 +12,18 @@ import { SystemPage } from "./pages/SystemPage";
 import { ActiveWorkspaceProvider, WorkspaceGate, WorkspaceRequiredSurface, useActiveWorkspace, type WorkspaceUiRecord } from "./features/workspace";
 import { desktopPageDefinitions, desktopPageRequiresWorkspace, type DesktopPageKey } from "./routes/desktopPages";
 import { resolveDesktopWorkspaceRouteBoundary } from "./routes/workspaceRouteBoundary";
+import { recordRendererMemorySnapshot } from "./diagnostics/rendererMemoryDiagnostics";
 
 type DesktopWorkspacePageKey = Extract<DesktopPageKey, "artifacts" | "assets" | "models" | "image-generation">;
 
 export function App() {
+  useEffect(() => {
+    recordRendererMemorySnapshot({
+      milestone: "renderer.app.mounted",
+      component: "desktop-renderer",
+    });
+  }, []);
+
   return (
     <ActiveWorkspaceProvider>
       <WorkspaceAwareDesktopApp />
@@ -66,6 +74,18 @@ function WorkspaceAwareDesktopApp() {
         return <WorkspaceRequiredSurface />;
     }
   };
+
+  useEffect(() => {
+    recordRendererMemorySnapshot({
+      milestone: "renderer.page.active.changed",
+      component: "desktop-renderer",
+      detail: {
+        activePage,
+        visibleActivePage: routeBoundary.visibleActivePage,
+        workspaceStatus: workspace.status,
+      },
+    });
+  }, [activePage, routeBoundary.visibleActivePage, workspace.status]);
 
   const content = routeBoundary.blocked ? (
     <WorkspaceRequiredSurface />

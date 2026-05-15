@@ -391,6 +391,7 @@ export type DesktopAssetResourceBackedViewsListBridgeInput = Omit<DesktopAssetRe
 export type DesktopAssetResourceBackedViewReadBridgeInput = Omit<DesktopAssetResourceBackedViewReadRequest["payload"], "boundary">;
 
 export interface DesktopPreloadApi {
+  memoryDiagnosticsEnabled: boolean;
   getHuggingFaceTokenStatus: (
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopHuggingFaceTokenGetResponse>;
@@ -656,6 +657,7 @@ export interface CreateDesktopPreloadApiDependencies {
   ipcRenderer: IpcRendererInvokePort;
   uploadSource?: string;
   artifactSource?: string;
+  memoryDiagnosticsEnabled?: boolean;
 }
 
 function assertDesktopEnvelopeResponse<TResponse extends { operation: string; channel: string }>(
@@ -710,6 +712,8 @@ export function createDesktopPreloadApi(
   const assetRegistrySource = DEFAULT_ASSET_REGISTRY_SOURCE;
 
   return {
+    memoryDiagnosticsEnabled: dependencies.memoryDiagnosticsEnabled === true,
+
     async getHuggingFaceTokenStatus(context = {}) {
       const request = createDesktopHuggingFaceTokenGetRequest(context);
       const response = await dependencies.ipcRenderer.invoke(

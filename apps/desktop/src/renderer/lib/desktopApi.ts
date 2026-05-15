@@ -397,6 +397,7 @@ export interface DesktopPythonRuntimeApi {
 }
 
 interface DesktopApiBridge {
+  memoryDiagnosticsEnabled?: boolean;
   getHuggingFaceTokenStatus: () => Promise<unknown>;
   setHuggingFaceToken: (input: { token: string }) => Promise<unknown>;
   clearHuggingFaceToken: () => Promise<unknown>;
