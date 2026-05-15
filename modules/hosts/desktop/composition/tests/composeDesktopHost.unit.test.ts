@@ -345,22 +345,10 @@ describe("composeDesktopHost", () => {
       DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
     ]);
     expect(/asset\.(?:create|update|delete|patch|edit|seed|publish|scan|execute|run)/i.test(channels.join(" "))).toBe(false);
-    expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(true);
+    expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
-    const internalRegistry = host.getInternalAssetRegistry();
-    expect(internalRegistry).toBeDefined();
-    expect(internalRegistry?.resourceBackedViewProvider).toBeDefined();
-    expect(internalRegistry?.diagnostics.resourceBackedViewsEnabled).toBe(true);
-    const resourceBacked = await internalRegistry?.readFacade.listResourceBackedViewCards({ limit: 10 });
-    expect(resourceBacked?.items).toEqual([]);
-    expect(resourceBacked?.diagnostics?.some((diagnostic) => diagnostic.code.includes("source-unavailable") || diagnostic.code.includes("unsupported") || diagnostic.code.includes("workspace"))).toBe(true);
-    const missingResourceBackedDetail = await internalRegistry!.readFacade.readResourceBackedViewDetail("asset-view.image.internal.missing");
-    expect(missingResourceBackedDetail).toBeUndefined();
+    expect(host.getInternalAssetRegistry()).toBeUndefined();
     expect(artifactRepoFetch).not.toHaveBeenCalled();
-    expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
-    expect(
-      await internalRegistry?.readFacade.listDefinitionCards({ includeBuiltIns: true, includeCustom: true }),
-    ).toEqual({ items: [] });
     const preloadSource = [
       readFileSync(resolve("apps/desktop/src/preload/index.ts"), "utf8"),
       readFileSync(resolve("apps/desktop/src/preload/exposedApi.ts"), "utf8"),
@@ -373,7 +361,7 @@ describe("composeDesktopHost", () => {
     expect(preloadSource).toContain("localizeExternalRepositoryObjectAsAsset");
     expect(/createAsset|updateAsset|deleteAsset|patchAsset|editAsset|seedAsset|publishAsset|listAssetInstances|readAssetInstance/i.test(preloadSource)).toBe(false);
     const hostSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopHost.ts"), "utf8");
-    expect(hostSource).toContain("assetRegistryRead: internalAssetRegistry.readFacade");
+    expect(hostSource).toContain("assetRegistryRead: lazyUseCase(() => getAssetFeatures().assetRegistryRead)");
     expect(hostSource).toContain("assetMutationUseCases");
     expect(hostSource).not.toContain("assetRegistryRead: internalAssetRegistry,");
     const listener = ipcMain.handle.mock.calls[0]?.[1];
@@ -494,9 +482,9 @@ describe("composeDesktopHost", () => {
       : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
     const source = readFileSync(sourcePath, "utf8");
 
-    expect(source).toContain("const huggingFaceArtifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter");
-    expect(source).toContain("adapter: huggingFaceArtifactRepoStorage");
-    expect(source).toContain("repoBrowser: huggingFaceArtifactRepoStorage");
+    expect(source).toContain("const artifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter");
+    expect(source).toContain("adapter: artifactRepoStorage");
+    expect(source).toContain("repoBrowser: remote.huggingFaceArtifactRepoStorage");
     expect(source).not.toContain("repoBrowser: artifactRepoStorage");
   });
 
@@ -516,7 +504,7 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("HF_HUB_DISABLE_XET");
     expect(source).not.toContain("HF_HUB_DISABLE_XET: process.env.HF_HUB_DISABLE_XET ?? \"1\"");
     expect(source).toContain("PrepareTrainingDatasetFromArtifactsUseCase");
-    expect(source).toContain("prepareTrainingDatasetFromArtifactsUseCase");
+    expect(source).toContain("prepareTrainingDatasetUseCase: new PrepareTrainingDatasetFromArtifactsUseCase");
   });
 
   it("preserves the full Python runtime port when adding desktop composition logging wrappers", () => {
@@ -542,8 +530,8 @@ describe("composeDesktopHost", () => {
       : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
     const source = readFileSync(sourcePath, "utf8");
 
-    expect(source).toContain("const comfyUiInstallRoot = resolveComfyUiInstallRoot");
-    expect(source).toContain("const comfyUiInstaller = createComfyUiRuntimeInstaller");
+    expect(source).toContain("const installRoot = comfyUiInstallRoot()");
+    expect(source).toContain("createComfyUiRuntimeInstaller");
     expect(source).toContain("const configuredComfyUiInstallCommandTimeoutMs = Number(process.env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS)");
     expect(source).toContain("execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true })");
     expect(source).toContain("const resolvedRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode");
@@ -552,10 +540,10 @@ describe("composeDesktopHost", () => {
     expect(source).toContain("runtimeDeviceMode: resolvedRuntimeDeviceMode");
     expect(source).toContain("IMAGE_GENERATION_GPU_TYPE_SETTING_KEY");
     expect(source).toContain("processReuse: modeChanged ? \"restarted_mode_changed\" : \"reused_or_started\"");
-    expect(source).toContain("comfyUiInstaller,");
-    expect(source).toContain("comfyUiInstallRoot,");
+    expect(source).toContain("comfyUiInstaller: lazyUseCase(() => getComfyUiFeatures().installer)");
+    expect(source).toContain("comfyUiInstallRoot: comfyUiInstallRoot()");
     expect(source).toContain("createRuntimePreparedModelCheckpointResolver");
-    expect(source).toContain("runtime: comfyUiSupervisorPort");
+    expect(source).toContain("runtime: comfyUi.supervisorPort");
     expect(source).toContain("modelCheckpointResolver: localModelCheckpointResolver");
   });
 
@@ -567,10 +555,10 @@ describe("composeDesktopHost", () => {
       : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
     const source = readFileSync(sourcePath, "utf8");
 
-    expect(source).toContain("const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService");
+    expect(source).toContain("imageGenerationFinalizationOrchestrator: new ImageGenerationFinalizationOrchestratorService")
     expect(source).toContain("createFilesystemGeneratedImagePersistenceAdapter");
-    expect(source).toContain("artifactCatalogAppend: artifactCatalog");
-    expect(source).toContain("imageGenerationFinalizationOrchestrator,");
+    expect(source).toContain("artifactCatalogAppend: artifacts.artifactCatalog");
+    expect(source).toContain("imageGenerationFinalizationOrchestrator: lazyUseCase(() => getImageGenerationFeatures().imageGenerationFinalizationOrchestrator)");
   });
 
   it("derives the Python runtime client URL from host and port when no base URL is configured", () => {
