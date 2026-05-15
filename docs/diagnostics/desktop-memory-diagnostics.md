@@ -42,7 +42,7 @@ The following feature milestones should **not** appear during initial startup or
 - `desktop.host.image-generation-features.compose.*` for image generation requests.
 - `desktop.host.ingestion-features.compose.*` for website ingestion requests.
 - `desktop.host.dataset-preparation-features.compose.*` for dataset preparation requests.
-- `desktop.host.huggingface-features.compose.*` for Hugging Face remote browse/publish/import/localize operations.
+- `desktop.host.artifact-remote-features.compose.*` for Hugging Face remote browse/publish/import/localize operations.
 - `desktop.host.comfyui-features.compose.*` for ComfyUI install/status/repair/start or image generation requests.
 - `desktop.host.runtime-task-features.compose.*` for runtime-backed task execution paths.
 
@@ -70,3 +70,30 @@ The following should appear only after the first feature request:
 - `desktop.host.python-runtime-foundation.import.*` / `desktop.host.python-runtime-foundation.compose.*` for explicit Python runtime control or runtime-task paths.
 
 A startup regression is likely if any deferred feature import or compose milestone appears before the renderer invokes that feature's IPC channel. A source-boundary regression is likely if `modules/hosts/desktop/composition/composeDesktopHost.ts` regains static imports of deferred implementation modules such as filesystem artifact storage, Hugging Face artifact/model adapters, model use cases, image-generation use cases, ComfyUI runtime/installer adapters, asset resource-backed view composition, website ingestion, dataset preparation, Python task registry, or power lifecycle implementations. ComfyUI install-root resolution, GPU detection (`nvidia-smi`), Python start/probe/task activity, and ComfyUI start/probe activity should remain absent from startup and registration diagnostics.
+
+## Prompt 4 feature-group IPC registration
+
+Prompt 4 splits Electron IPC channel registration into explicit feature-group boundaries while keeping renderer-facing preload methods, IPC channel names, and request/response envelopes stable. Startup may now show registration-only milestones for each group:
+
+- `desktop.host.ipc.startup-group.register.*`
+- `desktop.host.ipc.artifact-group.register.*`
+- `desktop.host.ipc.asset-group.register.*`
+- `desktop.host.ipc.model-group.register.*`
+- `desktop.host.ipc.image-generation-group.register.*`
+- `desktop.host.ipc.runtime-group.register.*`
+- `desktop.host.ipc.ingestion-group.register.*`
+- `desktop.host.ipc.dataset-preparation-group.register.*`
+
+Those milestones mean only that IPC handlers were attached to Electron. They should appear between `desktop.host.ipc-registration.lazy-handlers.before` and `desktop.host.ipc-registration.lazy-handlers.after` during startup. They must not be accompanied by deferred feature import or composition milestones during registration.
+
+Use Prompt 3 import/compose milestones to distinguish handler registration from provider resolution. During startup, the logs should still omit deferred milestones such as `desktop.host.model-features.import.*`, `desktop.host.model-features.compose.*`, `desktop.host.artifact-features.import.*`, `desktop.host.artifact-remote-features.import.*`, `desktop.host.asset-features.import.*`, `desktop.host.image-generation-features.import.*`, `desktop.host.comfyui-features.import.*`, `desktop.host.ingestion-features.import.*`, `desktop.host.dataset-preparation-features.import.*`, `desktop.host.runtime-task-features.import.*`, and `desktop.host.python-runtime-foundation.import.*`.
+
+To diagnose accidental provider resolution during registration, collect a startup baseline and inspect the log segment from `desktop.host.ipc-registration.lazy-handlers.before` through `desktop.host.ipc-registration.lazy-handlers.after`. That segment should contain the feature-group `register.before`/`register.after` pairs only. If a deferred `<feature>.import.*` or `<feature>.compose.*` milestone appears in the same segment, a registration function probably called a lazy provider while attaching handlers.
+
+To compare Prompt 3 and Prompt 4 diagnostics, use the same command before and after the split:
+
+```bash
+DESKTOP_MEMORY_DIAGNOSTICS=1 npm run dev:desktop
+```
+
+Prompt 4 should add finer-grained IPC registration pairs without moving feature import/compose milestones earlier. Model, artifact, asset, image-generation, ComfyUI, ingestion, dataset-preparation, artifact-remote/Hugging Face, runtime-task, and Python runtime foundation milestones should appear only after the first corresponding feature request, not during startup or channel registration.

@@ -9,7 +9,10 @@ import {
   DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL,
   DESKTOP_COMFYUI_INSTALL_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL,
   DESKTOP_IMAGE_GENERATION_START_REQUEST_CHANNEL,
+  DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL,
   DESKTOP_MODEL_LIST_REQUEST_CHANNEL,
   DESKTOP_WORKSPACE_CREATE_REQUEST_CHANNEL,
   DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL,
@@ -17,8 +20,11 @@ import {
   createDesktopArtifactBrowseRequest,
   createDesktopAssetDefinitionsListRequest,
   createDesktopComfyUiInstallStatusRequest,
+  createDesktopHuggingFaceNamespaceDatasetsBrowseRequest,
   createDesktopImageGenerationStartRequest,
+  createDesktopIngestWebsitePageRequest,
   createDesktopModelListRequest,
+  createDesktopPrepareTrainingDatasetStartRequest,
   createDesktopWorkspaceCreateRequest,
   createDesktopWorkspaceListRequest,
   createDesktopWorkspaceSelectionReadRequest,
@@ -134,6 +140,10 @@ describe("desktop startup lazy composition contract", () => {
     expect(milestones).toContain("desktop.host.startup-workspace-shell.compose.after");
     expect(milestones).toContain("desktop.host.ipc-registration.lazy-handlers.before");
     expect(milestones).toContain("desktop.host.ipc-registration.lazy-handlers.after");
+    for (const group of ["startup", "artifact", "asset", "model", "image-generation", "runtime", "ingestion", "dataset-preparation"]) {
+      expect(milestones).toContain(`desktop.host.ipc.${group}-group.register.before`);
+      expect(milestones).toContain(`desktop.host.ipc.${group}-group.register.after`);
+    }
     for (const milestone of deferredMilestones) {
       expect(milestones).not.toContain(milestone);
     }
@@ -169,6 +179,42 @@ describe("desktop startup lazy composition contract", () => {
     expect(secondMilestones).not.toContain("desktop.host.model-features.compose.before");
   });
 
+  it("composes remote artifact, ingestion, and dataset-preparation groups only on first relevant requests", async () => {
+    const harness = await composeRegisteredHost();
+
+    const { milestones: remoteMilestones } = await captureMemoryMilestones(() => harness.invoke(DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL.value, createDesktopHuggingFaceNamespaceDatasetsBrowseRequest({
+      namespace: "ai-system-builder-test",
+      boundary: { host: "desktop", source: "test" },
+    })));
+    expect(remoteMilestones).toContain("desktop.host.artifact-remote-features.compose.before");
+    expect(remoteMilestones).toContain("desktop.host.artifact-features.compose.before");
+    expect(remoteMilestones).not.toContain("desktop.host.model-features.compose.before");
+
+    const { milestones: ingestionMilestones } = await captureMemoryMilestones(() => harness.invoke(DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL.value, createDesktopIngestWebsitePageRequest({
+      request: { url: "https://example.com/page" },
+      boundary: { host: "desktop", source: "test" },
+    })));
+    expect(ingestionMilestones).toContain("desktop.host.ingestion-features.compose.before");
+    expect(ingestionMilestones).not.toContain("desktop.host.model-features.compose.before");
+
+    const { milestones: datasetMilestones } = await captureMemoryMilestones(() => harness.invoke(DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL.value, createDesktopPrepareTrainingDatasetStartRequest({
+      command: {
+        sourceArtifactIds: ["artifact.dataset-source"],
+        recipe: {
+          normalization: { targetFormat: "markdown" },
+          chunking: { strategy: "character", chunkSize: 1000, chunkOverlap: 100 },
+          generation: { mode: "qa", model: { provider: "transformers", modelId: "test-model" } },
+        },
+        split: { trainRatio: 0.8, testRatio: 0.2 },
+        output: { format: "jsonl" },
+      },
+      boundary: { host: "desktop", source: "test" },
+    })));
+    expect(datasetMilestones).toContain("desktop.host.dataset-preparation-features.compose.before");
+    expect(datasetMilestones).toContain("desktop.host.runtime-task-features.compose.before");
+    expect(datasetMilestones).not.toContain("desktop.host.image-generation-features.compose.before");
+  });
+
   it("composes image-generation, artifact, and ComfyUI feature groups only on first relevant requests", async () => {
     const harness = await composeRegisteredHost();
 
@@ -177,7 +223,7 @@ describe("desktop startup lazy composition contract", () => {
         boundary: { host: "desktop", source: "test" },
       })));
     expect(artifactMilestones).toContain("desktop.host.artifact-features.compose.before");
-    expect(artifactMilestones).not.toContain("desktop.host.huggingface-features.compose.before");
+    expect(artifactMilestones).not.toContain("desktop.host.artifact-remote-features.compose.before");
 
     const { milestones: assetMilestones } = await captureMemoryMilestones(() => harness.invoke(DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL.value, createDesktopAssetDefinitionsListRequest({
       boundary: { host: "desktop", source: "test" },
