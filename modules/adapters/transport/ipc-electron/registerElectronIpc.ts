@@ -1,195 +1,124 @@
-import {
-  registerArtifactUploadIpc,
-  type RegisterArtifactUploadIpcDependencies,
-} from "./artifact-upload/registerArtifactUploadIpc";
+import { registerArtifactUploadIpc } from "./artifact-upload/registerArtifactUploadIpc";
 import type { IpcMainHandlePort } from "./ipcMainHandlePort";
-import {
-  registerArtifactBrowserIpc,
-  type RegisterArtifactBrowserIpcDependencies,
-} from "./artifact-browser/registerArtifactBrowserIpc";
-import {
-  registerWebsiteIngestionIpc,
-  type RegisterWebsiteIngestionIpcDependencies,
-} from "./website-ingestion/registerWebsiteIngestionIpc";
-import {
-  registerDatasetPreparationIpc,
-  type RegisterDatasetPreparationIpcDependencies,
-} from "./dataset-preparation/registerDatasetPreparationIpc";
-import {
-  registerPythonRuntimeIpc,
-  type PythonRuntimeControlPort,
-} from "./python-runtime/registerPythonRuntimeIpc";
-import {
-  registerApplicationSettingsIpc,
-  type RegisterApplicationSettingsIpcDependencies,
-} from "./settings/registerApplicationSettingsIpc";
-import {
-  registerModelManagementIpc,
-  type RegisterModelManagementIpcDependencies,
-} from "./model/registerModelManagementIpc";
-import { registerImageGenerationIpc, type RegisterImageGenerationIpcDependencies } from "./image-generation/registerImageGenerationIpc";
+import { registerArtifactBrowserIpc } from "./artifact-browser/registerArtifactBrowserIpc";
+import { registerWebsiteIngestionIpc } from "./website-ingestion/registerWebsiteIngestionIpc";
+import { registerDatasetPreparationIpc } from "./dataset-preparation/registerDatasetPreparationIpc";
+import { registerPythonRuntimeIpc, type PythonRuntimeControlPort } from "./python-runtime/registerPythonRuntimeIpc";
+import { registerApplicationSettingsIpc } from "./settings/registerApplicationSettingsIpc";
+import { registerModelManagementIpc } from "./model/registerModelManagementIpc";
+import { registerImageGenerationIpc } from "./image-generation/registerImageGenerationIpc";
 import { registerComfyUiRuntimeIpc } from "./comfyui-runtime/registerComfyUiRuntimeIpc";
-import { registerRuntimeReadinessIpc, type RegisterRuntimeReadinessIpcDependencies } from "./runtime-readiness/registerRuntimeReadinessIpc";
-import { registerAssetRegistryIpc, type RegisterAssetRegistryIpcDependencies } from "./asset-registry/registerAssetRegistryIpc";
-import { registerAssetMutationIpc, type RegisterAssetMutationIpcDependencies } from "./asset-registry/registerAssetMutationIpc";
+import { registerRuntimeReadinessIpc } from "./runtime-readiness/registerRuntimeReadinessIpc";
+import { registerAssetRegistryIpc } from "./asset-registry/registerAssetRegistryIpc";
+import { registerAssetMutationIpc } from "./asset-registry/registerAssetMutationIpc";
 import { registerWorkspaceIpc, type RegisterWorkspaceIpcDependencies } from "./workspace/registerWorkspaceIpc";
-import type { RuntimeInstallerPort } from "../../../application/ports/runtime-installer/runtime-installer.port";
+
+export type AsyncFeatureProvider<T extends object> = () => Promise<T>;
+
+function lazyProvidedObject<T extends object>(provider: AsyncFeatureProvider<T>, select?: (feature: T) => object): any {
+  return new Proxy({}, {
+    get(_target, property) {
+      if (property === "then") return undefined;
+      return async (...args: unknown[]) => {
+        const feature = await provider();
+        const object = select ? select(feature) : feature;
+        const value = (object as Record<PropertyKey, unknown>)[property];
+        if (typeof value !== "function") return value;
+        return value.apply(object, args);
+      };
+    },
+  });
+}
 
 export interface RegisterElectronIpcDependencies {
   ipcMain: IpcMainHandlePort;
   pythonRuntime: PythonRuntimeControlPort;
-  runtimeReadiness: RegisterRuntimeReadinessIpcDependencies["runtimeReadiness"];
-  assetRegistryRead?: RegisterAssetRegistryIpcDependencies["assetRegistryRead"];
-  assetMutationUseCases?: Omit<RegisterAssetMutationIpcDependencies, "ipcMain">;
+  runtimeReadiness: any;
   workspaceServices?: Omit<RegisterWorkspaceIpcDependencies, "ipcMain">;
-  getHuggingFaceTokenStatus: RegisterArtifactBrowserIpcDependencies["getHuggingFaceTokenStatus"];
-  setHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["setHuggingFaceToken"];
-  clearHuggingFaceToken: RegisterArtifactBrowserIpcDependencies["clearHuggingFaceToken"];
-  storeArtifactUploadUseCase: RegisterArtifactUploadIpcDependencies["storeArtifactUploadUseCase"];
-  browseArtifactsUseCase: RegisterArtifactBrowserIpcDependencies["browseArtifactsUseCase"];
-  browseUnregisteredArtifactsUseCase: RegisterArtifactBrowserIpcDependencies["browseUnregisteredArtifactsUseCase"];
-  registerUnregisteredArtifactUseCase: RegisterArtifactBrowserIpcDependencies["registerUnregisteredArtifactUseCase"];
-  deleteUnregisteredArtifactUseCase: RegisterArtifactBrowserIpcDependencies["deleteUnregisteredArtifactUseCase"];
-  deleteRegisteredArtifactUseCase: RegisterArtifactBrowserIpcDependencies["deleteRegisteredArtifactUseCase"];
-  readArtifactDetailUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactDetailUseCase"];
-  readArtifactContentUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactContentUseCase"];
-  artifactMediaViewRetrieval: RegisterArtifactBrowserIpcDependencies["artifactMediaViewRetrieval"];
-  publishArtifactToRepoUseCase: RegisterArtifactBrowserIpcDependencies["publishArtifactToRepoUseCase"];
-  browseHuggingFaceNamespaceDatasetsUseCase: RegisterArtifactBrowserIpcDependencies["browseHuggingFaceNamespaceDatasetsUseCase"];
-  browseHuggingFaceDatasetParquetFilesUseCase: RegisterArtifactBrowserIpcDependencies["browseHuggingFaceDatasetParquetFilesUseCase"];
-  verifyPublishedArtifactBackingUseCase: RegisterArtifactBrowserIpcDependencies["verifyPublishedArtifactBackingUseCase"];
-  verifyImportedArtifactSourceBackingUseCase: RegisterArtifactBrowserIpcDependencies["verifyImportedArtifactSourceBackingUseCase"];
-  registerArtifactFromRepoUseCase: RegisterArtifactBrowserIpcDependencies["registerArtifactFromRepoUseCase"];
-  localizeArtifactFromRepoUseCase: RegisterArtifactBrowserIpcDependencies["localizeArtifactFromRepoUseCase"];
-  ingestWebsitePageUseCase: RegisterWebsiteIngestionIpcDependencies["ingestWebsitePageUseCase"];
-  ingestWebsitePagesBatchUseCase: RegisterWebsiteIngestionIpcDependencies["ingestWebsitePagesBatchUseCase"];
-  prepareTrainingDatasetUseCase: RegisterDatasetPreparationIpcDependencies["prepareTrainingDatasetUseCase"];
-  listSettingsDefinitionsUseCase: RegisterApplicationSettingsIpcDependencies["listSettingsDefinitionsUseCase"];
-  readSettingsUseCase: RegisterApplicationSettingsIpcDependencies["readSettingsUseCase"];
-  updateSettingUseCase: RegisterApplicationSettingsIpcDependencies["updateSettingUseCase"];
-  clearSettingUseCase: RegisterApplicationSettingsIpcDependencies["clearSettingUseCase"];
-  resolveModelDefaultUseCase: RegisterApplicationSettingsIpcDependencies["resolveModelDefaultUseCase"];
-  browseModelsUseCase: RegisterModelManagementIpcDependencies["browseModelsUseCase"];
-  getModelDetailsUseCase: RegisterModelManagementIpcDependencies["getModelDetailsUseCase"];
-  listModelsUseCase: RegisterModelManagementIpcDependencies["listModelsUseCase"];
-  saveModelReferenceUseCase: RegisterModelManagementIpcDependencies["saveModelReferenceUseCase"];
-  downloadModelUseCase: RegisterModelManagementIpcDependencies["downloadModelUseCase"];
-  updateModelRecordUseCase: RegisterModelManagementIpcDependencies["updateModelRecordUseCase"];
-  deleteModelRecordUseCase: RegisterModelManagementIpcDependencies["deleteModelRecordUseCase"];
-  trainModelUseCase: RegisterModelManagementIpcDependencies["trainModelUseCase"];
-  validateModelUseCase: RegisterModelManagementIpcDependencies["validateModelUseCase"];
-  publishModelUseCase: RegisterModelManagementIpcDependencies["publishModelUseCase"];
-  generateImageUseCase: RegisterImageGenerationIpcDependencies["generateImageUseCase"];
-  imageGenerationFinalizationOrchestrator?: RegisterImageGenerationIpcDependencies["imageGenerationFinalizationOrchestrator"];
-  comfyUiInstaller: RuntimeInstallerPort;
-  comfyUiInstallRoot: string;
+  settingsUseCases: any;
+  tokens: {
+    getHuggingFaceTokenStatus: () => any;
+    setHuggingFaceToken: (token: string) => any;
+    clearHuggingFaceToken: () => any;
+  };
+  features: {
+    artifact: AsyncFeatureProvider<any>;
+    artifactRemote: AsyncFeatureProvider<any>;
+    asset: AsyncFeatureProvider<any>;
+    model: AsyncFeatureProvider<any>;
+    imageGeneration: AsyncFeatureProvider<any>;
+    comfyUi: AsyncFeatureProvider<any>;
+    ingestion: AsyncFeatureProvider<any>;
+    datasetPreparation: AsyncFeatureProvider<any>;
+  };
 }
 
-export function registerElectronIpc(
-  dependencies: RegisterElectronIpcDependencies,
-): void {
-  registerRuntimeReadinessIpc({
-    ipcMain: dependencies.ipcMain,
-    runtimeReadiness: dependencies.runtimeReadiness,
-  });
+export function registerElectronIpc(dependencies: RegisterElectronIpcDependencies): void {
+  registerRuntimeReadinessIpc({ ipcMain: dependencies.ipcMain, runtimeReadiness: dependencies.runtimeReadiness });
 
   registerArtifactUploadIpc({
     ipcMain: dependencies.ipcMain,
-    storeArtifactUploadUseCase: dependencies.storeArtifactUploadUseCase,
+    storeArtifactUploadUseCase: lazyProvidedObject(dependencies.features.artifact, (feature) => feature.storeArtifactUploadUseCase),
   });
 
-  if (dependencies.workspaceServices) {
-    registerWorkspaceIpc({ ipcMain: dependencies.ipcMain, ...dependencies.workspaceServices });
-  }
+  if (dependencies.workspaceServices) registerWorkspaceIpc({ ipcMain: dependencies.ipcMain, ...dependencies.workspaceServices });
 
-  if (dependencies.assetRegistryRead) {
-    registerAssetRegistryIpc({
-      ipcMain: dependencies.ipcMain,
-      assetRegistryRead: dependencies.assetRegistryRead,
-    });
-  }
-
-  if (dependencies.assetMutationUseCases) {
-    registerAssetMutationIpc({
-      ipcMain: dependencies.ipcMain,
-      ...dependencies.assetMutationUseCases,
-    });
-  }
+  registerAssetRegistryIpc({ ipcMain: dependencies.ipcMain, assetRegistryRead: lazyProvidedObject(dependencies.features.asset, (feature) => feature.assetRegistryRead) });
+  registerAssetMutationIpc({
+    ipcMain: dependencies.ipcMain,
+    registerResourceBackedViewAsAsset: lazyProvidedObject(dependencies.features.asset, (feature) => feature.assetMutationUseCases.registerResourceBackedViewAsAsset),
+    finalizeGeneratedOutputAsAsset: lazyProvidedObject(dependencies.features.asset, (feature) => feature.assetMutationUseCases.finalizeGeneratedOutputAsAsset),
+    importExternalRepositoryObjectAsAsset: lazyProvidedObject(dependencies.features.asset, (feature) => feature.assetMutationUseCases.importExternalRepositoryObjectAsAsset),
+    localizeExternalRepositoryObjectAsAsset: lazyProvidedObject(dependencies.features.asset, (feature) => feature.assetMutationUseCases.localizeExternalRepositoryObjectAsAsset),
+  });
 
   registerArtifactBrowserIpc({
     ipcMain: dependencies.ipcMain,
-    getHuggingFaceTokenStatus: dependencies.getHuggingFaceTokenStatus,
-    setHuggingFaceToken: dependencies.setHuggingFaceToken,
-    clearHuggingFaceToken: dependencies.clearHuggingFaceToken,
-    browseArtifactsUseCase: dependencies.browseArtifactsUseCase,
-    browseUnregisteredArtifactsUseCase: dependencies.browseUnregisteredArtifactsUseCase,
-    registerUnregisteredArtifactUseCase: dependencies.registerUnregisteredArtifactUseCase,
-    deleteUnregisteredArtifactUseCase: dependencies.deleteUnregisteredArtifactUseCase,
-    deleteRegisteredArtifactUseCase: dependencies.deleteRegisteredArtifactUseCase,
-    readArtifactDetailUseCase: dependencies.readArtifactDetailUseCase,
-    readArtifactContentUseCase: dependencies.readArtifactContentUseCase,
-    artifactMediaViewRetrieval: dependencies.artifactMediaViewRetrieval,
-    publishArtifactToRepoUseCase: dependencies.publishArtifactToRepoUseCase,
-    browseHuggingFaceNamespaceDatasetsUseCase: dependencies.browseHuggingFaceNamespaceDatasetsUseCase,
-    browseHuggingFaceDatasetParquetFilesUseCase: dependencies.browseHuggingFaceDatasetParquetFilesUseCase,
-    verifyPublishedArtifactBackingUseCase: dependencies.verifyPublishedArtifactBackingUseCase,
-    verifyImportedArtifactSourceBackingUseCase: dependencies.verifyImportedArtifactSourceBackingUseCase,
-    registerArtifactFromRepoUseCase: dependencies.registerArtifactFromRepoUseCase,
-    localizeArtifactFromRepoUseCase: dependencies.localizeArtifactFromRepoUseCase,
+    getHuggingFaceTokenStatus: dependencies.tokens.getHuggingFaceTokenStatus,
+    setHuggingFaceToken: dependencies.tokens.setHuggingFaceToken,
+    clearHuggingFaceToken: dependencies.tokens.clearHuggingFaceToken,
+    browseArtifactsUseCase: lazyProvidedObject(dependencies.features.artifact, (feature) => feature.browseArtifactsUseCase),
+    browseUnregisteredArtifactsUseCase: lazyProvidedObject(dependencies.features.artifact, (feature) => feature.browseUnregisteredArtifactsUseCase),
+    registerUnregisteredArtifactUseCase: lazyProvidedObject(dependencies.features.artifact, (feature) => feature.registerUnregisteredArtifactUseCase),
+    deleteUnregisteredArtifactUseCase: lazyProvidedObject(dependencies.features.artifact, (feature) => feature.deleteUnregisteredArtifactUseCase),
+    deleteRegisteredArtifactUseCase: lazyProvidedObject(dependencies.features.artifact, (feature) => feature.deleteRegisteredArtifactUseCase),
+    readArtifactDetailUseCase: lazyProvidedObject(dependencies.features.artifact, (feature) => feature.readArtifactDetailUseCase),
+    readArtifactContentUseCase: lazyProvidedObject(dependencies.features.artifact, (feature) => feature.readArtifactContentUseCase),
+    artifactMediaViewRetrieval: lazyProvidedObject(dependencies.features.artifact, (feature) => feature.artifactMediaViewRetrieval),
+    publishArtifactToRepoUseCase: lazyProvidedObject(dependencies.features.artifactRemote, (feature) => feature.publishArtifactToRepoUseCase),
+    browseHuggingFaceNamespaceDatasetsUseCase: lazyProvidedObject(dependencies.features.artifactRemote, (feature) => feature.browseHuggingFaceNamespaceDatasetsUseCase),
+    browseHuggingFaceDatasetParquetFilesUseCase: lazyProvidedObject(dependencies.features.artifactRemote, (feature) => feature.browseHuggingFaceDatasetParquetFilesUseCase),
+    verifyPublishedArtifactBackingUseCase: lazyProvidedObject(dependencies.features.artifactRemote, (feature) => feature.verifyPublishedArtifactBackingUseCase),
+    verifyImportedArtifactSourceBackingUseCase: lazyProvidedObject(dependencies.features.artifactRemote, (feature) => feature.verifyImportedArtifactSourceBackingUseCase),
+    registerArtifactFromRepoUseCase: lazyProvidedObject(dependencies.features.artifactRemote, (feature) => feature.registerArtifactFromRepoUseCase),
+    localizeArtifactFromRepoUseCase: lazyProvidedObject(dependencies.features.artifactRemote, (feature) => feature.localizeArtifactFromRepoUseCase),
   });
 
-  registerWebsiteIngestionIpc({
-    ipcMain: dependencies.ipcMain,
-    ingestWebsitePageUseCase: dependencies.ingestWebsitePageUseCase,
-    ingestWebsitePagesBatchUseCase: dependencies.ingestWebsitePagesBatchUseCase,
-  });
+  registerWebsiteIngestionIpc({ ipcMain: dependencies.ipcMain, ingestWebsitePageUseCase: lazyProvidedObject(dependencies.features.ingestion, (feature) => feature.ingestWebsitePageUseCase), ingestWebsitePagesBatchUseCase: lazyProvidedObject(dependencies.features.ingestion, (feature) => feature.ingestWebsitePagesBatchUseCase) });
+  registerDatasetPreparationIpc({ ipcMain: dependencies.ipcMain, prepareTrainingDatasetUseCase: lazyProvidedObject(dependencies.features.datasetPreparation, (feature) => feature.prepareTrainingDatasetUseCase) });
 
-  registerDatasetPreparationIpc({
-    ipcMain: dependencies.ipcMain,
-    prepareTrainingDatasetUseCase: dependencies.prepareTrainingDatasetUseCase,
-  });
-
-  registerApplicationSettingsIpc({
-    ipcMain: dependencies.ipcMain,
-    listSettingsDefinitionsUseCase: dependencies.listSettingsDefinitionsUseCase,
-    readSettingsUseCase: dependencies.readSettingsUseCase,
-    updateSettingUseCase: dependencies.updateSettingUseCase,
-    clearSettingUseCase: dependencies.clearSettingUseCase,
-    resolveModelDefaultUseCase: dependencies.resolveModelDefaultUseCase,
-  });
+  registerApplicationSettingsIpc({ ipcMain: dependencies.ipcMain, ...dependencies.settingsUseCases });
   registerModelManagementIpc({
     ipcMain: dependencies.ipcMain,
-    browseModelsUseCase: dependencies.browseModelsUseCase,
-    getModelDetailsUseCase: dependencies.getModelDetailsUseCase,
-    listModelsUseCase: dependencies.listModelsUseCase,
-    saveModelReferenceUseCase: dependencies.saveModelReferenceUseCase,
-    downloadModelUseCase: dependencies.downloadModelUseCase,
-    updateModelRecordUseCase: dependencies.updateModelRecordUseCase,
-    deleteModelRecordUseCase: dependencies.deleteModelRecordUseCase,
-    trainModelUseCase: dependencies.trainModelUseCase,
-    validateModelUseCase: dependencies.validateModelUseCase,
-    publishModelUseCase: dependencies.publishModelUseCase,
+    browseModelsUseCase: lazyProvidedObject(dependencies.features.model, (feature) => feature.browseModelsUseCase),
+    getModelDetailsUseCase: lazyProvidedObject(dependencies.features.model, (feature) => feature.getModelDetailsUseCase),
+    listModelsUseCase: lazyProvidedObject(dependencies.features.model, (feature) => feature.listModelsUseCase),
+    saveModelReferenceUseCase: lazyProvidedObject(dependencies.features.model, (feature) => feature.saveModelReferenceUseCase),
+    downloadModelUseCase: lazyProvidedObject(dependencies.features.model, (feature) => feature.downloadModelUseCase),
+    updateModelRecordUseCase: lazyProvidedObject(dependencies.features.model, (feature) => feature.updateModelRecordUseCase),
+    deleteModelRecordUseCase: lazyProvidedObject(dependencies.features.model, (feature) => feature.deleteModelRecordUseCase),
+    trainModelUseCase: lazyProvidedObject(dependencies.features.model, (feature) => feature.trainModelUseCase),
+    validateModelUseCase: lazyProvidedObject(dependencies.features.model, (feature) => feature.validateModelUseCase),
+    publishModelUseCase: lazyProvidedObject(dependencies.features.model, (feature) => feature.publishModelUseCase),
   });
 
-  registerImageGenerationIpc({
-    ipcMain: dependencies.ipcMain,
-    generateImageUseCase: dependencies.generateImageUseCase,
-    imageGenerationFinalizationOrchestrator: dependencies.imageGenerationFinalizationOrchestrator,
-  });
+  registerImageGenerationIpc({ ipcMain: dependencies.ipcMain, generateImageUseCase: lazyProvidedObject(dependencies.features.imageGeneration, (feature) => feature.generateImageUseCase), imageGenerationFinalizationOrchestrator: lazyProvidedObject(dependencies.features.imageGeneration, (feature) => feature.imageGenerationFinalizationOrchestrator) });
 
   registerComfyUiRuntimeIpc({
     ipcMain: dependencies.ipcMain,
-    installer: dependencies.comfyUiInstaller,
-    installRoot: dependencies.comfyUiInstallRoot,
+    installer: lazyProvidedObject(dependencies.features.comfyUi, (feature) => feature.installer),
+    getInstallRoot: async () => (await dependencies.features.comfyUi()).installRoot,
   });
 
-  registerPythonRuntimeIpc({
-    ipcMain: dependencies.ipcMain,
-    startPythonRuntime: dependencies.pythonRuntime.startPythonRuntime,
-    stopPythonRuntime: dependencies.pythonRuntime.stopPythonRuntime,
-    restartPythonRuntime: dependencies.pythonRuntime.restartPythonRuntime,
-    unloadPythonRuntimeModel: dependencies.pythonRuntime.unloadPythonRuntimeModel,
-    clearPythonRuntimeLogs: dependencies.pythonRuntime.clearPythonRuntimeLogs,
-    readPythonRuntimeStatus: dependencies.pythonRuntime.readPythonRuntimeStatus,
-  });
+  registerPythonRuntimeIpc({ ipcMain: dependencies.ipcMain, ...dependencies.pythonRuntime });
 }
