@@ -353,7 +353,7 @@ describe("composeDesktopHost", () => {
     expect(internalRegistry?.diagnostics.resourceBackedViewsEnabled).toBe(true);
     const resourceBacked = await internalRegistry?.readFacade.listResourceBackedViewCards({ limit: 10 });
     expect(resourceBacked?.items).toEqual([]);
-    expect(resourceBacked?.diagnostics?.some((diagnostic) => diagnostic.code.includes("source-unavailable") || diagnostic.code.includes("unsupported"))).toBe(true);
+    expect(resourceBacked?.diagnostics?.some((diagnostic) => diagnostic.code.includes("source-unavailable") || diagnostic.code.includes("unsupported") || diagnostic.code.includes("workspace"))).toBe(true);
     const missingResourceBackedDetail = await internalRegistry!.readFacade.readResourceBackedViewDetail("asset-view.image.internal.missing");
     expect(missingResourceBackedDetail).toBeUndefined();
     expect(artifactRepoFetch).not.toHaveBeenCalled();

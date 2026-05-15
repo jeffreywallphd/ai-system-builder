@@ -65,6 +65,11 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
       return;
     }
 
+    if (!hasWorkspaceId(query)) {
+      response.status(400).json(createApiAssetDefinitionsListFailureResponse("validation", "Workspace id is required for Asset Library reads.", context));
+      return;
+    }
+
     try {
       const result = await dependencies.assetRegistryRead.listDefinitionCards(query);
       response.status(200).json(createApiAssetDefinitionsListSuccessResponse(sanitizeAssetViewValue(result), context));
@@ -80,6 +85,11 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
       query = toAssetRegistryResourceBackedViewListQuery(parseAssetRegistryResourceBackedViewListInput(withWorkspaceId(request, request.query ?? {}), "api-query"));
     } catch {
       response.status(400).json(createApiAssetResourceBackedViewsListFailureResponse("validation", "Invalid asset resource-backed views query.", context));
+      return;
+    }
+
+    if (!hasWorkspaceId(query)) {
+      response.status(400).json(createApiAssetResourceBackedViewsListFailureResponse("validation", "Workspace id is required for Asset Library reads.", context));
       return;
     }
 
@@ -114,6 +124,11 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
       return;
     }
 
+    if (!hasWorkspaceId(payload)) {
+      response.status(400).json(createApiAssetResourceBackedViewReadFailureResponse("validation", "Workspace id is required for Asset Library reads.", context));
+      return;
+    }
+
     if (!dependencies.assetRegistryRead.readResourceBackedViewDetail) {
       response.status(503).json(createApiAssetResourceBackedViewReadFailureResponse("unavailable", "Asset resource-backed views are unavailable.", context));
       return;
@@ -144,6 +159,11 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
       return;
     }
 
+    if (!hasWorkspaceId(payload)) {
+      response.status(400).json(createApiAssetDefinitionReadFailureResponse("validation", "Workspace id is required for Asset Library reads.", context));
+      return;
+    }
+
     try {
       const detail = await dependencies.assetRegistryRead.readDefinitionDetail(
         toAssetRegistryDefinitionReference(payload),
@@ -169,6 +189,11 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
       return;
     }
 
+    if (!hasWorkspaceId(payload)) {
+      response.status(400).json(createApiAssetDefinitionVersionReadFailureResponse("validation", "Workspace id is required for Asset Library reads.", context));
+      return;
+    }
+
     try {
       const detail = await dependencies.assetRegistryRead.readDefinitionDetail(
         toAssetRegistryDefinitionReference(payload),
@@ -183,6 +208,10 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
       writeApiReadError(response, createApiAssetDefinitionVersionReadFailureResponse, error, context, "Unable to read asset definition version.");
     }
   });
+}
+
+function hasWorkspaceId(value: { readonly workspaceId?: unknown }): value is { readonly workspaceId: string } {
+  return typeof value.workspaceId === "string" && value.workspaceId.trim().length > 0;
 }
 
 function workspaceIdFrom(request: ExpressRequestLike): string | undefined {

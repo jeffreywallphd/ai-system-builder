@@ -249,6 +249,18 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient, wor
   }, [readDetail]);
 
   const selectResourceBackedView = useCallback(async (view: AssetLibraryResourceBackedViewCard) => {
+    if (!workspaceId) {
+      setActiveTab("resource-views");
+      setSelectedResourceBackedView(view);
+      setSelectedDefinition(undefined);
+      setSelectedDetail(undefined);
+      setSelectedResourceBackedViewDetail(undefined);
+      setDetailError("Select a workspace before loading resource-backed views.");
+      setValidationError(undefined);
+      setIsLoadingDetail(false);
+      return;
+    }
+
     setActiveTab("resource-views");
     setSelectedResourceBackedView(view);
     setSelectedDefinition(undefined);

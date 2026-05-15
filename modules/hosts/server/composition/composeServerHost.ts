@@ -533,24 +533,29 @@ export function composeServerHost(
         artifactCatalogRead: artifactCatalog,
       });
 
+      const workspaceFoundation = internalAssetRegistry ?? composeInternalAssetRegistry({
+        rootDirectory: registerOptions.storageRootDirectory,
+        now: options.now,
+      });
+      internalAssetRegistry = workspaceFoundation;
       const storeArtifactUploadUseCase = new StoreArtifactUploadUseCase({
         storage,
         logging: loggingPort,
         now: options.now,
-        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
+        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
       });
 
       const browseArtifacts = new BrowseArtifactsUseCase({
         artifactBrowserMetadataRead: artifactBrowserRead,
-        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
+        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
       });
       const readArtifactDetail = new ReadArtifactDetailUseCase({
         artifactBrowserMetadataRead: artifactBrowserRead,
-        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
+        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
       });
       const readArtifactContent = new ReadArtifactContentUseCase({
         artifactBrowserContentRead: artifactBrowserRead,
-        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
+        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
       });
 
       const hasArtifactInRepo = new HasArtifactInRepoUseCase({
@@ -604,7 +609,7 @@ export function composeServerHost(
         artifactCatalogDelete: artifactCatalog,
         storage,
         artifactBindingStorage: artifactBindings,
-        workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
+        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
       });
 
       const resolvedRuntimeDeviceMode = runtimeDeviceMode;
@@ -990,9 +995,9 @@ export function composeServerHost(
         runtimeReadiness,
         assetRegistryRead: internalAssetRegistry.workspaceReadFacade,
         workspaceServices: {
-          workspaceRepository: internalAssetRegistry.workspaceRepositories.workspaceRepository,
-          workspaceSelectionRepository: internalAssetRegistry.workspaceRepositories.workspaceSelectionRepository,
-          createWorkspaceUseCase: internalAssetRegistry.workspaceUseCases.createWorkspace,
+          workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
+          workspaceSelectionRepository: workspaceFoundation.workspaceRepositories.workspaceSelectionRepository,
+          createWorkspaceUseCase: workspaceFoundation.workspaceUseCases.createWorkspace,
         },
         assetMutationUseCases,
       });

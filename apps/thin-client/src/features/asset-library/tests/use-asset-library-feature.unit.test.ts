@@ -115,6 +115,19 @@ describe("thin-client useAssetLibraryFeature", () => {
     expect(client.listAssetResourceBackedViews).not.toHaveBeenCalled();
   });
 
+  it("does not call resource-backed detail clients without an active workspace", async () => {
+    const client = createClient();
+    const { states } = await render(client, null);
+
+    await act(async () => {
+      await states[states.length - 1]?.selectResourceBackedView(resourceViewCard);
+    });
+    await flush();
+
+    expect(client.readAssetResourceBackedView).not.toHaveBeenCalled();
+    expect(states[states.length - 1]?.detailError).toBe("Select a workspace before loading resource-backed views.");
+  });
+
   it("loads definitions once on initial render without background repeat calls", async () => {
     const client = createClient();
     await render(client);
