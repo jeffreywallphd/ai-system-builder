@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 
 import { useActiveWorkspace, type WorkspaceUiRecord } from "../hooks/useActiveWorkspace";
+import { WorkspaceCreateForm } from "./WorkspaceCreateForm";
 
 export const WORKSPACE_REQUIRED_MESSAGE = "Create a workspace to use Assets, Artifacts, Data, Models, and Images.";
 
@@ -11,9 +12,6 @@ export interface WorkspaceGateProps {
 
 export function WorkspaceGate({ pageLabel, children }: WorkspaceGateProps) {
   const workspace = useActiveWorkspace();
-  const [workspaceName, setWorkspaceName] = useState("");
-  const [includeFoundation, setIncludeFoundation] = useState(true);
-
   if (workspace.loading) {
     return <section className="ui-panel ui-stack ui-stack--sm"><p>Loading workspaces...</p></section>;
   }
@@ -51,27 +49,7 @@ export function WorkspaceGate({ pageLabel, children }: WorkspaceGateProps) {
           </div>
         </div>
       ) : null}
-      <form className="ui-stack ui-stack--sm" onSubmit={(event) => {
-        event.preventDefault();
-        const form = event.currentTarget;
-        const formWorkspaceName = new FormData(form).get("workspaceName");
-        void workspace.createWorkspace({ name: typeof formWorkspaceName === "string" ? formWorkspaceName : workspaceName, includeSystemFoundationAssets: includeFoundation })
-          .then(() => setWorkspaceName(""))
-          .catch(() => {
-            // The context exposes a safe user-facing error.
-          });
-      }}>
-        <h3>Create workspace</h3>
-        <label className="ui-field">
-          <span>Workspace name</span>
-          <input name="workspaceName" value={workspaceName} onChange={(event) => setWorkspaceName(event.currentTarget.value)} placeholder="My Project" />
-        </label>
-        <label className="ui-checkbox">
-          <input type="checkbox" checked={includeFoundation} onChange={(event) => setIncludeFoundation(event.currentTarget.checked)} />
-          <span>Include System Foundation assets</span>
-        </label>
-        <button className="ui-button ui-button--primary" type="submit">Create workspace</button>
-      </form>
+      <WorkspaceCreateForm />
     </section>
   );
 }

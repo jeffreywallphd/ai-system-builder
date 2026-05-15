@@ -101,6 +101,11 @@ export function useArtifactSelectionContent(
     }
   }, [clearSelectedArtifact, client, setManagedImageViewUrl, setViewState, workspaceId]);
 
+
+  useEffect(() => {
+    clearSelectedArtifact();
+  }, [clearSelectedArtifact, workspaceId]);
+
   useEffect(() => () => {
     if (activeImageViewUrl.current) {
       revokeObjectUrl(activeImageViewUrl.current);

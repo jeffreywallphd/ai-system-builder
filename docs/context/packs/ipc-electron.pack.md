@@ -51,3 +51,9 @@ Desktop Asset Registry IPC/preload read payloads carry `workspaceId` for Asset L
 ## Phase 6 Prompt 8 artifact workspace scoping
 
 Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.
+
+## Phase 6 Prompt 10 workspace IPC/preload UI contract
+
+Desktop workspace UI uses the real preload/IPC workspace operations for list, create, active-selection read/save/clear, and passes the selected workspace id through workspace-owned feature requests. Renderer code must not synthesize authoritative ids, use display-name slugs as ids, or bypass preload for workspace selection. Create workspace may request System Foundation inclusion only as the existing `system.foundation@1.0.0` activation reference.
+
+Workspace-required renderer pages must remain gated before an active workspace exists, and unavailable/archived/missing selections must show safe user-facing unavailable copy rather than raw ids, paths, stack traces, or provider payloads.

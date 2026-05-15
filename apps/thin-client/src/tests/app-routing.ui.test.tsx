@@ -4,6 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../App";
 
+function json(payload: unknown): Response {
+  return { status: 200, headers: { get: () => "application/json" }, json: async () => payload } as Response;
+}
+
 describe("thin-client routing and page composition", () => {
   let mountedRoot: Root | undefined;
   let mountedContainer: HTMLDivElement | undefined;
@@ -24,10 +28,18 @@ describe("thin-client routing and page composition", () => {
   });
 
   it("gates workspace pages until a workspace is selected and keeps global-safe pages accessible", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ status: 200, headers: { get: () => "application/json" }, json: vi.fn().mockResolvedValue({ ok: true, value: { models: [] } }) })
-      .mockResolvedValue({ status: 200, headers: { get: () => "application/json" }, json: vi.fn().mockResolvedValue({ ok: true, value: { items: [], models: [] } }) });
+    const workspaces = [{ workspaceId: "thin-workspace", displayName: "Thin Workspace", status: "active", createdAt: "2026-05-14T00:00:00.000Z" }];
+    let selectedWorkspaceId: string | undefined;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
+      if (url.endsWith("/api/workspaces")) return json({ ok: true, value: { workspaces } });
+      if (url.endsWith("/api/workspaces/active-selection") && init?.method === "GET") return json({ ok: true, value: selectedWorkspaceId ? { workspaceId: selectedWorkspaceId } : {} });
+      if (url.endsWith("/api/workspaces/active-selection")) { selectedWorkspaceId = body.selection?.workspaceId; return json({ ok: true, value: { selection: body.selection } }); }
+      if (url.endsWith("/api/model/list")) return json({ ok: true, value: { models: [] } });
+      if (url.endsWith("/api/artifact/browse")) return json({ ok: true, value: { items: [] } });
+      return json({ ok: true, value: { items: [], models: [] } });
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const container = document.createElement("div");
@@ -52,10 +64,9 @@ describe("thin-client routing and page composition", () => {
     expect(container.textContent).toContain("Create a workspace to use Assets, Artifacts, Data, Models, and Images.");
     expect(container.textContent).toContain("Include System Foundation assets");
     expect(container.textContent).not.toContain("Open Models");
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining("/api/model/list"), expect.anything());
 
-    window.localStorage.setItem("ai-system-builder.thin-client.workspaces", JSON.stringify([{ id: "thin-workspace", displayName: "Thin Workspace", status: "active", createdAt: "2026-05-14T00:00:00.000Z" }]));
-    window.localStorage.setItem("ai-system-builder.thin-client.activeWorkspaceId", "thin-workspace");
+    selectedWorkspaceId = "thin-workspace";
     await act(async () => {
       root.unmount();
     });

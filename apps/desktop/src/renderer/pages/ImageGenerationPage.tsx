@@ -6,5 +6,12 @@ export interface WorkspaceScopedPageProps {
 }
 
 export function ImageGenerationPage({ workspaceId, workspaceName }: WorkspaceScopedPageProps = {}) {
-  return <section className="ui-stack ui-stack--sm" data-workspace-id={workspaceId} data-workspace-name={workspaceName}><h1>Image Generation</h1><p>Run runtime-backed image generation tasks and track progress to finalized assets.</p><ImageGenerationFeature workspaceId={workspaceId} workspaceName={workspaceName} /></section>;
+  return (
+    <section className="ui-stack ui-stack--sm" data-workspace-name={workspaceName}>
+      <h1>Image Generation</h1>
+      <p>Showing records for: {workspaceName ?? "No workspace selected"}</p>
+      <p>Run runtime-backed image generation tasks and track progress to finalized assets.</p>
+      <ImageGenerationFeature key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} />
+    </section>
+  );
 }

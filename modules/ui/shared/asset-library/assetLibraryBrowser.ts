@@ -145,6 +145,17 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient, wor
   const loadList = useCallback(async () => {
     setIsLoadingList(true);
     setListError(undefined);
+    if (!workspaceId) {
+      setDefinitions([]);
+      setResourceBackedViews([]);
+      setSelectedDefinition(undefined);
+      setSelectedResourceBackedView(undefined);
+      setSelectedDetail(undefined);
+      setSelectedResourceBackedViewDetail(undefined);
+      setDiagnostics([]);
+      setIsLoadingList(false);
+      return;
+    }
     const result = await client.listAssetDefinitions(query);
     const resourceResult = await client.listAssetResourceBackedViews({
       searchText: query.searchText,
@@ -203,6 +214,9 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient, wor
     definition: AssetLibraryDefinitionCard,
     options: { readonly includeValidation?: boolean },
   ) => {
+    if (!workspaceId) {
+      return { ok: false, error: { code: "workspace_required", message: "Select a workspace before loading assets." } } as const;
+    }
     return definition.version
       ? client.readAssetDefinitionVersion(
         { definitionId: definition.definitionId, version: definition.version },

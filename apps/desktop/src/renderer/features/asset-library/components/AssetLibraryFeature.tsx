@@ -42,6 +42,7 @@ export function AssetLibraryFeature({ client, workspaceId, workspaceName }: Asse
       action: pendingAction,
       view: state.selectedResourceBackedViewDetail,
       userConfirmed: true,
+      workspaceId: workspaceId as never,
     });
     const result = await callMutationClient(state, command);
     if (result.ok === true) {

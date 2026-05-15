@@ -204,3 +204,9 @@ Hosts may later call the application-layer workspace system pack activation use 
 ## Phase 6 artifact workspace context
 
 Desktop and server hosts forward request/UI workspace ids into artifact browse, read, upload, and artifact-backed resource-view seams. Hosts only compose dependencies and transports; they must not create hidden/default workspaces, auto-migrate legacy global artifacts, or implement workspace filtering rules outside the application/persistence seams.
+
+### Desktop and thin-client workspace UX integration (Phase 6 Prompt 10)
+
+Desktop and thin-client hosts now expose visible workspace create/select/switch controls in the shell. Workspace-required pages remain reachable from navigation, but render a gated create/select state until an active workspace is available. Home can guide first-run users to create a workspace; hosts must not create hidden/default workspaces or seed workspaces automatically at startup.
+
+Create-workspace UI delegates to the real workspace transport/use case and does not generate authoritative workspace ids locally. The optional System Foundation checkbox requests `system.foundation@1.0.0` activation by reference during workspace creation; it is not a system-pack installer UI and must not copy definitions. Workspace-scoped UI clients pass the active workspace id explicitly on reads/writes and clear or refetch stale records when the active workspace changes. User-library, cross-workspace reuse, and collaboration remain later work.

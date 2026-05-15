@@ -5,8 +5,9 @@ import { TabbedPanel } from "../components/ui/TabbedPanel";
 export interface WorkspaceScopedPageProps { workspaceId?: string; workspaceName?: string; }
 export function ArtifactsPage({ workspaceId, workspaceName }: WorkspaceScopedPageProps = {}) {
   return (
-    <section className="ui-stack ui-stack--sm" data-workspace-id={workspaceId} data-workspace-name={workspaceName}>
-      <p>Active workspace: {workspaceName ?? workspaceId ?? "No active workspace"}</p>
+    <section className="ui-stack ui-stack--sm" data-workspace-name={workspaceName}>
+      <h1>Data Management</h1>
+      <p>Showing records for: {workspaceName ?? "No workspace selected"}</p>
       <TabbedPanel
         tabListAriaLabel="Artifact workspace panels"
         defaultTabId="ingestion"
@@ -14,16 +15,15 @@ export function ArtifactsPage({ workspaceId, workspaceName }: WorkspaceScopedPag
           {
             id: "ingestion",
             label: "Artifact Ingestion",
-            content: <ArtifactIngestionFeature workspaceId={workspaceId} workspaceName={workspaceName} />,
+            content: <ArtifactIngestionFeature key={`ingest-${workspaceId}`} workspaceId={workspaceId} workspaceName={workspaceName} />,
           },
           {
             id: "browser",
             label: "Artifact Browser",
-            content: <ArtifactBrowserFeature workspaceId={workspaceId} workspaceName={workspaceName} />,
+            content: <ArtifactBrowserFeature key={`browser-${workspaceId}`} workspaceId={workspaceId} workspaceName={workspaceName} />,
           },
         ]}
       />
     </section>
   );
 }
-

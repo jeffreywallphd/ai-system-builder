@@ -1,3 +1,4 @@
+import type { WorkspaceId } from "../../../contracts/workspace";
 import type {
   AssetMutationActor,
   AssetMutationApproval,
@@ -51,6 +52,7 @@ export interface BuildAssetLibraryMutationCommandOptions {
   readonly userConfirmed: boolean;
   readonly thinClientSafe?: boolean;
   readonly context?: AssetMutationRequestContext;
+  readonly workspaceId?: WorkspaceId;
 }
 
 export interface AssetLibraryMutationDisplay {
@@ -106,6 +108,7 @@ export function buildAssetLibraryMutationCommand({
   userConfirmed,
   thinClientSafe,
   context,
+  workspaceId,
 }: BuildAssetLibraryMutationCommandOptions): AssetLibraryMutationCommand {
   const approval = {
     ...action.approvalDefaults,
@@ -131,9 +134,13 @@ export function buildAssetLibraryMutationCommand({
         viewId: view.viewId,
       };
     case "asset.finalize-generated-output":
+      if (!workspaceId) {
+        throw new Error("Workspace is required to finalize generated outputs.");
+      }
       return {
         ...base,
         operation: "asset.finalize-generated-output",
+        workspaceId,
         viewId: view.viewId,
       };
     case "asset.import-external-repository-object":

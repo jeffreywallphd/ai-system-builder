@@ -6,7 +6,7 @@ import {
   type AssetLibraryFeatureState,
   type AssetLibraryFiltersState,
   type AssetLibraryFilterValue,
-} from "../../../../../../modules/ui/shared/asset-library";
+} from "../../../../../../modules/ui/shared/asset-library/assetLibraryBrowser";
 import { createApiAssetLibraryClient } from "../api/apiAssetLibraryClient";
 
 export type {

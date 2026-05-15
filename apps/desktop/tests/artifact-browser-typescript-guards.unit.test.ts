@@ -25,7 +25,7 @@ describe("artifact browser TypeScript regression guards", () => {
     );
 
     expect(source).toContain("selectedStorageKey");
-    expect(source).toMatchObject(expect.stringMatching(/const\s*\{\s*[\s\S]*selectedStorageKey[\s\S]*\}\s*=\s*useArtifactBrowserFeature\(client\);/));
+    expect(source).toMatchObject(expect.stringMatching(/const\s*\{\s*[\s\S]*selectedStorageKey[\s\S]*\}\s*=\s*useArtifactBrowserFeature\(client, workspaceId\);/));
   });
 
   it("keeps publish logic result typed with TDetail for setPublishedBackingFromDetail", () => {
