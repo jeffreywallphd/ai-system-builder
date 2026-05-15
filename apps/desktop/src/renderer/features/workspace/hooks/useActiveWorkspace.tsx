@@ -13,6 +13,7 @@ import {
   type WorkspaceRecord,
 } from "../../../../../../../modules/contracts/workspace";
 import { getDesktopApi } from "../../../lib/desktopApi";
+import { recordRendererMemorySnapshot } from "../../../diagnostics/rendererMemoryDiagnostics";
 
 export type WorkspaceUiStatus = "active" | "archived" | "deleting";
 
@@ -68,6 +69,10 @@ export function ActiveWorkspaceProvider({
   const [error, setError] = useState<string | undefined>();
 
   const load = useCallback(async () => {
+    recordRendererMemorySnapshot({
+      milestone: "renderer.workspace-provider.load.before",
+      component: "desktop-renderer-workspace-provider",
+    });
     setLoading(true);
     try {
       const [records, selection] = await Promise.all([
@@ -77,8 +82,20 @@ export function ActiveWorkspaceProvider({
       setWorkspaces([...records]);
       setActiveWorkspaceId(selection.workspaceId);
       setError(undefined);
+      recordRendererMemorySnapshot({
+        milestone: "renderer.workspace-provider.load.after",
+        component: "desktop-renderer-workspace-provider",
+        detail: {
+          workspaceCount: records.length,
+          hasActiveWorkspaceSelection: Boolean(selection.workspaceId),
+        },
+      });
     } catch {
       setError("Workspace could not be loaded.");
+      recordRendererMemorySnapshot({
+        milestone: "renderer.workspace-provider.load.error",
+        component: "desktop-renderer-workspace-provider",
+      });
     } finally {
       setLoading(false);
     }
