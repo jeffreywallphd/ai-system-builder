@@ -106,7 +106,7 @@ app.whenReady().then(async () => {
     milestone: "desktop.ipc.register.before",
     component: "desktop-main",
   });
-  desktopHost.registerArtifactUploadIpc({
+  desktopHost.registerDesktopIpc({
     ipcMain,
     storageRootDirectory,
     runtimeRootDirectory: desktopDataRootDirectory,

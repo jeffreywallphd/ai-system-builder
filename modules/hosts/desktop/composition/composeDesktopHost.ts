@@ -55,6 +55,8 @@ import { GenerateImageUseCase } from "../../../application/use-cases/image-gener
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { recordDesktopMemorySnapshot } from "../diagnostics";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
+import { createLocalWorkspaceRepository, createLocalWorkspaceSelectionRepository, createLocalWorkspaceSystemPackActivationRepository } from "../../../adapters/persistence/workspace";
+import { CreateWorkspaceUseCase } from "../../../application/use-cases/workspace";
 import { DefaultModelDefaultResolver } from "../../../application/services/settings";
 import type { ApplicationSecretsPort, ApplicationSettingsPort, ModelDefaultResolverPort } from "../../../application/ports/settings";
 import type { ArtifactObjectStoragePort } from "../../../application/ports/storage";
@@ -253,6 +255,7 @@ export interface DesktopHostComposition {
   readPythonRuntimeStatus: () => Promise<DesktopPythonRuntimeStatusPayload>;
   getPythonRuntimeDiagnostics: () => Promise<{ status: string; healthy: boolean; capabilities: string[] }>;
   powerSuspensionBlocker: PowerSuspensionBlockerPort;
+  registerDesktopIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
   registerArtifactUploadIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
   getInternalAssetRegistry: () => InternalAssetRegistryComposition | undefined;
 }
@@ -453,6 +456,26 @@ export function composeDesktopHost(
     });
   };
 
+  const memoizeFeature = <T>(milestoneBase: string, compose: () => T): (() => T) => {
+    let value: T | undefined;
+    return () => {
+      if (value !== undefined) {
+        return value;
+      }
+      recordHostMemorySnapshot(`${milestoneBase}.before`);
+      value = compose();
+      recordHostMemorySnapshot(`${milestoneBase}.after`);
+      return value;
+    };
+  };
+
+  const lazyUseCase = <T extends object>(getUseCase: () => T): T => new Proxy({}, {
+    get(_target, property) {
+      const value = (getUseCase() as Record<PropertyKey, unknown>)[property];
+      return typeof value === "function" ? value.bind(getUseCase()) : value;
+    },
+  }) as T;
+
   recordHostMemorySnapshot("desktop.host.compose.enter");
 
   const loggingConfig = createLoggingConfig({
@@ -470,6 +493,7 @@ export function composeDesktopHost(
     now: options.now,
   });
   recordHostMemorySnapshot("desktop.host.logging.ready");
+
   const now = options.now ?? (() => new Date().toISOString());
   const runtimeLogs: DesktopPythonRuntimeLogEntry[] = [];
   let lastObservedRuntimeHealthSnapshot:
@@ -496,11 +520,10 @@ export function composeDesktopHost(
       event: "runtime.python.activity",
       message: normalized.message,
       component: "python-runtime-supervisor",
-      data: {
-        severity: entry.level,
-      },
+      data: { severity: entry.level },
     });
   };
+
   const tokenConfigStore = createHuggingFaceTokenConfigStore({
     filePath: options.artifactRepo?.huggingFaceTokenConfigFilePath ?? "/tmp/ai-system-builder/desktop/hugging-face-token.json",
     fallbackToken: options.artifactRepo?.huggingFaceAccessToken,
@@ -509,13 +532,13 @@ export function composeDesktopHost(
     tokenConfigured: Boolean(options.artifactRepo?.huggingFaceAccessToken?.trim()),
     tokenConfigPathConfigured: Boolean(options.artifactRepo?.huggingFaceTokenConfigFilePath?.trim()),
   });
+
   const pythonRuntimeEndpoint = resolvePythonRuntimeHostAndPort();
   const pythonRuntimeBaseUrl = resolvePythonRuntimeBaseUrl();
   const configuredPythonRuntimeStartupTimeoutMs = Number(process.env.PYTHON_RUNTIME_STARTUP_TIMEOUT_MS);
-  const pythonRuntimeStartupTimeoutMs =
-    Number.isFinite(configuredPythonRuntimeStartupTimeoutMs) && configuredPythonRuntimeStartupTimeoutMs > 0
-      ? configuredPythonRuntimeStartupTimeoutMs
-      : PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT;
+  const pythonRuntimeStartupTimeoutMs = Number.isFinite(configuredPythonRuntimeStartupTimeoutMs) && configuredPythonRuntimeStartupTimeoutMs > 0
+    ? configuredPythonRuntimeStartupTimeoutMs
+    : PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT;
   const pythonRuntimeEnvironment = {
     ...process.env,
     PYTHON_RUNTIME_HOST: pythonRuntimeEndpoint.host,
@@ -525,9 +548,7 @@ export function composeDesktopHost(
   };
   recordHostMemorySnapshot("desktop.host.python-runtime-foundation.before");
   const pythonRuntimeFoundation = createPythonRuntimeAdapterFoundation({
-    client: {
-      baseUrl: pythonRuntimeBaseUrl,
-    },
+    client: { baseUrl: pythonRuntimeBaseUrl },
     supervisor: {
       command: process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3"),
       args: process.env.PYTHON_RUNTIME_ARGS?.split(" ").filter(Boolean) ?? ["main.py"],
@@ -536,41 +557,26 @@ export function composeDesktopHost(
       startupTimeoutMs: pythonRuntimeStartupTimeoutMs,
       requiredCapabilities: PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES,
       prepareRuntimeEnvironment(context) {
-        ensurePythonRuntimeWorkerDependencies({
-          command: context.command,
-          cwd: context.cwd,
-          env: context.env,
-        });
+        ensurePythonRuntimeWorkerDependencies({ command: context.command, cwd: context.cwd, env: context.env });
       },
       onEvent(event) {
         if (event.type === "stdio") {
           const message = event.detail?.trim();
-          if (!message) {
-            return;
-          }
+          if (!message) return;
           const stream = event.data?.source === "stderr" ? "stderr" : "stdout";
           const level = classifyPythonRuntimeStdioLogLevel(stream, message);
-          recordRuntimeLog({
-            level,
-            message: `Python runtime ${stream}: ${message}`,
-          });
+          recordRuntimeLog({ level, message: `Python runtime ${stream}: ${message}` });
           return;
         }
-
         const message = event.detail ?? `Python runtime event: ${event.type}`;
         const level: "info" | "warn" | "error" = event.type === "process-error" || event.type === "startup-timeout"
           ? "error"
           : (event.type === "process-exit" ? "warn" : "info");
-        recordRuntimeLog({
-          level,
-          message,
-        });
+        recordRuntimeLog({ level, message });
       },
     },
   });
-  recordHostMemorySnapshot("desktop.host.python-runtime-foundation.after", {
-    baseUrlConfigured: Boolean(pythonRuntimeBaseUrl),
-  });
+  recordHostMemorySnapshot("desktop.host.python-runtime-foundation.after", { baseUrlConfigured: Boolean(pythonRuntimeBaseUrl) });
 
   const readPythonRuntimeStatus = async (): Promise<DesktopPythonRuntimeStatusPayload> => {
     const supervisorStatus = pythonRuntimeFoundation.supervisor.getStatus();
@@ -597,10 +603,7 @@ export function composeDesktopHost(
         const diagnosticsMessage = error instanceof Error ? error.message : String(error);
         const wasAlreadyUnavailable = lastObservedRuntimeHealthSnapshot?.runtimeStatus === "unavailable";
         if (!wasAlreadyUnavailable) {
-          recordRuntimeLog({
-            level: "warn",
-            message: `Unable to read Python runtime diagnostics: ${diagnosticsMessage}`,
-          });
+          recordRuntimeLog({ level: "warn", message: `Unable to read Python runtime diagnostics: ${diagnosticsMessage}` });
         }
       }
     }
@@ -633,65 +636,52 @@ export function composeDesktopHost(
       logs: [...runtimeLogs],
     };
   };
+
   const applicationSettings = createLocalApplicationSettingsAdapter({
     filePath: options.settings?.localSettingsFilePath ?? "/tmp/ai-system-builder/desktop/application-settings.json",
   });
-  recordHostMemorySnapshot("desktop.host.settings.ready", {
-    settingsPathConfigured: Boolean(options.settings?.localSettingsFilePath?.trim()),
-  });
+  recordHostMemorySnapshot("desktop.host.settings.ready", { settingsPathConfigured: Boolean(options.settings?.localSettingsFilePath?.trim()) });
   const baseApplicationSecrets = createInMemorySecretsAdapter();
   const applicationSecrets: ApplicationSecretsPort = {
     async setSecret(key, value) {
       await baseApplicationSecrets.setSecret(key, value);
-      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) {
-        tokenConfigStore.setToken(value);
-      }
+      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) tokenConfigStore.setToken(value);
     },
     async getSecret(key) {
       const inMemorySecret = await baseApplicationSecrets.getSecret(key);
-      if (inMemorySecret?.trim()) {
-        return inMemorySecret;
-      }
-
-      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) {
-        return tokenConfigStore.getToken();
-      }
-
+      if (inMemorySecret?.trim()) return inMemorySecret;
+      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) return tokenConfigStore.getToken();
       return undefined;
     },
     async clearSecret(key) {
       await baseApplicationSecrets.clearSecret(key);
-      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) {
-        tokenConfigStore.clearToken();
-      }
+      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) tokenConfigStore.clearToken();
     },
     async hasSecret(key) {
-      if (await baseApplicationSecrets.hasSecret(key)) {
-        return true;
-      }
-
-      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) {
-        return Boolean(tokenConfigStore.getToken()?.trim());
-      }
-
+      if (await baseApplicationSecrets.hasSecret(key)) return true;
+      if (key === HUGGING_FACE_TOKEN_SETTING_KEY) return Boolean(tokenConfigStore.getToken()?.trim());
       return false;
     },
   };
-  const modelDefaultResolver = new DefaultModelDefaultResolver({
-    settings: applicationSettings,
-  });
+  const modelDefaultResolver = new DefaultModelDefaultResolver({ settings: applicationSettings });
   const readRuntimeSettingString = async (key: string): Promise<string | undefined> => {
     const value = (await applicationSettings.readValues({ keys: [key] }))[0]?.value;
     return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
   };
 
-  const powerSuspensionBlocker = createElectronPowerSuspensionBlocker();
-  const taskPowerLifecycle = new TaskPowerLifecycleService(powerSuspensionBlocker);
-  recordHostMemorySnapshot("desktop.host.power-lifecycle.ready");
-  const pythonRuntimeTaskRegistry = createPythonRuntimeTaskRegistryAdapter({ ...pythonRuntimeFoundation.runtimePort }, {
-    ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
-  });
-  const comfyUiBaseUrl = process.env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188";
+  const lazyPowerSuspensionBlocker: PowerSuspensionBlockerPort = {
+    async startBlocker(reason, metadata) {
+      return getPowerSuspensionBlocker().startBlocker(reason, metadata);
+    },
+    async stopBlocker(blockerId) {
+      return getPowerSuspensionBlocker().stopBlocker(blockerId);
+    },
+    async listBlockers() {
+      return getPowerSuspensionBlocker().listBlockers();
+    },
+  };
+  const getPowerSuspensionBlocker = memoizeFeature("desktop.host.power-lifecycle.compose", () => createElectronPowerSuspensionBlocker());
+  const getTaskPowerLifecycle = memoizeFeature("desktop.host.runtime-task-power-lifecycle.compose", () => new TaskPowerLifecycleService(lazyPowerSuspensionBlocker));
 
   let internalAssetRegistry: InternalAssetRegistryComposition | undefined;
 
@@ -703,565 +693,339 @@ export function composeDesktopHost(
     applicationSettings,
     applicationSecrets,
     modelDefaultResolver,
-    powerSuspensionBlocker,
-    getHuggingFaceTokenStatus() {
-      return tokenConfigStore.getStatus();
-    },
-    setHuggingFaceToken(token: string) {
-      return tokenConfigStore.setToken(token);
-    },
-    clearHuggingFaceToken() {
-      return tokenConfigStore.clearToken();
-    },
+    powerSuspensionBlocker: lazyPowerSuspensionBlocker,
+    getHuggingFaceTokenStatus() { return tokenConfigStore.getStatus(); },
+    setHuggingFaceToken(token: string) { return tokenConfigStore.setToken(token); },
+    clearHuggingFaceToken() { return tokenConfigStore.clearToken(); },
     async startPythonRuntime() {
-      recordRuntimeLog({
-        level: "info",
-        message: "Starting Python runtime.",
-      });
+      recordRuntimeLog({ level: "info", message: "Starting Python runtime." });
       await pythonRuntimeFoundation.supervisor.start();
     },
     async stopPythonRuntime() {
-      recordRuntimeLog({
-        level: "info",
-        message: "Stopping Python runtime.",
-      });
+      recordRuntimeLog({ level: "info", message: "Stopping Python runtime." });
       await pythonRuntimeFoundation.supervisor.stop();
     },
     async restartPythonRuntime() {
-      recordRuntimeLog({
-        level: "info",
-        message: "Restarting Python runtime.",
-      });
+      recordRuntimeLog({ level: "info", message: "Restarting Python runtime." });
       await pythonRuntimeFoundation.supervisor.restart();
     },
     async unloadPythonRuntimeModel() {
-      recordRuntimeLog({
-        level: "info",
-        message: "Unloading Python runtime generation model from memory.",
-      });
+      recordRuntimeLog({ level: "info", message: "Unloading Python runtime generation model from memory." });
       const result = await pythonRuntimeFoundation.runtimePort.unloadModels();
-      recordRuntimeLog({
-        level: "info",
-        message: `Unloaded ${result.unloadedModels.length} Python runtime generation model(s) from memory.`,
-      });
+      recordRuntimeLog({ level: "info", message: `Unloaded ${result.unloadedModels.length} Python runtime generation model(s) from memory.` });
     },
     async clearPythonRuntimeLogs() {
       runtimeLogs.splice(0, runtimeLogs.length);
-      recordRuntimeLog({
-        level: "info",
-        message: "Cleared Python runtime activity log.",
-      });
+      recordRuntimeLog({ level: "info", message: "Cleared Python runtime activity log." });
     },
-    async readPythonRuntimeStatus() {
-      return readPythonRuntimeStatus();
-    },
+    async readPythonRuntimeStatus() { return readPythonRuntimeStatus(); },
     async getPythonRuntimeDiagnostics() {
       const status = await readPythonRuntimeStatus();
-      return {
-        status: status.runtimeStatus,
-        healthy: status.healthy,
-        capabilities: status.capabilities,
-      };
+      return { status: status.runtimeStatus, healthy: status.healthy, capabilities: status.capabilities };
     },
-    getInternalAssetRegistry() {
-      return internalAssetRegistry;
-    },
-    registerArtifactUploadIpc(registerOptions) {
+    getInternalAssetRegistry() { return internalAssetRegistry; },
+    registerDesktopIpc(registerOptions) {
       recordHostMemorySnapshot("desktop.host.ipc-registration.enter", {
         hasRuntimeRootDirectory: Boolean(registerOptions.runtimeRootDirectory),
         hasStorageRootDirectory: Boolean(registerOptions.storageRootDirectory),
       });
 
-      recordHostMemorySnapshot("desktop.host.comfyui-config.before");
-      const comfyUiInstallRoot = resolveComfyUiInstallRoot(process.env, registerOptions.runtimeRootDirectory);
-      const comfyUiBasePythonCommand = process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3");
-      const comfyUiPythonEnvironmentMode = resolveComfyUiPythonEnvironmentMode(process.env);
-      const comfyUiSkipPythonSetup = process.env.COMFYUI_SKIP_PYTHON_SETUP === "1";
-      const comfyUiPythonCommand = resolveComfyUiLaunchPythonExecutable({
-        installRoot: comfyUiInstallRoot,
-        basePythonCommand: comfyUiBasePythonCommand,
-        pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
-        skipPythonSetup: comfyUiSkipPythonSetup,
+      const getStartupWorkspaceShell = memoizeFeature("desktop.host.startup-workspace-shell.compose", () => {
+        const workspaceRepository = createLocalWorkspaceRepository({ rootDirectory: registerOptions.storageRootDirectory });
+        const workspaceSelectionRepository = createLocalWorkspaceSelectionRepository({ rootDirectory: registerOptions.storageRootDirectory });
+        const systemPackActivationRepository = createLocalWorkspaceSystemPackActivationRepository({ rootDirectory: registerOptions.storageRootDirectory });
+        const createWorkspaceUseCase = new CreateWorkspaceUseCase({
+          workspaceRepository,
+          workspaceSelectionRepository,
+          systemPackActivationRepository,
+        });
+        return { workspaceRepository, workspaceSelectionRepository, systemPackActivationRepository, createWorkspaceUseCase };
       });
-      const configuredComfyUiInstallCommandTimeoutMs = Number(process.env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS);
-      const comfyUiInstallCommandTimeoutMs =
-        Number.isFinite(configuredComfyUiInstallCommandTimeoutMs) && configuredComfyUiInstallCommandTimeoutMs > 0
+      const startupWorkspaceShell = getStartupWorkspaceShell();
+
+      const comfyUiInstallRoot = () => resolveComfyUiInstallRoot(process.env, registerOptions.runtimeRootDirectory);
+      const getRuntimeReadiness = memoizeFeature("desktop.host.runtime-readiness.compose", () => createDesktopRuntimeReadinessService({
+        readPythonSupervisorState: () => pythonRuntimeFoundation.supervisor.getStatus(),
+        readComfyUiLifecycleState: () => "uninitialized",
+        async readComfyUiInstallStatus() { return "unknown"; },
+        now,
+      }));
+
+      const getComfyUiFeatures = memoizeFeature("desktop.host.comfyui-features.compose", () => {
+        const installRoot = comfyUiInstallRoot();
+        const comfyUiBasePythonCommand = process.env.COMFYUI_PYTHON_COMMAND ?? process.env.PYTHON_RUNTIME_COMMAND ?? (process.platform === "win32" ? "python" : "python3");
+        const comfyUiPythonEnvironmentMode = resolveComfyUiPythonEnvironmentMode(process.env);
+        const comfyUiSkipPythonSetup = process.env.COMFYUI_SKIP_PYTHON_SETUP === "1";
+        const comfyUiPythonCommand = resolveComfyUiLaunchPythonExecutable({
+          installRoot,
+          basePythonCommand: comfyUiBasePythonCommand,
+          pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
+          skipPythonSetup: comfyUiSkipPythonSetup,
+        });
+        const configuredComfyUiInstallCommandTimeoutMs = Number(process.env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS);
+        const comfyUiInstallCommandTimeoutMs = Number.isFinite(configuredComfyUiInstallCommandTimeoutMs) && configuredComfyUiInstallCommandTimeoutMs > 0
           ? configuredComfyUiInstallCommandTimeoutMs
           : COMFYUI_INSTALL_COMMAND_TIMEOUT_MS_DEFAULT;
-      const gitRuntimeInstaller = createGitRuntimeInstallerAdapter({ logging: loggingPort });
-      recordHostMemorySnapshot("desktop.host.comfyui-config.after", {
-        pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
-        skipPythonSetup: comfyUiSkipPythonSetup,
-      });
-      const createConfiguredComfyUiInstaller = async (runtimeDeviceMode?: ComfyUiRuntimeDeviceMode) => {
-        const comfyUiInstaller = createComfyUiRuntimeInstaller({
-          gitInstaller: gitRuntimeInstaller,
+        const createConfiguredComfyUiInstaller = async (runtimeDeviceMode?: ComfyUiRuntimeDeviceMode) => createComfyUiRuntimeInstaller({
+          gitInstaller: createGitRuntimeInstallerAdapter(),
           pythonCommand: comfyUiBasePythonCommand,
-          pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
-          runtimeDeviceMode: runtimeDeviceMode ?? resolveComfyUiRuntimeDeviceMode({
-            env: process.env,
-            hasNvidiaGpu: detectNvidiaGpu(),
-            gpuType: process.env.COMFYUI_GPU_TYPE,
-            cudaTorchWheelIndexUrl: await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY),
-          }),
-          cudaTorchWheelIndexUrl: await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY),
           execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true }),
+          pythonEnvironmentMode: comfyUiPythonEnvironmentMode,
+          runtimeDeviceMode,
           skipPythonSetup: comfyUiSkipPythonSetup,
-          skipPythonValidation: process.env.COMFYUI_SKIP_PYTHON_VALIDATION === "1",
           directMlTorchVersion: process.env.COMFYUI_DIRECTML_TORCH_VERSION,
-          directMlTorchAudioVersion: process.env.COMFYUI_DIRECTML_TORCHAUDIO_VERSION,
           directMlTorchVisionVersion: process.env.COMFYUI_DIRECTML_TORCHVISION_VERSION,
           directMlPackageName: process.env.COMFYUI_DIRECTML_PACKAGE,
           logging: loggingPort,
         });
-        return comfyUiInstaller;
-      };
-      const comfyUiInstaller = {
-        async ensureInstalled(request) {
-          return (await createConfiguredComfyUiInstaller()).ensureInstalled(request);
-        },
-        async getInstallStatus(request) {
-          return (await createConfiguredComfyUiInstaller()).getInstallStatus(request);
-        },
-        async repairInstall(request) {
-          const installer = await createConfiguredComfyUiInstaller();
-          return installer.repairInstall?.(request) ?? installer.ensureInstalled({ ...request, allowUpdate: true });
-        },
-      } satisfies RuntimeInstallerPort;
-      let comfyUiSupervisor: ReturnType<typeof createComfyUiRuntimeSupervisor> | undefined;
-      let activeRuntimeDeviceMode: ComfyUiRuntimeDeviceMode | undefined;
-      const comfyUiSupervisorPort = {
-        async start() {
-          const persistedValue = (await applicationSettings.readValues({ keys: [IMAGE_GENERATION_GPU_TYPE_SETTING_KEY] }))[0]?.value;
-          const persistedGpuType = typeof persistedValue === "string" ? persistedValue : undefined;
-          const cudaTorchWheelIndexUrl = await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY);
-          const envOverride = readComfyUiEnvOverride(process.env);
-          const resolvedRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode({
-            env: process.env,
-            hasNvidiaGpu: detectNvidiaGpu(),
-            gpuType: persistedGpuType,
-            cudaTorchWheelIndexUrl,
-          });
-          const modeChanged = activeRuntimeDeviceMode !== undefined && activeRuntimeDeviceMode !== resolvedRuntimeDeviceMode;
-          if (modeChanged && comfyUiSupervisor) {
-            await comfyUiSupervisor.stop();
-            comfyUiSupervisor = undefined;
-          }
-          if (!comfyUiSupervisor) {
-            const comfyUiInstaller = await createConfiguredComfyUiInstaller(resolvedRuntimeDeviceMode);
-            comfyUiSupervisor = createComfyUiRuntimeSupervisor({
-              workingDirectory: comfyUiInstallRoot,
-              pythonExecutable: comfyUiPythonCommand,
-              installer: comfyUiInstaller,
-              installRoot: comfyUiInstallRoot,
-              runtimeDeviceMode: resolvedRuntimeDeviceMode,
-              autoInstall: true,
-              installSourceRef: process.env.COMFYUI_INSTALL_REF,
-              logging: loggingPort,
+        const comfyUiInstaller = {
+          async ensureInstalled(request) { return (await createConfiguredComfyUiInstaller()).ensureInstalled(request); },
+          async getInstallStatus(request) { return (await createConfiguredComfyUiInstaller()).getInstallStatus(request); },
+          async repairInstall(request) {
+            const installer = await createConfiguredComfyUiInstaller();
+            return installer.repairInstall?.(request) ?? installer.ensureInstalled({ ...request, allowUpdate: true });
+          },
+        } satisfies RuntimeInstallerPort;
+        let comfyUiSupervisor: ReturnType<typeof createComfyUiRuntimeSupervisor> | undefined;
+        let activeRuntimeDeviceMode: ComfyUiRuntimeDeviceMode | undefined;
+        const comfyUiSupervisorPort = {
+          async start() {
+            const persistedValue = (await applicationSettings.readValues({ keys: [IMAGE_GENERATION_GPU_TYPE_SETTING_KEY] }))[0]?.value;
+            const persistedGpuType = typeof persistedValue === "string" ? persistedValue : undefined;
+            const cudaTorchWheelIndexUrl = await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY);
+            const envOverride = readComfyUiEnvOverride(process.env);
+            const resolvedRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode({
+              env: process.env,
+              hasNvidiaGpu: detectNvidiaGpu(),
+              gpuType: persistedGpuType,
+              cudaTorchWheelIndexUrl,
             });
-            activeRuntimeDeviceMode = resolvedRuntimeDeviceMode;
-          }
-          await loggingPort.log({
-            level: "info",
-            message: "Resolved ComfyUI runtime mode before start.",
-            timestamp: new Date().toISOString(),
-            verbosity: "normal",
-            event: "runtime.comfyui.mode.resolution",
-            component: "desktop-host-composition",
-            subsystem: "runtime",
-            data: {
-              persistedGpuType,
-              cudaTorchWheelIndexConfigured: Boolean(cudaTorchWheelIndexUrl),
-              envOverride,
-              envOverrideWon: Boolean(envOverride),
-              runtimeDeviceMode: resolvedRuntimeDeviceMode,
-              processReuse: modeChanged ? "restarted_mode_changed" : "reused_or_started",
-            },
-          });
-          await comfyUiSupervisor.start();
-        },
-        getRecentRuntimeOutput() {
-          return comfyUiSupervisor?.getRecentRuntimeOutput() ?? [];
-        },
-        getRuntimeDeviceMode() {
-          return activeRuntimeDeviceMode ?? "cpu";
-        },
-      };
-      recordHostMemorySnapshot("desktop.host.runtime-readiness.before");
-      const runtimeReadiness = createDesktopRuntimeReadinessService({
-        readPythonSupervisorState: () => pythonRuntimeFoundation.supervisor.getStatus(),
-        async readComfyUiLifecycleState() {
-          if (!comfyUiSupervisor) {
-            return "uninitialized";
-          }
-          return comfyUiSupervisor.getStatus();
-        },
-        async readComfyUiInstallStatus() {
-          const status = await comfyUiInstaller.getInstallStatus({
-            targetId: "comfyui",
-            installRoot: comfyUiInstallRoot,
-          });
-          return status.status;
-        },
-        now,
-      });
-      recordHostMemorySnapshot("desktop.host.runtime-readiness.after");
-      const runtimeCapabilityGuard = new RuntimeCapabilityGuardService(runtimeReadiness);
-      let latentReferenceStorage: Pick<ArtifactObjectStoragePort, "retrieveArtifact"> | undefined;
-      const comfyUiRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
-        client: createComfyUiHttpClient({ baseUrl: comfyUiBaseUrl }),
-        supervisor: comfyUiSupervisorPort,
-        prepareLatentReferenceImage: async ({ artifactId }) => {
-          if (!latentReferenceStorage) {
-            throw new Error("Artifact storage is unavailable for latent reference image preparation.");
-          }
-          const result = await latentReferenceStorage.retrieveArtifact({ key: artifactId });
-          if (!result.ok) {
-            throw new Error(`Unable to read latent reference image artifact '${artifactId}': ${result.error.message}`);
-          }
-          const content = result.value.content instanceof Uint8Array
-            ? result.value.content
-            : new Uint8Array(result.value.content as ArrayBufferLike);
-          const extension = extensionForImageReference(result.value.descriptor.mediaType, artifactId);
-          const imageName = `ai-system-builder-latent-${Date.now()}-${Math.random().toString(36).slice(2)}${extension}`;
-          const inputDirectory = join(comfyUiInstallRoot, "input");
-          await mkdir(inputDirectory, { recursive: true });
-          await writeFile(join(inputDirectory, imageName), content);
-          return { imageName };
-        },
-        mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT },
-      });
-      const runtimeTaskRegistry = createDesktopRuntimeTaskRegistry({ pythonRuntimeTaskRegistry, imageRuntimeTaskRegistry: comfyUiRuntimeTaskRegistry });
-
-      recordHostMemorySnapshot("desktop.host.storage-composition.before");
-      const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
-        rootDirectory: registerOptions.storageRootDirectory,
-      });
-      const artifactBindings = createLocalArtifactStorageBindingAdapter({
-        rootDirectory: registerOptions.storageRootDirectory,
-      });
-      const huggingFaceArtifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter({
-        accessTokenProvider: () => tokenConfigStore.getToken(),
-        fetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation,
-      });
-      const artifactRepoStorage = createArtifactRepoStorageAdapter({
-        providers: [
-          {
-            provider: "huggingface",
-            adapter: huggingFaceArtifactRepoStorage,
-          },
-        ],
-      });
-      const storage = createFilesystemArtifactObjectStorageAdapter({
-        rootDirectory: registerOptions.storageRootDirectory,
-        host: "desktop",
-        logging: loggingPort,
-        now: options.now,
-        artifactCatalogAppend: artifactCatalog,
-      });
-      latentReferenceStorage = storage;
-      const artifactBrowserRead = createFilesystemArtifactBrowserReadAdapter({
-        rootDirectory: registerOptions.storageRootDirectory,
-        artifactCatalogRead: artifactCatalog,
-        artifactCatalogAppend: artifactCatalog,
-        storage,
-        artifactBindingRead: artifactBindings,
-      });
-      const artifactMediaViewRetrieval = createFilesystemArtifactContentRetrievalAdapter({
-        storage,
-        artifactCatalogRead: artifactCatalog,
-      });
-      recordHostMemorySnapshot("desktop.host.storage-composition.after");
-      recordHostMemorySnapshot("desktop.host.workspace-foundation.before");
-      const reusedExistingWorkspaceFoundation = internalAssetRegistry !== undefined;
-      const workspaceFoundation = internalAssetRegistry ?? composeInternalAssetRegistry({
-        rootDirectory: registerOptions.storageRootDirectory,
-        now: options.now,
-      });
-      internalAssetRegistry = workspaceFoundation;
-      recordHostMemorySnapshot("desktop.host.workspace-foundation.after", {
-        reusedExistingRegistry: reusedExistingWorkspaceFoundation,
-      });
-
-      recordHostMemorySnapshot("desktop.host.artifact-usecases.before");
-      const storeArtifactUploadUseCase = new StoreArtifactUploadUseCase({
-        storage,
-        logging: loggingPort,
-        now: options.now,
-        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
-      });
-
-      const browseArtifacts = new BrowseArtifactsUseCase({
-        artifactBrowserMetadataRead: artifactBrowserRead,
-        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
-      });
-      const readArtifactDetail = new ReadArtifactDetailUseCase({
-        artifactBrowserMetadataRead: artifactBrowserRead,
-        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
-      });
-      const readArtifactContent = new ReadArtifactContentUseCase({
-        artifactBrowserContentRead: artifactBrowserRead,
-        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
-      });
-      const browseUnregisteredArtifacts = new BrowseUnregisteredArtifactsUseCase({
-        artifactBrowserUnregistered: artifactBrowserRead,
-      });
-      const registerUnregisteredArtifact = new RegisterUnregisteredArtifactUseCase({
-        artifactBrowserUnregistered: artifactBrowserRead,
-      });
-      const deleteUnregisteredArtifact = new DeleteUnregisteredArtifactUseCase({
-        artifactBrowserUnregistered: artifactBrowserRead,
-      });
-      const deleteRegisteredArtifact = new DeleteRegisteredArtifactUseCase({
-        artifactCatalogRead: artifactCatalog,
-        artifactCatalogDelete: artifactCatalog,
-        storage,
-        artifactBindingStorage: artifactBindings,
-        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
-      });
-      const publishArtifactToRepo = new PublishArtifactToRepoUseCase({
-        artifactStorage: storage,
-        artifactRepoStorage,
-        artifactBindingStorage: artifactBindings,
-        now: options.now,
-      });
-      const verifyPublishedArtifactBacking = new VerifyPublishedArtifactBackingUseCase({
-        artifactRepoStorage,
-        artifactBindingStorage: artifactBindings,
-        now: options.now,
-      });
-      const verifyImportedArtifactSourceBacking = new VerifyImportedArtifactSourceBackingUseCase({
-        artifactRepoStorage,
-        artifactBindingStorage: artifactBindings,
-        now: options.now,
-      });
-      const registerArtifactFromRepo = new RegisterArtifactFromRepoUseCase({
-        artifactRepoStorage,
-        artifactBindingStorage: artifactBindings,
-        artifactCatalogAppend: artifactCatalog,
-        logging: loggingPort,
-        now: options.now,
-        artifactIdFactory: new SystemArtifactIdFactory(),
-      });
-      const localizeArtifactFromRepo = new LocalizeArtifactFromRepoUseCase({
-        artifactRepoStorage,
-        artifactBindingStorage: artifactBindings,
-        artifactStorage: storage,
-        now: options.now,
-      });
-      const browseHuggingFaceNamespaceDatasets = new BrowseHuggingFaceNamespaceDatasetsUseCase({
-        repoBrowser: huggingFaceArtifactRepoStorage,
-        logging: loggingPort,
-        now: options.now,
-      });
-      const browseHuggingFaceDatasetParquetFiles = new BrowseHuggingFaceDatasetParquetFilesUseCase({
-        repoBrowser: huggingFaceArtifactRepoStorage,
-        logging: loggingPort,
-        now: options.now,
-      });
-      recordHostMemorySnapshot("desktop.host.artifact-usecases.after");
-
-      const websiteHtmlAcquisition = createWebsiteHtmlAcquisitionPort();
-      const ingestWebsitePage = new IngestWebsitePageUseCase({
-        acquisition: websiteHtmlAcquisition,
-        storage,
-        now: options.now,
-      });
-      const ingestWebsitePagesBatch = new IngestWebsitePagesBatchUseCase({
-        ingestWebsitePage,
-      });
-      const prepareTrainingDatasetFromArtifactsUseCase = new PrepareTrainingDatasetFromArtifactsUseCase({
-        runtimeTaskRegistry,
-        storageBindings: artifactBindings,
-        storage,
-        artifactRepoStorage,
-        artifactCatalog,
-        now: options.now,
-        taskPowerLifecycle,
-        runtimeCapabilityGuard,
-      });
-      recordHostMemorySnapshot("desktop.host.settings-usecases.before");
-      const listSettingsDefinitions = new ListSettingsDefinitionsUseCase({
-        settings: applicationSettings,
-      });
-      const readSettings = new ReadSettingsUseCase({
-        settings: applicationSettings,
-        secrets: applicationSecrets,
-      });
-      const updateSetting = new UpdateSettingUseCase({
-        settings: applicationSettings,
-        secrets: applicationSecrets,
-      });
-      const clearSetting = new ClearSettingUseCase({
-        settings: applicationSettings,
-        secrets: applicationSecrets,
-      });
-      const resolveModelDefault = new ResolveModelDefaultUseCase({
-        modelDefaultResolver,
-      });
-      recordHostMemorySnapshot("desktop.host.settings-usecases.after");
-      const modelRegistry = createLocalModelRegistryAdapter({
-        filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`,
-        now,
-      });
-      const imageAssetRegistry = createLocalImageAssetRegistryAdapter({
-        filePath: join(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
-        now,
-      });
-      recordHostMemorySnapshot("desktop.host.asset-registry-resource-views.before");
-      internalAssetRegistry = composeInternalAssetRegistry({
-        rootDirectory: registerOptions.storageRootDirectory,
-        now,
-        resourceBackedViewProvider: composeResourceBackedViewProviders({
-          artifactBrowserMetadataRead: artifactBrowserRead,
-          imageAssetDescriptorRead: imageAssetRegistry,
-          modelRegistry,
-          publishedModelRegistry: modelRegistry,
-        }),
-      });
-      const generateAssetInstanceId = () => `asset-instance.${randomUUID()}`;
-      const assetMutationUseCases = {
-        registerResourceBackedViewAsAsset: new RegisterResourceBackedViewAsAssetInstanceUseCase({
-          assetRegistryRead: internalAssetRegistry.readFacade,
-          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
-          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
-          now,
-          generateInstanceId: generateAssetInstanceId,
-        }),
-        finalizeGeneratedOutputAsAsset: new FinalizeGeneratedOutputAsAssetUseCase({
-          assetRegistryRead: internalAssetRegistry.readFacade,
-          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
-          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
-          now,
-          generateInstanceId: generateAssetInstanceId,
-        }),
-        importExternalRepositoryObjectAsAsset: new ImportExternalRepositoryObjectAsAssetUseCase({
-          assetRegistryRead: internalAssetRegistry.readFacade,
-          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
-          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
-          now,
-          generateInstanceId: generateAssetInstanceId,
-        }),
-        localizeExternalRepositoryObjectAsAsset: new LocalizeExternalRepositoryObjectAsAssetUseCase({
-          assetRegistryRead: internalAssetRegistry.readFacade,
-          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
-          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
-          now,
-          generateInstanceId: generateAssetInstanceId,
-        }),
-      };
-      recordHostMemorySnapshot("desktop.host.asset-registry-resource-views.after");
-
-      recordHostMemorySnapshot("desktop.host.model-usecases.before");
-      const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({
-        accessTokenProvider: () => tokenConfigStore.getToken(),
-      });
-      const browseModels = new BrowseModelsUseCase({
-        providers: {
-          huggingface: huggingFaceModelBrowseDetails,
-        },
-      });
-      const getModelDetails = new GetModelDetailsUseCase({
-        providers: {
-          huggingface: huggingFaceModelBrowseDetails,
-        },
-      });
-      const listModels = new ListModelsUseCase({
-        modelRegistry,
-      });
-      const modelPublisher = createHuggingFaceModelPublisherAdapter({
-        tokenProvider: () => tokenConfigStore.getToken(),
-        client: {
-          async uploadFile(params) {
-            const hub = await import("@huggingface/hub");
-            await hub.uploadFile({
-              repo: { type: "model", name: params.repo },
-              file: {
-                path: params.path,
-                content: new Blob([new Uint8Array(params.content)]),
-              },
-              branch: params.revision,
-              accessToken: params.token,
+            const modeChanged = activeRuntimeDeviceMode !== undefined && activeRuntimeDeviceMode !== resolvedRuntimeDeviceMode;
+            if (modeChanged && comfyUiSupervisor) {
+              await comfyUiSupervisor.stop();
+              comfyUiSupervisor = undefined;
+            }
+            if (!comfyUiSupervisor) {
+              const configuredInstaller = await createConfiguredComfyUiInstaller(resolvedRuntimeDeviceMode);
+              comfyUiSupervisor = createComfyUiRuntimeSupervisor({
+                workingDirectory: installRoot,
+                pythonExecutable: comfyUiPythonCommand,
+                installer: configuredInstaller,
+                installRoot,
+                runtimeDeviceMode: resolvedRuntimeDeviceMode,
+                autoInstall: true,
+                installSourceRef: process.env.COMFYUI_INSTALL_REF,
+                logging: loggingPort,
+              });
+              activeRuntimeDeviceMode = resolvedRuntimeDeviceMode;
+            }
+            await loggingPort.log({
+              level: "info",
+              message: "Resolved ComfyUI runtime mode before start.",
+              timestamp: new Date().toISOString(),
+              verbosity: "normal",
+              event: "runtime.comfyui.mode.resolution",
+              component: "desktop-host-composition",
+              subsystem: "runtime",
+              data: { persistedGpuType, cudaTorchWheelIndexConfigured: Boolean(cudaTorchWheelIndexUrl), envOverride, envOverrideWon: Boolean(envOverride), runtimeDeviceMode: resolvedRuntimeDeviceMode, processReuse: modeChanged ? "restarted_mode_changed" : "reused_or_started" },
             });
+            await comfyUiSupervisor.start();
           },
-        },
-      });
-      const saveModelReference = new SaveModelReferenceUseCase({
-        modelRegistry,
-      });
-      const downloadModel = new DownloadModelUseCase({
-        modelRegistry,
-        modelDownloader: {
-          ensureModelDownloaded: async (request) => {
-            await pythonRuntimeFoundation.supervisor.start();
-            return pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request);
+          getRecentRuntimeOutput() { return comfyUiSupervisor?.getRecentRuntimeOutput() ?? []; },
+          getRuntimeDeviceMode() { return activeRuntimeDeviceMode ?? "cpu"; },
+        };
+        const imageRuntimeTaskRegistry = createComfyUiImageGenerationRuntimeAdapter({
+          client: createComfyUiHttpClient({ baseUrl: process.env.COMFYUI_BASE_URL?.trim() || "http://127.0.0.1:8188" }),
+          supervisor: comfyUiSupervisorPort,
+          prepareLatentReferenceImage: async ({ artifactId }) => {
+            const result = await getArtifactFeatures().storage.retrieveArtifact({ key: artifactId });
+            if (!result.ok) throw new Error(`Unable to read latent reference image artifact '${artifactId}': ${result.error.message}`);
+            const content = result.value.content instanceof Uint8Array ? result.value.content : new Uint8Array(result.value.content as ArrayBufferLike);
+            const extension = extensionForImageReference(result.value.descriptor.mediaType, artifactId);
+            const imageName = `ai-system-builder-latent-${Date.now()}-${Math.random().toString(36).slice(2)}${extension}`;
+            const inputDirectory = join(installRoot, "input");
+            await mkdir(inputDirectory, { recursive: true });
+            await writeFile(join(inputDirectory, imageName), content);
+            return { imageName };
           },
-        },
+          mapperOptions: { defaultCheckpoint: process.env.COMFYUI_DEFAULT_CHECKPOINT },
+        });
+        return { installRoot, installer: comfyUiInstaller, supervisorPort: comfyUiSupervisorPort, imageRuntimeTaskRegistry };
       });
-      const updateModelRecord = new UpdateModelRecordUseCase({
-        modelRegistry,
-      });
-      const deleteModelRecord = new DeleteModelRecordUseCase({
-        modelRegistry,
-        artifactCatalogDeletePort: artifactCatalog,
-      });
-      const trainModel = new TrainModelUseCase({
-        runtimeTaskRegistry,
-        modelRegistry,
-        storageBindings: artifactBindings,
-        storage,
-        generatedModelStorage: createLocalGeneratedModelStorageAdapter({
-          env: process.env,
-        }),
-        modelPublisher,
-        taskPowerLifecycle,
-        runtimeCapabilityGuard,
-      });
-      const validateModel = new ValidateModelUseCase({
-        runtimeTaskRegistry,
-        modelRegistry,
-        runtimeCapabilityGuard,
-      });
-      // TODO(prompt-7): remove legacy modelPublisher/modelValidationPort wiring after executeTask deprecation cleanup.
-      const publishModel = new PublishModelUseCase({
-        modelRegistry,
-        runtimeTaskRegistry,
-        runtimeCapabilityGuard,
-      });
-      recordHostMemorySnapshot("desktop.host.model-usecases.after");
 
-      recordHostMemorySnapshot("desktop.host.image-generation-usecases.before");
-      const localModelCheckpointResolver = createLocalModelCheckpointResolverAdapter({
-        modelRegistry,
-        comfyUiCheckpointDirectory: join(comfyUiInstallRoot, "models", "checkpoints"),
-        log: (entry) => recordRuntimeLog({ level: "info", message: `Image generation model checkpoint resolution: ${JSON.stringify(entry)}` }),
+      const getRuntimeTaskFeatures = memoizeFeature("desktop.host.runtime-task-features.compose", () => {
+        const pythonRuntimeTaskRegistry = createPythonRuntimeTaskRegistryAdapter({ ...pythonRuntimeFoundation.runtimePort }, {
+          ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start(),
+        });
+        const runtimeTaskRegistry = createDesktopRuntimeTaskRegistry({
+          pythonRuntimeTaskRegistry,
+          imageRuntimeTaskRegistry: getComfyUiFeatures().imageRuntimeTaskRegistry,
+        });
+        const runtimeCapabilityGuard = new RuntimeCapabilityGuardService(getRuntimeReadiness());
+        return { runtimeTaskRegistry, runtimeCapabilityGuard };
       });
-      const generateImageUseCase = new GenerateImageUseCase({
-        runtimeTaskRegistry,
-        modelCheckpointResolver: createRuntimePreparedModelCheckpointResolver({
-          runtime: comfyUiSupervisorPort,
-          modelCheckpointResolver: localModelCheckpointResolver,
-        }),
-        runtimeCapabilityGuard,
+
+      const getArtifactStorageFoundation = memoizeFeature("desktop.host.artifact-features.compose", () => {
+        const workspaceShell = getStartupWorkspaceShell();
+        const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory: registerOptions.storageRootDirectory });
+        const artifactBindings = createLocalArtifactStorageBindingAdapter({ rootDirectory: registerOptions.storageRootDirectory });
+        const storage = createFilesystemArtifactObjectStorageAdapter({
+          rootDirectory: registerOptions.storageRootDirectory,
+          host: "desktop",
+          logging: loggingPort,
+          now: options.now,
+          artifactCatalogAppend: artifactCatalog,
+        });
+        const artifactBrowserRead = createFilesystemArtifactBrowserReadAdapter({
+          rootDirectory: registerOptions.storageRootDirectory,
+          artifactCatalogRead: artifactCatalog,
+          artifactCatalogAppend: artifactCatalog,
+          storage,
+          artifactBindingRead: artifactBindings,
+        });
+        const artifactMediaViewRetrieval = createFilesystemArtifactContentRetrievalAdapter({ storage, artifactCatalogRead: artifactCatalog });
+        return { workspaceShell, artifactCatalog, artifactBindings, storage, artifactBrowserRead, artifactMediaViewRetrieval };
       });
-      const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({
-        runtimeTaskRegistry,
-        finalizeImageGenerationService: new FinalizeImageGenerationService({
-          imageAssetRegistry,
-          generatedImagePersistence: createFilesystemGeneratedImagePersistenceAdapter({
-            comfyUiOutputRoot: join(comfyUiInstallRoot, "output"),
-            artifactStorageRoot: registerOptions.storageRootDirectory,
-            artifactCatalogAppend: artifactCatalog,
-            artifactStorageBinding: artifactBindings,
-            logging: loggingPort,
-            now,
+
+      const getHuggingFaceFeatures = memoizeFeature("desktop.host.huggingface-features.compose", () => {
+        const artifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter({
+          accessTokenProvider: () => tokenConfigStore.getToken(),
+          fetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation,
+        });
+        return {
+          huggingFaceArtifactRepoStorage: artifactRepoStorage,
+          artifactRepoStorage: createArtifactRepoStorageAdapter({ providers: [{ provider: "huggingface", adapter: artifactRepoStorage }] }),
+        };
+      });
+
+      const getArtifactFeatures = memoizeFeature("desktop.host.artifact-usecases.compose", () => {
+        const foundation = getArtifactStorageFoundation();
+        return {
+          ...foundation,
+          storeArtifactUploadUseCase: new StoreArtifactUploadUseCase({ storage: foundation.storage, logging: loggingPort, now: options.now, workspaceRepository: foundation.workspaceShell.workspaceRepository }),
+          browseArtifactsUseCase: new BrowseArtifactsUseCase({ artifactBrowserMetadataRead: foundation.artifactBrowserRead, workspaceRepository: foundation.workspaceShell.workspaceRepository }),
+          browseUnregisteredArtifactsUseCase: new BrowseUnregisteredArtifactsUseCase({ artifactBrowserUnregistered: foundation.artifactBrowserRead }),
+          registerUnregisteredArtifactUseCase: new RegisterUnregisteredArtifactUseCase({ artifactBrowserUnregistered: foundation.artifactBrowserRead }),
+          deleteUnregisteredArtifactUseCase: new DeleteUnregisteredArtifactUseCase({ artifactBrowserUnregistered: foundation.artifactBrowserRead }),
+          deleteRegisteredArtifactUseCase: new DeleteRegisteredArtifactUseCase({ artifactCatalogRead: foundation.artifactCatalog, artifactCatalogDelete: foundation.artifactCatalog, storage: foundation.storage, artifactBindingStorage: foundation.artifactBindings, workspaceRepository: foundation.workspaceShell.workspaceRepository }),
+          readArtifactDetailUseCase: new ReadArtifactDetailUseCase({ artifactBrowserMetadataRead: foundation.artifactBrowserRead, workspaceRepository: foundation.workspaceShell.workspaceRepository }),
+          readArtifactContentUseCase: new ReadArtifactContentUseCase({ artifactBrowserContentRead: foundation.artifactBrowserRead, workspaceRepository: foundation.workspaceShell.workspaceRepository }),
+        };
+      });
+
+      const getArtifactRemoteFeatures = memoizeFeature("desktop.host.artifact-remote-features.compose", () => {
+        const foundation = getArtifactStorageFoundation();
+        const remote = getHuggingFaceFeatures();
+        return {
+          publishArtifactToRepoUseCase: new PublishArtifactToRepoUseCase({ artifactStorage: foundation.storage, artifactRepoStorage: remote.artifactRepoStorage, artifactBindingStorage: foundation.artifactBindings, now: options.now }),
+          browseHuggingFaceNamespaceDatasetsUseCase: new BrowseHuggingFaceNamespaceDatasetsUseCase({ repoBrowser: remote.huggingFaceArtifactRepoStorage, logging: loggingPort, now: options.now }),
+          browseHuggingFaceDatasetParquetFilesUseCase: new BrowseHuggingFaceDatasetParquetFilesUseCase({ repoBrowser: remote.huggingFaceArtifactRepoStorage, logging: loggingPort, now: options.now }),
+          verifyPublishedArtifactBackingUseCase: new VerifyPublishedArtifactBackingUseCase({ artifactRepoStorage: remote.artifactRepoStorage, artifactBindingStorage: foundation.artifactBindings, now: options.now }),
+          verifyImportedArtifactSourceBackingUseCase: new VerifyImportedArtifactSourceBackingUseCase({ artifactRepoStorage: remote.artifactRepoStorage, artifactBindingStorage: foundation.artifactBindings, now: options.now }),
+          registerArtifactFromRepoUseCase: new RegisterArtifactFromRepoUseCase({ artifactRepoStorage: remote.artifactRepoStorage, artifactBindingStorage: foundation.artifactBindings, artifactCatalogAppend: foundation.artifactCatalog, logging: loggingPort, now: options.now, artifactIdFactory: new SystemArtifactIdFactory() }),
+          localizeArtifactFromRepoUseCase: new LocalizeArtifactFromRepoUseCase({ artifactRepoStorage: remote.artifactRepoStorage, artifactBindingStorage: foundation.artifactBindings, artifactStorage: foundation.storage, now: options.now }),
+        };
+      });
+
+      const getSettingsFeatures = memoizeFeature("desktop.host.settings-features.compose", () => ({
+        listSettingsDefinitionsUseCase: new ListSettingsDefinitionsUseCase({ settings: applicationSettings }),
+        readSettingsUseCase: new ReadSettingsUseCase({ settings: applicationSettings, secrets: applicationSecrets }),
+        updateSettingUseCase: new UpdateSettingUseCase({ settings: applicationSettings, secrets: applicationSecrets }),
+        clearSettingUseCase: new ClearSettingUseCase({ settings: applicationSettings, secrets: applicationSecrets }),
+        resolveModelDefaultUseCase: new ResolveModelDefaultUseCase({ modelDefaultResolver }),
+      }));
+
+      const getAssetFeatures = memoizeFeature("desktop.host.asset-features.compose", () => {
+        const artifacts = getArtifactFeatures();
+        const modelRegistry = createLocalModelRegistryAdapter({ filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`, now });
+        const imageAssetRegistry = createLocalImageAssetRegistryAdapter({ filePath: join(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"), now });
+        internalAssetRegistry = composeInternalAssetRegistry({
+          rootDirectory: registerOptions.storageRootDirectory,
+          now,
+          resourceBackedViewProvider: composeResourceBackedViewProviders({
+            artifactBrowserMetadataRead: artifacts.artifactBrowserRead,
+            imageAssetDescriptorRead: imageAssetRegistry,
+            modelRegistry,
+            publishedModelRegistry: modelRegistry,
           }),
-          now,
-        }),
+        });
+        const generateAssetInstanceId = () => `asset-instance.${randomUUID()}`;
+        const assetMutationUseCases = {
+          registerResourceBackedViewAsAsset: new RegisterResourceBackedViewAsAssetInstanceUseCase({ assetRegistryRead: internalAssetRegistry.readFacade, definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository, instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository, now, generateInstanceId: generateAssetInstanceId }),
+          finalizeGeneratedOutputAsAsset: new FinalizeGeneratedOutputAsAssetUseCase({ assetRegistryRead: internalAssetRegistry.readFacade, definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository, instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository, now, generateInstanceId: generateAssetInstanceId }),
+          importExternalRepositoryObjectAsAsset: new ImportExternalRepositoryObjectAsAssetUseCase({ assetRegistryRead: internalAssetRegistry.readFacade, definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository, instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository, now, generateInstanceId: generateAssetInstanceId }),
+          localizeExternalRepositoryObjectAsAsset: new LocalizeExternalRepositoryObjectAsAssetUseCase({ assetRegistryRead: internalAssetRegistry.readFacade, definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository, instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository, now, generateInstanceId: generateAssetInstanceId }),
+        };
+        return { assetRegistryRead: internalAssetRegistry.workspaceReadFacade, assetMutationUseCases, modelRegistry, imageAssetRegistry };
       });
-      recordHostMemorySnapshot("desktop.host.image-generation-usecases.after");
 
-      recordHostMemorySnapshot("desktop.host.register-electron-ipc.before");
+      const getModelFeatures = memoizeFeature("desktop.host.model-features.compose", () => {
+        const modelRegistry = createLocalModelRegistryAdapter({ filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`, now });
+        const lazyArtifactFoundation = () => getArtifactStorageFoundation();
+        const lazyRuntimeTaskFeatures = () => getRuntimeTaskFeatures();
+        const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({ accessTokenProvider: () => tokenConfigStore.getToken() });
+        const modelPublisher = createHuggingFaceModelPublisherAdapter({
+          tokenProvider: () => tokenConfigStore.getToken(),
+          client: { async uploadFile(params) {
+            const hub = await import("@huggingface/hub");
+            await hub.uploadFile({ repo: { type: "model", name: params.repo }, file: { path: params.path, content: new Blob([new Uint8Array(params.content)]) }, branch: params.revision, accessToken: params.token });
+          } },
+        });
+        return {
+          browseModelsUseCase: new BrowseModelsUseCase({ providers: { huggingface: huggingFaceModelBrowseDetails } }),
+          getModelDetailsUseCase: new GetModelDetailsUseCase({ providers: { huggingface: huggingFaceModelBrowseDetails } }),
+          listModelsUseCase: new ListModelsUseCase({ modelRegistry }),
+          saveModelReferenceUseCase: new SaveModelReferenceUseCase({ modelRegistry }),
+          downloadModelUseCase: new DownloadModelUseCase({ modelRegistry, modelDownloader: { ensureModelDownloaded: async (request) => { await pythonRuntimeFoundation.supervisor.start(); return pythonRuntimeFoundation.runtimePort.ensureModelDownloaded(request); } } }),
+          updateModelRecordUseCase: new UpdateModelRecordUseCase({ modelRegistry }),
+          deleteModelRecordUseCase: new DeleteModelRecordUseCase({ modelRegistry, artifactCatalogDeletePort: lazyUseCase(() => lazyArtifactFoundation().artifactCatalog) }),
+          trainModelUseCase: new TrainModelUseCase({ runtimeTaskRegistry: lazyUseCase(() => lazyRuntimeTaskFeatures().runtimeTaskRegistry), modelRegistry, storageBindings: lazyUseCase(() => lazyArtifactFoundation().artifactBindings), storage: lazyUseCase(() => lazyArtifactFoundation().storage), generatedModelStorage: lazyUseCase(() => createLocalGeneratedModelStorageAdapter({ env: process.env })), modelPublisher, taskPowerLifecycle: lazyUseCase(() => getTaskPowerLifecycle()), runtimeCapabilityGuard: lazyUseCase(() => lazyRuntimeTaskFeatures().runtimeCapabilityGuard) }),
+          validateModelUseCase: new ValidateModelUseCase({ runtimeTaskRegistry: lazyUseCase(() => lazyRuntimeTaskFeatures().runtimeTaskRegistry), modelRegistry, runtimeCapabilityGuard: lazyUseCase(() => lazyRuntimeTaskFeatures().runtimeCapabilityGuard) }),
+          publishModelUseCase: new PublishModelUseCase({ modelRegistry, runtimeTaskRegistry: lazyUseCase(() => lazyRuntimeTaskFeatures().runtimeTaskRegistry), runtimeCapabilityGuard: lazyUseCase(() => lazyRuntimeTaskFeatures().runtimeCapabilityGuard) }),
+        };
+      });
+
+      const getImageGenerationFeatures = memoizeFeature("desktop.host.image-generation-features.compose", () => {
+        const artifacts = getArtifactFeatures();
+        const assets = getAssetFeatures();
+        const runtime = getRuntimeTaskFeatures();
+        const comfyUi = getComfyUiFeatures();
+        const localModelCheckpointResolver = createLocalModelCheckpointResolverAdapter({
+          modelRegistry: assets.modelRegistry,
+          comfyUiCheckpointDirectory: join(comfyUi.installRoot, "models", "checkpoints"),
+          log: (entry) => recordRuntimeLog({ level: "info", message: `Image generation model checkpoint resolution: ${JSON.stringify(entry)}` }),
+        });
+        return {
+          generateImageUseCase: new GenerateImageUseCase({
+            runtimeTaskRegistry: runtime.runtimeTaskRegistry,
+            modelCheckpointResolver: createRuntimePreparedModelCheckpointResolver({ runtime: comfyUi.supervisorPort, modelCheckpointResolver: localModelCheckpointResolver }),
+            runtimeCapabilityGuard: runtime.runtimeCapabilityGuard,
+          }),
+          imageGenerationFinalizationOrchestrator: new ImageGenerationFinalizationOrchestratorService({
+            runtimeTaskRegistry: runtime.runtimeTaskRegistry,
+            finalizeImageGenerationService: new FinalizeImageGenerationService({
+              imageAssetRegistry: assets.imageAssetRegistry,
+              generatedImagePersistence: createFilesystemGeneratedImagePersistenceAdapter({ comfyUiOutputRoot: join(comfyUi.installRoot, "output"), artifactStorageRoot: registerOptions.storageRootDirectory, artifactCatalogAppend: artifacts.artifactCatalog, artifactStorageBinding: artifacts.artifactBindings, logging: loggingPort, now }),
+              now,
+            }),
+          }),
+        };
+      });
+
+      const getIngestionFeatures = memoizeFeature("desktop.host.ingestion-features.compose", () => {
+        const artifacts = getArtifactFeatures();
+        const websiteHtmlAcquisition = createWebsiteHtmlAcquisitionPort();
+        const ingestWebsitePageUseCase = new IngestWebsitePageUseCase({ acquisition: websiteHtmlAcquisition, storage: artifacts.storage, now: options.now });
+        return { ingestWebsitePageUseCase, ingestWebsitePagesBatchUseCase: new IngestWebsitePagesBatchUseCase({ ingestWebsitePage: ingestWebsitePageUseCase }) };
+      });
+
+      const getDatasetPreparationFeatures = memoizeFeature("desktop.host.dataset-preparation-features.compose", () => {
+        const artifacts = getArtifactFeatures();
+        const runtime = getRuntimeTaskFeatures();
+        return { prepareTrainingDatasetUseCase: new PrepareTrainingDatasetFromArtifactsUseCase({ runtimeTaskRegistry: runtime.runtimeTaskRegistry, storageBindings: artifacts.artifactBindings, storage: artifacts.storage, artifactRepoStorage: getHuggingFaceFeatures().artifactRepoStorage, artifactCatalog: artifacts.artifactCatalog, now: options.now, taskPowerLifecycle: lazyUseCase(() => getTaskPowerLifecycle()), runtimeCapabilityGuard: runtime.runtimeCapabilityGuard }) };
+      });
+
+      recordHostMemorySnapshot("desktop.host.ipc-registration.lazy-handlers.before");
       registerElectronIpc({
         ipcMain: registerOptions.ipcMain,
         pythonRuntime: {
@@ -1269,77 +1033,73 @@ export function composeDesktopHost(
           stopPythonRuntime: () => pythonRuntimeFoundation.supervisor.stop(),
           restartPythonRuntime: () => pythonRuntimeFoundation.supervisor.restart(),
           unloadPythonRuntimeModel: async () => {
-            recordRuntimeLog({
-              level: "info",
-              message: "Unloading Python runtime generation model from memory.",
-            });
+            recordRuntimeLog({ level: "info", message: "Unloading Python runtime generation model from memory." });
             const result = await pythonRuntimeFoundation.runtimePort.unloadModels();
-            recordRuntimeLog({
-              level: "info",
-              message: `Unloaded ${result.unloadedModels.length} Python runtime generation model(s) from memory.`,
-            });
+            recordRuntimeLog({ level: "info", message: `Unloaded ${result.unloadedModels.length} Python runtime generation model(s) from memory.` });
           },
           clearPythonRuntimeLogs: async () => {
             runtimeLogs.splice(0, runtimeLogs.length);
-            recordRuntimeLog({
-              level: "info",
-              message: "Cleared Python runtime activity log.",
-            });
+            recordRuntimeLog({ level: "info", message: "Cleared Python runtime activity log." });
           },
           readPythonRuntimeStatus,
         },
-        runtimeReadiness,
-        assetRegistryRead: internalAssetRegistry.workspaceReadFacade,
-        workspaceServices: {
-          workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
-          workspaceSelectionRepository: workspaceFoundation.workspaceRepositories.workspaceSelectionRepository,
-          createWorkspaceUseCase: workspaceFoundation.workspaceUseCases.createWorkspace,
+        runtimeReadiness: lazyUseCase(() => getRuntimeReadiness()),
+        workspaceServices: startupWorkspaceShell,
+        assetRegistryRead: lazyUseCase(() => getAssetFeatures().assetRegistryRead),
+        assetMutationUseCases: {
+          registerResourceBackedViewAsAsset: lazyUseCase(() => getAssetFeatures().assetMutationUseCases.registerResourceBackedViewAsAsset),
+          finalizeGeneratedOutputAsAsset: lazyUseCase(() => getAssetFeatures().assetMutationUseCases.finalizeGeneratedOutputAsAsset),
+          importExternalRepositoryObjectAsAsset: lazyUseCase(() => getAssetFeatures().assetMutationUseCases.importExternalRepositoryObjectAsAsset),
+          localizeExternalRepositoryObjectAsAsset: lazyUseCase(() => getAssetFeatures().assetMutationUseCases.localizeExternalRepositoryObjectAsAsset),
         },
-        assetMutationUseCases,
         getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(),
         setHuggingFaceToken: (token) => tokenConfigStore.setToken(token),
         clearHuggingFaceToken: () => tokenConfigStore.clearToken(),
-        storeArtifactUploadUseCase,
-        browseArtifactsUseCase: browseArtifacts,
-        browseUnregisteredArtifactsUseCase: browseUnregisteredArtifacts,
-        registerUnregisteredArtifactUseCase: registerUnregisteredArtifact,
-        deleteUnregisteredArtifactUseCase: deleteUnregisteredArtifact,
-        deleteRegisteredArtifactUseCase: deleteRegisteredArtifact,
-        readArtifactDetailUseCase: readArtifactDetail,
-        readArtifactContentUseCase: readArtifactContent,
-        artifactMediaViewRetrieval,
-        publishArtifactToRepoUseCase: publishArtifactToRepo,
-        browseHuggingFaceNamespaceDatasetsUseCase: browseHuggingFaceNamespaceDatasets,
-        browseHuggingFaceDatasetParquetFilesUseCase: browseHuggingFaceDatasetParquetFiles,
-        verifyPublishedArtifactBackingUseCase: verifyPublishedArtifactBacking,
-        verifyImportedArtifactSourceBackingUseCase: verifyImportedArtifactSourceBacking,
-        registerArtifactFromRepoUseCase: registerArtifactFromRepo,
-        localizeArtifactFromRepoUseCase: localizeArtifactFromRepo,
-        ingestWebsitePageUseCase: ingestWebsitePage,
-        ingestWebsitePagesBatchUseCase: ingestWebsitePagesBatch,
-        prepareTrainingDatasetUseCase: prepareTrainingDatasetFromArtifactsUseCase,
-        listSettingsDefinitionsUseCase: listSettingsDefinitions,
-        readSettingsUseCase: readSettings,
-        updateSettingUseCase: updateSetting,
-        clearSettingUseCase: clearSetting,
-        resolveModelDefaultUseCase: resolveModelDefault,
-        browseModelsUseCase: browseModels,
-        getModelDetailsUseCase: getModelDetails,
-        listModelsUseCase: listModels,
-        saveModelReferenceUseCase: saveModelReference,
-        downloadModelUseCase: downloadModel,
-        updateModelRecordUseCase: updateModelRecord,
-        deleteModelRecordUseCase: deleteModelRecord,
-        trainModelUseCase: trainModel,
-        validateModelUseCase: validateModel,
-        publishModelUseCase: publishModel,
-        generateImageUseCase,
-        imageGenerationFinalizationOrchestrator,
-        comfyUiInstaller,
-        comfyUiInstallRoot,
+        storeArtifactUploadUseCase: lazyUseCase(() => getArtifactFeatures().storeArtifactUploadUseCase),
+        browseArtifactsUseCase: lazyUseCase(() => getArtifactFeatures().browseArtifactsUseCase),
+        browseUnregisteredArtifactsUseCase: lazyUseCase(() => getArtifactFeatures().browseUnregisteredArtifactsUseCase),
+        registerUnregisteredArtifactUseCase: lazyUseCase(() => getArtifactFeatures().registerUnregisteredArtifactUseCase),
+        deleteUnregisteredArtifactUseCase: lazyUseCase(() => getArtifactFeatures().deleteUnregisteredArtifactUseCase),
+        deleteRegisteredArtifactUseCase: lazyUseCase(() => getArtifactFeatures().deleteRegisteredArtifactUseCase),
+        readArtifactDetailUseCase: lazyUseCase(() => getArtifactFeatures().readArtifactDetailUseCase),
+        readArtifactContentUseCase: lazyUseCase(() => getArtifactFeatures().readArtifactContentUseCase),
+        artifactMediaViewRetrieval: lazyUseCase(() => getArtifactFeatures().artifactMediaViewRetrieval),
+        publishArtifactToRepoUseCase: lazyUseCase(() => getArtifactRemoteFeatures().publishArtifactToRepoUseCase),
+        browseHuggingFaceNamespaceDatasetsUseCase: lazyUseCase(() => getArtifactRemoteFeatures().browseHuggingFaceNamespaceDatasetsUseCase),
+        browseHuggingFaceDatasetParquetFilesUseCase: lazyUseCase(() => getArtifactRemoteFeatures().browseHuggingFaceDatasetParquetFilesUseCase),
+        verifyPublishedArtifactBackingUseCase: lazyUseCase(() => getArtifactRemoteFeatures().verifyPublishedArtifactBackingUseCase),
+        verifyImportedArtifactSourceBackingUseCase: lazyUseCase(() => getArtifactRemoteFeatures().verifyImportedArtifactSourceBackingUseCase),
+        registerArtifactFromRepoUseCase: lazyUseCase(() => getArtifactRemoteFeatures().registerArtifactFromRepoUseCase),
+        localizeArtifactFromRepoUseCase: lazyUseCase(() => getArtifactRemoteFeatures().localizeArtifactFromRepoUseCase),
+        ingestWebsitePageUseCase: lazyUseCase(() => getIngestionFeatures().ingestWebsitePageUseCase),
+        ingestWebsitePagesBatchUseCase: lazyUseCase(() => getIngestionFeatures().ingestWebsitePagesBatchUseCase),
+        prepareTrainingDatasetUseCase: lazyUseCase(() => getDatasetPreparationFeatures().prepareTrainingDatasetUseCase),
+        listSettingsDefinitionsUseCase: lazyUseCase(() => getSettingsFeatures().listSettingsDefinitionsUseCase),
+        readSettingsUseCase: lazyUseCase(() => getSettingsFeatures().readSettingsUseCase),
+        updateSettingUseCase: lazyUseCase(() => getSettingsFeatures().updateSettingUseCase),
+        clearSettingUseCase: lazyUseCase(() => getSettingsFeatures().clearSettingUseCase),
+        resolveModelDefaultUseCase: lazyUseCase(() => getSettingsFeatures().resolveModelDefaultUseCase),
+        browseModelsUseCase: lazyUseCase(() => getModelFeatures().browseModelsUseCase),
+        getModelDetailsUseCase: lazyUseCase(() => getModelFeatures().getModelDetailsUseCase),
+        listModelsUseCase: lazyUseCase(() => getModelFeatures().listModelsUseCase),
+        saveModelReferenceUseCase: lazyUseCase(() => getModelFeatures().saveModelReferenceUseCase),
+        downloadModelUseCase: lazyUseCase(() => getModelFeatures().downloadModelUseCase),
+        updateModelRecordUseCase: lazyUseCase(() => getModelFeatures().updateModelRecordUseCase),
+        deleteModelRecordUseCase: lazyUseCase(() => getModelFeatures().deleteModelRecordUseCase),
+        trainModelUseCase: lazyUseCase(() => getModelFeatures().trainModelUseCase),
+        validateModelUseCase: lazyUseCase(() => getModelFeatures().validateModelUseCase),
+        publishModelUseCase: lazyUseCase(() => getModelFeatures().publishModelUseCase),
+        generateImageUseCase: lazyUseCase(() => getImageGenerationFeatures().generateImageUseCase),
+        imageGenerationFinalizationOrchestrator: lazyUseCase(() => getImageGenerationFeatures().imageGenerationFinalizationOrchestrator),
+        comfyUiInstaller: lazyUseCase(() => getComfyUiFeatures().installer),
+        comfyUiInstallRoot: comfyUiInstallRoot(),
       });
-      recordHostMemorySnapshot("desktop.host.register-electron-ipc.after");
+      recordHostMemorySnapshot("desktop.host.ipc-registration.lazy-handlers.after");
       recordHostMemorySnapshot("desktop.host.ipc-registration.return");
+    },
+    /** @deprecated Compatibility alias. Use registerDesktopIpc for desktop startup IPC registration. */
+    registerArtifactUploadIpc(registerOptions) {
+      this.registerDesktopIpc(registerOptions);
     },
   };
 }
