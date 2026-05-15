@@ -61,8 +61,23 @@ class FakeInstanceRepository implements AssetInstanceRepositoryPort {
   public async listInstances(query?: AssetInstanceListQuery) {
     this.listCalls += 1;
     this.lastQuery = query;
-    return { instances: this.instances.slice(0, query?.limit ?? this.instances.length) };
+    const instances = query?.workspaceId
+      ? this.instances.filter((instance) => instanceWorkspaceId(instance) === query.workspaceId)
+      : this.instances;
+    return { instances: instances.slice(0, query?.limit ?? instances.length) };
   }
+}
+
+
+function instanceWorkspaceId(instance: AssetInstance): string | undefined {
+  const metadata = instance.metadata as Record<string, unknown> | undefined;
+  const finalization = metadata?.assetFinalization as Record<string, unknown> | undefined;
+  const finalizedImage = finalization?.finalizedImage as Record<string, unknown> | undefined;
+  return typeof finalization?.workspaceId === "string"
+    ? finalization.workspaceId
+    : typeof finalizedImage?.workspaceId === "string"
+      ? finalizedImage.workspaceId
+      : undefined;
 }
 
 class FakeReadPort {
@@ -383,6 +398,32 @@ describe("FinalizeGeneratedOutputAsAssetUseCase", () => {
     assert.equal(second.status, "existing");
     assert.equal(finalizer?.calls.length, 1);
     assert.equal(instances.saved.length, 1);
+  });
+
+  it("scopes duplicate detection to the command workspace", async () => {
+    const read = new FakeReadPort();
+    read.details.set("view.generated", { view: generatedView() });
+    const { useCase, instances, finalizer } = makeUseCase(read);
+
+    const first = await useCase.execute(command());
+    assert.equal(first.status, "created");
+    assert.equal(instances.lastQuery?.workspaceId, "workspace-a");
+
+    read.details.set("view.generated.b", {
+      view: generatedView({
+        viewId: "view.generated.b",
+        metadata: { ...generatedView().metadata, workspaceId: "workspace-b" },
+        generatedOutput: { ...generatedView().generatedOutput!, metadata: { workspaceId: "workspace-b" } },
+      }),
+    });
+    finalizer!.result = finalizedResult({ finalizedImage: { ...finalizedResult().finalizedImage, workspaceId: "workspace-b" as never, imageAssetId: "image.safe-output-b", backingArtifactId: "artifact.safe-output-b" } });
+
+    const second = await useCase.execute(command({ workspaceId: "workspace-b" as never, viewId: "view.generated.b" }));
+
+    assert.equal(second.status, "created");
+    assert.equal(instances.saved.length, 2);
+    assert.equal(instances.lastQuery?.workspaceId, "workspace-b");
+    assert.equal(finalizer?.calls.length, 2);
   });
 
   it("performs duplicate detection before finalization after the guard passes", async () => {

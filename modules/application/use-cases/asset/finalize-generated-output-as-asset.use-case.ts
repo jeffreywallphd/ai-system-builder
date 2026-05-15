@@ -119,7 +119,7 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
       }
       const sourceIdentity = identityResult.sourceIdentity;
 
-      const preDuplicate = await this.findDuplicate([sourceIdentity]);
+      const preDuplicate = await this.findDuplicate(command.workspaceId, [sourceIdentity]);
       if (preDuplicate.result) return preDuplicate.result;
 
       const targetResult = await this.resolveTargetDefinition(command);
@@ -136,7 +136,7 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
       if (!finalized.ok) return failureResult(finalizationFailure(finalized), sourceIdentity);
 
       const finalizedSourceIdentity = this.sourceIdentityService.deriveFromFinalizedGeneratedImage(finalized.finalizedImage, sourceIdentity);
-      const postDuplicate = await this.findDuplicate([sourceIdentity, finalizedSourceIdentity], targetResult.definitionRef);
+      const postDuplicate = await this.findDuplicate(command.workspaceId, [sourceIdentity, finalizedSourceIdentity], targetResult.definitionRef);
       if (postDuplicate.result) return postDuplicate.result;
 
       const createdAt = this.now();
@@ -294,6 +294,7 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
   }
 
   private async findDuplicate(
+    workspaceId: string,
     identities: readonly AssetSourceIdentity[],
     targetDefinitionRef?: AssetReference,
   ): Promise<{ readonly result?: AssetMutationResult; readonly diagnostics: readonly AssetMutationDiagnostic[] }> {
@@ -303,7 +304,7 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
       }),
     ];
     const keys = new Set(identities.map((identity) => identity.deduplicationKey));
-    const list = await this.dependencies.instanceRepository.listInstances({ limit: this.duplicateSearchLimit });
+    const list = await this.dependencies.instanceRepository.listInstances({ limit: this.duplicateSearchLimit, workspaceId });
     const matching = list.instances.filter((instance) => storedDeduplicationKeys(instance).some((key) => keys.has(key)));
     if (matching.length === 0) return { diagnostics };
 

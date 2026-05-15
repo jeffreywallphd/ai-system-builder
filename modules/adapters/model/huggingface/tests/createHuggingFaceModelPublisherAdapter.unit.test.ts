@@ -16,7 +16,7 @@ describe("createHuggingFaceModelPublisherAdapter", () => {
     const uploadFile = testDouble.fn(async () => undefined);
     const adapter = createHuggingFaceModelPublisherAdapter({ client: { uploadFile } });
 
-    const result = await adapter.publishModel({ modelRecordId: "m1", modelPath: root, repository: "owner/repo" });
+    const result = await adapter.publishModel({ workspaceId: "workspace-a" as never, modelRecordId: "m1", modelPath: root, repository: "owner/repo" });
     expect(result.published).toBe(true);
     expect(uploadFile.mock.calls.length).toBe(2);
   });
@@ -27,7 +27,7 @@ describe("createHuggingFaceModelPublisherAdapter", () => {
     await writeFile(join(root, "adapter_model.safetensors"), "tensor", "utf8");
 
     const adapter = createHuggingFaceModelPublisherAdapter({ client: { uploadFile: testDouble.fn(async () => undefined) } });
-    await expect(adapter.publishModel({ modelRecordId: "m1", modelPath: root, repository: "owner/repo" })).rejects.toThrow(
+    await expect(adapter.publishModel({ workspaceId: "workspace-a" as never, modelRecordId: "m1", modelPath: root, repository: "owner/repo" })).rejects.toThrow(
       /requires both adapter_config\.json and adapter_model\.safetensors/i,
     );
   });
@@ -40,7 +40,7 @@ describe("createHuggingFaceModelPublisherAdapter", () => {
     await writeFile(join(root, "config.json"), "{}", "utf8");
 
     const adapter = createHuggingFaceModelPublisherAdapter({ client: { uploadFile: testDouble.fn(async () => undefined) } });
-    await expect(adapter.publishModel({ modelRecordId: "m1", modelPath: root, repository: "owner/repo" })).rejects.toThrow(
+    await expect(adapter.publishModel({ workspaceId: "workspace-a" as never, modelRecordId: "m1", modelPath: root, repository: "owner/repo" })).rejects.toThrow(
       /requires model\.safetensors\.index\.json/i,
     );
   });
@@ -57,7 +57,7 @@ describe("createHuggingFaceModelPublisherAdapter", () => {
     await writeFile(join(root, "model-00001-of-00002.safetensors"), "tensor", "utf8");
 
     const adapter = createHuggingFaceModelPublisherAdapter({ client: { uploadFile: testDouble.fn(async () => undefined) } });
-    await expect(adapter.publishModel({ modelRecordId: "m1", modelPath: root, repository: "owner/repo" })).rejects.toThrow(
+    await expect(adapter.publishModel({ workspaceId: "workspace-a" as never, modelRecordId: "m1", modelPath: root, repository: "owner/repo" })).rejects.toThrow(
       /missing shard file referenced by index/i,
     );
   });
@@ -68,7 +68,7 @@ describe("createHuggingFaceModelPublisherAdapter", () => {
     await writeFile(join(root, "model.safetensors"), "tensor", "utf8");
 
     const adapter = createHuggingFaceModelPublisherAdapter({ client: { uploadFile: testDouble.fn(async () => undefined) } });
-    await expect(adapter.publishModel({ modelRecordId: "m1", modelPath: root, repository: "owner/repo" })).rejects.toThrow(
+    await expect(adapter.publishModel({ workspaceId: "workspace-a" as never, modelRecordId: "m1", modelPath: root, repository: "owner/repo" })).rejects.toThrow(
       /requires config\.json/i,
     );
   });
@@ -82,7 +82,7 @@ describe("createHuggingFaceModelPublisherAdapter", () => {
 
     const uploadFile = testDouble.fn(async () => undefined);
     const adapter = createHuggingFaceModelPublisherAdapter({ client: { uploadFile } });
-    await adapter.publishModel({ modelRecordId: "m1", modelPath: root, repository: "owner/repo" });
+    await adapter.publishModel({ workspaceId: "workspace-a" as never, modelRecordId: "m1", modelPath: root, repository: "owner/repo" });
 
     const uploadedPaths = uploadFile.mock.calls.map((call) => call[0].path).sort();
     expect(uploadedPaths).toEqual(["adapter_config.json", "adapter_model.safetensors", "tokenizer.json"]);
@@ -105,6 +105,7 @@ describe("createHuggingFaceModelPublisherAdapter", () => {
     const adapter = createHuggingFaceModelPublisherAdapter({ client: { uploadFile }, fetchImplementation });
 
     const result = await adapter.publishModel({
+      workspaceId: "workspace-a" as never,
       modelRecordId: "m1",
       modelPath: root,
       repository: "OpenFinAL/ai-system-builder-model",

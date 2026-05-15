@@ -22,7 +22,7 @@ export interface ModelValidationSummary {
 }
 
 export interface ValidateModelRequest {
-  workspaceId?: WorkspaceId;
+  workspaceId: WorkspaceId;
   modelRecordId: string;
   modelPath?: string;
   reportOutputDirectory?: string;

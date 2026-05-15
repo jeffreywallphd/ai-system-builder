@@ -1,4 +1,4 @@
-import type { WorkspaceId } from "../workspace";
+import { createWorkspaceId, type WorkspaceId } from "../workspace";
 import { type ModelTaskTag, normalizeModelTaskTags } from "../../domain/model";
 import { type ModelBrowseProvider, normalizeModelBrowseProvider } from "./model-browse-provider";
 import { type ModelInferenceMode, normalizeModelInferenceMode } from "./model-inference-mode";
@@ -253,6 +253,7 @@ export function normalizeModelTrainingRequest(request: ModelTrainingRequest): Mo
   }
 
   return {
+    workspaceId: request.workspaceId ? createWorkspaceId(request.workspaceId) : undefined,
     baseModel: {
       modelRecordId: normalizeOptionalText(request.baseModel.modelRecordId),
       provider: typeof request.baseModel.provider === "string" ? normalizeModelBrowseProvider(request.baseModel.provider) : undefined,

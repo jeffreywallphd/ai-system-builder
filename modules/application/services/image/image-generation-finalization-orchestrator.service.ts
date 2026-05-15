@@ -12,13 +12,13 @@ export class ImageGenerationFinalizationOrchestratorService {
     },
   ) {}
 
-  public async finalizeIfCompleted(requestId: string, workspaceId: string): Promise<{ finalized: boolean; assets?: Array<{ assetId: string; artifactId: string; storageKey: string; mediaType: string; source: "generated" }>; reason?: string }> {
+  public async finalizeIfCompleted(requestId: string, workspaceId: string | undefined): Promise<{ finalized: boolean; assets?: Array<{ assetId: string; artifactId: string; storageKey: string; mediaType: string; source: "generated" }>; reason?: string }> {
     if (!isWorkspaceId(workspaceId)) return { finalized: false, reason: "workspace id is required" };
     const finalizedAssets = this.finalizedRequests.get(`${workspaceId}:${requestId}`);
     if (finalizedAssets) return { finalized: true, assets: finalizedAssets };
 
     const task = await this.dependencies.runtimeTaskRegistry.getTaskStatus(requestId);
-    if (task.workspaceId !== workspaceId) return { finalized: false, reason: "task not found in workspace" };
+    if ("recordType" in task || task.workspaceId !== workspaceId) return { finalized: false, reason: "task not found in workspace" };
     if (task.status !== "succeeded") return { finalized: false, reason: "task not completed" };
 
     const outputs = this.readOutputs(task.data);

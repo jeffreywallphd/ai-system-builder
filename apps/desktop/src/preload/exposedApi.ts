@@ -503,7 +503,7 @@ export interface DesktopPreloadApi {
   startImageGeneration: (input: DesktopImageGenerationStartRequest["payload"], context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopImageGenerationStartResponse>;
   readImageGeneration: (input: { requestId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopImageGenerationReadResponse>;
   cancelImageGeneration: (input: { requestId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopImageGenerationCancelResponse>;
-  finalizeImageGenerationIfCompleted: (input: { requestId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopImageGenerationFinalizeResponse>;
+  finalizeImageGenerationIfCompleted: (input: { requestId: string; workspaceId?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopImageGenerationFinalizeResponse>;
   readComfyUiInstallStatus: (input?: { installRoot?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<any>;
   repairComfyUiInstall: (input?: { installRoot?: string; allowUpdate?: boolean; forceRepair?: boolean }, context?: DesktopArtifactUploadBridgeContext) => Promise<any>;
   browseArtifacts: (
