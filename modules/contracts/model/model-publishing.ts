@@ -2,7 +2,7 @@ import { createWorkspaceId, type WorkspaceId } from "../workspace";
 import type { ModelValidationStatus } from "./model-validation";
 
 export interface PublishModelRequest {
-  workspaceId?: WorkspaceId;
+  workspaceId: WorkspaceId;
   modelRecordId: string;
   repository: string;
   owner?: string;

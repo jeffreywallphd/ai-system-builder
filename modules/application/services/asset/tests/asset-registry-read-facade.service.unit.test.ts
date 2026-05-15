@@ -770,6 +770,31 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     assert.equal(detail?.view.assetDefinitionRef, undefined);
   });
 
+  it("passes workspace context to resource-backed providers for isolated list/detail reads", async () => {
+    const views: readonly AssetResourceBackedView[] = [
+      { viewId: "view.workspace-a", viewKind: "generated-output", displayName: "Workspace A", assetType: "image", assetFamily: "resource-backed", metadata: { workspaceId: "workspace-a" }, generatedOutput: { outputId: "out-a", producedAssetType: "image", producedAt: "2026-01-01T00:00:00.000Z", metadata: { workspaceId: "workspace-a" } } },
+      { viewId: "view.workspace-b", viewKind: "generated-output", displayName: "Workspace B", assetType: "image", assetFamily: "resource-backed", metadata: { workspaceId: "workspace-b" }, generatedOutput: { outputId: "out-b", producedAssetType: "image", producedAt: "2026-01-01T00:00:00.000Z", metadata: { workspaceId: "workspace-b" } } },
+    ];
+    const provider: AssetResourceBackedViewProvider = {
+      async listResourceBackedViews(query = {}) {
+        if (!query.workspaceId) return { items: [], diagnostics: [{ severity: "error", code: "workspace-required", message: "Workspace id is required." }] };
+        return { items: views.filter((view) => (view.metadata as Record<string, unknown>).workspaceId === query.workspaceId) };
+      },
+      async readResourceBackedView(viewId, query = {}) {
+        return views.find((view) => view.viewId === viewId && (view.metadata as Record<string, unknown>).workspaceId === query.workspaceId);
+      },
+    };
+    const facade = createFacade({ resourceBackedViewProvider: provider });
+
+    assert.deepEqual((await facade.listResourceBackedViewCards({ workspaceId: "workspace-a", limit: 10 })).items.map((item) => item.viewId), ["view.workspace-a"]);
+    assert.deepEqual((await facade.listResourceBackedViewCards({ workspaceId: "workspace-b", limit: 10 })).items.map((item) => item.viewId), ["view.workspace-b"]);
+    assert.equal((await facade.readResourceBackedViewDetail("view.workspace-a", { workspaceId: "workspace-a" }))?.view.viewId, "view.workspace-a");
+    assert.equal(await facade.readResourceBackedViewDetail("view.workspace-a", { workspaceId: "workspace-b" }), undefined);
+    const missingWorkspace = await facade.listResourceBackedViewCards({ limit: 10 });
+    assert.equal(missingWorkspace.items.length, 0);
+    assert.equal(missingWorkspace.diagnostics?.[0]?.code, "workspace-required");
+  });
+
   it("returns empty/undefined without a provider and sanitizes provider errors", async () => {
     const noProviderFacade = createFacade();
     assert.deepEqual(await noProviderFacade.listResourceBackedViewCards(), { items: [] });
@@ -802,19 +827,19 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     const provider = new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser });
     const facade = createFacade({ resourceBackedViewProvider: provider });
 
-    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10 });
+    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10, workspaceId: "workspace-a" });
     assert.deepEqual(list.items.map((item) => item.viewKind), ["document", "artifact"]);
     assert.equal(list.items[0]?.assetDefinitionRef?.id, "builtin.document");
     assert.equal(list.items[1]?.displayName?.startsWith("artifact."), true);
     assertSafe(list);
 
-    const detail = await facade.readResourceBackedViewDetail(list.items[0]!.viewId, { includeMetadata: true, includeResourceBackings: true });
+    const detail = await facade.readResourceBackedViewDetail(list.items[0]!.viewId, { includeMetadata: true, includeResourceBackings: true, workspaceId: "workspace-a" });
     assert.equal(detail?.view.viewKind, "document");
     assert.equal(detail?.validationSummary, undefined);
     assert.equal(detail?.view.validationSummary, undefined);
     assertSafe(detail);
 
-    assert.equal(await facade.readResourceBackedViewDetail("missing-artifact-view"), undefined);
+    assert.equal(await facade.readResourceBackedViewDetail("missing-artifact-view", { workspaceId: "workspace-a" }), undefined);
     assert.equal(browser.readContentCalls, 0);
   });
 
@@ -827,7 +852,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     });
     const facade = createFacade({ resourceBackedViewProvider: provider });
 
-    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10 });
+    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10, workspaceId: "workspace-a" });
     assert.deepEqual(list.items.map((item) => item.viewKind), ["image-asset", "generated-output"]);
     assert.equal(list.items[0]?.assetDefinitionRef?.id, "builtin.resource-backed-image");
     assert.equal(list.items[1]?.assetDefinitionRef, undefined);
@@ -837,6 +862,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     const imageDetail = await facade.readResourceBackedViewDetail(list.items[0]!.viewId, {
       includeMetadata: true,
       includeResourceBackings: true,
+      workspaceId: "workspace-a",
     });
     assert.equal(imageDetail?.view.viewKind, "image-asset");
     assert.equal(imageDetail?.validationSummary, undefined);
@@ -846,6 +872,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     const generatedDetail = await facade.readResourceBackedViewDetail(list.items[1]!.viewId, {
       includeMetadata: true,
       includeResourceBackings: true,
+      workspaceId: "workspace-a",
     });
     assert.equal(generatedDetail?.view.viewKind, "generated-output");
     assert.equal(generatedDetail?.view.assetDefinitionRef, undefined);
@@ -853,7 +880,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     assert.equal(generatedDetail?.view.summary?.includes("not finalized or registered"), true);
     assertSafe(generatedDetail);
 
-    assert.equal(await facade.readResourceBackedViewDetail("missing-image-view"), undefined);
+    assert.equal(await facade.readResourceBackedViewDetail("missing-image-view", { workspaceId: "workspace-a" }), undefined);
     assert.equal(imageSource.byteReadCalls + outputSource.byteReadCalls, 0);
     assert.equal(outputSource.statusReadCalls + outputSource.generationCalls, 0);
     assert.equal(imageSource.storageScanCalls + imageSource.createAssetInstanceCalls + imageSource.persistMappingCalls, 0);
@@ -868,7 +895,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     });
     const facade = createFacade({ resourceBackedViewProvider: provider });
 
-    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10 });
+    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10, workspaceId: "workspace-a" });
     assert.deepEqual(list.items.map((item) => item.viewKind), ["dataset", "model"]);
     assert.equal(list.items[0]?.assetDefinitionRef?.id, "builtin.dataset");
     assert.equal(list.items[1]?.assetDefinitionRef?.id, "builtin.model");
@@ -877,6 +904,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     const datasetDetail = await facade.readResourceBackedViewDetail(list.items[0]!.viewId, {
       includeMetadata: true,
       includeResourceBackings: true,
+      workspaceId: "workspace-a",
     });
     assert.equal(datasetDetail?.view.viewKind, "dataset");
     assert.equal(datasetDetail?.validationSummary, undefined);
@@ -886,12 +914,13 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
       includeMetadata: true,
       includeResourceBackings: true,
       includeValidation: true,
+      workspaceId: "workspace-a",
     });
     assert.equal(modelDetail?.view.viewKind, "model");
     assert.equal(modelDetail?.validationSummary?.status, "valid");
     assertSafe(modelDetail);
 
-    assert.equal(await facade.readResourceBackedViewDetail("missing-dataset-model-view"), undefined);
+    assert.equal(await facade.readResourceBackedViewDetail("missing-dataset-model-view", { workspaceId: "workspace-a" }), undefined);
     assert.equal(modelRegistry.discoveryCalls, 0);
     assert.equal(modelRegistry.validationCalls, 0);
     assert.equal(modelRegistry.trainingCalls, 0);
@@ -907,7 +936,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     });
     const facade = createFacade({ resourceBackedViewProvider: provider });
 
-    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10 });
+    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10, workspaceId: "workspace-a" });
     assert.equal(list.items.length, 1);
     assert.equal(list.items[0]?.viewKind, "external-repository-object");
     assert.equal(list.items[0]?.assetDefinitionRef, undefined);
@@ -917,6 +946,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     const detail = await facade.readResourceBackedViewDetail(list.items[0]!.viewId, {
       includeMetadata: true,
       includeResourceBackings: true,
+      workspaceId: "workspace-a",
     });
     assert.equal(detail?.view.viewKind, "external-repository-object");
     assert.equal(detail?.view.assetDefinitionRef, undefined);

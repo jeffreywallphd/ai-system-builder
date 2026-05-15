@@ -183,6 +183,7 @@ export class AssetRegistryReadFacade {
       viewKinds: query.viewKinds,
       limit,
       cursor: query.cursor,
+      workspaceId: query.workspaceId,
     };
     const result = await this.readRepository(
       () => this.dependencies.resourceBackedViewProvider!.listResourceBackedViews(providerQuery),
@@ -196,7 +197,7 @@ export class AssetRegistryReadFacade {
   public async readResourceBackedViewDetail(viewId: string, options: AssetRegistryReadOptions = {}): Promise<AssetRegistryResourceBackedViewDetail | undefined> {
     if (!this.dependencies.resourceBackedViewProvider) return undefined;
     const view = await this.readRepository(
-      () => this.dependencies.resourceBackedViewProvider!.readResourceBackedView(viewId),
+      () => this.dependencies.resourceBackedViewProvider!.readResourceBackedView(viewId, { workspaceId: options.workspaceId }),
       "resource-backed-view-provider-failed",
     );
     if (!view) return undefined;

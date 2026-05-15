@@ -141,10 +141,12 @@ export function registerModelManagementApiRoutes(dependencies: RegisterModelMana
   registerRoute(dependencies.app, dependencies.logger, "/api/model/download", "model.download", async (body) => dependencies.downloadModelUseCase.execute(mapDownloadModelApiRequestToCommand(body)));
   registerRoute(dependencies.app, dependencies.logger, "/api/model/record/update", "model.record.update", async (body) => dependencies.updateModelRecordUseCase.execute(mapUpdateModelRecordApiRequestToCommand(body)));
   registerRoute(dependencies.app, dependencies.logger, "/api/model/record/delete", "model.record.delete", async (body) => dependencies.deleteModelRecordUseCase.execute(mapDeleteModelRecordApiRequestToCommand(body)));
-  if (dependencies.validateModelUseCase) {
-    registerRoute(dependencies.app, dependencies.logger, "/api/model/validate", "model.validate", async (body) => dependencies.validateModelUseCase.execute(mapValidateModelApiRequestToCommand(body)));
+  const validateModelUseCase = dependencies.validateModelUseCase;
+  if (validateModelUseCase) {
+    registerRoute(dependencies.app, dependencies.logger, "/api/model/validate", "model.validate", async (body) => validateModelUseCase.execute(mapValidateModelApiRequestToCommand(body)));
   }
-  if (dependencies.publishModelUseCase) {
-    registerRoute(dependencies.app, dependencies.logger, "/api/model/publish", "model.publish", async (body) => dependencies.publishModelUseCase.execute(mapPublishModelApiRequestToCommand(body)));
+  const publishModelUseCase = dependencies.publishModelUseCase;
+  if (publishModelUseCase) {
+    registerRoute(dependencies.app, dependencies.logger, "/api/model/publish", "model.publish", async (body) => publishModelUseCase.execute(mapPublishModelApiRequestToCommand(body)));
   }
 }

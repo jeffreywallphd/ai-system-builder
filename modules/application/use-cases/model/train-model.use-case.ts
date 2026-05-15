@@ -11,6 +11,7 @@ import {
 } from "../../../contracts/model";
 import { TaskType, type RuntimeTaskRecord } from "../../../contracts/runtime";
 import { createRetrieveArtifactRequest } from "../../../contracts/storage";
+import { isWorkspaceId } from "../../../contracts/workspace";
 import type { GeneratedModelStoragePort, ModelPublisherPort, ModelRegistryPort } from "../../ports/model";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
 import type { ArtifactObjectStoragePort, ArtifactStorageBindingPort } from "../../ports/storage";
@@ -117,7 +118,10 @@ export class TrainModelUseCase {
     let baseModelRecordId: string | undefined = normalizedRequest.baseModel.modelRecordId;
 
     if (normalizedRequest.baseModel.modelRecordId) {
-      const baseModelRecord = await this.dependencies.modelRegistry.getModelRecord(normalizedRequest.baseModel.modelRecordId);
+      if (!isWorkspaceId(normalizedRequest.workspaceId)) {
+        throw new Error("workspaceId must be provided to resolve workspace-scoped base model records.");
+      }
+      const baseModelRecord = await this.dependencies.modelRegistry.getModelRecord(normalizedRequest.workspaceId, normalizedRequest.baseModel.modelRecordId);
       if (!baseModelRecord) {
         throw new Error(`Base model record '${normalizedRequest.baseModel.modelRecordId}' was not found.`);
       }
@@ -244,6 +248,7 @@ export class TrainModelUseCase {
       ? this.rewriteGeneratedMetadataPaths(generated.metadata, generated.localPath, localStorageResult.localPath)
       : (publishedResult ? this.removeGeneratedMetadataOutputPaths(generated.metadata) : generated.metadata);
     const registered = await this.dependencies.modelRegistry.registerGeneratedModel({
+      ...(normalizedRequest.workspaceId ? { workspaceId: normalizedRequest.workspaceId } : {}),
       displayName: registration?.displayName ?? generated.displayName,
       provider: publishedResult ? "huggingface" : generated.provider,
       modelId: publishedResult?.repository ?? generated.modelId ?? localStorageResult?.modelId,
@@ -279,6 +284,7 @@ export class TrainModelUseCase {
 
     const outputModel = publishedResult
       ? (await this.dependencies.modelRegistry.updateModelRecord({
+          ...(normalizedRequest.workspaceId ? { workspaceId: normalizedRequest.workspaceId } : {}),
           modelRecordId: registered.model.modelRecordId,
           patch: {
             published: {
@@ -349,7 +355,12 @@ export class TrainModelUseCase {
       throw new Error("Hugging Face model publishing is not configured.");
     }
 
+    if (!isWorkspaceId(request.workspaceId)) {
+      throw new Error("workspaceId must be provided for workspace-scoped model publishing.");
+    }
+
     return this.dependencies.modelPublisher.publishModel({
+      workspaceId: request.workspaceId,
       modelRecordId: requestId,
       repository: huggingFace.repository,
       revision: huggingFace.revision,
