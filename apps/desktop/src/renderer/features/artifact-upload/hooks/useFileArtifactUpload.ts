@@ -71,8 +71,7 @@ export function useFileArtifactUpload(
         workspaceId: options.workspaceId,
         fileName: selectedFile.name,
         mediaType: resolveArtifactUploadMediaType({
-          workspaceId: options.workspaceId,
-        fileName: selectedFile.name,
+          fileName: selectedFile.name,
           browserMediaType: selectedFile.type,
         }),
         bytes: new Uint8Array(await selectedFile.arrayBuffer()),

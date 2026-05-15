@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -62,6 +62,26 @@ describe("createLocalArtifactCatalogPersistenceAdapter", () => {
     expect(workspaceB.value.records.map((record) => record.storageKey)).toEqual(["uploads/b.png"]);
     expect(crossRead.ok).toBe(false);
     expect(missingWorkspace.ok).toBe(false);
+  });
+
+
+  it("treats a missing catalog file as empty but returns safe failures for read errors", async () => {
+    const rootDirectory = await createTempRoot();
+    const missingAdapter = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
+    const missing = await missingAdapter.browseArtifactCatalogRecords({ workspaceId: "workspace-a" });
+    expect(missing.ok).toBe(true);
+    if (!missing.ok) throw new Error("Expected missing catalog to browse as empty.");
+    expect(missing.value.records).toEqual([]);
+
+    await mkdir(path.join(rootDirectory, ".catalog"), { recursive: true });
+    await mkdir(path.join(rootDirectory, ".catalog", "artifact-catalog.ndjson"));
+    const failingAdapter = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory });
+    const failure = await failingAdapter.browseArtifactCatalogRecords({ workspaceId: "workspace-a" });
+    expect(failure.ok).toBe(false);
+    if (failure.ok) throw new Error("Expected catalog directory read to fail.");
+    expect(failure.error.message).toBe("Artifact catalog is unavailable.");
+    expect(JSON.stringify(failure.error)).not.toContain(rootDirectory);
+    expect(JSON.stringify(failure.error)).not.toContain("artifact-catalog.ndjson");
   });
 
 });

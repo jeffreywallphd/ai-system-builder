@@ -210,8 +210,8 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
   });
 }
 
-function hasWorkspaceId(value: { readonly workspaceId?: unknown }): value is { readonly workspaceId: string } {
-  return typeof value.workspaceId === "string" && value.workspaceId.trim().length > 0;
+function hasWorkspaceId(value: { readonly workspaceId?: unknown } | undefined): value is { readonly workspaceId: string } {
+  return typeof value?.workspaceId === "string" && value.workspaceId.trim().length > 0;
 }
 
 function workspaceIdFrom(request: ExpressRequestLike): string | undefined {

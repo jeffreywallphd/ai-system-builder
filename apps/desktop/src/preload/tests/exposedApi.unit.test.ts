@@ -410,6 +410,7 @@ describe("desktop preload exposedApi bridge", () => {
         fileName: " kitten.png ",
         mediaType: " image/png ",
         bytes: new Uint8Array([137, 80, 78, 71]),
+        workspaceId: "workspace-a",
       },
       {
         requestId: "req-upload-1",
@@ -442,8 +443,8 @@ describe("desktop preload exposedApi bridge", () => {
     });
     const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
 
-    await api.browseArtifacts();
-    const mediaResponse = await api.readArtifactViewerMedia({ storageKey: "uploads/cat.png" });
+    await api.browseArtifacts({}, { workspaceId: "workspace-a" });
+    const mediaResponse = await api.readArtifactViewerMedia({ storageKey: "uploads/cat.png" }, { workspaceId: "workspace-a" });
 
     expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value);
     expect((invoke.mock.calls[0]?.[1] as { payload?: { artifactFamily?: string } } | undefined)?.payload?.artifactFamily).toBeUndefined();
@@ -457,7 +458,7 @@ describe("desktop preload exposedApi bridge", () => {
     );
     const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
 
-    await api.browseArtifacts({ artifactFamily: "structured-text" });
+    await api.browseArtifacts({ artifactFamily: "structured-text" }, { workspaceId: "workspace-a" });
 
     expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value);
     expect((invoke.mock.calls[0]?.[1] as { payload?: { artifactFamily?: string } } | undefined)?.payload?.artifactFamily).toBe("structured-text");
@@ -512,6 +513,7 @@ describe("desktop preload exposedApi bridge", () => {
         fileName: "cat.png",
         mediaType: "image/png",
         bytes: new Uint8Array([1]),
+        workspaceId: "workspace-a",
       }),
     ).rejects.toThrow("Received invalid desktop artifact upload IPC response envelope.");
   });

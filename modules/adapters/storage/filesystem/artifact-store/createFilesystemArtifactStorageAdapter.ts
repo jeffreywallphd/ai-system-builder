@@ -87,12 +87,8 @@ function toErrorCode(
   }
 }
 
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return String(error);
+function toFilesystemCode(error: unknown): string | undefined {
+  return isFsError(error) ? error.code : undefined;
 }
 
 function resolvePathInsideRoot(rootDirectory: string, key: string): string {
@@ -418,7 +414,7 @@ export function createFilesystemArtifactObjectStorageAdapter(
             errorMessage: message,
             details: {
               key: attemptedKey,
-              filesystemCode: isFsError(error) ? (error.code ?? "unknown") : "unknown",
+              filesystemCode: toFilesystemCode(error) ?? "unknown",
             },
           },
         });
@@ -429,7 +425,7 @@ export function createFilesystemArtifactObjectStorageAdapter(
             details: {
               operation: "storeArtifact",
               key: attemptedKey,
-              filesystemCode: isFsError(error) ? error.code : undefined,
+              filesystemCode: toFilesystemCode(error),
             },
           }),
           requestContext,
@@ -464,12 +460,12 @@ export function createFilesystemArtifactObjectStorageAdapter(
       } catch (error) {
         const code = toErrorCode(error, "not-found");
         return createRetrieveArtifactFailureResult<TContent>(
-          createContractError(code, `Failed to retrieve artifact bytes: ${toErrorMessage(error)}`, {
+          createContractError(code, "Failed to retrieve artifact bytes.", {
             requestId: requestContext.requestId,
             correlationId: requestContext.correlationId,
             details: {
               operation: "retrieveArtifact",
-              filesystemCode: isFsError(error) ? error.code : undefined,
+              filesystemCode: toFilesystemCode(error),
             },
           }),
           requestContext,
@@ -505,12 +501,12 @@ export function createFilesystemArtifactObjectStorageAdapter(
 
         const code = toErrorCode(error, "internal");
         return createHasArtifactFailureResult(
-          createContractError(code, `Failed to check artifact existence: ${toErrorMessage(error)}`, {
+          createContractError(code, "Failed to check artifact existence.", {
             requestId: requestContext.requestId,
             correlationId: requestContext.correlationId,
             details: {
               operation: "hasArtifact",
-              filesystemCode: isFsError(error) ? error.code : undefined,
+              filesystemCode: toFilesystemCode(error),
             },
           }),
           requestContext,
@@ -542,12 +538,12 @@ export function createFilesystemArtifactObjectStorageAdapter(
 
         const code = toErrorCode(error, "internal");
         return createDeleteArtifactFailureResult(
-          createContractError(code, `Failed to delete artifact: ${toErrorMessage(error)}`, {
+          createContractError(code, "Failed to delete artifact.", {
             requestId: requestContext.requestId,
             correlationId: requestContext.correlationId,
             details: {
               operation: "deleteArtifact",
-              filesystemCode: isFsError(error) ? error.code : undefined,
+              filesystemCode: toFilesystemCode(error),
             },
           }),
           requestContext,

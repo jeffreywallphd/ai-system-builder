@@ -37,6 +37,23 @@ function normalizeRecord(record: ArtifactCatalogRecord): ArtifactCatalogRecord {
   };
 }
 
+function isFsError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error;
+}
+
+function toFilesystemCode(error: unknown): string | undefined {
+  return isFsError(error) ? error.code : undefined;
+}
+
+function createCatalogUnavailableError(operation: string, error: unknown) {
+  return createContractError("unavailable", "Artifact catalog is unavailable.", {
+    details: {
+      operation,
+      filesystemCode: toFilesystemCode(error),
+    },
+  });
+}
+
 function parseRecordLine(line: string): ArtifactCatalogRecordLine | undefined {
   try {
     const parsed = JSON.parse(line) as Partial<ArtifactCatalogRecord> & { deletedAt?: unknown };
@@ -92,7 +109,16 @@ export function createLocalArtifactCatalogPersistenceAdapter(
   const catalogPath = path.join(rootDirectory, catalogFile);
 
   async function readCatalogRecords(): Promise<ArtifactCatalogRecord[]> {
-    const content = await readFile(catalogPath, "utf8").catch(() => "");
+    let content: string;
+    try {
+      content = await readFile(catalogPath, "utf8");
+    } catch (error) {
+      if (isFsError(error) && error.code === "ENOENT") {
+        return [];
+      }
+      throw error;
+    }
+
     if (!content.trim()) {
       return [];
     }
@@ -131,7 +157,8 @@ export function createLocalArtifactCatalogPersistenceAdapter(
         return createFailureResult(
           createContractError("unavailable", "Failed to append artifact catalog record.", {
             details: {
-              reason: error instanceof Error ? error.message : String(error),
+              operation: "appendArtifactCatalogRecord",
+              filesystemCode: toFilesystemCode(error),
             },
           }),
           context,
@@ -149,12 +176,16 @@ export function createLocalArtifactCatalogPersistenceAdapter(
         );
       }
 
-      const records = (await readCatalogRecords()).filter((record) => record.workspaceId === request.workspaceId);
-      return createSuccessResult({
-        records: request.artifactFamily
-          ? records.filter((record) => record.artifactFamily === request.artifactFamily)
-          : records,
-      }, context);
+      try {
+        const records = (await readCatalogRecords()).filter((record) => record.workspaceId === request.workspaceId);
+        return createSuccessResult({
+          records: request.artifactFamily
+            ? records.filter((record) => record.artifactFamily === request.artifactFamily)
+            : records,
+        }, context);
+      } catch (error) {
+        return createFailureResult(createCatalogUnavailableError("browseArtifactCatalogRecords", error), context);
+      }
     },
 
     async readArtifactCatalogRecord(request, context = {}) {
@@ -167,7 +198,12 @@ export function createLocalArtifactCatalogPersistenceAdapter(
         );
       }
       const storageKey = normalizeStorageArtifactKey(request.storageKey);
-      const record = (await readCatalogRecords()).find((entry) => entry.workspaceId === request.workspaceId && entry.storageKey === storageKey);
+      let record: ArtifactCatalogRecord | undefined;
+      try {
+        record = (await readCatalogRecords()).find((entry) => entry.workspaceId === request.workspaceId && entry.storageKey === storageKey);
+      } catch (error) {
+        return createFailureResult(createCatalogUnavailableError("readArtifactCatalogRecord", error), context);
+      }
       if (!record) {
         return createFailureResult(
           createContractError("not-found", `Artifact not found for storage key \"${storageKey}\".`),
@@ -188,15 +224,19 @@ export function createLocalArtifactCatalogPersistenceAdapter(
         );
       }
       const storageKey = normalizeStorageArtifactKey(request.storageKey);
-      const records = await readCatalogRecords();
-      const exists = records.some((entry) => entry.workspaceId === request.workspaceId && entry.storageKey === storageKey);
-      if (!exists) {
-        return createSuccessResult({ deleted: false }, context);
-      }
+      try {
+        const records = await readCatalogRecords();
+        const exists = records.some((entry) => entry.workspaceId === request.workspaceId && entry.storageKey === storageKey);
+        if (!exists) {
+          return createSuccessResult({ deleted: false }, context);
+        }
 
-      await mkdir(path.dirname(catalogPath), { recursive: true });
-      await appendFile(catalogPath, `${JSON.stringify({ workspaceId: request.workspaceId, storageKey, deletedAt: new Date().toISOString() })}\n`, "utf8");
-      return createSuccessResult({ deleted: true }, context);
+        await mkdir(path.dirname(catalogPath), { recursive: true });
+        await appendFile(catalogPath, `${JSON.stringify({ workspaceId: request.workspaceId, storageKey, deletedAt: new Date().toISOString() })}\n`, "utf8");
+        return createSuccessResult({ deleted: true }, context);
+      } catch (error) {
+        return createFailureResult(createCatalogUnavailableError("deleteArtifactCatalogRecord", error), context);
+      }
     },
   };
 }

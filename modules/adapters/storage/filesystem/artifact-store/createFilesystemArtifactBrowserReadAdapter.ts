@@ -34,7 +34,7 @@ import {
   type ArtifactStorageBindingRole,
   type StorageObjectMetadata,
 } from "../../../../contracts/storage";
-import { isWorkspaceId } from "../../../../contracts/workspace";
+import { isWorkspaceId, type WorkspaceId } from "../../../../contracts/workspace";
 import { resolveArtifactFamily } from "../../../../application/shared/artifact-family-classifier";
 
 export interface FilesystemArtifactBrowserReadAdapter
@@ -53,7 +53,7 @@ export interface CreateFilesystemArtifactBrowserReadAdapterOptions {
 const UPLOADS_ROOT_SEGMENT = "uploads";
 
 
-function requireWorkspaceId(context: ApplicationRequestContext): string | undefined {
+function requireWorkspaceId(context: ApplicationRequestContext): WorkspaceId | undefined {
   return isWorkspaceId(context.workspaceId) ? context.workspaceId : undefined;
 }
 
@@ -295,7 +295,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
     ) {
       const browseResult = await options.artifactCatalogRead.browseArtifactCatalogRecords(
         {
-          workspaceId: requireWorkspaceId(context) ?? "",
+          workspaceId: requireWorkspaceId(context),
           artifactFamily: request.artifactFamily,
         },
         context,
@@ -330,7 +330,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
     ) {
       const storageKey = normalizeStorageArtifactKey(request.locator.storageKey);
       const readResult = await options.artifactCatalogRead.readArtifactCatalogRecord(
-        { workspaceId: requireWorkspaceId(context) ?? "", storageKey },
+        { workspaceId: requireWorkspaceId(context), storageKey },
         context,
       );
 
@@ -362,7 +362,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
     ) {
       const storageKey = normalizeStorageArtifactKey(request.locator.storageKey);
       const readResult = await options.artifactCatalogRead.readArtifactCatalogRecord(
-        { workspaceId: requireWorkspaceId(context) ?? "", storageKey },
+        { workspaceId: requireWorkspaceId(context), storageKey },
         context,
       );
 
@@ -422,7 +422,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
 
     async browseUnregisteredArtifacts(context: ApplicationRequestContext = {}) {
       const [catalogResult, uploadRelativePaths] = await Promise.all([
-        options.artifactCatalogRead.browseArtifactCatalogRecords({ workspaceId: requireWorkspaceId(context) ?? "" }, context),
+        options.artifactCatalogRead.browseArtifactCatalogRecords({ workspaceId: requireWorkspaceId(context) }, context),
         listRelativeFilesRecursively(uploadsRoot),
       ]);
 
@@ -464,7 +464,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
       }
 
       const [catalogResult, fileStats] = await Promise.all([
-        options.artifactCatalogRead.browseArtifactCatalogRecords({ workspaceId: requireWorkspaceId(context) ?? "" }, context),
+        options.artifactCatalogRead.browseArtifactCatalogRecords({ workspaceId: requireWorkspaceId(context) }, context),
         stat(path.resolve(options.rootDirectory, storageKey)).catch(() => undefined),
       ]);
 
@@ -490,7 +490,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
       const mediaType = inferMediaTypeFromStorageKey(storageKey);
       const appendResult = await options.artifactCatalogAppend.appendArtifactCatalogRecord({
         record: {
-          workspaceId: requireWorkspaceId(context) ?? "",
+          workspaceId: requireWorkspaceId(context),
           storageKey,
           artifactFamily: resolveArtifactFamily({ mediaType, fileName: storageKey }),
           mediaType,
@@ -517,7 +517,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
         );
       }
 
-      const catalogResult = await options.artifactCatalogRead.browseArtifactCatalogRecords({ workspaceId: requireWorkspaceId(context) ?? "" }, context);
+      const catalogResult = await options.artifactCatalogRead.browseArtifactCatalogRecords({ workspaceId: requireWorkspaceId(context) }, context);
       if (!catalogResult.ok) {
         return catalogResult;
       }

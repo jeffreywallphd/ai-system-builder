@@ -19,6 +19,18 @@ interface PreloadEnvelope {
   error?: { message?: string };
 }
 
+
+function sanitizeModelRecord<T>(model: T): T {
+  if (typeof model !== "object" || model === null) return model;
+  const { localPath: _localPath, validationReportPath: _validationReportPath, ...safeModel } = model as Record<string, unknown>;
+  return safeModel as T;
+}
+
+function sanitizeDownloadResult(result: DesktopDownloadModelResult): DesktopDownloadModelResult {
+  const { localPath: _localPath, ...safeDownload } = result.download as Record<string, unknown>;
+  return { ...result, model: sanitizeModelRecord(result.model), download: safeDownload as DesktopDownloadModelResult["download"] };
+}
+
 function ensureSuccess<T>(response: unknown, pick: (value: unknown) => T, fallback: string): T {
   if (typeof response !== "object" || response === null || !("ok" in response)) {
     throw new Error(fallback);
@@ -79,7 +91,7 @@ export function createDesktopModelsClient(): DesktopModelsClient {
       }
       return ensureSuccess(
         await desktopApi.listModels(input),
-        (value) => (value as { models: DesktopModelInventoryRecord[] }).models ?? [],
+        (value) => ((value as { models: DesktopModelInventoryRecord[] }).models ?? []).map(sanitizeModelRecord),
         "Failed to list models.",
       );
     },
@@ -96,9 +108,9 @@ export function createDesktopModelsClient(): DesktopModelsClient {
           taskTags: input.taskTags,
           artifactForm: input.artifactForm,
           metadata: input.metadata,
-          workspaceId: input.workspaceId,
+          workspaceId: input.workspaceId as never,
         }),
-        (value) => (value as { model: DesktopModelInventoryRecord }).model,
+        (value) => sanitizeModelRecord((value as { model: DesktopModelInventoryRecord }).model),
         "Failed to save model reference.",
       );
     },
@@ -115,9 +127,9 @@ export function createDesktopModelsClient(): DesktopModelsClient {
           taskTags: input.taskTags,
           artifactForm: input.artifactForm,
           metadata: input.metadata,
-          workspaceId: input.workspaceId,
+          workspaceId: input.workspaceId as never,
         }),
-        (value) => value as DesktopDownloadModelResult,
+        (value) => sanitizeDownloadResult(value as DesktopDownloadModelResult),
         "Failed to download model.",
       );
     },
@@ -127,7 +139,7 @@ export function createDesktopModelsClient(): DesktopModelsClient {
       }
       return ensureSuccess(
         await desktopApi.updateModelRecord(input),
-        (value) => (value as { model: DesktopModelInventoryRecord }).model,
+        (value) => sanitizeModelRecord((value as { model: DesktopModelInventoryRecord }).model),
         "Failed to update model record.",
       );
     },
@@ -136,7 +148,7 @@ export function createDesktopModelsClient(): DesktopModelsClient {
         throw new Error("Desktop preload model delete bridge is unavailable.");
       }
       return ensureSuccess(
-        await desktopApi.deleteModelRecord(input),
+        await desktopApi.deleteModelRecord({ ...input, workspaceId: input.workspaceId as never }),
         (value) => value as DesktopDeleteModelRecordResult,
         "Failed to delete model record.",
       );
