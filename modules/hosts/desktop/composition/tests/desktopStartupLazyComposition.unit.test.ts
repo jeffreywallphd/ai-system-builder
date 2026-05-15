@@ -111,8 +111,10 @@ const deferredMilestones = [
   "desktop.host.ingestion-features.compose.before",
   "desktop.host.dataset-preparation-features.import.before",
   "desktop.host.dataset-preparation-features.compose.before",
-  "desktop.host.comfyui-features.import.before",
-  "desktop.host.comfyui-features.compose.before",
+  "desktop.host.comfyui-install-features.import.before",
+  "desktop.host.comfyui-install-features.compose.before",
+  "desktop.host.comfyui-image-runtime-features.import.before",
+  "desktop.host.comfyui-image-runtime-features.compose.before",
   "desktop.host.runtime-task-features.import.before",
   "desktop.host.runtime-task-features.compose.before",
   "desktop.host.python-runtime-foundation.import.before",
@@ -174,7 +176,7 @@ describe("desktop startup lazy composition contract", () => {
 
     expect(firstMilestones).toContain("desktop.host.model-features.compose.before");
     expect(firstMilestones).toContain("desktop.host.model-features.compose.after");
-    expect(firstMilestones).not.toContain("desktop.host.comfyui-features.compose.before");
+    expect(firstMilestones).not.toContain("desktop.host.comfyui-image-runtime-features.compose.before");
     expect(firstMilestones).not.toContain("desktop.host.runtime-task-features.compose.before");
     expect(secondMilestones).not.toContain("desktop.host.model-features.compose.before");
   });
@@ -233,10 +235,12 @@ describe("desktop startup lazy composition contract", () => {
 
     const { milestones: imageMilestones } = await captureMemoryMilestones(() => harness.invoke(DESKTOP_IMAGE_GENERATION_START_REQUEST_CHANNEL.value, createDesktopImageGenerationStartRequest({ prompt: "cat" })));
     expect(imageMilestones).toContain("desktop.host.image-generation-features.compose.before");
-    expect(imageMilestones).toContain("desktop.host.comfyui-features.compose.before");
+    expect(imageMilestones).toContain("desktop.host.comfyui-image-runtime-features.compose.before");
     expect(imageMilestones).toContain("desktop.host.runtime-task-features.compose.before");
 
     const { milestones: comfyUiMilestones } = await captureMemoryMilestones(() => harness.invoke(DESKTOP_COMFYUI_INSTALL_STATUS_READ_REQUEST_CHANNEL.value, createDesktopComfyUiInstallStatusRequest({})));
-    expect(comfyUiMilestones).not.toContain("desktop.host.comfyui-features.compose.before");
+    expect(comfyUiMilestones).toContain("desktop.host.comfyui-install-features.compose.before");
+    expect(comfyUiMilestones).not.toContain("desktop.host.comfyui-image-runtime-features.compose.before");
+    expect(comfyUiMilestones).not.toContain("desktop.host.runtime-task-features.compose.before");
   });
 });

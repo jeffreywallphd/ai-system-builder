@@ -1,19 +1,10 @@
 import type { LoggingPort } from "../../../application/ports/logging";
-import type { DesktopPythonRuntimeLogEntry, DesktopPythonRuntimeStatusPayload } from "../../../contracts/ipc";
+import type { DesktopPythonRuntimeLogEntry } from "../../../contracts/ipc";
 import { PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES } from "../../../contracts/runtime";
-import { resolvePythonRuntimeBaseUrl, resolvePythonRuntimeHostAndPort, classifyPythonRuntimeStdioLogLevel } from "./composeDesktopHost";
+import { resolvePythonRuntimeBaseUrl, resolvePythonRuntimeHostAndPort, classifyPythonRuntimeStdioLogLevel, type DesktopPythonRuntimeFeature } from "./desktopPythonRuntimeHelpers";
 
 const PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT = 60_000;
 
-export interface DesktopPythonRuntimeFeature {
-  supervisor: {
-    start: () => Promise<void>;
-    stop: () => Promise<void>;
-    restart: () => Promise<void>;
-    getStatus: () => string;
-  };
-  runtimePort: any;
-}
 
 export interface ComposeDesktopPythonRuntimeFeatureOptions {
   loggingPort: LoggingPort;
@@ -67,25 +58,4 @@ export async function composeDesktopPythonRuntimeFeature(options: ComposeDesktop
       },
     },
   });
-}
-
-export function createUnavailablePythonRuntimeStatus(input: {
-  runtimeLogs: DesktopPythonRuntimeLogEntry[];
-  memoryUsagePercent: number;
-  cpuUsagePercent: number;
-}): DesktopPythonRuntimeStatusPayload {
-  return {
-    supervisorStatus: "stopped",
-    healthy: false,
-    runtimeStatus: "unavailable",
-    capabilities: [],
-    loadedModels: [],
-    activeTaskCount: 0,
-    systemResources: {
-      memoryUsagePercent: input.memoryUsagePercent,
-      cpuUsagePercent: input.cpuUsagePercent,
-      gpuUsagePercent: 0,
-    },
-    logs: [...input.runtimeLogs],
-  };
 }
