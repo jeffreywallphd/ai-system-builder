@@ -43,7 +43,7 @@ The following feature milestones should **not** appear during initial startup or
 - `desktop.host.ingestion-features.compose.*` for website ingestion requests.
 - `desktop.host.dataset-preparation-features.compose.*` for dataset preparation requests.
 - `desktop.host.artifact-remote-features.compose.*` for Hugging Face remote browse/publish/import/localize operations.
-- `desktop.host.comfyui-features.compose.*` for ComfyUI install/status/repair/start or image generation requests.
+- `desktop.host.comfyui-install-features.compose.*` for ComfyUI install/status/repair requests, and `desktop.host.comfyui-image-runtime-features.compose.*` for ComfyUI-backed image runtime requests.
 - `desktop.host.runtime-task-features.compose.*` for runtime-backed task execution paths.
 
 To compare Prompt 1 and Prompt 2 memory deltas, collect the same startup path with `DESKTOP_MEMORY_DIAGNOSTICS=1 npm run dev:desktop` before and after the change. Compare adjacent deltas for `desktop.host.compose.before` → `desktop.host.compose.after`, `desktop.ipc.register.before` → `desktop.ipc.register.after`, and `desktop.host.ipc-registration.lazy-handlers.before` → `desktop.host.ipc-registration.lazy-handlers.after`. Prompt 2 should move most Tier 2/Tier 3 memory growth out of those startup pairs and into the first-request feature milestones.
@@ -63,7 +63,8 @@ The following should appear only after the first feature request:
 - `desktop.host.asset-features.import.*` / `desktop.host.asset-features.compose.*` for asset registry and mutation operations.
 - `desktop.host.model-features.import.*` / `desktop.host.model-features.compose.*` for model management operations.
 - `desktop.host.image-generation-features.import.*` / `desktop.host.image-generation-features.compose.*` for image generation operations.
-- `desktop.host.comfyui-features.import.*` / `desktop.host.comfyui-features.compose.*` for ComfyUI install/status/repair or ComfyUI-backed generation operations.
+- `desktop.host.comfyui-install-features.import.*` / `desktop.host.comfyui-install-features.compose.*` for ComfyUI install/status/repair operations.
+- `desktop.host.comfyui-image-runtime-features.import.*` / `desktop.host.comfyui-image-runtime-features.compose.*` for ComfyUI-backed generation operations.
 - `desktop.host.ingestion-features.import.*` / `desktop.host.ingestion-features.compose.*` for website ingestion operations.
 - `desktop.host.dataset-preparation-features.import.*` / `desktop.host.dataset-preparation-features.compose.*` for dataset preparation operations.
 - `desktop.host.runtime-task-features.import.*` / `desktop.host.runtime-task-features.compose.*` for runtime-backed task execution.
@@ -86,7 +87,7 @@ Prompt 4 splits Electron IPC channel registration into explicit feature-group bo
 
 Those milestones mean only that IPC handlers were attached to Electron. They should appear between `desktop.host.ipc-registration.lazy-handlers.before` and `desktop.host.ipc-registration.lazy-handlers.after` during startup. They must not be accompanied by deferred feature import or composition milestones during registration.
 
-Use Prompt 3 import/compose milestones to distinguish handler registration from provider resolution. During startup, the logs should still omit deferred milestones such as `desktop.host.model-features.import.*`, `desktop.host.model-features.compose.*`, `desktop.host.artifact-features.import.*`, `desktop.host.artifact-remote-features.import.*`, `desktop.host.asset-features.import.*`, `desktop.host.image-generation-features.import.*`, `desktop.host.comfyui-features.import.*`, `desktop.host.ingestion-features.import.*`, `desktop.host.dataset-preparation-features.import.*`, `desktop.host.runtime-task-features.import.*`, and `desktop.host.python-runtime-foundation.import.*`.
+Use Prompt 3 import/compose milestones to distinguish handler registration from provider resolution. During startup, the logs should still omit deferred milestones such as `desktop.host.model-features.import.*`, `desktop.host.model-features.compose.*`, `desktop.host.artifact-features.import.*`, `desktop.host.artifact-remote-features.import.*`, `desktop.host.asset-features.import.*`, `desktop.host.image-generation-features.import.*`, `desktop.host.comfyui-install-features.import.*`, `desktop.host.comfyui-image-runtime-features.import.*`, `desktop.host.ingestion-features.import.*`, `desktop.host.dataset-preparation-features.import.*`, `desktop.host.runtime-task-features.import.*`, and `desktop.host.python-runtime-foundation.import.*`.
 
 To diagnose accidental provider resolution during registration, collect a startup baseline and inspect the log segment from `desktop.host.ipc-registration.lazy-handlers.before` through `desktop.host.ipc-registration.lazy-handlers.after`. That segment should contain the feature-group `register.before`/`register.after` pairs only. If a deferred `<feature>.import.*` or `<feature>.compose.*` milestone appears in the same segment, a registration function probably called a lazy provider while attaching handlers.
 
@@ -97,3 +98,29 @@ DESKTOP_MEMORY_DIAGNOSTICS=1 npm run dev:desktop
 ```
 
 Prompt 4 should add finer-grained IPC registration pairs without moving feature import/compose milestones earlier. Model, artifact, asset, image-generation, ComfyUI, ingestion, dataset-preparation, artifact-remote/Hugging Face, runtime-task, and Python runtime foundation milestones should appear only after the first corresponding feature request, not during startup or channel registration.
+
+## Cleanup checkpoint: refined lazy feature boundaries
+
+The desktop main-process lazy boundary now separates ComfyUI install/status work from the ComfyUI image runtime. A first install/status or repair request should import and compose only `desktop.host.comfyui-install-features.*`; it should not import or compose `desktop.host.comfyui-image-runtime-features.*`, create the ComfyUI HTTP client, create the image-generation runtime adapter, start ComfyUI, or run GPU detection. The install root is resolved inside the install feature when the install/status/repair request is handled, not during startup or IPC registration.
+
+ComfyUI image generation and runtime-backed task paths use the separate image runtime feature. Those paths may show `desktop.host.comfyui-image-runtime-features.import.before/after` and `desktop.host.comfyui-image-runtime-features.compose.before/after` on first use. GPU/device resolution is still deferred until an explicit ComfyUI runtime start/action path needs it, so install-status reads should not run `nvidia-smi` or equivalent detection.
+
+Python runtime helper functions used by startup status reads live in a lightweight helper module, separate from Python runtime feature composition. Startup status reads may produce unavailable Python status without importing the Python runtime foundation. `desktop.host.python-runtime-foundation.import.*` and `desktop.host.python-runtime-foundation.compose.*` should appear only after explicit Python runtime control or runtime-task requests.
+
+Feature-group IPC registration uses narrow typed lazy providers. Registration should attach handlers only; it should not resolve model, artifact, asset, image-generation, ComfyUI install, ComfyUI image runtime, ingestion, dataset-preparation, runtime-task, or Python runtime providers. In diagnostics, the IPC group `register.before`/`register.after` pairs should still appear during startup without adjacent deferred feature import/compose milestones.
+
+Runtime task power lifecycle is task-action lazy. Composing `desktop.host.runtime-task-features.*` should not create the real Electron power suspension blocker. The first task lifecycle action that starts, stops, or lists a blocker may show `desktop.host.power-blocker.compose.before` and `desktop.host.power-blocker.compose.after`.
+
+For a baseline comparison, run:
+
+```bash
+DESKTOP_MEMORY_DIAGNOSTICS=1 npm run dev:desktop
+```
+
+Expected milestone split:
+
+- Startup: base host, logging, token/settings, startup workspace shell, and IPC group registration milestones only.
+- First ComfyUI install/status request: `desktop.host.comfyui-install-features.import.*` and `desktop.host.comfyui-install-features.compose.*` only.
+- First ComfyUI-backed image generation/runtime action: `desktop.host.comfyui-image-runtime-features.import.*` and `desktop.host.comfyui-image-runtime-features.compose.*` along with the relevant image/runtime-task feature milestones.
+- First Python runtime control or Python-backed runtime task: `desktop.host.python-runtime-foundation.import.*` and `desktop.host.python-runtime-foundation.compose.*`.
+- First task power lifecycle action: `desktop.host.power-blocker.compose.*`.

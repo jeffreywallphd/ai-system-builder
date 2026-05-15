@@ -31,7 +31,7 @@ export interface StoreArtifactUploadUseCasePort {
       workspaceId?: string;
     },
   ) => Promise<StoreArtifactUploadUseCaseResult>;
-  getAcceptedUploadPolicy: () => ArtifactUploadAcceptedTypePolicy;
+  getAcceptedUploadPolicy: () => ArtifactUploadAcceptedTypePolicy | Promise<ArtifactUploadAcceptedTypePolicy>;
 }
 
 export interface RegisterArtifactUploadIpcDependencies {
@@ -117,7 +117,7 @@ export function registerArtifactUploadIpc(
     DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_REQUEST_CHANNEL.value,
     async (_event, request: { requestId?: string; correlationId?: string }) =>
       createDesktopArtifactUploadPolicyReadSuccessResponse(
-        dependencies.storeArtifactUploadUseCase.getAcceptedUploadPolicy(),
+        await dependencies.storeArtifactUploadUseCase.getAcceptedUploadPolicy(),
         {
           requestId: request.requestId,
           correlationId: request.correlationId,

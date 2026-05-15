@@ -1,10 +1,12 @@
-import { registerModelManagementIpc } from "./model/registerModelManagementIpc";
+import { registerModelManagementIpc, type RegisterModelManagementIpcDependencies } from "./model/registerModelManagementIpc";
 import type { IpcMainHandlePort } from "./ipcMainHandlePort";
 import { lazyProvidedObject, type AsyncFeatureProvider } from "./lazyFeatureProvider";
 
+export type DesktopModelIpcFeature = Omit<RegisterModelManagementIpcDependencies, "ipcMain">;
+
 export interface RegisterDesktopModelIpcDependencies {
   ipcMain: IpcMainHandlePort;
-  getModelFeature: AsyncFeatureProvider<any>;
+  getModelFeature: AsyncFeatureProvider<DesktopModelIpcFeature>;
 }
 
 export function registerDesktopModelIpc(dependencies: RegisterDesktopModelIpcDependencies): void {

@@ -7,6 +7,7 @@ import { describe, expect, expectTypeOf, it, testDouble } from "../../../../test
 
 import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
+import { TaskType } from "../../../../contracts/runtime";
 import type { HuggingFaceFetchImplementation } from "../../../../adapters/storage/huggingface";
 
 import {
@@ -73,18 +74,22 @@ import {
 import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 
 import {
-  classifyPythonRuntimeStdioLogLevel,
   composeDesktopHost,
   createDesktopRuntimeReadinessService,
+  type ComposeDesktopHostOptions,
+  type RegisterDesktopArtifactUploadIpcOptions,
+} from "../composeDesktopHost";
+import {
   resolveComfyUiLaunchPythonExecutable,
   resolveComfyUiPythonEnvironmentMode,
   resolveComfyUiRuntimeDeviceMode,
   resolveComfyUiInstallRoot,
+} from "../composeDesktopComfyUiHelpers";
+import {
+  classifyPythonRuntimeStdioLogLevel,
   resolveDefaultManagedPythonRuntimePort,
   resolvePythonRuntimeBaseUrl,
-  type ComposeDesktopHostOptions,
-  type RegisterDesktopArtifactUploadIpcOptions,
-} from "../composeDesktopHost";
+} from "../desktopPythonRuntimeHelpers";
 
 describe("composeDesktopHost", () => {
   it("resolves ComfyUI install root with COMFYUI_INSTALL_ROOT override", () => {
@@ -206,7 +211,7 @@ describe("composeDesktopHost", () => {
       logSink: sink,
     });
 
-    expectTypeOf(host.loggingPort).toExtend<LoggingPort>();
+    expectTypeOf<typeof host.loggingPort>().toExtend<LoggingPort>();
     expect(host.loggingConfig).toEqual({
       verbosity: "verbose",
       level: "debug",
@@ -476,7 +481,37 @@ describe("composeDesktopHost", () => {
     }
     expect(source).toContain("await import(\"./composeDesktopModelFeature\")");
     expect(source).toContain("await import(\"./composeDesktopArtifactFeature\")");
-    expect(source).toContain("await import(\"./composeDesktopComfyUiFeature\")");
+    expect(source).toContain("await import(\"./composeDesktopComfyUiInstallFeature\")");
+    expect(source).toContain("await import(\"./composeDesktopComfyUiImageRuntimeFeature\")");
+  });
+
+
+  it("keeps runtime task power blocker construction lazy until a task lifecycle action", async () => {
+    const { composeDesktopRuntimeTaskFeature } = await import("../composeDesktopRuntimeTaskFeature");
+    const milestones: string[] = [];
+
+    const feature = await composeDesktopRuntimeTaskFeature({
+      pythonRuntimeFoundation: {
+        supervisor: { start: testDouble.fn(async () => undefined) },
+        runtimePort: {},
+      },
+      imageRuntimeTaskRegistry: {
+        startTask: testDouble.fn(),
+        readTask: testDouble.fn(),
+        cancelTask: testDouble.fn(),
+        listTasks: testDouble.fn(),
+      },
+      runtimeReadiness: {
+        readCapabilityStatus: testDouble.fn(async () => ({ capabilityId: "runtime.test", status: "ready", checkedAt: "2026-05-15T00:00:00.000Z" })),
+        readAllCapabilityStatuses: testDouble.fn(async () => []),
+      },
+      recordMilestone: (milestone) => milestones.push(milestone),
+    });
+
+    expect(milestones).not.toContain("desktop.host.power-blocker.compose.before");
+    await feature.taskPowerLifecycle.startTask("task.lazy-power", TaskType.DATASET_PREPARATION);
+    expect(milestones).toContain("desktop.host.power-blocker.compose.before");
+    expect(milestones).toContain("desktop.host.power-blocker.compose.after");
   });
 
   it("keeps desktop composition source free of DOM-global fetch typing to stay webpack main emit-safe", () => {
@@ -488,7 +523,8 @@ describe("composeDesktopHost", () => {
   it("moves deferred feature implementations into explicit dynamically imported composers", () => {
     const artifactRemoteSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopArtifactRemoteFeature.ts"), "utf8");
     const pythonSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopPythonRuntimeFeature.ts"), "utf8");
-    const comfySource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopComfyUiFeature.ts"), "utf8");
+    const comfySource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopComfyUiImageRuntimeFeature.ts"), "utf8");
+    const comfyInstallSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopComfyUiInstallFeature.ts"), "utf8");
     const imageSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopImageGenerationFeature.ts"), "utf8");
 
     expect(artifactRemoteSource).toContain("PublishArtifactToRepoUseCase");
@@ -496,10 +532,42 @@ describe("composeDesktopHost", () => {
     expect(artifactRemoteSource).toContain("repoBrowser: huggingFaceArtifactRepoStorage");
     expect(pythonSource).toContain("createPythonRuntimeAdapterFoundation");
     expect(pythonSource).toContain("ensurePythonRuntimeWorkerDependencies");
+    expect(comfyInstallSource).toContain("createComfyUiRuntimeInstaller");
     expect(comfySource).toContain("createComfyUiRuntimeInstaller");
     expect(comfySource).toContain("detectNvidiaGpu()");
+    expect(pythonSource).not.toContain("./composeDesktopHost");
     expect(imageSource).toContain("ImageGenerationFinalizationOrchestratorService");
     expect(imageSource).toContain("createFilesystemGeneratedImagePersistenceAdapter");
+  });
+
+
+  it("enforces cleanup import boundaries for ComfyUI, Python, runtime IPC, and typed providers", () => {
+    const hostSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopHost.ts"), "utf8");
+    const pythonFeatureSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopPythonRuntimeFeature.ts"), "utf8");
+    const comfyRuntimeIpcSource = readFileSync(resolve("modules/adapters/transport/ipc-electron/comfyui-runtime/registerComfyUiRuntimeIpc.ts"), "utf8");
+    const runtimeIpcSource = readFileSync(resolve("modules/adapters/transport/ipc-electron/registerDesktopRuntimeIpc.ts"), "utf8");
+    const lazyProviderSource = readFileSync(resolve("modules/adapters/transport/ipc-electron/lazyFeatureProvider.ts"), "utf8");
+
+    expect(comfyRuntimeIpcSource).not.toContain("../../../runtime/installer/comfyui");
+    expect(comfyRuntimeIpcSource).not.toContain("buildComfyUiInstallRequest");
+    expect(runtimeIpcSource).not.toContain("RuntimeInstallerPort");
+    expect(pythonFeatureSource).not.toContain("./composeDesktopHost");
+    expect(hostSource).not.toContain("from \"./composeDesktopPythonRuntimeFeature\"");
+    expect(hostSource).not.toContain("export {\n  detectNvidiaGpu");
+    expect(lazyProviderSource).not.toContain("AsyncFeatureProvider<any>");
+
+    for (const filePath of [
+      "modules/adapters/transport/ipc-electron/registerDesktopArtifactIpc.ts",
+      "modules/adapters/transport/ipc-electron/registerDesktopAssetIpc.ts",
+      "modules/adapters/transport/ipc-electron/registerDesktopModelIpc.ts",
+      "modules/adapters/transport/ipc-electron/registerDesktopImageGenerationIpc.ts",
+      "modules/adapters/transport/ipc-electron/registerDesktopRuntimeIpc.ts",
+      "modules/adapters/transport/ipc-electron/registerDesktopIngestionIpc.ts",
+      "modules/adapters/transport/ipc-electron/registerDesktopDatasetPreparationIpc.ts",
+    ]) {
+      const source = readFileSync(resolve(filePath), "utf8");
+      expect(source).not.toContain("AsyncFeatureProvider<any>");
+    }
   });
 
   it("stores and exposes desktop Hugging Face token status", () => {

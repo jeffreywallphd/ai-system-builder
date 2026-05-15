@@ -1,25 +1,44 @@
-import { registerArtifactUploadIpc } from "./artifact-upload/registerArtifactUploadIpc";
-import { registerArtifactBrowserIpc } from "./artifact-browser/registerArtifactBrowserIpc";
+import { registerArtifactUploadIpc, type StoreArtifactUploadUseCasePort } from "./artifact-upload/registerArtifactUploadIpc";
+import { registerArtifactBrowserIpc, type RegisterArtifactBrowserIpcDependencies } from "./artifact-browser/registerArtifactBrowserIpc";
 import type { IpcMainHandlePort } from "./ipcMainHandlePort";
 import { lazyProvidedObject, type AsyncFeatureProvider } from "./lazyFeatureProvider";
 
+type HuggingFaceTokenStatus = { configured: boolean; maskedToken?: string };
+export interface DesktopArtifactIpcFeature {
+  storeArtifactUploadUseCase: StoreArtifactUploadUseCasePort;
+  browseArtifactsUseCase: RegisterArtifactBrowserIpcDependencies["browseArtifactsUseCase"];
+  browseUnregisteredArtifactsUseCase: RegisterArtifactBrowserIpcDependencies["browseUnregisteredArtifactsUseCase"];
+  registerUnregisteredArtifactUseCase: RegisterArtifactBrowserIpcDependencies["registerUnregisteredArtifactUseCase"];
+  deleteUnregisteredArtifactUseCase: RegisterArtifactBrowserIpcDependencies["deleteUnregisteredArtifactUseCase"];
+  deleteRegisteredArtifactUseCase: RegisterArtifactBrowserIpcDependencies["deleteRegisteredArtifactUseCase"];
+  readArtifactDetailUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactDetailUseCase"];
+  readArtifactContentUseCase: RegisterArtifactBrowserIpcDependencies["readArtifactContentUseCase"];
+  artifactMediaViewRetrieval: RegisterArtifactBrowserIpcDependencies["artifactMediaViewRetrieval"];
+}
+
+export interface DesktopArtifactRemoteIpcFeature {
+  publishArtifactToRepoUseCase: RegisterArtifactBrowserIpcDependencies["publishArtifactToRepoUseCase"];
+  browseHuggingFaceNamespaceDatasetsUseCase: RegisterArtifactBrowserIpcDependencies["browseHuggingFaceNamespaceDatasetsUseCase"];
+  browseHuggingFaceDatasetParquetFilesUseCase: RegisterArtifactBrowserIpcDependencies["browseHuggingFaceDatasetParquetFilesUseCase"];
+  verifyPublishedArtifactBackingUseCase: RegisterArtifactBrowserIpcDependencies["verifyPublishedArtifactBackingUseCase"];
+  verifyImportedArtifactSourceBackingUseCase: RegisterArtifactBrowserIpcDependencies["verifyImportedArtifactSourceBackingUseCase"];
+  registerArtifactFromRepoUseCase: RegisterArtifactBrowserIpcDependencies["registerArtifactFromRepoUseCase"];
+  localizeArtifactFromRepoUseCase: RegisterArtifactBrowserIpcDependencies["localizeArtifactFromRepoUseCase"];
+}
+
 export interface RegisterDesktopArtifactIpcDependencies {
   ipcMain: IpcMainHandlePort;
-  getArtifactFeature: AsyncFeatureProvider<any>;
-  getArtifactRemoteFeature: AsyncFeatureProvider<any>;
+  getArtifactFeature: AsyncFeatureProvider<DesktopArtifactIpcFeature>;
+  getArtifactRemoteFeature: AsyncFeatureProvider<DesktopArtifactRemoteIpcFeature>;
   tokens: {
-    getHuggingFaceTokenStatus: () => any;
-    setHuggingFaceToken: (token: string) => any;
-    clearHuggingFaceToken: () => any;
+    getHuggingFaceTokenStatus: () => HuggingFaceTokenStatus;
+    setHuggingFaceToken: (token: string) => HuggingFaceTokenStatus;
+    clearHuggingFaceToken: () => HuggingFaceTokenStatus;
   };
 }
 
 export function registerDesktopArtifactIpc(dependencies: RegisterDesktopArtifactIpcDependencies): void {
-  registerArtifactUploadIpc({
-    ipcMain: dependencies.ipcMain,
-    storeArtifactUploadUseCase: lazyProvidedObject(dependencies.getArtifactFeature, (feature) => feature.storeArtifactUploadUseCase),
-  });
-
+  registerArtifactUploadIpc({ ipcMain: dependencies.ipcMain, storeArtifactUploadUseCase: lazyProvidedObject(dependencies.getArtifactFeature, (feature) => feature.storeArtifactUploadUseCase) });
   registerArtifactBrowserIpc({
     ipcMain: dependencies.ipcMain,
     getHuggingFaceTokenStatus: dependencies.tokens.getHuggingFaceTokenStatus,

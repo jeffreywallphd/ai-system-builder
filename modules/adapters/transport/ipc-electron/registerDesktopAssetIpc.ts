@@ -1,11 +1,16 @@
-import { registerAssetRegistryIpc } from "./asset-registry/registerAssetRegistryIpc";
-import { registerAssetMutationIpc } from "./asset-registry/registerAssetMutationIpc";
+import { registerAssetRegistryIpc, type RegisterAssetRegistryIpcDependencies } from "./asset-registry/registerAssetRegistryIpc";
+import { registerAssetMutationIpc, type RegisterAssetMutationIpcDependencies } from "./asset-registry/registerAssetMutationIpc";
 import type { IpcMainHandlePort } from "./ipcMainHandlePort";
 import { lazyProvidedObject, type AsyncFeatureProvider } from "./lazyFeatureProvider";
 
+export interface DesktopAssetIpcFeature {
+  assetRegistryRead: RegisterAssetRegistryIpcDependencies["assetRegistryRead"];
+  assetMutationUseCases: Pick<RegisterAssetMutationIpcDependencies, "registerResourceBackedViewAsAsset" | "finalizeGeneratedOutputAsAsset" | "importExternalRepositoryObjectAsAsset" | "localizeExternalRepositoryObjectAsAsset">;
+}
+
 export interface RegisterDesktopAssetIpcDependencies {
   ipcMain: IpcMainHandlePort;
-  getAssetFeature: AsyncFeatureProvider<any>;
+  getAssetFeature: AsyncFeatureProvider<DesktopAssetIpcFeature>;
 }
 
 export function registerDesktopAssetIpc(dependencies: RegisterDesktopAssetIpcDependencies): void {

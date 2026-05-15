@@ -22,22 +22,10 @@ import { createHuggingFaceTokenConfigStore, type HuggingFaceTokenStatus } from "
 import type { InternalAssetRegistryComposition } from "../../shared/composition/composeInternalAssetRegistry";
 import { recordDesktopMemorySnapshot } from "../diagnostics";
 import { createDesktopRuntimeReadinessService } from "./composeDesktopRuntimeReadiness";
-import { createUnavailablePythonRuntimeStatus, type DesktopPythonRuntimeFeature } from "./composeDesktopPythonRuntimeFeature";
-export {
-  detectNvidiaGpu,
-  resolveComfyUiInstallRoot,
-  resolveComfyUiLaunchPythonExecutable,
-  resolveComfyUiPythonEnvironmentMode,
-  resolveComfyUiRuntimeDeviceMode,
-  type ComfyUiPythonEnvironmentMode,
-  type ComfyUiRuntimeDeviceMode,
-} from "./composeDesktopComfyUiHelpers";
+import { createUnavailablePythonRuntimeStatus, resolvePythonRuntimeBaseUrl, type DesktopPythonRuntimeFeature } from "./desktopPythonRuntimeHelpers";
 export { createDesktopRuntimeReadinessService, type CreateDesktopRuntimeReadinessServiceOptions } from "./composeDesktopRuntimeReadiness";
 
 const HUGGING_FACE_TOKEN_SETTING_KEY = "huggingface.token" as const;
-const PYTHON_RUNTIME_MANAGED_BASE_PORT = 43111;
-const PYTHON_RUNTIME_MANAGED_PORT_SPAN = 10_000;
-
 function clampPercent(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));
@@ -116,38 +104,6 @@ export interface DesktopHostComposition {
   getInternalAssetRegistry: () => InternalAssetRegistryComposition | undefined;
 }
 
-export function classifyPythonRuntimeStdioLogLevel(stream: "stdout" | "stderr", message: string): "info" | "warn" | "error" {
-  if (stream === "stdout") return "info";
-  const normalizedMessage = message.trim();
-  if (/^(ERROR|CRITICAL):/i.test(normalizedMessage) || normalizedMessage.includes("Traceback (most recent call last)")) return "error";
-  if (/^WARNING:/i.test(normalizedMessage) || /\b(?:UserWarning|FutureWarning|RuntimeWarning|DeprecationWarning):/.test(normalizedMessage)) return "warn";
-  return "info";
-}
-
-export function resolveDefaultManagedPythonRuntimePort(processId: number = process.pid): string {
-  const processPortOffset = Math.abs(processId) % PYTHON_RUNTIME_MANAGED_PORT_SPAN;
-  return String(PYTHON_RUNTIME_MANAGED_BASE_PORT + processPortOffset);
-}
-
-export function resolvePythonRuntimeHostAndPort(env: NodeJS.ProcessEnv = process.env): { host: string; port: string } {
-  const configuredBaseUrl = env.PYTHON_RUNTIME_BASE_URL?.trim();
-  if (configuredBaseUrl) {
-    try {
-      const parsed = new URL(configuredBaseUrl);
-      return { host: env.PYTHON_RUNTIME_HOST?.trim() || parsed.hostname || "127.0.0.1", port: env.PYTHON_RUNTIME_PORT?.trim() || parsed.port || (parsed.protocol === "https:" ? "443" : "80") };
-    } catch {
-      return { host: env.PYTHON_RUNTIME_HOST?.trim() || "127.0.0.1", port: env.PYTHON_RUNTIME_PORT?.trim() || resolveDefaultManagedPythonRuntimePort() };
-    }
-  }
-  return { host: env.PYTHON_RUNTIME_HOST?.trim() || "127.0.0.1", port: env.PYTHON_RUNTIME_PORT?.trim() || resolveDefaultManagedPythonRuntimePort() };
-}
-
-export function resolvePythonRuntimeBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
-  const configuredBaseUrl = env.PYTHON_RUNTIME_BASE_URL?.trim();
-  if (configuredBaseUrl) return configuredBaseUrl;
-  const { host, port } = resolvePythonRuntimeHostAndPort(env);
-  return `http://${host}:${port}`;
-}
 
 export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): DesktopHostComposition {
   const recordHostMemorySnapshot = (milestone: string, detail?: Record<string, unknown>) => recordDesktopMemorySnapshot({ milestone, component: "desktop-host-composition", detail });
@@ -325,13 +281,17 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
         const module = await import("./composeDesktopAssetFeature");
         return async () => module.composeDesktopAssetFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, artifacts: await getArtifactFeatures(), onInternalAssetRegistry: (registry) => { internalAssetRegistry = registry; } });
       });
-      const getComfyUiFeatures = memoizeAsyncFeature("desktop.host.comfyui-features", async () => {
-        const module = await import("./composeDesktopComfyUiFeature");
-        return () => module.composeDesktopComfyUiFeature({ runtimeRootDirectory: registerOptions.runtimeRootDirectory, loggingPort, applicationSettings, readRuntimeSettingString, getArtifacts: getArtifactFeatures });
+      const getComfyUiInstallFeatures = memoizeAsyncFeature("desktop.host.comfyui-install-features", async () => {
+        const module = await import("./composeDesktopComfyUiInstallFeature");
+        return () => module.composeDesktopComfyUiInstallFeature({ runtimeRootDirectory: registerOptions.runtimeRootDirectory, loggingPort });
+      });
+      const getComfyUiImageRuntimeFeatures = memoizeAsyncFeature("desktop.host.comfyui-image-runtime-features", async () => {
+        const module = await import("./composeDesktopComfyUiImageRuntimeFeature");
+        return () => module.composeDesktopComfyUiImageRuntimeFeature({ runtimeRootDirectory: registerOptions.runtimeRootDirectory, loggingPort, applicationSettings, readRuntimeSettingString, getArtifacts: getArtifactFeatures });
       });
       const getRuntimeTaskFeatures = memoizeAsyncFeature("desktop.host.runtime-task-features", async () => {
         const module = await import("./composeDesktopRuntimeTaskFeature");
-        return async () => module.composeDesktopRuntimeTaskFeature({ pythonRuntimeFoundation: await getPythonRuntimeFoundation(), imageRuntimeTaskRegistry: (await getComfyUiFeatures()).imageRuntimeTaskRegistry, runtimeReadiness });
+        return async () => module.composeDesktopRuntimeTaskFeature({ pythonRuntimeFoundation: await getPythonRuntimeFoundation(), imageRuntimeTaskRegistry: (await getComfyUiImageRuntimeFeatures()).imageRuntimeTaskRegistry, runtimeReadiness, recordMilestone: recordHostMemorySnapshot });
       });
       const getModelFeatures = memoizeAsyncFeature("desktop.host.model-features", async () => {
         const module = await import("./composeDesktopModelFeature");
@@ -339,7 +299,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
       });
       const getImageGenerationFeatures = memoizeAsyncFeature("desktop.host.image-generation-features", async () => {
         const module = await import("./composeDesktopImageGenerationFeature");
-        return async () => module.composeDesktopImageGenerationFeature({ storageRootDirectory: registerOptions.storageRootDirectory, loggingPort, now, recordRuntimeLog, artifacts: await getArtifactFeatures(), assets: await getAssetFeatures(), runtime: await getRuntimeTaskFeatures(), comfyUi: await getComfyUiFeatures() });
+        return async () => module.composeDesktopImageGenerationFeature({ storageRootDirectory: registerOptions.storageRootDirectory, loggingPort, now, recordRuntimeLog, artifacts: await getArtifactFeatures(), assets: await getAssetFeatures(), runtime: await getRuntimeTaskFeatures(), comfyUi: await getComfyUiImageRuntimeFeatures() });
       });
       const getIngestionFeatures = memoizeAsyncFeature("desktop.host.ingestion-features", async () => {
         const module = await import("./composeDesktopIngestionFeature");
@@ -382,7 +342,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
         asset: { ipcMain: registerOptions.ipcMain, getAssetFeature: getAssetFeatures },
         model: { ipcMain: registerOptions.ipcMain, getModelFeature: getModelFeatures },
         imageGeneration: { ipcMain: registerOptions.ipcMain, getImageGenerationFeature: getImageGenerationFeatures },
-        runtime: { ipcMain: registerOptions.ipcMain, getComfyUiFeature: getComfyUiFeatures },
+        runtime: { ipcMain: registerOptions.ipcMain, getComfyUiFeature: getComfyUiInstallFeatures },
         ingestion: { ipcMain: registerOptions.ipcMain, getIngestionFeature: getIngestionFeatures },
         datasetPreparation: { ipcMain: registerOptions.ipcMain, getDatasetPreparationFeature: getDatasetPreparationFeatures },
       });
