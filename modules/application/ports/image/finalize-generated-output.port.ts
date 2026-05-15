@@ -1,6 +1,8 @@
 import type { AssetMetadata } from "../../../contracts/asset";
+import type { WorkspaceId } from "../../../contracts/workspace";
 
 export interface FinalizeGeneratedOutputRequest {
+  readonly workspaceId: WorkspaceId;
   readonly generatedOutputId: string;
   readonly sourceViewId?: string;
   readonly displayName?: string;
@@ -10,6 +12,7 @@ export interface FinalizeGeneratedOutputRequest {
 }
 
 export interface FinalizedGeneratedImageDescriptor {
+  readonly workspaceId: WorkspaceId;
   readonly imageAssetId: string;
   readonly backingArtifactId: string;
   readonly source: "generated";

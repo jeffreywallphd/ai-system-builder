@@ -28,7 +28,7 @@ export interface RegisterImageGenerationApiRoutesDependencies {
 }
 
 const getHeader = (h: ExpressRequestLike["headers"], k: string) => Array.isArray(h?.[k]) ? h?.[k][0] : h?.[k];
-const contextFrom = (r: ExpressRequestLike) => ({ requestId: getHeader(r.headers, "x-request-id"), correlationId: getHeader(r.headers, "x-correlation-id") });
+const contextFrom = (r: ExpressRequestLike) => ({ requestId: getHeader(r.headers, "x-request-id"), correlationId: getHeader(r.headers, "x-correlation-id"), workspaceId: isObjectRecord(r.body) && typeof r.body.workspaceId === "string" ? r.body.workspaceId : undefined });
 
 const isObjectRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null;
 
@@ -126,7 +126,7 @@ export function registerImageGenerationApiRoutes(dependencies: RegisterImageGene
         return;
       }
 
-      const value = await dependencies.imageGenerationFinalizationOrchestrator.finalizeIfCompleted(requestId);
+      const value = await dependencies.imageGenerationFinalizationOrchestrator.finalizeIfCompleted(requestId, context.workspaceId ?? "");
       const apiResponse = createApiSuccessResponse(API_IMAGE_GENERATION_FINALIZE_OPERATION, value, context);
       response.status(statusCode(apiResponse)).json(apiResponse);
     } catch (error) {

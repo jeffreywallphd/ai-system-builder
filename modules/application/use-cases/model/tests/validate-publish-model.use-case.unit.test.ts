@@ -12,17 +12,17 @@ describe("ValidateModelUseCase", () => {
       modelRegistry: { getModelRecord: testDouble.fn().mockResolvedValue({ modelRecordId: "m1", localPath: "/tmp/m1" }) } as never,
       runtimeTaskRegistry: { startTask, getTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), listTasks: testDouble.fn() } as never,
     });
-    const result = await useCase.execute({ modelRecordId: "m1" });
+    const result = await useCase.execute({ workspaceId: "workspace-a" as never, modelRecordId: "m1" });
     expect(result.requestId).toBe("req-validate-1");
     expect(result.modelRecordId).toBe("m1");
-    expect(startTask).toHaveBeenCalledWith({ taskType: TaskType.MODEL_VALIDATION, payload: { modelRecordId: "m1", modelPath: "/tmp/m1", validationStrictness: "normal" } });
+    expect(startTask).toHaveBeenCalledWith({ taskType: TaskType.MODEL_VALIDATION, workspaceId: "workspace-a", payload: { workspaceId: "workspace-a", modelRecordId: "m1", modelPath: "/tmp/m1", validationStrictness: "normal" } });
   });
 
   it("reads succeeded validation status and updates model record", async () => {
     const updateModelRecord = testDouble.fn().mockResolvedValue({ model: {} });
     const useCase = new ValidateModelUseCase({
       modelRegistry: { getModelRecord: testDouble.fn().mockResolvedValue({ modelRecordId: "m1", lifecycleStatus: "generated", metadata: {} }), updateModelRecord } as never,
-      runtimeTaskRegistry: { startTask: testDouble.fn(), getTaskStatus: testDouble.fn().mockResolvedValue({ requestId: "req-1", taskType: TaskType.MODEL_VALIDATION, status: "succeeded", data: { modelRecordId: "m1", status: "valid", reportPath: "/tmp/report.md", validationStrictness: "normal" } }), cancelTask: testDouble.fn(), listTasks: testDouble.fn() } as never,
+      runtimeTaskRegistry: { startTask: testDouble.fn(), getTaskStatus: testDouble.fn().mockResolvedValue({ requestId: "req-1", workspaceId: "workspace-a" as never, taskType: TaskType.MODEL_VALIDATION, status: "succeeded", data: { modelRecordId: "m1", status: "valid", reportPath: "/tmp/report.md", validationStrictness: "normal" } }), cancelTask: testDouble.fn(), listTasks: testDouble.fn() } as never,
     });
     const result = await useCase.read("req-1");
     expect(result.status).toBe("valid");
@@ -36,16 +36,16 @@ describe("ValidateModelUseCase", () => {
       readCount += 1;
       if (readCount === 1) return { requestId: "req-2", taskType: TaskType.MODEL_VALIDATION, status: "running" };
       if (readCount === 2) return { requestId: "req-2", taskType: TaskType.MODEL_VALIDATION, status: "failed", error: { message: "bad" } };
-      return { requestId: "req-3", taskType: TaskType.MODEL_VALIDATION, status: "succeeded", data: { modelRecordId: "m1", status: "valid" } };
+      return { requestId: "req-3", workspaceId: "workspace-a" as never, taskType: TaskType.MODEL_VALIDATION, status: "succeeded", data: { modelRecordId: "m1", status: "valid" } };
     });
     const useCase = new ValidateModelUseCase({
       modelRegistry: { getModelRecord: testDouble.fn().mockResolvedValue({ modelRecordId: "m1", localPath: "/tmp/m1", lifecycleStatus: "generated", metadata: {} }), updateModelRecord } as never,
       runtimeTaskRegistry: { startTask: testDouble.fn().mockResolvedValue({ requestId: "req-2" }), getTaskStatus, cancelTask: testDouble.fn(), listTasks: testDouble.fn() } as never,
     });
-    await useCase.execute({ modelRecordId: "m1" });
+    await useCase.execute({ workspaceId: "workspace-a" as never, modelRecordId: "m1" });
     expect((await useCase.read("req-2")).modelRecordId).toBe("m1");
     expect((await useCase.read("req-2")).modelRecordId).toBe("m1");
-    await useCase.execute({ modelRecordId: "m1" });
+    await useCase.execute({ workspaceId: "workspace-a" as never, modelRecordId: "m1" });
     await useCase.read("req-3");
     await useCase.read("req-3");
     expect(updateModelRecord).toHaveBeenCalledTimes(1);
@@ -73,7 +73,7 @@ describe("PublishModelUseCase", () => {
       runtimeCapabilityGuard: { requireCapabilityReady: testDouble.fn(async () => { throw unavailable; }) },
     });
 
-    await useCase.execute({ modelRecordId: "m1", repository: "owner/repo" })
+    await useCase.execute({ workspaceId: "workspace-a" as never, modelRecordId: "m1", repository: "owner/repo" })
       .catch((error) => expect(error).toMatchObject({
         code: "unavailable",
         details: {
@@ -98,6 +98,6 @@ it("rejects validation start when runtime capability is not ready", async () => 
     runtimeCapabilityGuard: { requireCapabilityReady: testDouble.fn(async () => { throw unavailable; }) },
   });
 
-  await useCase.execute({ modelRecordId: "m1" }).catch((error) => expect(error).toMatchObject({ code: "unavailable", details: { capabilityId: "model-validation", status: "starting" } }));
+  await useCase.execute({ workspaceId: "workspace-a" as never, modelRecordId: "m1" }).catch((error) => expect(error).toMatchObject({ code: "unavailable", details: { capabilityId: "model-validation", status: "starting" } }));
   expect(startTask).not.toHaveBeenCalled();
 });

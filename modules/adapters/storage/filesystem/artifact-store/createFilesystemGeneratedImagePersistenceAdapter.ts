@@ -6,6 +6,7 @@ import type { LoggingPort } from "../../../../application/ports/logging";
 import type { GeneratedImagePersistencePort } from "../../../../application/ports/image";
 import type { ArtifactCatalogAppendPort } from "../../../../application/ports/artifact-catalog";
 import type { ArtifactStorageBindingPort } from "../../../../application/ports/storage";
+import { isWorkspaceId } from "../../../../contracts/workspace";
 import { SystemArtifactIdFactory } from "../../../../domain/artifact";
 
 export function createFilesystemGeneratedImagePersistenceAdapter(options: {
@@ -22,10 +23,11 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
   const artifactIdFactory = new SystemArtifactIdFactory();
 
   return {
-    async persistGeneratedImage({ output }) {
+    async persistGeneratedImage({ output, workspaceId }) {
+      if (!isWorkspaceId(workspaceId)) throw new Error("Workspace id is required for generated image persistence.");
       const artifactId = artifactIdFactory.createArtifactId().toString();
       const desiredFileName = sanitizeFileName(output.fileName) ?? "generated-image.png";
-      const storageKey = await reserveGeneratedImageStorageKey(storageRoot, desiredFileName);
+      const storageKey = await reserveGeneratedImageStorageKey(storageRoot, workspaceId, desiredFileName);
       const destinationPath = path.join(storageRoot, storageKey);
       await mkdir(path.dirname(destinationPath), { recursive: true });
 
@@ -55,11 +57,11 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
       const checksum = { algorithm: "sha256" as const, value: createHash("sha256").update(destinationBytes).digest("hex") };
       const createdAt = now();
       if (options.artifactCatalogAppend) {
-        const appendResult = await options.artifactCatalogAppend.appendArtifactCatalogRecord({ record: { storageKey, artifactFamily: "image", mediaType: "image/png", sizeBytes: destinationStats.size, sourceKind: "generated", originalName: output.fileName, createdAt, checksum } });
+        const appendResult = await options.artifactCatalogAppend.appendArtifactCatalogRecord({ record: { workspaceId, storageKey, artifactFamily: "image", mediaType: "image/png", sizeBytes: destinationStats.size, sourceKind: "generated", originalName: output.fileName, createdAt, checksum } });
         if (!appendResult.ok) throw new Error(`Failed to register generated image artifact: ${appendResult.error.message}`);
       }
       if (options.artifactStorageBinding) {
-        const bindingResult = await options.artifactStorageBinding.upsertArtifactStorageBinding({ binding: { artifactId, role: "primary", backing: { kind: "artifact-object", provider: "filesystem", locator: storageKey, verification: { exists: true, verifiedAt: createdAt } }, createdAt } });
+        const bindingResult = await options.artifactStorageBinding.upsertArtifactStorageBinding({ workspaceId, binding: { artifactId, role: "primary", backing: { kind: "artifact-object", provider: "filesystem", locator: storageKey, verification: { exists: true, verifiedAt: createdAt } }, createdAt } });
         if (!bindingResult.ok) throw new Error(`Failed to persist generated image primary binding: ${bindingResult.error.message}`);
       }
       await options.logging?.log({ timestamp: new Date().toISOString(), level: "info", verbosity: "normal", component: "storage.filesystem", event: "generated_image_persist_succeeded", message: `Persisted generated image ${output.fileName} as ${storageKey} (${artifactId}).` });
@@ -86,14 +88,14 @@ function sanitizeFileName(value: string | undefined): string | undefined {
   return `${stripped}.png`;
 }
 
-async function reserveGeneratedImageStorageKey(storageRoot: string, desiredFileName: string): Promise<string> {
+async function reserveGeneratedImageStorageKey(storageRoot: string, workspaceId: string, desiredFileName: string): Promise<string> {
   const parsed = path.parse(desiredFileName);
   const ext = parsed.ext || ".png";
   const base = parsed.name || "generated-image";
   let next = 0;
   while (next < 10_000) {
     const candidate = next === 0 ? `${base}${ext}` : `${base}-${next + 1}${ext}`;
-    const storageKey = `generated/images/${candidate}`;
+    const storageKey = `workspaces/${workspaceId}/generated/images/${candidate}`;
     try {
       await access(path.join(storageRoot, storageKey), constants.F_OK);
       next += 1;

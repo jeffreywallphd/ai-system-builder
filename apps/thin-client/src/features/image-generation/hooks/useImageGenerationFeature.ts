@@ -52,6 +52,7 @@ export function useImageGenerationFeature(
   onGenerated?: (assets: FinalizedImageAsset[]) => void,
   modelClient: ModelManagementApiClient = defaultModelManagementClient,
   artifactClient: ArtifactBrowserApiClient = defaultArtifactBrowserClient,
+  workspaceId?: string,
 ) {
   const [form, setForm] = useState<ImageGenerationFormState>(persistedState?.form ?? { prompt: DEFAULT_PROMPT, negativePrompt: DEFAULT_NEGATIVE_PROMPT, seed: "", width: "1024", height: "1024", steps: "20", cfg: "8", denoise: "1", sampler: "dpmpp_2m", scheduler: "karras", model: "", numImages: "1", latentSourceArtifactId: "", faceIdEnabled: false, faceIdArtifactId1: "", faceIdArtifactId2: "", faceIdArtifactId3: "", faceIdIdentityStrength: "0.85", faceIdStructureStrength: "0.75", faceIdNoise: "0.35" });
   const [runtimeMode, setRuntimeMode] = useState<ImageGenerationRuntimeMode>(persistedState?.runtimeMode ?? "auto");
@@ -84,7 +85,7 @@ export function useImageGenerationFeature(
     setModelInventoryLoading(true);
     setModelInventoryError(undefined);
         try {
-      const result = await modelClient.listModels();
+      const result = workspaceId ? await modelClient.listModels({ workspaceId }) : { models: [] };
       if (!mountedRef.current || requestId !== modelInventoryRequestRef.current) return;
       const sorted = [...result.models].sort((a, b) => rankInventoryModel(a) - rankInventoryModel(b) || a.displayName.localeCompare(b.displayName));
       const downloadedImageModel = sorted.find((m) => isServerInventoryImageGenerationModel(m) && isImageGenerationModelReady(m));
@@ -110,7 +111,7 @@ export function useImageGenerationFeature(
     setImageArtifactsLoading(true);
     setImageArtifactsError(undefined);
     try {
-      const items = await artifactClient.browseArtifacts({ artifactFamily: "image" });
+      const items = workspaceId ? await artifactClient.browseArtifacts({ artifactFamily: "image", workspaceId }) : [];
       if (!mountedRef.current || requestId !== imageArtifactsRequestRef.current) return;
       setImageArtifacts(items.filter((item) => item.artifactFamily === "image" || item.mediaType?.startsWith("image/")));
     } catch (cause) {
@@ -155,13 +156,13 @@ export function useImageGenerationFeature(
   const selectedModelRecord = useMemo(() => modelInventory.find((m) => m.modelRecordId === selectedModelRecordId), [modelInventory, selectedModelRecordId]);
 
   const pollUntilTerminal = useCallback(async (id: string, runId: number): Promise<RuntimeTaskRecord | undefined> => {
-    let latest = await client.readImageGeneration({ requestId: id });
+    let latest = await client.readImageGeneration({ requestId: id, workspaceId } as never);
     while (mountedRef.current && pollRunIdRef.current === runId) {
       setStatus(toUiStatus(latest.status));
       if (["succeeded", "failed", "cancelled"].includes(latest.status)) return latest;
       await sleep(POLL_INTERVAL_MS);
       if (!mountedRef.current || pollRunIdRef.current !== runId) return undefined;
-      latest = await client.readImageGeneration({ requestId: id });
+      latest = await client.readImageGeneration({ requestId: id, workspaceId } as never);
     }
     return undefined;
   }, [client]);
@@ -217,7 +218,7 @@ export function useImageGenerationFeature(
         }
       }
 
-      const started = await client.startImageGeneration(payload);
+      if (!workspaceId) { setError("Select a workspace before generating images."); setStatus("failed"); return; } const started = await client.startImageGeneration({ ...payload, workspaceId } as never);
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;
       setRequestId(started.requestId); activeRequestRef.current = started.requestId; setStatus("queued");
 
@@ -225,7 +226,7 @@ export function useImageGenerationFeature(
       if (!finalTask || !mountedRef.current || pollRunIdRef.current !== runId) return;
       if (finalTask.status !== "succeeded") return;
       setStatus("finalizing");
-      const finalized = await client.finalizeImageGenerationIfCompleted({ requestId: started.requestId });
+      const finalized = await client.finalizeImageGenerationIfCompleted({ requestId: started.requestId, workspaceId } as never);
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;
       if (!finalized.finalized) {
         setStatus("failed");
@@ -305,7 +306,7 @@ export function useImageGenerationFeature(
         return;
       }
       setStatus("finalizing");
-      const finalized = await client.finalizeImageGenerationIfCompleted({ requestId });
+      const finalized = await client.finalizeImageGenerationIfCompleted({ requestId, workspaceId } as never);
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;
       if (!finalized.finalized) {
         setStatus("failed");

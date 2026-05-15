@@ -1,6 +1,8 @@
 import type { ImageAsset } from "../../../contracts/image";
+import type { WorkspaceId } from "../../../contracts/workspace";
 
 export interface ImageAssetDescriptorListQuery {
+  readonly workspaceId: WorkspaceId;
   readonly searchText?: string;
   readonly limit?: number;
   readonly cursor?: string;
@@ -19,5 +21,5 @@ export interface ImageAssetDescriptorListResult {
  */
 export interface ImageAssetDescriptorReadPort {
   listImageAssetDescriptors(query?: ImageAssetDescriptorListQuery): Promise<ImageAssetDescriptorListResult>;
-  readImageAssetDescriptor?(assetId: string): Promise<ImageAsset | null | undefined>;
+  readImageAssetDescriptor?(workspaceId: WorkspaceId, assetId: string): Promise<ImageAsset | null | undefined>;
 }

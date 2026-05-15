@@ -3,6 +3,8 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import type { ImageAsset } from "../../../contracts/image";
+import { isWorkspaceId } from "../../../contracts/workspace";
+import type { WorkspaceId } from "../../../contracts/workspace";
 import type {
   ImageAssetDescriptorListQuery,
   ImageAssetDescriptorListResult,
@@ -48,8 +50,16 @@ export function createLocalImageAssetRegistryAdapter(
   const now = options.now ?? (() => new Date().toISOString());
   const createAssetId = options.createAssetId ?? (() => randomUUID());
 
+  function assertWorkspaceId(workspaceId: WorkspaceId | string | undefined): asserts workspaceId is WorkspaceId {
+    if (!isWorkspaceId(workspaceId)) {
+      throw new Error("Workspace id is required for image asset registry operations.");
+    }
+  }
+
   function toImageAsset(input: RegisterImageAssetInput): ImageAsset {
+    assertWorkspaceId(input.workspaceId);
     return {
+      workspaceId: input.workspaceId,
       assetId: input.assetId ?? createAssetId(),
       artifactId: input.artifactId,
       source: input.source,
@@ -71,6 +81,7 @@ export function createLocalImageAssetRegistryAdapter(
 
   return {
     async registerImageAsset(input) {
+      assertWorkspaceId(input.workspaceId);
       const document = await readDocument(options.filePath);
       const assets = document.assets ?? {};
       const asset = toImageAsset(input);
@@ -78,17 +89,21 @@ export function createLocalImageAssetRegistryAdapter(
       await writeDocument(options.filePath, { ...document, assets });
       return { assetId: asset.assetId };
     },
-    async getImageAsset(assetId) {
+    async getImageAsset(workspaceId, assetId) {
+      assertWorkspaceId(workspaceId);
       const document = await readDocument(options.filePath);
-      return document.assets?.[assetId] ?? null;
+      const asset = document.assets?.[assetId] ?? null;
+      return asset?.workspaceId === workspaceId ? asset : null;
     },
-    async listImageAssetDescriptors(query: ImageAssetDescriptorListQuery = {}): Promise<ImageAssetDescriptorListResult> {
+    async listImageAssetDescriptors(query: ImageAssetDescriptorListQuery): Promise<ImageAssetDescriptorListResult> {
+      assertWorkspaceId(query?.workspaceId);
       const document = await readDocument(options.filePath);
       const limit = typeof query.limit === "number" && Number.isFinite(query.limit) && query.limit > 0
         ? Math.floor(query.limit)
         : 50;
       const searchText = query.searchText?.trim().toLowerCase();
       const sorted = Object.values(document.assets ?? {})
+        .filter((asset) => asset.workspaceId === query.workspaceId)
         .sort((left, right) => left.assetId.localeCompare(right.assetId))
         .filter((asset) => {
           if (!searchText) return true;
@@ -112,9 +127,11 @@ export function createLocalImageAssetRegistryAdapter(
         ...(next ? { nextCursor: next.assetId } : {}),
       };
     },
-    async readImageAssetDescriptor(assetId) {
+    async readImageAssetDescriptor(workspaceId, assetId) {
+      assertWorkspaceId(workspaceId);
       const document = await readDocument(options.filePath);
-      return document.assets?.[assetId] ?? null;
+      const asset = document.assets?.[assetId] ?? null;
+      return asset?.workspaceId === workspaceId ? asset : null;
     },
   };
 }

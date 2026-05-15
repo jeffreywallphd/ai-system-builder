@@ -29,6 +29,7 @@ export class DownloadModelUseCase {
 
     const result = await this.dependencies.modelRegistry.registerDownloadedModel({
       modelRecordId: normalizedRequest.modelRecordId,
+      workspaceId: normalizedRequest.workspaceId,
       displayName: normalizedRequest.displayName ?? normalizedRequest.modelId,
       source: "huggingface",
       provider: normalizedRequest.provider,

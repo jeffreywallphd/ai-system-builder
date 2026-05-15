@@ -1,6 +1,8 @@
 import type { ImageGenerationOutput } from "../../../contracts/image-generation";
+import type { WorkspaceId } from "../../../contracts/workspace";
 
 export interface PersistGeneratedImageInput {
+  workspaceId: WorkspaceId;
   output: ImageGenerationOutput;
   requestId: string;
 }

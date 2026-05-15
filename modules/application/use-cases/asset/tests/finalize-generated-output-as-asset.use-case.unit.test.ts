@@ -98,6 +98,7 @@ class CountingSourceIdentityService extends AssetSourceIdentityService {
 function command(overrides: Partial<FinalizeGeneratedOutputCommand> = {}): FinalizeGeneratedOutputCommand {
   return {
     operation: "asset.finalize-generated-output",
+    workspaceId: "workspace-a" as never,
     viewId: "view.generated",
     approval: { userConfirmed: true, confirmationKind: "finalize-generated-output", allowFilesystemWrite: true, allowPartialCompletion: true },
     actor: { initiatedBy: "human", actorRef: "user.1", actorDisplayName: "User One" },
@@ -115,7 +116,7 @@ function generatedView(overrides: Partial<AssetResourceBackedView> = {}): AssetR
       runtimeCapabilityId: "image-generation",
       producedAssetType: "image",
       producedAt: "2026-05-08T11:00:00.000Z",
-      metadata: { engine: "comfyui", prompt: "raw prompt text" },
+      metadata: { workspaceId: "workspace-a", engine: "comfyui", prompt: "raw prompt text" },
     },
     resourceBacking: {
       backingId: "generated-output.safe-output",
@@ -130,6 +131,7 @@ function generatedView(overrides: Partial<AssetResourceBackedView> = {}): AssetR
     },
     displayName: "Generated Safe Output",
     metadata: {
+      workspaceId: "workspace-a",
       outputId: "generated.safe-output",
       producedAssetType: "image",
       finalized: false,
@@ -151,6 +153,7 @@ function finalizedResult(overrides: Partial<FinalizeGeneratedOutputResult & { ok
     ok: true,
     status: "finalized",
     finalizedImage: {
+      workspaceId: "workspace-a" as never,
       imageAssetId: "image.safe-output",
       backingArtifactId: "artifact.safe-output",
       source: "generated",
@@ -242,6 +245,16 @@ describe("FinalizeGeneratedOutputAsAssetUseCase", () => {
     assert.equal((await useCase.execute(command({ viewId: "view.preview" }))).failure?.code, "validation");
     assert.equal((await useCase.execute(command({ viewId: "view.image" }))).failure?.code, "conflict");
     assert.equal(instances.saved.length, 0);
+    assert.equal(finalizer?.calls.length, 0);
+  });
+
+  it("rejects generated output finalization across workspaces", async () => {
+    const { read, useCase, finalizer } = makeUseCase();
+    read.details.set("view.generated", { view: generatedView() });
+    const result = await useCase.execute(command({ workspaceId: "workspace-b" as never }));
+    assert.equal(result.ok, false);
+    assert.equal(result.failure?.code, "validation");
+    assert.equal(result.failure?.diagnostics?.some((diagnostic) => diagnostic.code === "generated-output-workspace-mismatch"), true);
     assert.equal(finalizer?.calls.length, 0);
   });
 

@@ -1,3 +1,4 @@
+import type { WorkspaceId } from "../workspace";
 import type {
   DatasetOutputConfig,
   DatasetPreparationRecipe,
@@ -10,6 +11,7 @@ export interface DatasetPreparationRuntimeOptions {
 }
 
 export interface PrepareTrainingDatasetRequest {
+  workspaceId?: WorkspaceId;
   sourceInputs: DatasetPreparationSourceInput[];
   recipe: DatasetPreparationRecipe;
   split: DatasetSplitConfig;

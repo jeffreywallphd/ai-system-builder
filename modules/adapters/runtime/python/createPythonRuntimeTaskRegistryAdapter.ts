@@ -11,6 +11,7 @@ import type {
   RuntimeTaskListRequest,
   RuntimeTaskListResult,
 } from "../../../contracts/runtime";
+import { isWorkspaceId } from "../../../contracts/workspace";
 import { TaskType } from "../../../contracts/runtime";
 
 const genericToPythonTaskTypeMap: Partial<Record<TaskType, string>> = {
@@ -76,6 +77,9 @@ export function createPythonRuntimeTaskRegistryAdapter(
 ): RuntimeTaskRegistryPort {
   return {
     async startTask(request: StartRuntimeTaskRequest): Promise<StartRuntimeTaskResult> {
+      if (!isWorkspaceId(request.workspaceId)) {
+        throw new Error("Workspace id is required for python runtime tasks.");
+      }
       if (request.taskType === TaskType.MODEL_PUBLISHING) {
         throw new Error("model publishing runtime task is not implemented");
       }
@@ -89,7 +93,7 @@ export function createPythonRuntimeTaskRegistryAdapter(
         requestId: request.requestId ?? randomUUID(),
         taskType: toPythonTaskType(request.taskType),
         payload: request.payload,
-        metadata: request.metadata,
+        metadata: { ...(request.metadata ?? {}), workspaceId: request.workspaceId },
       });
     },
     async getTaskStatus(requestId: string): Promise<RuntimeTaskStatusRecord> {
@@ -112,6 +116,7 @@ export function createPythonRuntimeTaskRegistryAdapter(
       }
       return {
         requestId: status.requestId,
+        workspaceId: (status.metadata?.workspaceId as never),
         taskType: toGenericTaskType(status.taskType),
         status: status.status,
         concurrencyClass: "unknown",
@@ -134,6 +139,7 @@ export function createPythonRuntimeTaskRegistryAdapter(
       };
     },
     async listTasks(request: RuntimeTaskListRequest): Promise<RuntimeTaskListResult> {
+      if (!isWorkspaceId(request.workspaceId)) return { tasks: [], warnings: [{ code: "python_runtime_task_workspace_required", message: "Workspace id is required to list python runtime task outputs." }] };
       const unsupportedTaskTypes = request.taskTypes ?? [
         TaskType.DATASET_PREPARATION,
         TaskType.MODEL_TRAINING,

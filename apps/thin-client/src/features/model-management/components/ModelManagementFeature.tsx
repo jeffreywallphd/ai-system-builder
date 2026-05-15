@@ -10,9 +10,9 @@ function downloadStateLabel(record: ModelInventoryRecord): string {
   return "Not downloaded";
 }
 
-export function ModelManagementFeature({ client }: { client?: ModelManagementApiClient }) {
-  const vm = useModelManagementFeature(client);
-  return <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm"><header className="ui-grid ui-grid--two"><h2>Models</h2><button className="ui-button" onClick={() => void vm.refreshInventory()} disabled={vm.inventoryLoading}>{vm.inventoryLoading ? "Refreshing..." : "Refresh"}</button></header>
+export function ModelManagementFeature({ client, workspaceId, workspaceName }: { client?: ModelManagementApiClient; workspaceId?: string; workspaceName?: string }) {
+  const vm = useModelManagementFeature(client, workspaceId);
+  return <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm"><header className="ui-grid ui-grid--two"><div><h2>Models</h2><p>Workspace: {workspaceName ?? workspaceId ?? "No active workspace"}</p></div><button className="ui-button" onClick={() => void vm.refreshInventory()} disabled={vm.inventoryLoading}>{vm.inventoryLoading ? "Refreshing..." : "Refresh"}</button></header>
     {vm.error ? <p className="ui-feedback ui-feedback--error" role="alert">{vm.error}</p> : null}
     {vm.status ? <p role="status" className="ui-status">{vm.status}</p> : null}
 

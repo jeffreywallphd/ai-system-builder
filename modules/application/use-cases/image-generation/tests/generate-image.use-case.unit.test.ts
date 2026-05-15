@@ -20,7 +20,7 @@ describe("GenerateImageUseCase", () => {
 
   it("rejects empty prompt", async () => {
     const useCase = new GenerateImageUseCase({ runtimeTaskRegistry: createRuntimeTaskRegistryFake() });
-    await expect(useCase.startImageGeneration({ ...validRequest, prompt: "   " })).rejects.toThrow("Image generation requires a non-empty prompt.");
+    await expect(useCase.startImageGeneration({ ...validRequest, prompt: "   " }, { workspaceId: "workspace-a" })).rejects.toThrow("Image generation requires a non-empty prompt.");
   });
 
 
@@ -33,7 +33,7 @@ describe("GenerateImageUseCase", () => {
     };
     const useCase = new GenerateImageUseCase({ runtimeTaskRegistry, runtimeCapabilityGuard });
 
-    await useCase.startImageGeneration(validRequest);
+    await useCase.startImageGeneration(validRequest, { workspaceId: "workspace-a" });
 
     expect(runtimeCapabilityGuard.requireCapabilityReady).toHaveBeenCalledWith("image-generation");
     expect(runtimeTaskRegistry.startTask).toHaveBeenCalledTimes(1);
@@ -50,7 +50,7 @@ describe("GenerateImageUseCase", () => {
       runtimeCapabilityGuard: { requireCapabilityReady: testDouble.fn(async () => { throw unavailable; }) },
     });
 
-    await useCase.startImageGeneration(validRequest).catch((error) => expect(error).toMatchObject({ code: "unavailable" }));
+    await useCase.startImageGeneration(validRequest, { workspaceId: "workspace-a" }).catch((error) => expect(error).toMatchObject({ code: "unavailable" }));
     expect(runtimeTaskRegistry.startTask).not.toHaveBeenCalled();
   });
 
@@ -63,7 +63,7 @@ describe("GenerateImageUseCase", () => {
       },
     });
 
-    await useCase.startImageGeneration({ ...validRequest, model: "record-123" });
+    await useCase.startImageGeneration({ ...validRequest, model: "record-123" }, { workspaceId: "workspace-a" });
     expect((runtimeTaskRegistry.startTask as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0]).toMatchObject({ payload: { model: "sdxl.safetensors" } });
   });
 
@@ -73,7 +73,7 @@ describe("GenerateImageUseCase", () => {
       runtimeTaskRegistry,
       modelCheckpointResolver: { resolveCheckpoint: testDouble.fn(async () => ({ checkpoint: "existing.safetensors" })) },
     });
-    await useCase.startImageGeneration({ ...validRequest, model: "existing.safetensors" });
+    await useCase.startImageGeneration({ ...validRequest, model: "existing.safetensors" }, { workspaceId: "workspace-a" });
     expect((runtimeTaskRegistry.startTask as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0]).toMatchObject({ payload: { model: "existing.safetensors" } });
   });
   it("read returns runtime task unchanged", async () => {

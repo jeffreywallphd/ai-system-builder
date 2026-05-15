@@ -1,3 +1,4 @@
+import type { WorkspaceId } from "../workspace";
 import { normalizeModelSerializationFormat, type ModelSerializationFormat } from "../../domain/model";
 
 export const MODEL_VALIDATION_STATUSES = ["unknown", "valid", "invalid", "warning"] as const;
@@ -21,6 +22,7 @@ export interface ModelValidationSummary {
 }
 
 export interface ValidateModelRequest {
+  workspaceId?: WorkspaceId;
   modelRecordId: string;
   modelPath?: string;
   reportOutputDirectory?: string;
