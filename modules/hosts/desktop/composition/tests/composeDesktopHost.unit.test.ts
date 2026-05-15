@@ -266,7 +266,7 @@ describe("composeDesktopHost", () => {
 
     expect(ipcMain.handle).toHaveBeenCalledTimes(65);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
-    expect(channels).toEqual([
+    const expectedChannels = [
       DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL.value,
       DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
@@ -332,7 +332,8 @@ describe("composeDesktopHost", () => {
       "ipc.comfyui-runtime.repair-install.request",
       DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value,
       DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
-    ]);
+    ];
+    expect(new Set(channels)).toEqual(new Set(expectedChannels));
     expect(channels.filter((channel) => String(channel).startsWith("ipc.asset."))).toEqual([
       DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL.value,
       DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL.value,

@@ -358,20 +358,33 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
       };
       recordHostMemorySnapshot("desktop.host.ipc-registration.lazy-handlers.before");
       registerElectronIpc({
-        ipcMain: registerOptions.ipcMain,
-        pythonRuntime: {
-          startPythonRuntime: async () => (await getPythonRuntimeFoundation()).supervisor.start(),
-          stopPythonRuntime: async () => { if (pythonRuntimeFoundationPromise) await (await pythonRuntimeFoundationPromise).supervisor.stop(); },
-          restartPythonRuntime: async () => (await getPythonRuntimeFoundation()).supervisor.restart(),
-          unloadPythonRuntimeModel: async () => { const result = await (await getPythonRuntimeFoundation()).runtimePort.unloadModels(); recordRuntimeLog({ level: "info", message: `Unloaded ${result.unloadedModels.length} Python runtime generation model(s) from memory.` }); },
-          clearPythonRuntimeLogs: async () => { runtimeLogs.splice(0, runtimeLogs.length); recordRuntimeLog({ level: "info", message: "Cleared Python runtime activity log." }); },
-          readPythonRuntimeStatus,
+        recordMilestone: recordHostMemorySnapshot,
+        startup: {
+          ipcMain: registerOptions.ipcMain,
+          pythonRuntime: {
+            startPythonRuntime: async () => (await getPythonRuntimeFoundation()).supervisor.start(),
+            stopPythonRuntime: async () => { if (pythonRuntimeFoundationPromise) await (await pythonRuntimeFoundationPromise).supervisor.stop(); },
+            restartPythonRuntime: async () => (await getPythonRuntimeFoundation()).supervisor.restart(),
+            unloadPythonRuntimeModel: async () => { const result = await (await getPythonRuntimeFoundation()).runtimePort.unloadModels(); recordRuntimeLog({ level: "info", message: `Unloaded ${result.unloadedModels.length} Python runtime generation model(s) from memory.` }); },
+            clearPythonRuntimeLogs: async () => { runtimeLogs.splice(0, runtimeLogs.length); recordRuntimeLog({ level: "info", message: "Cleared Python runtime activity log." }); },
+            readPythonRuntimeStatus,
+          },
+          runtimeReadiness,
+          workspaceServices: startupWorkspaceShell,
+          settingsUseCases,
         },
-        runtimeReadiness,
-        workspaceServices: startupWorkspaceShell,
-        settingsUseCases,
-        tokens: { getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(), setHuggingFaceToken: (token) => tokenConfigStore.setToken(token), clearHuggingFaceToken: () => tokenConfigStore.clearToken() },
-        features: { artifact: getArtifactFeatures, artifactRemote: getArtifactRemoteFeatures, asset: getAssetFeatures, model: getModelFeatures, imageGeneration: getImageGenerationFeatures, comfyUi: getComfyUiFeatures, ingestion: getIngestionFeatures, datasetPreparation: getDatasetPreparationFeatures },
+        artifact: {
+          ipcMain: registerOptions.ipcMain,
+          tokens: { getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(), setHuggingFaceToken: (token) => tokenConfigStore.setToken(token), clearHuggingFaceToken: () => tokenConfigStore.clearToken() },
+          getArtifactFeature: getArtifactFeatures,
+          getArtifactRemoteFeature: getArtifactRemoteFeatures,
+        },
+        asset: { ipcMain: registerOptions.ipcMain, getAssetFeature: getAssetFeatures },
+        model: { ipcMain: registerOptions.ipcMain, getModelFeature: getModelFeatures },
+        imageGeneration: { ipcMain: registerOptions.ipcMain, getImageGenerationFeature: getImageGenerationFeatures },
+        runtime: { ipcMain: registerOptions.ipcMain, getComfyUiFeature: getComfyUiFeatures },
+        ingestion: { ipcMain: registerOptions.ipcMain, getIngestionFeature: getIngestionFeatures },
+        datasetPreparation: { ipcMain: registerOptions.ipcMain, getDatasetPreparationFeature: getDatasetPreparationFeatures },
       });
       recordHostMemorySnapshot("desktop.host.ipc-registration.lazy-handlers.after");
       recordHostMemorySnapshot("desktop.host.ipc-registration.return");
