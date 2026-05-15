@@ -12,11 +12,11 @@ export interface WorkspaceGateProps {
 
 export function WorkspaceGate({ pageLabel, children }: WorkspaceGateProps) {
   const workspace = useActiveWorkspace();
-  if (workspace.loading) {
-    return <section className="ui-panel ui-stack ui-stack--sm"><p>Loading workspaces...</p></section>;
+  if (workspace.status === "loading") {
+    return <section className="ui-panel ui-stack ui-stack--sm" aria-label="Workspace loading"><p>Loading workspaces...</p></section>;
   }
 
-  if (workspace.activeWorkspace) {
+  if (workspace.status === "ready" && workspace.activeWorkspace) {
     return (
       <section className="ui-stack ui-stack--sm" aria-label={`${pageLabel} workspace context`}>
         <div className="ui-panel workspace-banner">
@@ -35,7 +35,8 @@ export function WorkspaceGate({ pageLabel, children }: WorkspaceGateProps) {
       <header className="ui-stack ui-stack--sm">
         <h2>Workspace required</h2>
         <p>{WORKSPACE_REQUIRED_MESSAGE}</p>
-        {workspace.error ? <p className="ui-status ui-status--error" role="alert">{workspace.error}</p> : null}
+        {workspace.status === "unavailable" ? <p className="ui-status ui-status--error" role="alert">This workspace is unavailable. Select or create another workspace.</p> : null}
+        {workspace.error && workspace.status !== "unavailable" ? <p className="ui-status ui-status--error" role="alert">{workspace.error}</p> : null}
       </header>
       {selectableWorkspaces.length > 0 ? (
         <div className="ui-stack ui-stack--sm">

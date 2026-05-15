@@ -37,11 +37,14 @@ export interface WorkspaceClient {
   readonly clearActiveWorkspaceSelection: () => Promise<void>;
 }
 
+export type ActiveWorkspaceReadinessStatus = "loading" | "ready" | "missing" | "unavailable" | "error";
+
 export interface ActiveWorkspaceContextValue {
   readonly workspaces: readonly WorkspaceUiRecord[];
   readonly activeWorkspace?: WorkspaceUiRecord;
   readonly activeWorkspaceId?: string;
   readonly loading: boolean;
+  readonly status: ActiveWorkspaceReadinessStatus;
   readonly error?: string;
   readonly selectWorkspace: (workspaceId: string) => Promise<void>;
   readonly clearActiveWorkspace: () => Promise<void>;
@@ -138,11 +141,20 @@ export function ActiveWorkspaceProvider({
     }
   }, [client]);
 
+  const status = useMemo<ActiveWorkspaceReadinessStatus>(() => {
+    if (loading) return "loading";
+    if (error) return "error";
+    if (activeWorkspace) return "ready";
+    if (activeWorkspaceId) return "unavailable";
+    return "missing";
+  }, [activeWorkspace, activeWorkspaceId, error, loading]);
+
   const value = useMemo<ActiveWorkspaceContextValue>(() => ({
     workspaces,
     activeWorkspace,
     activeWorkspaceId,
     loading,
+    status,
     error: error ?? (activeWorkspaceId && !activeWorkspace
       ? "This workspace is unavailable. Select or create another workspace."
       : undefined),
@@ -159,6 +171,7 @@ export function ActiveWorkspaceProvider({
     load,
     loading,
     selectWorkspace,
+    status,
     workspaces,
   ]);
 

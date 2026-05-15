@@ -47,3 +47,7 @@ The User Library is a separate user-owned scope, not a workspace and not the sys
 ## Collaboration placeholders
 
 Workspace records may carry passive collaboration/readiness placeholders for future phases, but Phase 6 does not implement invites, memberships, permissions, sync, remote auth, multi-user conflict resolution, or sharing policy. Those behaviors belong to later collaboration and distribution phases.
+
+## UI route boundary
+
+Workspace-required UI routes must be blocked at the app route boundary before the requested page becomes the visible shell state. Page-level workspace gates remain defensive boundaries, but setup, loading, and unavailable-workspace surfaces must be stable and must not flash or mark the pending workspace page active until a valid active workspace is available.

@@ -5,7 +5,7 @@ import appLogoSrc from "../../../../../../modules/ui/shared/assets/branding/logo
 import { WorkspaceSwitcher } from "../../features/workspace";
 
 export interface AppShellProps {
-  activePage: DesktopPageKey;
+  activePage?: DesktopPageKey;
   onNavigate: (nextPage: DesktopPageKey) => void;
   pages: readonly DesktopPageDefinition[];
   children: ReactNode;
