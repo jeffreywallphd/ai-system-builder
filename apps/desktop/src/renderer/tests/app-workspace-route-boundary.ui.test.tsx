@@ -57,6 +57,15 @@ function installDesktopApi(options: {
   return { resolveList };
 }
 
+async function waitForText(container: HTMLElement, text: string) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    if (container.textContent?.includes(text)) return;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+  }
+}
+
 async function renderAndNavigateToModels(container: HTMLDivElement) {
   const root = createRoot(container);
   await act(async () => { root.render(<App />); });
@@ -118,17 +127,16 @@ describe("desktop app workspace route boundary", () => {
     expect(container.querySelector("button[aria-current='page']")?.textContent).not.toBe("Models");
   });
 
-  it("renders the pending workspace page with required workspace props once the workspace is ready", async () => {
+  it("shows the page loading fallback for a pending workspace page once the workspace is ready", async () => {
     installDesktopApi({ workspaces: [workspaceRecord()], selectedWorkspaceId: "workspace.ready" });
     container = document.createElement("div");
     document.body.appendChild(container);
     root = await renderAndNavigateToModels(container);
     await act(async () => {});
 
-    expect(container.textContent).toContain("Active workspace: Ready Workspace");
-    expect(container.textContent).toContain("Model Management");
-    expect(container.textContent).toContain("Showing records for: Ready Workspace");
+    expect(container.textContent).toContain("Loading page…");
     expect(container.textContent).not.toContain("No workspace selected");
+    expect(window.desktopApi?.listModels).not.toHaveBeenCalled();
     expect(container.querySelector("button[aria-current='page']")?.textContent).toBe("Models");
   });
 });

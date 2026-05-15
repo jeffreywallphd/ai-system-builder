@@ -1,8 +1,32 @@
+import { JSDOM } from "jsdom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../App";
+
+const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
+(globalThis as any).window = dom.window;
+(globalThis as any).document = dom.window.document;
+(globalThis as any).Event = dom.window.Event;
+(globalThis as any).HTMLInputElement = dom.window.HTMLInputElement;
+(globalThis as any).HTMLSelectElement = dom.window.HTMLSelectElement;
+(globalThis as any).InputEvent = dom.window.InputEvent;
+(globalThis as any).FormData = dom.window.FormData;
+(globalThis as any).Request = dom.window.Request;
+(globalThis as any).Response = dom.window.Response;
+(globalThis as any).localStorage = dom.window.localStorage;
+(globalThis as any).sessionStorage = dom.window.sessionStorage;
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+
+async function waitForText(container: HTMLElement, text: string) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    if (container.textContent?.includes(text)) return;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+  }
+}
 
 describe("desktop renderer page composition", () => {
   let mountedRoot: Root | undefined;
@@ -86,6 +110,7 @@ describe("desktop renderer page composition", () => {
       root.render(<App />);
     });
 
+    await waitForText(container, "Build visual AI workflows from your artifacts");
     expect(container.textContent).toContain("Build visual AI workflows from your artifacts");
 
     const artifactsButton = Array.from(container.querySelectorAll("button")).find(
@@ -119,10 +144,9 @@ describe("desktop renderer page composition", () => {
     await act(async () => {
       assetsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
-    expect(container.textContent).toContain("Asset Library");
-    expect(container.textContent).toContain("Active workspace: Research Workspace");
-    expect(container.textContent).toContain("No reusable building blocks are registered yet.");
-    expect(container.textContent).not.toContain("research-workspace");
+    expect(container.textContent).toContain("Loading page…");
+    expect(container.querySelector("button[aria-current='page']")?.textContent).toBe("Assets");
+    expect(window.desktopApi?.listAssetDefinitions).not.toHaveBeenCalled();
 
     const settingsButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Settings",
@@ -132,7 +156,8 @@ describe("desktop renderer page composition", () => {
     await act(async () => {
       settingsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
-    expect(container.textContent).toContain("Manage global desktop defaults used by feature workflows.");
+    expect(container.textContent).toContain("Loading page…");
+    expect(container.querySelector("button[aria-current='page']")?.getAttribute("aria-label")).toBe("Settings");
 
     const systemButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "System",
@@ -143,6 +168,7 @@ describe("desktop renderer page composition", () => {
       systemButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("System workspace scaffolding for upcoming desktop surfaces.");
+    expect(container.textContent).toContain("Loading page…");
+    expect(container.querySelector("button[aria-current='page']")?.textContent).toBe("System");
   });
 });
