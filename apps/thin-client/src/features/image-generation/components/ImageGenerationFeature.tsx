@@ -26,7 +26,7 @@ export function ImageGenerationFeature({
   return (
     <section className="ui-panel ui-stack ui-stack--sm" aria-label="Image Generation">
       <h2>Image Generation</h2>
-      <p>Workspace: {workspaceName ?? workspaceId ?? "No active workspace"}</p>
+      <p>Workspace: {workspaceName ?? "No workspace selected"}</p>
       <p className="ui-text-muted">Generate images from a prompt. Completed generations are registered in Artifacts automatically.</p>
 
       <section className="ui-stack ui-stack--sm">

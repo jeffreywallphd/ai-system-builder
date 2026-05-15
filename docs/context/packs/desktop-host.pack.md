@@ -112,3 +112,9 @@ Desktop host composition wires public Asset Registry reads through the workspace
 ## Phase 6 Prompt 8 artifact workspace scoping
 
 Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.
+
+## Phase 6 Prompt 10 desktop workspace UX integration
+
+Desktop renderer surfaces include a visible workspace selector/switcher and create-workspace flow. Workspace-required pages show a gated create/select state without an active workspace, then display the active workspace name and pass the active workspace id through desktop preload/IPC-backed clients after selection. Workspace switching keeps the route, refetches workspace-scoped data, and clears stale selected details where applicable.
+
+The desktop UI must not show raw storage roots/paths or use raw workspace ids as primary labels. It must not generate authoritative workspace ids in the renderer, create hidden/default workspaces, auto-seed startup workspaces, expose pack installer/activation management UI, or add user-library/cross-workspace/collaboration behavior. The create-workspace System Foundation checkbox requests the existing `system.foundation@1.0.0` activation by reference only.

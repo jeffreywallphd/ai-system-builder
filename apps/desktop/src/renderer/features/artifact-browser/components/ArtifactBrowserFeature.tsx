@@ -173,7 +173,7 @@ export function ArtifactBrowserFeature({ client, workspaceId, workspaceName }: A
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
       <header className="ui-grid ui-grid--two">
         <h2 className="ui-panel__title">Artifact Browser</h2>
-        <p>Workspace: {workspaceName ?? workspaceId ?? "No active workspace"}</p>
+        <p>Workspace: {workspaceName ?? "No workspace selected"}</p>
         <button className="ui-button" type="button" onClick={() => void refreshArtifacts()}>
           Refresh
         </button>

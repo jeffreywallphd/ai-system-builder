@@ -96,6 +96,7 @@ export interface UseArtifactBrowserFeatureResult {
 
 export function useArtifactBrowserFeature(
   client?: ArtifactBrowserApiClient,
+  workspaceId?: string,
 ): UseArtifactBrowserFeatureResult {
   type DatasetFilesPanelState = {
     files: ThinClientHuggingFaceDatasetParquetFile[];
@@ -163,8 +164,18 @@ export function useArtifactBrowserFeature(
   async function refreshArtifacts(): Promise<void> {
     setViewState({ status: "loading", message: "Loading data artifacts..." });
     try {
-      const browseItems = workspaceId ? await artifactClient.browseArtifacts({ workspaceId }) : [];
+      if (!workspaceId) {
+        setItems([]);
+        setSelectedStorageKey(undefined);
+        setDetail(undefined);
+        setContent(undefined);
+        setImageViewUrl(undefined);
+        setViewState({ status: "success", message: "No data artifacts found yet." });
+        return;
+      }
+      const browseItems = await artifactClient.browseArtifacts({ workspaceId });
       setItems(browseItems);
+      setSelectedStorageKey((current) => browseItems.some((item) => item.storageKey === current) ? current : undefined);
       setViewState({
         status: "success",
         message: browseItems.length > 0 ? "Loaded data artifacts." : "No data artifacts found yet.",

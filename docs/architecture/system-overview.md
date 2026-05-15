@@ -281,3 +281,9 @@ Workspace foundations now include internal application use cases for listing, re
 ## Phase 6 artifact workspace isolation
 
 Workspace foundations now include artifact and upload isolation: workspace pages and transports must send an explicit workspace id for artifact browse, read, and upload operations. Workspace A artifacts must not appear in Workspace B, and missing workspace context must fail safely instead of returning global artifacts.
+
+### Workspace-aware desktop and thin-client surfaces (Phase 6 Prompt 10)
+
+Desktop and thin-client users can see the active workspace in the shell and on workspace-scoped pages. Assets, Artifacts/Data, Models, Images, generated-output/data/model surfaces remain gated without an active workspace; Settings, safe diagnostics, and system/status pages remain globally accessible when they do not display workspace-owned records.
+
+The UI uses real workspace clients/transports for create/select/switch, never derives workspace ids from display names, and never creates a hidden default workspace. Creating a workspace may include System Foundation assets via a `system.foundation@1.0.0` activation reference. Workspace-scoped feature clients must include the active workspace id and must not fall back to global records. User-library/cross-workspace reuse, collaboration, invites, sync, and marketplace/pack-management behavior remain out of scope.

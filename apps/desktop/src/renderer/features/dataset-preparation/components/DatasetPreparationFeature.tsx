@@ -14,9 +14,11 @@ export interface DatasetPreparationFeatureProps {
   client?: DesktopDatasetPreparationClient;
   settingsClient?: DesktopApplicationSettingsClient;
   runtimeStatusClient?: Pick<DesktopPythonRuntimeClient, "readStatus" | "controlRuntime">;
+  workspaceId?: string;
+  workspaceName?: string;
 }
 
-export function DatasetPreparationFeature({ onPrepared, client, settingsClient, runtimeStatusClient }: DatasetPreparationFeatureProps) {
+export function DatasetPreparationFeature({ onPrepared, client, settingsClient, runtimeStatusClient, workspaceId, workspaceName }: DatasetPreparationFeatureProps) {
   const {
     artifacts,
     filteredArtifacts,
@@ -94,6 +96,7 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
     settingsClient,
     runtimeStatusClient,
     onPrepared,
+    workspaceId,
   });
   const [showModelOverrides, setShowModelOverrides] = useState(false);
   const [showHuggingFaceDefaults, setShowHuggingFaceDefaults] = useState(false);
@@ -111,6 +114,7 @@ export function DatasetPreparationFeature({ onPrepared, client, settingsClient, 
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
       <h2 className="ui-panel__title">Dataset Preparation</h2>
+      <p>Showing records for: {workspaceName ?? "No workspace selected"}</p>
       <p>Prepare training datasets from selected artifacts.</p>
       <form className="ui-stack ui-stack--sm" onSubmit={(event) => void onSubmit(event)}>
         <fieldset className="ui-stack ui-stack--sm" disabled={formLocked}>

@@ -70,7 +70,7 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
       <h1>Data Artifact Ingester</h1>
-      <p>Workspace: {workspaceName ?? workspaceId ?? "No active workspace"}</p>
+      <p>Workspace: {workspaceName ?? "No workspace selected"}</p>
       <p>Please select a method below to add data to the system.</p>
 
       <CollapsiblePanel

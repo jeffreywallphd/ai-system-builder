@@ -67,7 +67,15 @@ describe("desktop renderer artifact workflow page", () => {
         },
       });
 
+    const workspaces: Array<{ workspaceId: string; displayName: string; status: "active"; createdAt: string; settings?: { defaultIncludeSystemFoundationAssets?: boolean } }> = [];
+    let selectedWorkspaceId: string | undefined;
+
     window.desktopApi = {
+      listWorkspaces: vi.fn(async () => ({ ok: true, value: { workspaces } })),
+      readActiveWorkspaceSelection: vi.fn(async () => ({ ok: true, value: selectedWorkspaceId ? { workspaceId: selectedWorkspaceId } : {} })),
+      saveActiveWorkspaceSelection: vi.fn(async (selection: { workspaceId?: string }) => { selectedWorkspaceId = selection.workspaceId; return { ok: true, value: { selection } }; }),
+      clearActiveWorkspaceSelection: vi.fn(async () => { selectedWorkspaceId = undefined; return { ok: true, value: {} }; }),
+      createWorkspace: vi.fn(async (input: { command: { displayName: string; includeSystemFoundationAssets?: boolean } }) => { const workspace = { workspaceId: "workspace.upload", displayName: input.command.displayName, status: "active" as const, createdAt: "2026-05-14T00:00:00.000Z", settings: { defaultIncludeSystemFoundationAssets: input.command.includeSystemFoundationAssets } }; workspaces.push(workspace); selectedWorkspaceId = workspace.workspaceId; return { ok: true, value: { workspace } }; }),
       uploadArtifact,
       browseArtifacts,
       readArtifactDetail: vi.fn().mockResolvedValue({

@@ -1,12 +1,4 @@
 import {
-  mapAssetDefinitionDetail,
-  mapAssetDefinitionListResult,
-  mapAssetResourceBackedViewDetail,
-  mapAssetResourceBackedViewListResult,
-  mapAssetMutationTransportFailure,
-  mapTransportEnvelopeError,
-  mapTransportEnvelopeSuccess,
-  sanitizeAssetMutationResult,
   type AssetLibraryClient,
   type AssetLibraryClientResult,
   type AssetLibraryDefinitionCard,
@@ -21,6 +13,18 @@ import {
   type AssetLibraryResourceBackedViewExpansion,
   type AssetLibraryResourceBackedViewQuery,
 } from "../../../../../../modules/ui/shared/asset-library";
+import {
+  mapAssetDefinitionDetail,
+  mapAssetDefinitionListResult,
+  mapAssetResourceBackedViewDetail,
+  mapAssetResourceBackedViewListResult,
+  mapTransportEnvelopeError,
+  mapTransportEnvelopeSuccess,
+} from "../../../../../../modules/ui/shared/asset-library/assetLibraryMappers";
+import {
+  mapAssetMutationTransportFailure,
+  sanitizeAssetMutationResult,
+} from "../../../../../../modules/ui/shared/asset-library/assetLibraryActions";
 import type {
   AssetMutationResult,
   FinalizeGeneratedOutputCommand,

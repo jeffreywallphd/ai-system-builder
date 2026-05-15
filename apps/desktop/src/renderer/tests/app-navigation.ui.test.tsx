@@ -28,7 +28,14 @@ describe("desktop renderer page composition", () => {
     mountedRoot = root;
     mountedContainer = container;
 
+    const workspaces = [{ workspaceId: "research-workspace", displayName: "Research Workspace", status: "active", createdAt: "2026-05-14T00:00:00.000Z" }];
+    let selectedWorkspaceId: string | undefined;
     window.desktopApi = {
+      listWorkspaces: vi.fn(async () => ({ ok: true, value: { workspaces } })),
+      readActiveWorkspaceSelection: vi.fn(async () => ({ ok: true, value: selectedWorkspaceId ? { workspaceId: selectedWorkspaceId } : {} })),
+      saveActiveWorkspaceSelection: vi.fn(async (selection: { workspaceId?: string }) => { selectedWorkspaceId = selection.workspaceId; return { ok: true, value: { selection } }; }),
+      clearActiveWorkspaceSelection: vi.fn(async () => { selectedWorkspaceId = undefined; return { ok: true, value: {} }; }),
+      createWorkspace: vi.fn(async (input: { command: { displayName: string; includeSystemFoundationAssets?: boolean } }) => { const workspace = { workspaceId: "workspace.created", displayName: input.command.displayName, status: "active", createdAt: "2026-05-14T00:00:00.000Z", settings: { defaultIncludeSystemFoundationAssets: input.command.includeSystemFoundationAssets } }; workspaces.push(workspace); selectedWorkspaceId = workspace.workspaceId; return { ok: true, value: { workspace } }; }),
       uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
       browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
       readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
@@ -95,8 +102,7 @@ describe("desktop renderer page composition", () => {
     expect(container.textContent).not.toContain("Data Artifact Ingester");
     expect(window.desktopApi?.browseArtifacts).not.toHaveBeenCalled();
 
-    window.localStorage.setItem("ai-system-builder.desktop.workspaces", JSON.stringify([{ id: "research-workspace", displayName: "Research Workspace", status: "active", createdAt: "2026-05-14T00:00:00.000Z" }]));
-    window.localStorage.setItem("ai-system-builder.desktop.activeWorkspaceId", "research-workspace");
+    selectedWorkspaceId = "research-workspace";
     await act(async () => {
       root.unmount();
     });

@@ -75,7 +75,7 @@ export function ActiveWorkspaceProvider({
       setActiveWorkspaceId(selection.workspaceId);
       setError(undefined);
     } catch {
-      setError("Workspaces are unavailable. Try again later.");
+      setError("Workspace could not be loaded.");
     } finally {
       setLoading(false);
     }
@@ -93,7 +93,7 @@ export function ActiveWorkspaceProvider({
   const selectWorkspace = useCallback(async (workspaceId: string) => {
     const workspace = workspaces.find((candidate) => candidate.id === workspaceId);
     if (!workspace || workspace.status !== "active") {
-      setError("That workspace is not available. Select another workspace or create a new one.");
+      setError("This workspace is unavailable. Select or create another workspace.");
       return;
     }
 
@@ -134,7 +134,7 @@ export function ActiveWorkspaceProvider({
       setError(undefined);
       return workspace;
     } catch (err) {
-      setError(err instanceof Error && err.message ? err.message : "Workspace could not be created.");
+      setError(err instanceof Error && err.message === "Enter a workspace name." ? err.message : "Workspace could not be created.");
       throw err;
     }
   }, [client]);
@@ -145,7 +145,7 @@ export function ActiveWorkspaceProvider({
     activeWorkspaceId,
     loading,
     error: error ?? (activeWorkspaceId && !activeWorkspace
-      ? "The selected workspace is unavailable. Select another workspace or create a new one."
+      ? "This workspace is unavailable. Select or create another workspace."
       : undefined),
     selectWorkspace,
     clearActiveWorkspace,
