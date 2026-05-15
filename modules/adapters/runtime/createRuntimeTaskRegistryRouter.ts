@@ -1,4 +1,5 @@
 import type { RuntimeTaskRegistryPort } from "../../application/ports/runtime";
+import { isWorkspaceId } from "../../contracts/workspace";
 import { TaskType, type CancelRuntimeTaskResult, type RuntimeTaskListRequest, type RuntimeTaskListResult, type RuntimeTaskRecord, type RuntimeTaskStatusRecord, type StartRuntimeTaskRequest, type StartRuntimeTaskResult } from "../../contracts/runtime";
 
 export function createRuntimeTaskRegistryRouter(delegates: { image: RuntimeTaskRegistryPort; python: RuntimeTaskRegistryPort }): RuntimeTaskRegistryPort {
@@ -69,6 +70,7 @@ export function createRuntimeTaskRegistryRouter(delegates: { image: RuntimeTaskR
 
   return {
     async startTask(request: StartRuntimeTaskRequest): Promise<StartRuntimeTaskResult> {
+      if (!isWorkspaceId(request.workspaceId)) throw new Error("Workspace id is required for runtime task start.");
       const delegate = taskTypeDelegates[request.taskType];
       const result = await delegate.startTask(request);
       requestToTaskType.set(result.requestId, request.taskType);
@@ -116,6 +118,7 @@ export function createRuntimeTaskRegistryRouter(delegates: { image: RuntimeTaskR
       return unknownCancel(requestId);
     },
     async listTasks(request: RuntimeTaskListRequest): Promise<RuntimeTaskListResult> {
+      if (!isWorkspaceId(request.workspaceId)) return { tasks: [], warnings: [{ code: "runtime_task_workspace_required", message: "Workspace id is required to list workspace-owned runtime task outputs." }] };
       const delegateResults = await Promise.all(delegateEntries.map(async (delegate) => {
         const delegateRequest = filterListRequest(request, delegate.taskTypes);
         if (!delegateRequest) return { tasks: [] } satisfies RuntimeTaskListResult;
@@ -136,7 +139,7 @@ export function createRuntimeTaskRegistryRouter(delegates: { image: RuntimeTaskR
         }
       }));
 
-      const tasks = delegateResults.flatMap((result) => result.tasks);
+      const tasks = delegateResults.flatMap((result) => result.tasks).filter((task) => task.workspaceId === request.workspaceId);
       const warnings = delegateResults.flatMap((result) => result.warnings ?? []);
       const unsupportedTaskTypes = new Set(delegateResults.flatMap((result) => result.unsupportedTaskTypes ?? []));
 

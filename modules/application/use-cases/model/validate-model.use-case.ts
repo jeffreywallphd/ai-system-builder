@@ -1,3 +1,4 @@
+import { isWorkspaceId } from "../../../contracts/workspace";
 import { TaskType, type RuntimeTaskRecord } from "../../../contracts/runtime";
 import { type ValidateModelRequest, type ValidateModelResult } from "../../../contracts/model";
 import type { ModelRegistryPort } from "../../ports/model";
@@ -17,7 +18,8 @@ export class ValidateModelUseCase {
   ) {}
 
   public async execute(request: ValidateModelRequest): Promise<ValidateModelResult> {
-    const model = await this.dependencies.modelRegistry.getModelRecord(request.modelRecordId);
+    if (!isWorkspaceId(request.workspaceId)) throw new Error("Workspace id is required for model validation.");
+    const model = await this.dependencies.modelRegistry.getModelRecord(request.workspaceId, request.modelRecordId);
     if (!model) {
       throw new Error(`Model record '${request.modelRecordId}' was not found.`);
     }
@@ -25,6 +27,7 @@ export class ValidateModelUseCase {
 
     const started = await this.dependencies.runtimeTaskRegistry.startTask({
       taskType: TaskType.MODEL_VALIDATION,
+      workspaceId: request.workspaceId,
       payload: {
         ...request,
         modelPath: request.modelPath ?? model.localPath,
@@ -61,12 +64,15 @@ export class ValidateModelUseCase {
       throw new Error(`Model validation runtime result missing for request '${statusRecord.requestId}'.`);
     }
     const result = statusRecord.data as ValidateModelResult;
-    const model = await this.dependencies.modelRegistry.getModelRecord(result.modelRecordId);
+    const context = this.requestContext.get(requestId);
+    const workspaceId = context?.request.workspaceId ?? statusRecord.workspaceId;
+    if (!isWorkspaceId(workspaceId)) throw new Error("Workspace id is required for model validation result finalization.");
+    const model = await this.dependencies.modelRegistry.getModelRecord(workspaceId, result.modelRecordId);
     if (!model) {
       throw new Error(`Model record '${result.modelRecordId}' was not found.`);
     }
     const nextLifecycleStatus = result.status === "valid" ? "validated" : (result.status === "invalid" ? "invalid" : model.lifecycleStatus);
-    await this.dependencies.modelRegistry.updateModelRecord({ modelRecordId: result.modelRecordId, patch: { validationStatus: result.status, validationReportPath: result.reportPath, serializationFormat: result.serializationFormat, lifecycleStatus: nextLifecycleStatus, metadata: { ...(model.metadata ?? {}), validationDiffPath: result.diffPath, validationWarnings: result.warnings, validationErrors: result.errors, shardCount: result.shardCount, validatedModelPath: result.validatedModelPath, validatedAt: result.validatedAt, validationStrictness: result.validationStrictness, tensorChecksCompleted: result.tensorChecksCompleted } } });
+    await this.dependencies.modelRegistry.updateModelRecord({ workspaceId, modelRecordId: result.modelRecordId, patch: { validationStatus: result.status, validationReportPath: result.reportPath, serializationFormat: result.serializationFormat, lifecycleStatus: nextLifecycleStatus, metadata: { ...(model.metadata ?? {}), validationDiffPath: result.diffPath, validationWarnings: result.warnings, validationErrors: result.errors, shardCount: result.shardCount, validatedModelPath: result.validatedModelPath, validatedAt: result.validatedAt, validationStrictness: result.validationStrictness, tensorChecksCompleted: result.tensorChecksCompleted } } });
     const finalized = { ...result, requestId } as ValidateModelResult;
     this.finalizedResults.set(requestId, finalized);
     return finalized;

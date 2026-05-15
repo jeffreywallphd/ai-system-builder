@@ -1,3 +1,4 @@
+import { isWorkspaceId } from "../../../contracts/workspace";
 import { TaskType, type RuntimeTaskRecord } from "../../../contracts/runtime";
 import { type PublishModelRequest, type PublishModelResult } from "../../../contracts/model";
 import type { ModelRegistryPort } from "../../ports/model";
@@ -17,12 +18,13 @@ export class PublishModelUseCase {
   ) {}
 
   public async execute(request: PublishModelRequest): Promise<PublishModelResult> {
-    const model = await this.dependencies.modelRegistry.getModelRecord(request.modelRecordId);
+    if (!isWorkspaceId(request.workspaceId)) throw new Error("Workspace id is required for model publishing.");
+    const model = await this.dependencies.modelRegistry.getModelRecord(request.workspaceId, request.modelRecordId);
     if (!model || !model.localPath) {
       throw new Error(`Model '${request.modelRecordId}' is missing a local model path and cannot be published.`);
     }
     await this.dependencies.runtimeCapabilityGuard?.requireCapabilityReady("model-publishing");
-    const started = await this.dependencies.runtimeTaskRegistry.startTask({ taskType: TaskType.MODEL_PUBLISHING, payload: request });
+    const started = await this.dependencies.runtimeTaskRegistry.startTask({ taskType: TaskType.MODEL_PUBLISHING, workspaceId: request.workspaceId, payload: request });
     this.requestContext.set(started.requestId, { request, modelRecordId: request.modelRecordId, repository: request.repository, provider: "huggingface" });
     return { modelRecordId: request.modelRecordId, published: false, provider: "huggingface", repository: request.repository, requestId: started.requestId } as PublishModelResult;
   }
@@ -55,12 +57,14 @@ export class PublishModelUseCase {
       throw new Error(`Model publishing runtime result missing for request '${statusRecord.requestId}'.`);
     }
     const result = statusRecord.data as PublishModelResult;
-    const model = await this.dependencies.modelRegistry.getModelRecord(result.modelRecordId);
+    const workspaceId = context?.request.workspaceId ?? statusRecord.workspaceId;
+    if (!isWorkspaceId(workspaceId)) throw new Error("Workspace id is required for model publishing result finalization.");
+    const model = await this.dependencies.modelRegistry.getModelRecord(workspaceId, result.modelRecordId);
     if (!model) {
       throw new Error(`Model record '${result.modelRecordId}' was not found.`);
     }
     const metadata = { ...(model.metadata ?? {}), publishedProvider: result.provider, publishedRepository: result.repository, publishedRevision: result.revision, publishedUrl: result.url, publishedAt: new Date().toISOString() };
-    await this.dependencies.modelRegistry.updateModelRecord({ modelRecordId: result.modelRecordId, patch: { published: { provider: result.provider, repository: result.repository, revision: result.revision, url: result.url, publishedAt: metadata.publishedAt as string }, metadata } });
+    await this.dependencies.modelRegistry.updateModelRecord({ workspaceId, modelRecordId: result.modelRecordId, patch: { published: { provider: result.provider, repository: result.repository, revision: result.revision, url: result.url, publishedAt: metadata.publishedAt as string }, metadata } });
     const finalized = { ...result, requestId } as PublishModelResult;
     this.finalizedResults.set(requestId, finalized);
     return finalized;

@@ -256,6 +256,7 @@ describe("model contracts", () => {
 
   it("normalizes list/delete model-management operation requests", () => {
     const list = normalizeListModelsRequest({
+      workspaceId: "workspace-a" as never,
       source: "generated",
       lifecycleStatus: "generated",
       artifactForm: "adapter",
@@ -269,12 +270,14 @@ describe("model contracts", () => {
     expect(list.includeDiscovered).toBe(false);
 
     const del = normalizeDeleteModelRecordRequest({
+      workspaceId: "workspace-a" as never,
       modelRecordId: " model-1 ",
       deleteLocalFiles: true,
       deleteBackingArtifacts: false,
     });
 
     expect(del).toEqual({
+      workspaceId: "workspace-a",
       modelRecordId: "model-1",
       deleteLocalFiles: true,
       deleteBackingArtifacts: false,
@@ -283,6 +286,7 @@ describe("model contracts", () => {
 
   it("preserves validation metadata when registering downloaded and generated models", () => {
     const downloaded: RegisterDownloadedModelRequest = {
+      workspaceId: "workspace-a" as never,
       displayName: " Downloaded Model ",
       source: "huggingface",
       provider: "huggingface",
@@ -299,6 +303,7 @@ describe("model contracts", () => {
     });
 
     expect(normalizeRegisterGeneratedModelRequest({
+      workspaceId: "workspace-a" as never,
       displayName: " Generated Adapter ",
       provider: "huggingface",
       localPath: " C:/models/generated ",

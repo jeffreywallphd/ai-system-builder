@@ -1,8 +1,10 @@
+import type { WorkspaceId } from "../workspace";
 import type { RuntimeTaskRecord } from "./runtime-task-record";
 import type { RuntimeTaskStatus } from "./runtime-task-status";
 import type { TaskType } from "./task-type";
 
 export interface RuntimeTaskListRequest {
+  workspaceId?: WorkspaceId;
   statuses?: RuntimeTaskStatus[];
   taskTypes?: TaskType[];
   includeCompleted?: boolean;

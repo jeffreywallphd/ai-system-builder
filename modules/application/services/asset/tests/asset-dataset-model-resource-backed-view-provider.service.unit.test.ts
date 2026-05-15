@@ -34,7 +34,7 @@ class FakeDatasetDescriptorSource implements SafeDatasetDescriptorSource {
     return { items: [...this.items].slice(0, query?.limit), ...(this.nextCursor ? { nextCursor: this.nextCursor } : {}) };
   }
 
-  public async readDatasetDescriptor(datasetId: string) {
+  public async readDatasetDescriptor(_workspaceId: string, datasetId: string) {
     this.readCalls += 1;
     return this.items.find((item) => item.id === datasetId);
   }
@@ -69,7 +69,7 @@ class FakeModelRegistry implements Pick<ModelRegistryPort, "listModels" | "getMo
     return { models: [...this.records].slice(0, request.limit), ...(this.nextCursor ? { nextCursor: this.nextCursor } : {}) };
   }
 
-  public async getModelRecord(modelRecordId: string) {
+  public async getModelRecord(_workspaceId: string, modelRecordId: string) {
     this.readCalls += 1;
     return this.records.find((record) => record.modelRecordId === modelRecordId);
   }
@@ -167,7 +167,7 @@ describe("AssetDatasetModelResourceBackedViewProvider", () => {
     const registry = new FakeModelRegistry([model()]);
     const provider = new AssetDatasetModelResourceBackedViewProvider({ modelRegistry: registry });
 
-    const result = await provider.listResourceBackedViews({ viewKinds: ["model"], includeMetadata: true } as never);
+    const result = await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, viewKinds: ["model"], includeMetadata: true } as never);
     const view = result.items[0]!;
 
     assert.equal(view.viewKind, "model");
@@ -190,7 +190,7 @@ describe("AssetDatasetModelResourceBackedViewProvider", () => {
 
   it("does not trigger local discovery, validation, training, publishing, asset creation, or mapping persistence", async () => {
     const registry = new FakeModelRegistry([model()]);
-    await new AssetDatasetModelResourceBackedViewProvider({ modelRegistry: registry }).listResourceBackedViews({ viewKinds: ["model"] });
+    await new AssetDatasetModelResourceBackedViewProvider({ modelRegistry: registry }).listResourceBackedViews({ workspaceId: "workspace-a" as never, viewKinds: ["model"] });
 
     assert.equal(registry.discoveryCalls, 0);
     assert.equal(registry.localModelScanCalls, 0);
@@ -204,7 +204,7 @@ describe("AssetDatasetModelResourceBackedViewProvider", () => {
 
   it("maps a safe dataset descriptor from an injected descriptor source", async () => {
     const source = new FakeDatasetDescriptorSource([dataset()]);
-    const result = await new AssetDatasetModelResourceBackedViewProvider({ datasetDescriptorSource: source }).listResourceBackedViews({
+    const result = await new AssetDatasetModelResourceBackedViewProvider({ datasetDescriptorSource: source }).listResourceBackedViews({ workspaceId: "workspace-a" as never,
       viewKinds: ["dataset"],
       limit: 10,
     });
@@ -222,7 +222,7 @@ describe("AssetDatasetModelResourceBackedViewProvider", () => {
   });
 
   it("returns unsupported diagnostics when dataset or model seams are missing", async () => {
-    const result = await new AssetDatasetModelResourceBackedViewProvider().listResourceBackedViews({ limit: 10 });
+    const result = await new AssetDatasetModelResourceBackedViewProvider().listResourceBackedViews({ workspaceId: "workspace-a" as never, limit: 10 });
 
     assert.deepEqual(result.items, []);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "dataset-resource-backed-view-source-unavailable"), true);
@@ -232,7 +232,7 @@ describe("AssetDatasetModelResourceBackedViewProvider", () => {
 
   it("does not prepare datasets, read dataset files, scan storage, create descriptors, or persist mappings", async () => {
     const source = new FakeDatasetDescriptorSource([dataset()]);
-    await new AssetDatasetModelResourceBackedViewProvider({ datasetDescriptorSource: source }).listResourceBackedViews({ viewKinds: ["dataset"] });
+    await new AssetDatasetModelResourceBackedViewProvider({ datasetDescriptorSource: source }).listResourceBackedViews({ workspaceId: "workspace-a" as never, viewKinds: ["dataset"] });
 
     assert.equal(source.prepareCalls, 0);
     assert.equal(source.fileReadCalls, 0);
@@ -251,19 +251,19 @@ describe("AssetDatasetModelResourceBackedViewProvider", () => {
     ], "next-model");
     const provider = new AssetDatasetModelResourceBackedViewProvider({ datasetDescriptorSource: datasetSource, modelRegistry: registry, maxListLimit: 2 });
 
-    const limited = await provider.listResourceBackedViews({ limit: 99 });
+    const limited = await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, limit: 99 });
     assert.equal(limited.items.length, 2);
     assert.equal(limited.diagnostics?.some((diagnostic) => diagnostic.code === "dataset-model-resource-backed-view-limit-clamped"), true);
 
-    assert.deepEqual((await provider.listResourceBackedViews({ searchText: "gamma", limit: 10 })).items.map((item) => item.viewKind), ["model"]);
-    assert.deepEqual((await provider.listResourceBackedViews({ assetTypes: ["dataset"], limit: 10 })).items.map((item) => item.viewKind), ["dataset", "dataset"]);
-    assert.deepEqual((await provider.listResourceBackedViews({ assetFamilies: ["resource-backed"], viewKinds: ["model"], limit: 10 })).items.map((item) => item.displayName), ["Alpha Model", "Gamma Model"]);
+    assert.deepEqual((await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, searchText: "gamma", limit: 10 })).items.map((item) => item.viewKind), ["model"]);
+    assert.deepEqual((await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, assetTypes: ["dataset"], limit: 10 })).items.map((item) => item.viewKind), ["dataset", "dataset"]);
+    assert.deepEqual((await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, assetFamilies: ["resource-backed"], viewKinds: ["model"], limit: 10 })).items.map((item) => item.displayName), ["Alpha Model", "Gamma Model"]);
 
-    const datasetCursor = await provider.listResourceBackedViews({ viewKinds: ["dataset"], cursor: "cursor-dataset", limit: 10 });
+    const datasetCursor = await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, viewKinds: ["dataset"], cursor: "cursor-dataset", limit: 10 });
     assert.equal(datasetSource.lastListQuery?.cursor, "cursor-dataset");
     assert.equal(datasetCursor.nextCursor, "next-dataset");
 
-    const modelCursor = await provider.listResourceBackedViews({ viewKinds: ["model"], cursor: "cursor-model", limit: 10 });
+    const modelCursor = await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, viewKinds: ["model"], cursor: "cursor-model", limit: 10 });
     assert.equal(registry.lastListRequest?.cursor, "cursor-model");
     assert.equal(modelCursor.nextCursor, "next-model");
   });
@@ -272,7 +272,7 @@ describe("AssetDatasetModelResourceBackedViewProvider", () => {
     const datasetSource = new FakeDatasetDescriptorSource([dataset()], "next-dataset");
     const registry = new FakeModelRegistry([model()], "next-model");
     const provider = new AssetDatasetModelResourceBackedViewProvider({ datasetDescriptorSource: datasetSource, modelRegistry: registry });
-    const combined = await provider.listResourceBackedViews({ cursor: "combined", limit: 10 });
+    const combined = await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, cursor: "combined", limit: 10 });
 
     assert.equal(datasetSource.lastListQuery?.cursor, undefined);
     assert.equal(registry.lastListRequest?.cursor, undefined);
@@ -281,7 +281,7 @@ describe("AssetDatasetModelResourceBackedViewProvider", () => {
 
     datasetSource.throws = true;
     registry.throws = true;
-    const failed = await provider.listResourceBackedViews({ limit: 10 });
+    const failed = await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, limit: 10 });
     assert.equal(failed.diagnostics?.some((diagnostic) => diagnostic.code === "dataset-resource-backed-view-source-failed"), true);
     assert.equal(failed.diagnostics?.some((diagnostic) => diagnostic.code === "model-resource-backed-view-source-failed"), true);
     assertSafe([combined, failed]);
@@ -296,17 +296,17 @@ describe("AssetDatasetModelResourceBackedViewProvider", () => {
       maxListLimit: 1,
     });
 
-    assert.equal((await provider.readResourceBackedView("asset-view.dataset.internal.dataset-read"))?.viewKind, "dataset");
-    assert.equal((await provider.readResourceBackedView("asset-view.model.internal.model-read"))?.viewKind, "model");
+    assert.equal((await provider.readResourceBackedView("asset-view.dataset.internal.dataset-read", { workspaceId: "workspace-a" as never }))?.viewKind, "dataset");
+    assert.equal((await provider.readResourceBackedView("asset-view.model.internal.model-read", { workspaceId: "workspace-a" as never }))?.viewKind, "model");
     assert.equal(datasetSource.readCalls, 1);
     assert.equal(registry.readCalls, 1);
-    assert.equal(await provider.readResourceBackedView("missing"), undefined);
+    assert.equal(await provider.readResourceBackedView("missing", { workspaceId: "workspace-a" as never }), undefined);
 
     const fallbackProvider = new AssetDatasetModelResourceBackedViewProvider({
       datasetDescriptorSource: { async listDatasetDescriptors() { return { items: [dataset({ id: "dataset-list-only" })] }; } },
       maxListLimit: 1,
     });
-    const fallback = await fallbackProvider.readResourceBackedView("asset-view.dataset.internal.dataset-list-only");
+    const fallback = await fallbackProvider.readResourceBackedView("asset-view.dataset.internal.dataset-list-only", { workspaceId: "workspace-a" as never });
     assert.equal(fallback?.diagnostics?.some((diagnostic) => diagnostic.code === "dataset-model-resource-backed-view-detail-list-fallback-limited"), true);
   });
 

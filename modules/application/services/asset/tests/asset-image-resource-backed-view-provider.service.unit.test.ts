@@ -32,7 +32,7 @@ class FakeImageAssetDescriptorRead implements ImageAssetDescriptorReadPort {
     return { items: [...this.items].slice(0, query?.limit), nextCursor: query?.cursor ? "next-image" : undefined };
   }
 
-  public async readImageAssetDescriptor(assetId: string) {
+  public async readImageAssetDescriptor(_workspaceId: string, assetId: string) {
     this.readCalls += 1;
     return this.items.find((item) => item.assetId === assetId);
   }
@@ -61,7 +61,7 @@ class FakeGeneratedOutputDescriptorSource implements GeneratedImageOutputDescrip
     return { items: [...this.items].slice(0, query?.limit), nextCursor: query?.cursor ? "next-generated" : undefined };
   }
 
-  public async readGeneratedImageOutputDescriptor(outputId: string) {
+  public async readGeneratedImageOutputDescriptor(_workspaceId: string, outputId: string) {
     this.readCalls += 1;
     return this.items.find((item) => item.outputId === outputId);
   }
@@ -142,7 +142,7 @@ describe("AssetImageResourceBackedViewProvider", () => {
     const imageSource = new FakeImageAssetDescriptorRead([imageAsset()]);
     const provider = new AssetImageResourceBackedViewProvider({ imageAssetDescriptorRead: imageSource });
 
-    const result = await provider.listResourceBackedViews({ viewKinds: ["image-asset"] });
+    const result = await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, viewKinds: ["image-asset"] });
     const view = result.items[0]!;
 
     assert.equal(view.viewKind, "image-asset");
@@ -158,7 +158,7 @@ describe("AssetImageResourceBackedViewProvider", () => {
   });
 
   it("returns safe unsupported diagnostics when finalized image asset listing is not wired", async () => {
-    const result = await new AssetImageResourceBackedViewProvider().listResourceBackedViews({ viewKinds: ["image-asset"] });
+    const result = await new AssetImageResourceBackedViewProvider().listResourceBackedViews({ workspaceId: "workspace-a" as never, viewKinds: ["image-asset"] });
 
     assert.deepEqual(result.items, []);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "image-resource-backed-view-image-source-unavailable"), true);
@@ -170,7 +170,7 @@ describe("AssetImageResourceBackedViewProvider", () => {
       { outputId: "output-1", output: output(), metadata: { seed: 7, model: "sdxl", prompt: "hidden" } },
     ]);
 
-    const result = await new AssetImageResourceBackedViewProvider({ generatedImageOutputDescriptorSource: generatedSource }).listResourceBackedViews({
+    const result = await new AssetImageResourceBackedViewProvider({ generatedImageOutputDescriptorSource: generatedSource }).listResourceBackedViews({ workspaceId: "workspace-a" as never,
       viewKinds: ["generated-output"],
     });
     const view = result.items[0]!;
@@ -193,7 +193,7 @@ describe("AssetImageResourceBackedViewProvider", () => {
     await new AssetImageResourceBackedViewProvider({
       imageAssetDescriptorRead: imageSource,
       generatedImageOutputDescriptorSource: generatedSource,
-    }).listResourceBackedViews();
+    }).listResourceBackedViews({ workspaceId: "workspace-a" as never });
 
     assert.equal(imageSource.byteReadCalls + generatedSource.byteReadCalls, 0);
     assert.equal(imageSource.storageScanCalls + generatedSource.storageScanCalls, 0);
@@ -254,7 +254,7 @@ describe("AssetImageResourceBackedViewProvider", () => {
     const result = await new AssetImageResourceBackedViewProvider({
       imageAssetDescriptorRead: imageSource,
       generatedImageOutputDescriptorSource: generatedSource,
-    }).listResourceBackedViews({ limit: 10 });
+    }).listResourceBackedViews({ workspaceId: "workspace-a" as never, limit: 10 });
 
     assert.equal(result.items.length, 2);
     assertSafe(result);
@@ -275,21 +275,21 @@ describe("AssetImageResourceBackedViewProvider", () => {
       maxListLimit: 2,
     });
 
-    const limited = await provider.listResourceBackedViews({ limit: 99 });
+    const limited = await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, limit: 99 });
     assert.equal(limited.items.length, 2);
     assert.equal(limited.diagnostics?.some((diagnostic) => diagnostic.code === "image-resource-backed-view-limit-clamped"), true);
 
-    assert.deepEqual((await provider.listResourceBackedViews({ searchText: "gamma", limit: 10 })).items.map((item) => item.viewKind), ["generated-output"]);
-    assert.deepEqual((await provider.listResourceBackedViews({ assetTypes: ["image"], limit: 10 })).items.map((item) => item.viewKind), ["image-asset", "image-asset"]);
-    assert.deepEqual((await provider.listResourceBackedViews({ assetFamilies: ["resource-backed"], viewKinds: ["image-asset"], limit: 10 })).items.map((item) => item.displayName), ["Alpha.png", "Beta.png"]);
-    assert.deepEqual((await provider.listResourceBackedViews({ viewKinds: ["generated-output"], limit: 10 })).items.map((item) => item.viewKind), ["generated-output", "generated-output"]);
+    assert.deepEqual((await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, searchText: "gamma", limit: 10 })).items.map((item) => item.viewKind), ["generated-output"]);
+    assert.deepEqual((await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, assetTypes: ["image"], limit: 10 })).items.map((item) => item.viewKind), ["image-asset", "image-asset"]);
+    assert.deepEqual((await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, assetFamilies: ["resource-backed"], viewKinds: ["image-asset"], limit: 10 })).items.map((item) => item.displayName), ["Alpha.png", "Beta.png"]);
+    assert.deepEqual((await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, viewKinds: ["generated-output"], limit: 10 })).items.map((item) => item.viewKind), ["generated-output", "generated-output"]);
   });
 
   it("safely reports unsupported cursor behavior and sanitized source failures", async () => {
     const generatedCursorSource = new FakeGeneratedOutputDescriptorSource([{ outputId: "output-1", output: output() }]);
     const cursorResult = await new AssetImageResourceBackedViewProvider({
       generatedImageOutputDescriptorSource: generatedCursorSource,
-    }).listResourceBackedViews({ cursor: "cursor-1", viewKinds: ["generated-output"] });
+    }).listResourceBackedViews({ workspaceId: "workspace-a" as never, cursor: "cursor-1", viewKinds: ["generated-output"] });
     assert.equal(generatedCursorSource.lastListQuery?.cursor, "cursor-1");
     assert.equal(cursorResult.nextCursor, "next-generated");
 
@@ -298,7 +298,7 @@ describe("AssetImageResourceBackedViewProvider", () => {
     const combinedCursorResult = await new AssetImageResourceBackedViewProvider({
       imageAssetDescriptorRead: combinedImageSource,
       generatedImageOutputDescriptorSource: combinedGeneratedSource,
-    }).listResourceBackedViews({ cursor: "cursor-1", limit: 10 });
+    }).listResourceBackedViews({ workspaceId: "workspace-a" as never, cursor: "cursor-1", limit: 10 });
     assert.equal(combinedImageSource.lastListQuery?.cursor, undefined);
     assert.equal(combinedGeneratedSource.lastListQuery?.cursor, undefined);
     assert.equal(combinedCursorResult.nextCursor, undefined);
@@ -311,7 +311,7 @@ describe("AssetImageResourceBackedViewProvider", () => {
     const failed = await new AssetImageResourceBackedViewProvider({
       imageAssetDescriptorRead: imageSource,
       generatedImageOutputDescriptorSource: generatedSource,
-    }).listResourceBackedViews({ limit: 10 });
+    }).listResourceBackedViews({ workspaceId: "workspace-a" as never, limit: 10 });
 
     assert.equal(failed.diagnostics?.some((diagnostic) => diagnostic.code === "image-resource-backed-view-image-source-failed"), true);
     assert.equal(failed.diagnostics?.some((diagnostic) => diagnostic.code === "image-resource-backed-view-generated-output-source-failed"), true);
@@ -330,9 +330,9 @@ describe("AssetImageResourceBackedViewProvider", () => {
       maxListLimit: 1,
     });
 
-    assert.equal((await provider.readResourceBackedView("asset-view.image.internal.image-read"))?.viewKind, "image-asset");
-    assert.equal((await provider.readResourceBackedView("asset-view.generated-output.internal.output-read"))?.viewKind, "generated-output");
-    assert.equal(await provider.readResourceBackedView("missing"), undefined);
+    assert.equal((await provider.readResourceBackedView("asset-view.image.internal.image-read", { workspaceId: "workspace-a" as never }))?.viewKind, "image-asset");
+    assert.equal((await provider.readResourceBackedView("asset-view.generated-output.internal.output-read", { workspaceId: "workspace-a" as never }))?.viewKind, "generated-output");
+    assert.equal(await provider.readResourceBackedView("missing", { workspaceId: "workspace-a" as never }), undefined);
     assert.equal(imageSource.readCalls, 1);
     assert.equal(generatedSource.readCalls, 1);
     assert.equal(imageSource.listCalls + generatedSource.listCalls, 1);
@@ -348,11 +348,11 @@ describe("AssetImageResourceBackedViewProvider", () => {
       },
     };
     const provider = new AssetImageResourceBackedViewProvider({ imageAssetDescriptorRead: imageSource, maxListLimit: 1 });
-    const detail = await provider.readResourceBackedView("asset-view.image.internal.image-list-only");
+    const detail = await provider.readResourceBackedView("asset-view.image.internal.image-list-only", { workspaceId: "workspace-a" as never });
 
     assert.equal(detail?.viewKind, "image-asset");
     assert.equal(detail?.diagnostics?.some((diagnostic) => diagnostic.code === "image-resource-backed-view-detail-list-fallback-limited"), true);
-    assert.equal(await provider.readResourceBackedView("asset-view.image.internal.image-beyond-first-page"), undefined);
+    assert.equal(await provider.readResourceBackedView("asset-view.image.internal.image-beyond-first-page", { workspaceId: "workspace-a" as never }), undefined);
   });
 
   it("imports no forbidden outer layers, storage adapters, byte readers, filesystem, network, runtime, or execution seams", () => {

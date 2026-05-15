@@ -4,8 +4,8 @@ import { ImageGenerationStatus } from "./ImageGenerationStatus";
 import { useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
 import { SettingsPanel } from "../../settings/components";
 
-export function ImageGenerationFeature() {
-  const feature = useImageGenerationFeature();
+export function ImageGenerationFeature(props: { workspaceId?: string; workspaceName?: string } = {}) {
+  const feature = useImageGenerationFeature(undefined, undefined, undefined, props.workspaceId);
   const previewWidth = Number(feature.form.width);
   const previewHeight = Number(feature.form.height);
   const hasPreviewDimensions = Number.isFinite(previewWidth) && previewWidth > 0 && Number.isFinite(previewHeight) && previewHeight > 0;

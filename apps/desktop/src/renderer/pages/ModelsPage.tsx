@@ -10,7 +10,7 @@ export function ModelsPage({ workspaceId, workspaceName }: WorkspaceScopedPagePr
     <section className="ui-stack ui-stack--sm" data-workspace-id={workspaceId} data-workspace-name={workspaceName}>
       <h1>Model Management</h1>
       <p>Browse remote model references, manage model asset records, and prepare future training workflows.</p>
-      <ModelsFeature />
+      <ModelsFeature workspaceId={workspaceId} workspaceName={workspaceName} />
     </section>
   );
 }

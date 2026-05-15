@@ -30,7 +30,7 @@ function normalizeOptionalSelect<TOption extends string>(value: string, options:
   return options.includes(normalized as TOption) ? normalized as TOption : undefined;
 }
 
-export function useModelsFeature(client?: DesktopModelsClient) {
+export function useModelsFeature(client?: DesktopModelsClient, workspaceId?: string) {
   const modelClient = useModelsClient(client);
   const [browseQuery, setBrowseQuery] = useState("");
   const [browseTaskTag, setBrowseTaskTag] = useState("");
@@ -114,7 +114,9 @@ export function useModelsFeature(client?: DesktopModelsClient) {
     }
     setSaveState({ status: "loading", message: "Saving model reference..." });
     try {
+      if (!workspaceId) { setSaveState({ status: "error", message: "Select a workspace before saving model references." }); return; }
       await modelClient.saveModelReference({
+        workspaceId,
         modelId: modelToSave.modelId,
         displayName: modelToSave.displayName,
         inferenceMode: modelToSave.inferenceMode,
@@ -133,24 +135,25 @@ export function useModelsFeature(client?: DesktopModelsClient) {
     } catch (error) {
       setSaveState({ status: "error", message: error instanceof Error ? error.message : "Failed to save model reference." });
     }
-  }, [modelClient, selectedBrowseModel]);
+  }, [modelClient, selectedBrowseModel, workspaceId]);
 
   const refreshModels = useCallback(async () => {
     setManageState({ status: "loading", message: "Loading model inventory..." });
     try {
-      const listed = await modelClient.listModels({
+      const listed = workspaceId ? await modelClient.listModels({
+        workspaceId: workspaceId as never,
         source: normalizeOptionalSelect<ModelSource>(manageSource, ["huggingface", "local", "generated"]),
         lifecycleStatus: normalizeOptionalSelect<ModelLifecycleStatus>(manageLifecycleStatus, ["remote-reference", "saved-reference", "downloaded", "generated", "validated", "invalid"]),
         artifactForm: normalizeOptionalSelect<ModelArtifactForm>(manageArtifactForm, ["full-model", "adapter", "merged-model", "quantized-model", "checkpoint"]),
         search: manageSearch || undefined,
-      });
+      }) : [];
       setModels(listed);
       setSelectedManagedModel((current) => listed.find((item) => item.modelRecordId === current?.modelRecordId));
       setManageState({ status: "success", message: listed.length > 0 ? "Loaded model inventory." : "No model records found." });
     } catch (error) {
       setManageState({ status: "error", message: error instanceof Error ? error.message : "Failed to list model records." });
     }
-  }, [manageArtifactForm, manageLifecycleStatus, manageSearch, manageSource, modelClient]);
+  }, [manageArtifactForm, manageLifecycleStatus, manageSearch, manageSource, modelClient, workspaceId]);
 
   useEffect(() => {
     void refreshModels();
@@ -167,7 +170,9 @@ export function useModelsFeature(client?: DesktopModelsClient) {
     }
     setDownloadState({ status: "loading", message: "Downloading model..." });
     try {
+      if (!workspaceId) { setDownloadState({ status: "error", message: "Select a workspace before downloading models." }); return; }
       const result = await modelClient.downloadModel({
+        workspaceId,
         modelId: modelToDownload.modelId,
         displayName: modelToDownload.displayName,
         inferenceMode: modelToDownload.inferenceMode,
@@ -186,17 +191,18 @@ export function useModelsFeature(client?: DesktopModelsClient) {
     } catch (error) {
       setDownloadState({ status: "error", message: error instanceof Error ? error.message : "Failed to download model." });
     }
-  }, [modelClient, refreshModels, selectedBrowseModel]);
+  }, [modelClient, refreshModels, selectedBrowseModel, workspaceId]);
 
   const confirmDeleteModelRecord = useCallback(async () => {
     if (!pendingDeleteModelRecordId || deleteConfirmationInput !== "Delete") {
       return;
     }
-    await modelClient.deleteModelRecord({ modelRecordId: pendingDeleteModelRecordId, deleteBackingArtifacts: false, deleteLocalFiles: false });
+    if (!workspaceId) { setManageState({ status: "error", message: "Select a workspace before deleting model records." }); return; }
+    await modelClient.deleteModelRecord({ workspaceId, modelRecordId: pendingDeleteModelRecordId, deleteBackingArtifacts: false, deleteLocalFiles: false });
     setPendingDeleteModelRecordId(undefined);
     setDeleteConfirmationInput("");
     await refreshModels();
-  }, [deleteConfirmationInput, modelClient, pendingDeleteModelRecordId, refreshModels]);
+  }, [deleteConfirmationInput, modelClient, pendingDeleteModelRecordId, refreshModels, workspaceId]);
 
   const lifecycleCounts = useMemo(() => ({
     saved: models.filter((item) => item.lifecycleStatus === "saved-reference").length,

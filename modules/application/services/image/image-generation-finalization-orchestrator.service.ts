@@ -1,3 +1,4 @@
+import { isWorkspaceId } from "../../../contracts/workspace";
 import type { RuntimeTaskRegistryPort } from "../../ports/runtime";
 import type { FinalizeImageGenerationService } from "./finalize-image-generation.service";
 
@@ -11,11 +12,13 @@ export class ImageGenerationFinalizationOrchestratorService {
     },
   ) {}
 
-  public async finalizeIfCompleted(requestId: string): Promise<{ finalized: boolean; assets?: Array<{ assetId: string; artifactId: string; storageKey: string; mediaType: string; source: "generated" }>; reason?: string }> {
-    const finalizedAssets = this.finalizedRequests.get(requestId);
+  public async finalizeIfCompleted(requestId: string, workspaceId: string): Promise<{ finalized: boolean; assets?: Array<{ assetId: string; artifactId: string; storageKey: string; mediaType: string; source: "generated" }>; reason?: string }> {
+    if (!isWorkspaceId(workspaceId)) return { finalized: false, reason: "workspace id is required" };
+    const finalizedAssets = this.finalizedRequests.get(`${workspaceId}:${requestId}`);
     if (finalizedAssets) return { finalized: true, assets: finalizedAssets };
 
     const task = await this.dependencies.runtimeTaskRegistry.getTaskStatus(requestId);
+    if (task.workspaceId !== workspaceId) return { finalized: false, reason: "task not found in workspace" };
     if (task.status !== "succeeded") return { finalized: false, reason: "task not completed" };
 
     const outputs = this.readOutputs(task.data);
@@ -24,12 +27,12 @@ export class ImageGenerationFinalizationOrchestratorService {
         .map((output) => this.toFinalizedAssetRef(output))
         .filter((asset): asset is { assetId: string; artifactId: string; storageKey: string; mediaType: string; source: "generated" } => Boolean(asset));
       if (assets.length === 0) return { finalized: false, reason: "completed task did not report artifact-backed generated image outputs" };
-      this.finalizedRequests.set(requestId, assets);
+      this.finalizedRequests.set(`${workspaceId}:${requestId}`, assets);
       return { finalized: true, assets };
     }
 
     const result = await this.dependencies.finalizeImageGenerationService.finalizeCompletedTask(task);
-    this.finalizedRequests.set(requestId, result.assets);
+    this.finalizedRequests.set(`${workspaceId}:${requestId}`, result.assets);
     return { finalized: true, assets: result.assets };
   }
 

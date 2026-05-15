@@ -5,12 +5,16 @@ export function ImageGenerationFeature({
   onGenerated,
   onNavigateToArtifacts,
   onNavigateToModels,
+  workspaceId,
+  workspaceName,
 }: {
   onGenerated?: () => void;
   onNavigateToArtifacts?: () => void;
   onNavigateToModels?: () => void;
+  workspaceId?: string;
+  workspaceName?: string;
 } = {}) {
-  const feature = useImageGenerationFeature(undefined, () => onGenerated?.());
+  const feature = useImageGenerationFeature(undefined, () => onGenerated?.(), undefined, undefined, workspaceId);
   const selectedModelDownloaded = feature.selectedModelRecord
     ? ["downloaded", "generated", "validated"].includes(feature.selectedModelRecord.lifecycleStatus)
     : false;
@@ -22,6 +26,7 @@ export function ImageGenerationFeature({
   return (
     <section className="ui-panel ui-stack ui-stack--sm" aria-label="Image Generation">
       <h2>Image Generation</h2>
+      <p>Workspace: {workspaceName ?? workspaceId ?? "No active workspace"}</p>
       <p className="ui-text-muted">Generate images from a prompt. Completed generations are registered in Artifacts automatically.</p>
 
       <section className="ui-stack ui-stack--sm">

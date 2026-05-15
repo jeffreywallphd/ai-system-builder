@@ -20,6 +20,8 @@ import {
   type UpdateModelRecordRequest,
   type UpdateModelRecordResult,
 } from "../../../contracts/model";
+import { isWorkspaceId } from "../../../contracts/workspace";
+import type { WorkspaceId } from "../../../contracts/workspace";
 import type { ModelRegistryPort } from "../../../application/ports/model";
 
 interface ModelRegistryFileShape {
@@ -109,7 +111,16 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     await writeOperation;
   }
 
+  function assertWorkspaceId(workspaceId: WorkspaceId | string | undefined): asserts workspaceId is WorkspaceId {
+    if (!isWorkspaceId(workspaceId)) {
+      throw new Error("Workspace id is required for model registry operations.");
+    }
+  }
+
   function matchesFilters(record: ModelInventoryRecord, request: ListModelsRequest): boolean {
+    if (record.workspaceId !== request.workspaceId) {
+      return false;
+    }
     if (request.source && record.source !== request.source) {
       return false;
     }
@@ -265,6 +276,7 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
 
         const timestamp = now();
         discovered.push(normalizeModelInventoryRecord({
+          workspaceId: existing[0]?.workspaceId as WorkspaceId,
           modelRecordId: buildStableModelRecordId(`discovered:${localPath}`),
           displayName: modelId,
           source: "local",
@@ -288,19 +300,13 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
 
   return {
     async listModels(request: ListModelsRequest): Promise<ListModelsResult> {
+      assertWorkspaceId(request.workspaceId);
       const document = await readDocument();
       const limit = request.limit ?? 50;
       const normalizedModels = (document.models ?? []).map(normalizeModelInventoryRecord);
-      const discovered = request.includeDiscovered === false
-        ? []
-        : await discoverCachedModels(normalizedModels);
-      const allModels = discovered.length > 0 ? [...normalizedModels, ...discovered] : normalizedModels;
-      if (discovered.length > 0) {
-        await writeDocument({
-          ...document,
-          models: allModels,
-        });
-      }
+      // Workspace model inventory must not masquerade global cache discovery as
+      // workspace-owned records. Explicit import/download can create scoped records later.
+      const allModels = normalizedModels;
 
       const filtered = allModels.filter((model) => matchesFilters(model, request));
       return {
@@ -309,17 +315,20 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
       };
     },
 
-    async getModelRecord(modelRecordId: string): Promise<ModelInventoryRecord | undefined> {
+    async getModelRecord(workspaceId: WorkspaceId, modelRecordId: string): Promise<ModelInventoryRecord | undefined> {
+      assertWorkspaceId(workspaceId);
       const document = await readDocument();
-      return (document.models ?? []).map(normalizeModelInventoryRecord).find((record) => record.modelRecordId === modelRecordId);
+      return (document.models ?? []).map(normalizeModelInventoryRecord).find((record) => record.workspaceId === workspaceId && record.modelRecordId === modelRecordId);
     },
 
     async saveModelReference(request: SaveModelReferenceRequest): Promise<SaveModelReferenceResult> {
+      assertWorkspaceId(request.workspaceId);
       const timestamp = now();
       const modelRecordId = request.modelRecordId
         ?? buildStableModelRecordId(`save:${request.provider}:${request.modelId}:${request.displayName ?? ""}`);
       const record = normalizeModelInventoryRecord({
         modelRecordId,
+        workspaceId: request.workspaceId,
         displayName: request.displayName?.trim() || request.modelId,
         source: "huggingface",
         lifecycleStatus: "saved-reference",
@@ -334,18 +343,20 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
 
       await updateDocument((document) => ({
         ...document,
-        models: [...(document.models ?? []).filter((model) => model.modelRecordId !== record.modelRecordId), record],
+        models: [...(document.models ?? []).filter((model) => model.workspaceId !== record.workspaceId || model.modelRecordId !== record.modelRecordId), record],
       }));
 
       return { model: record };
     },
 
     async registerDownloadedModel(request: RegisterDownloadedModelRequest): Promise<RegisterDownloadedModelResult> {
+      assertWorkspaceId(request.workspaceId);
       const timestamp = now();
       const modelRecordId = request.modelRecordId
         ?? buildStableModelRecordId(`downloaded:${request.provider}:${request.modelId ?? request.localPath ?? request.displayName}`);
       const record = normalizeModelInventoryRecord({
         modelRecordId,
+        workspaceId: request.workspaceId,
         displayName: request.displayName,
         source: request.source,
         lifecycleStatus: "downloaded",
@@ -369,17 +380,19 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
 
       await updateDocument((document) => ({
         ...document,
-        models: [...(document.models ?? []).filter((model) => model.modelRecordId !== record.modelRecordId), record],
+        models: [...(document.models ?? []).filter((model) => model.workspaceId !== record.workspaceId || model.modelRecordId !== record.modelRecordId), record],
       }));
       return { model: record };
     },
 
     async registerGeneratedModel(request: RegisterGeneratedModelRequest): Promise<RegisterGeneratedModelResult> {
+      assertWorkspaceId(request.workspaceId);
       const timestamp = now();
       const modelRecordId = request.modelRecordId
         ?? buildStableModelRecordId(`generated:${request.generatedFromRunId ?? "no-run"}:${request.displayName}:${request.modelId ?? ""}`);
       const record = normalizeModelInventoryRecord({
         modelRecordId,
+        workspaceId: request.workspaceId,
         displayName: request.displayName,
         source: "generated",
         lifecycleStatus: "generated",
@@ -402,17 +415,18 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
 
       await updateDocument((document) => ({
         ...document,
-        models: [...(document.models ?? []).filter((model) => model.modelRecordId !== record.modelRecordId), record],
+        models: [...(document.models ?? []).filter((model) => model.workspaceId !== record.workspaceId || model.modelRecordId !== record.modelRecordId), record],
       }));
       return { model: record };
     },
 
     async updateModelRecord(request: UpdateModelRecordRequest): Promise<UpdateModelRecordResult> {
+      assertWorkspaceId(request.workspaceId);
       let updated: ModelInventoryRecord | undefined;
       await updateDocument((document) => {
         const models = (document.models ?? []).map((candidate) => {
           const normalized = normalizeModelInventoryRecord(candidate);
-          if (normalized.modelRecordId !== request.modelRecordId) {
+          if (normalized.workspaceId !== request.workspaceId || normalized.modelRecordId !== request.modelRecordId) {
             return normalized;
           }
 
@@ -437,10 +451,12 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     },
 
     async deleteModelRecord(request: DeleteModelRecordRequest): Promise<DeleteModelRecordResult> {
+      assertWorkspaceId(request.workspaceId);
       let deleted = false;
       await updateDocument((document) => {
         const models = (document.models ?? []).filter((candidate) => {
-          const keep = candidate.modelRecordId !== request.modelRecordId;
+          const normalized = normalizeModelInventoryRecord(candidate);
+          const keep = normalized.workspaceId !== request.workspaceId || normalized.modelRecordId !== request.modelRecordId;
           if (!keep) {
             deleted = true;
           }

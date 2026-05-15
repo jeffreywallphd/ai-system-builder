@@ -27,6 +27,7 @@ import type { ArtifactCatalogReadPort } from "../ports/artifact-catalog";
 import type { ArtifactStorageBindingPort, ArtifactObjectStoragePort, ArtifactRepoStoragePort } from "../ports/storage";
 import type { ArtifactStorageBinding } from "../../contracts/storage";
 import { TaskType } from "../../contracts/runtime";
+import { isWorkspaceId } from "../../contracts/workspace";
 import type { RuntimeCapabilityGuardService, TaskPowerLifecyclePort } from "../services/runtime";
 import type { RuntimeTaskStatus, RuntimeTaskStatusRecord } from "../../contracts/runtime";
 
@@ -345,6 +346,10 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     command: PrepareTrainingDatasetFromArtifactsCommand,
     context?: ApplicationRequestContext,
   ): Promise<ContractResult<{ requestId: string; taskType: string; accepted: true; status: "queued" | "running"; startedAt?: string; updatedAt?: string; metadata?: Record<string, unknown> }>> {
+    if (!isWorkspaceId(context?.workspaceId)) {
+      return createFailureResult(createContractError("validation", "Workspace id is required for dataset preparation."), context);
+    }
+
     try {
       await this.runtimeCapabilityGuard?.requireCapabilityReady("dataset-preparation");
     } catch (error) {
@@ -360,6 +365,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     }
 
     const runtimeRequest: PrepareTrainingDatasetRequest = {
+      workspaceId: context.workspaceId,
       sourceInputs: staged.value.sourceInputs,
       recipe: command.recipe,
       split: command.split,
@@ -374,6 +380,8 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         requestId: context?.requestId,
         taskType: TaskType.DATASET_PREPARATION,
         payload: runtimeRequest,
+        workspaceId: context.workspaceId,
+        metadata: { workspaceId: context.workspaceId },
       });
       if (typeof started.requestId !== "string" || started.requestId.trim().length === 0) {
         await rm(staged.value.runtimeWorkingDir, { recursive: true, force: true });
@@ -413,6 +421,9 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     context?: ApplicationRequestContext,
   ): Promise<ContractResult<RuntimeTaskStatusRecord | { requestId: string; taskType: string; status: "succeeded"; result: PrepareTrainingDatasetFromArtifactsValue }>> {
     try {
+      if (!isWorkspaceId(context?.workspaceId)) {
+        return createFailureResult(createContractError("validation", "Workspace id is required for dataset preparation status reads."), context);
+      }
       const cached = this.materializedResultsByRequestId.get(requestId);
       if (cached) {
         return createSuccessResult({ requestId, taskType: "prepare-training-dataset", status: "succeeded", result: cached }, context);
@@ -475,6 +486,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
           key: storageKey,
           mediaType: datasetOutput.mediaType,
           metadata: {
+            workspaceId: context?.workspaceId,
             originalFileName,
             runtimeRole: "dataset",
             ...buildDatasetMetadata(command, runtimeResult.summary, { provider: "local" }, datasetOutput.metadata),

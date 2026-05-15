@@ -1,3 +1,5 @@
+import type { WorkspaceId } from "../workspace";
+
 export interface ImageAssetMetadata {
   requestId?: string;
   originalFileName?: string;
@@ -13,6 +15,7 @@ export interface ImageAssetMetadata {
 }
 
 export interface ImageAsset {
+  workspaceId?: WorkspaceId;
   assetId: string;
   artifactId: string;
   source: "uploaded" | "generated";

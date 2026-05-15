@@ -9,8 +9,8 @@ import { BrowseModelsTab } from "./BrowseModelsTab";
 import { ManageModelsTab } from "./ManageModelsTab";
 import { TrainModelTab } from "./TrainModelTab";
 
-export function ModelsFeature(props: { client?: DesktopModelsClient }) {
-  const state = useModelsFeature(props.client);
+export function ModelsFeature(props: { client?: DesktopModelsClient; workspaceId?: string; workspaceName?: string }) {
+  const state = useModelsFeature(props.client, props.workspaceId);
   const trainingState = useModelTrainingFeature(props.client);
   const [activeTabId, setActiveTabId] = useState("browse-models");
   return (

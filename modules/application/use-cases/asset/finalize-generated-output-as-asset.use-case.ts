@@ -12,6 +12,7 @@ import type {
   FinalizeGeneratedOutputCommand,
 } from "../../../contracts/asset";
 import { normalizeAssetId } from "../../../contracts/asset";
+import { isWorkspaceId } from "../../../contracts/workspace";
 import type {
   AssetDefinitionRepositoryPort,
   AssetInstanceRepositoryPort,
@@ -48,11 +49,11 @@ const DEFAULT_DUPLICATE_SEARCH_LIMIT = 250;
 export interface GeneratedOutputFinalizationReadPort {
   readResourceBackedViewDetail?(
     viewId: string,
-    options?: AssetRegistryReadOptions,
+    options?: AssetRegistryReadOptions & { readonly workspaceId?: string },
   ): Promise<AssetRegistryResourceBackedViewDetail | undefined>;
   readGeneratedOutputResourceBackedViewByOutputId?(
     generatedOutputId: string,
-    options?: AssetRegistryReadOptions,
+    options?: AssetRegistryReadOptions & { readonly workspaceId?: string },
   ): Promise<AssetRegistryResourceBackedViewDetail | undefined>;
 }
 
@@ -83,6 +84,12 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
   }
 
   public async execute(command: FinalizeGeneratedOutputCommand): Promise<AssetMutationResult> {
+    if (!isWorkspaceId(command.workspaceId)) {
+      return failureResult(failure("validation", "Workspace id is required for generated output finalization.", [
+        diagnostic("error", "generated-output-finalization-workspace-required", "Finalization requires an explicit active workspace id."),
+      ]));
+    }
+
     const guardFailure = validateFinalizeGeneratedOutputMutationGuard(command);
     if (guardFailure) return failureResult(guardFailure);
 
@@ -198,6 +205,7 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
       includeMetadata: true,
       includeResourceBackings: true,
       includeValidation: true,
+      workspaceId: command.workspaceId,
     };
     if (command.viewId) {
       return this.dependencies.assetRegistryRead.readResourceBackedViewDetail?.(command.viewId, options);
@@ -265,6 +273,7 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
         requestId: safeText(command.context?.requestId),
         correlationId: safeText(command.context?.correlationId),
         idempotencyKey: safeText(command.context?.idempotencyKey),
+        workspaceId: command.workspaceId,
       });
     } catch {
       return {
@@ -358,6 +367,7 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
       metadata: sanitizeAssetMetadata({
         generatedOutputFinalization: true,
         assetFinalization: {
+          workspaceId: input.command.workspaceId,
           operation: FINALIZE_OPERATION,
           createdAt: input.createdAt,
           sourceIdentity: input.sourceIdentity,
@@ -372,6 +382,7 @@ export class FinalizeGeneratedOutputAsAssetUseCase {
             producedAt: input.sourceView.generatedOutput?.producedAt,
           },
           finalizedImage: {
+            workspaceId: input.finalizedImage.workspaceId,
             imageAssetId: input.finalizedImage.imageAssetId,
             backingArtifactId: input.finalizedImage.backingArtifactId,
             mediaType: input.finalizedImage.mediaType,
@@ -408,6 +419,12 @@ function validateEligibility(
   view: AssetResourceBackedView,
   command: FinalizeGeneratedOutputCommand,
 ): AssetMutationFailure | undefined {
+  const sourceWorkspaceId = (view.metadata as Record<string, unknown> | undefined)?.workspaceId ?? view.generatedOutput?.metadata?.workspaceId;
+  if (sourceWorkspaceId !== command.workspaceId) {
+    return failure("validation", "Generated output does not belong to the requested workspace.", [
+      diagnostic("error", "generated-output-workspace-mismatch", "Finalization validates generated output workspace ownership before writing finalized assets."),
+    ]);
+  }
   if (view.viewKind === "image-asset") {
     return failure("conflict", "Already-finalized image asset views should use the resource-backed view registration workflow.", [
       diagnostic("info", "generated-output-already-finalized-view", "This source is a finalized image asset view, not a generated-output view."),

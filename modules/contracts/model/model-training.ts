@@ -1,3 +1,4 @@
+import type { WorkspaceId } from "../workspace";
 import { type ModelTaskTag, normalizeModelTaskTags } from "../../domain/model";
 import { type ModelBrowseProvider, normalizeModelBrowseProvider } from "./model-browse-provider";
 import { type ModelInferenceMode, normalizeModelInferenceMode } from "./model-inference-mode";
@@ -102,6 +103,7 @@ export interface ModelTrainingValidationConfig {
 }
 
 export interface ModelTrainingRequest {
+  workspaceId?: WorkspaceId;
   baseModel: ModelTrainingBaseModel;
   datasets: ModelTrainingDatasetInput[];
   method: ModelTrainingMethod;

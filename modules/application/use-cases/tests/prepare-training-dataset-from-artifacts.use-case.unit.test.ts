@@ -20,9 +20,9 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     const runtimeStart = testDouble.fn(async () => ({ requestId: "r1", taskType: "prepare-training-dataset", accepted: true, status: "queued" }));
     const runtimeStatus = testDouble.fn(async () => ({ requestId: "r1", taskType: "dataset-preparation", status: "succeeded", concurrencyClass: "unknown", data: { outputs:[{name:"d",role:"dataset",tempPath:outputPath,mediaType:"application/x-ndjson"}],summary:{sourceDocumentCount:1,normalizedDocumentCount:1,skippedDocumentCount:0,chunkCount:1,generatedExampleCount:1,datasetRowCount:1,trainRowCount:1,testRowCount:0} } }));
     const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({ runtimeTaskRegistry: createRegistry({ startTask: runtimeStart, getTaskStatus: runtimeStatus }), storageBindings:{ readArtifactStorageBindings:testDouble.fn(async()=>({ok:true,value:{bindings:[]}})), upsertArtifactStorageBinding:testDouble.fn(), deleteArtifactStorageBindings:testDouble.fn() }, storage:{ retrieveArtifact:testDouble.fn(async()=>({ok:true,value:{descriptor:{key:"a1",mediaType:"text/markdown",metadata:{}},content:new TextEncoder().encode("hi")}})), storeArtifact:testDouble.fn(async(request:any)=>({ok:true,value:request.descriptor})), hasArtifact:testDouble.fn(), deleteArtifact:testDouble.fn() }, taskPowerLifecycle: lifecycle });
-    const started = await useCase.startPrepareTrainingDataset(command);
+    const started = await useCase.startPrepareTrainingDataset(command, { workspaceId: "workspace-a" });
     expect(started.ok).toBe(true);
-    const status = await useCase.readPrepareTrainingDataset("r1");
+    const status = await useCase.readPrepareTrainingDataset("r1", { workspaceId: "workspace-a" });
     expect(status.ok).toBe(true);
     expect(runtimeStart).toHaveBeenCalledTimes(1);
     expect(runtimeStatus).toHaveBeenCalledWith("r1");
@@ -35,8 +35,8 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     const outputPath = join(outputDir, "d.jsonl");
     await writeFile(outputPath, `{"x":1}\n`);
     const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({ runtimeTaskRegistry: createRegistry({ startTask: testDouble.fn(async () => ({ requestId: "r1", taskType: "prepare-training-dataset", accepted: true, status: "queued" })), getTaskStatus: testDouble.fn(async () => ({ requestId: "r1", taskType: "dataset-preparation", status: "succeeded", concurrencyClass: "unknown", data: { outputs:[{name:"d",role:"dataset",tempPath:outputPath,mediaType:"application/x-ndjson"}],summary:{sourceDocumentCount:1,normalizedDocumentCount:1,skippedDocumentCount:0,chunkCount:1,generatedExampleCount:1,datasetRowCount:1,trainRowCount:1,testRowCount:0} } })) }), storageBindings:{ readArtifactStorageBindings:testDouble.fn(async()=>({ok:true,value:{bindings:[]}})), upsertArtifactStorageBinding:testDouble.fn(), deleteArtifactStorageBindings:testDouble.fn() }, storage:{ retrieveArtifact:testDouble.fn(async()=>({ok:true,value:{descriptor:{key:"a1",mediaType:"text/markdown",metadata:{}},content:new TextEncoder().encode("hi")}})), storeArtifact:testDouble.fn(async()=>({ok:false,error:{code:"internal",message:"store failed"}})), hasArtifact:testDouble.fn(), deleteArtifact:testDouble.fn() }, taskPowerLifecycle: lifecycle });
-    await useCase.startPrepareTrainingDataset(command);
-    const status = await useCase.readPrepareTrainingDataset("r1");
+    await useCase.startPrepareTrainingDataset(command, { workspaceId: "workspace-a" });
+    const status = await useCase.readPrepareTrainingDataset("r1", { workspaceId: "workspace-a" });
     expect(status.ok).toBe(false);
     expect(lifecycle.completeTask).toHaveBeenCalledWith("r1", "failed");
     await rm(outputDir, { recursive: true, force: true });
@@ -46,9 +46,9 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     const lifecycle = createLifecycleFake();
     let runtimeDir = "";
     const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({ runtimeTaskRegistry: createRegistry({ startTask: testDouble.fn(async (request: any) => { runtimeDir = request.payload.runtime.runtimeWorkingDirectory; return { requestId: "r1", taskType: "prepare-training-dataset", accepted: true, status: "queued" }; }), getTaskStatus: testDouble.fn(async () => ({ requestId: "r1", taskType: "dataset-preparation", status: "failed", concurrencyClass: "unknown", error: { code: "failed", message: "boom" } })) }), storageBindings:{ readArtifactStorageBindings:testDouble.fn(async()=>({ok:true,value:{bindings:[]}})), upsertArtifactStorageBinding:testDouble.fn(), deleteArtifactStorageBindings:testDouble.fn() }, storage:{ retrieveArtifact:testDouble.fn(async()=>({ok:true,value:{descriptor:{key:"a1",mediaType:"text/markdown",metadata:{}},content:new TextEncoder().encode("hi")}})), storeArtifact:testDouble.fn(), hasArtifact:testDouble.fn(), deleteArtifact:testDouble.fn() }, taskPowerLifecycle: lifecycle });
-    await useCase.startPrepareTrainingDataset(command);
+    await useCase.startPrepareTrainingDataset(command, { workspaceId: "workspace-a" });
     expect(await exists(runtimeDir)).toBe(true);
-    await useCase.readPrepareTrainingDataset("r1");
+    await useCase.readPrepareTrainingDataset("r1", { workspaceId: "workspace-a" });
     expect(await exists(runtimeDir)).toBe(false);
   });
 
@@ -65,7 +65,7 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
       taskPowerLifecycle: lifecycle,
     });
 
-    const started = await useCase.startPrepareTrainingDataset(command);
+    const started = await useCase.startPrepareTrainingDataset(command, { workspaceId: "workspace-a" });
 
     expect(started.ok).toBe(false);
     if (!started.ok) {
@@ -89,7 +89,7 @@ it("rejects dataset preparation start when runtime capability is not ready", asy
     runtimeCapabilityGuard: { requireCapabilityReady: testDouble.fn(async () => { throw unavailable; }) },
   });
 
-  const result = await useCase.startPrepareTrainingDataset(command, { requestId: "req-dataset", correlationId: "corr-dataset" });
+  const result = await useCase.startPrepareTrainingDataset(command, { requestId: "req-dataset", correlationId: "corr-dataset", workspaceId: "workspace-a" });
 
   expect(result).toMatchObject({
     ok: false,

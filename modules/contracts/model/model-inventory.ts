@@ -1,3 +1,4 @@
+import type { WorkspaceId } from "../workspace";
 import {
   normalizeModelArtifactForm,
   normalizeModelLifecycleStatus,
@@ -23,6 +24,7 @@ export interface ModelPublishedSummary {
 }
 
 export interface ModelInventoryRecord {
+  workspaceId?: WorkspaceId;
   modelRecordId: string;
   displayName: string;
   source: ModelSource;
@@ -103,6 +105,7 @@ function normalizePublishedSummary(value: ModelPublishedSummary | undefined): Mo
 
 export function normalizeModelInventoryRecord(record: ModelInventoryRecord): ModelInventoryRecord {
   return {
+    workspaceId: record.workspaceId,
     modelRecordId: normalizeRequiredText(record.modelRecordId, "modelRecordId"),
     displayName: normalizeRequiredText(record.displayName, "displayName"),
     source: normalizeModelSource(record.source),
