@@ -8,6 +8,7 @@ This directory is organized into four documentation areas with distinct roles.
   - Architecture Decision Records (ADRs): major architectural decisions and rationale.
 - `docs/architecture/`
   - Current intended system structure, module boundaries, and operating model.
+  - `docs/architecture/user-library-and-cross-workspace-reuse.md` is the Phase 7 baseline for User Library reuse, explicit promote/link/copy/import relationships, provenance, and propagation constraints.
 - `docs/standards/`
   - Canonical implementation and documentation rules.
 - `docs/context/`
@@ -32,7 +33,7 @@ This directory is organized into four documentation areas with distinct roles.
 - Phase 11 is **Pack Import/Export, Sharing, and Distribution**.
 - Phase 12 is **Collaboration, Permissions, and Multi-User Workspaces**.
 
-See `docs/architecture/workspace-model.md` for the Phase 6 workspace model, including reference-only `system.foundation@1.0.0` activation and the no-hidden-workspace/no-auto-migration rule.
+See `docs/architecture/workspace-model.md` for the Phase 6 workspace model, including reference-only `system.foundation@1.0.0` activation and the no-hidden-workspace/no-auto-migration rule. See `docs/architecture/user-library-and-cross-workspace-reuse.md` and ADR-0017 for the Phase 7 reuse baseline.
 
 ## Automation Note
 

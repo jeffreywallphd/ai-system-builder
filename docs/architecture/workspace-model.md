@@ -38,6 +38,12 @@ Workspace-owned resource records should carry workspace ownership in their own d
 
 Legacy global records are not silently assigned to a workspace, copied, migrated, or exposed as workspace-owned data. Any future migration/import must be explicit and user-visible.
 
+## Phase 7 reuse boundary
+
+Phase 7 introduces User Library and Cross-Workspace Asset Reuse as explicit reuse relationships only. Workspace isolation remains the default: workspace-local assets and resources stay visible only inside their owning workspace unless a later promote, link, copy, or import workflow creates a durable relationship. Direct workspace-to-workspace reuse begins as independent import/copy into the target workspace, not live linking.
+
+The User Library is a separate user-owned scope, not a workspace and not the system foundation. Phase 7 must not use the User Library to justify missing workspace context, hidden/default workspaces, system foundation mutation, startup seeding, or legacy/global auto-migration.
+
 ## Collaboration placeholders
 
 Workspace records may carry passive collaboration/readiness placeholders for future phases, but Phase 6 does not implement invites, memberships, permissions, sync, remote auth, multi-user conflict resolution, or sharing policy. Those behaviors belong to later collaboration and distribution phases.
