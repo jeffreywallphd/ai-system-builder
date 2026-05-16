@@ -6,6 +6,7 @@ import { createFilesystemGeneratedImagePersistenceAdapter } from "../../../adapt
 import { createLocalModelCheckpointResolverAdapter } from "../../../adapters/model/local";
 import { createRuntimePreparedModelCheckpointResolver } from "../../shared/createRuntimePreparedModelCheckpointResolver";
 import type { LoggingPort } from "../../../application/ports/logging";
+import { TaskType } from "../../../contracts/runtime";
 
 export interface ComposeDesktopImageGenerationFeatureOptions {
   storageRootDirectory: string;
@@ -19,12 +20,24 @@ export interface ComposeDesktopImageGenerationFeatureOptions {
 }
 
 export function composeDesktopImageGenerationFeature(options: ComposeDesktopImageGenerationFeatureOptions): any {
+  let disposed = false;
   const localModelCheckpointResolver = createLocalModelCheckpointResolverAdapter({
     modelRegistry: options.assets.modelRegistry,
     comfyUiCheckpointDirectory: join(options.comfyUi.installRoot, "models", "checkpoints"),
     log: (entry) => options.recordRuntimeLog({ level: "info", message: `Image generation model checkpoint resolution: ${JSON.stringify(entry)}` }),
   });
   return {
+    dispose() { disposed = true; },
+    get disposed() { return disposed; },
+    async canDispose() {
+      try {
+        const active = await options.runtime.runtimeTaskRegistry.listTasks({ taskTypes: [TaskType.IMAGE_GENERATION], statuses: ["queued", "running", "unknown"] });
+        const activeTaskCount = active.tasks.length;
+        return activeTaskCount > 0 ? { blockedReason: "active-runtime-tasks", activeTaskCount } : undefined;
+      } catch {
+        return { blockedReason: "active-task-status-unavailable" };
+      }
+    },
     generateImageUseCase: new GenerateImageUseCase({
       runtimeTaskRegistry: options.runtime.runtimeTaskRegistry,
       modelCheckpointResolver: createRuntimePreparedModelCheckpointResolver({ runtime: options.comfyUi.supervisorPort, modelCheckpointResolver: localModelCheckpointResolver }),

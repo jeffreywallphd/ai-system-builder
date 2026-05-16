@@ -155,3 +155,36 @@ Route-level lazy loading and page-section loading are separate checks. A route i
 Use these milestones to confirm that the page title, description, and local layout render before expensive sections resolve. Backend feature composition should still happen only after the section makes the relevant preload/IPC request; route import or page shell render alone should not compose Python, ComfyUI, GPU detection, Hugging Face browse, training, validation, publish, or remote artifact features.
 
 A regression usually appears as a burst of section start milestones for every remote/runtime panel immediately after opening a page, followed by matching backend compose milestones before the user expands, searches, selects an item, refreshes runtime status, or starts an explicit action. Expected Prompt 6 behavior is narrower: initial sections such as local model/artifact/asset definitions may load on page open, while remote browse, runtime readiness, artifact detail/media, resource-backed views, training, validation, publish, install, repair, and generation milestones appear only for the visible or user-triggered section.
+
+## Prompt 7 safe feature lifecycle and disposal policy
+
+Prompt 7 adds conservative lifecycle handling for host-owned lazy features and renderer-owned preview resources. Disposal is intentionally scoped: it releases memoized feature objects, subscriptions, temporary caches, and renderer object URLs when safe, but it does **not** delete persisted artifacts, model records, settings, workspace data, or local files.
+
+Lifecycle policy groups:
+
+- **Always resident:** logging, memory diagnostics helpers, Hugging Face token status/config storage, local application settings and secrets adapters, workspace list/create/selection shell, minimal IPC registration shell, and cheap runtime-readiness shell.
+- **Lazy retained/warm:** local workspace shell, basic settings use cases, local artifact storage foundations that do not hold large content buffers, local model registry records, asset definitions registry, and lightweight ComfyUI install status helpers.
+- **Lazy disposable:** Hugging Face artifact-remote browse/publish/import/localize objects, website-ingestion objects, dataset-preparation objects when no dataset-preparation task is active, and image-generation host objects when no image-generation task is active. Renderer pages also clean up generated image preview object URLs, artifact preview object URLs, large preview blobs, section timers, and local-only async updates on unmount.
+- **Explicit user-action unload only:** the Python process, loaded Python model weights, ComfyUI process/runtime state, runtime task registries with active work, model training/validation/publishing task state, and generated model training state. Ordinary page navigation and idle disposal do not stop Python or ComfyUI and do not unload Python model weights.
+
+Host disposal is best-effort and idempotent. A disposable feature's memoized instance is cleared after disposal, so the next IPC request recreates the feature through the same lazy provider. Disposal failures are logged and also clear the memoized failed instance so later requests can recover. Active runtime tasks block unsafe dataset-preparation and image-generation disposal.
+
+Lifecycle diagnostics remain gated by `DESKTOP_MEMORY_DIAGNOSTICS=1`. Relevant milestones include:
+
+- `desktop.host.feature.dispose.requested`
+- `desktop.host.feature.dispose.started`
+- `desktop.host.feature.dispose.completed`
+- `desktop.host.feature.dispose.failed`
+- `desktop.host.feature.idle.marked`
+- `desktop.host.feature.idle.cancelled`
+- `desktop.host.feature.memoized.cleared`
+- `renderer.section.cleanup.started`
+- `renderer.section.cleanup.completed`
+- `renderer.preview.object-url.revoked`
+- `renderer.section.request.aborted`
+
+To verify release behavior, start the desktop app with diagnostics enabled, open a feature page that loads a disposable feature, navigate away or trigger developer lifecycle disposal, confirm the lifecycle milestones above, then return to the feature page and confirm the feature composes again and remains functional. Python and ComfyUI should remain running unless the user uses the existing explicit stop/unload controls.
+
+```bash
+DESKTOP_MEMORY_DIAGNOSTICS=1 npm run dev:desktop
+```

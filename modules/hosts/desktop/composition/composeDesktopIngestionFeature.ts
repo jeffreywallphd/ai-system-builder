@@ -7,7 +7,8 @@ export interface ComposeDesktopIngestionFeatureOptions {
 }
 
 export function composeDesktopIngestionFeature(options: ComposeDesktopIngestionFeatureOptions): any {
+  let disposed = false;
   const websiteHtmlAcquisition = createWebsiteHtmlAcquisitionPort();
   const ingestWebsitePageUseCase = new IngestWebsitePageUseCase({ acquisition: websiteHtmlAcquisition, storage: options.artifacts.storage, now: options.now });
-  return { ingestWebsitePageUseCase, ingestWebsitePagesBatchUseCase: new IngestWebsitePagesBatchUseCase({ ingestWebsitePage: ingestWebsitePageUseCase }) };
+  return { dispose() { disposed = true; }, get disposed() { return disposed; }, ingestWebsitePageUseCase, ingestWebsitePagesBatchUseCase: new IngestWebsitePagesBatchUseCase({ ingestWebsitePage: ingestWebsitePageUseCase }) };
 }
