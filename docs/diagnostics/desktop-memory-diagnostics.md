@@ -147,3 +147,11 @@ DESKTOP_MEMORY_DIAGNOSTICS=1 npm run dev:desktop
 ```
 
 On initial startup, expect `renderer.app.mounted`, `renderer.page.active.changed`, and lazy-load milestones only for the active page. Navigating to Models should add lazy-load milestones for Models but not Image Generation; navigating to Data/Artifacts should not load Models unless the user opens Models. Main-process deferred feature compose/import milestones should remain tied to the first feature IPC request rather than to renderer lazy page import.
+
+## Prompt 6 page-section loading diagnostics
+
+Route-level lazy loading and page-section loading are separate checks. A route import should make only the page shell available; expensive panels inside that page should emit their own section milestones when they actually load data. With `DESKTOP_MEMORY_DIAGNOSTICS=1`, section boundaries log `renderer.section.load.start`, `renderer.section.load.resolved`, `renderer.section.load.failed`, `renderer.section.load.skipped`, and `renderer.section.load.retry` with small details such as `pageKey`, `sectionKey`, `trigger`, `activePage`, and workspace status when available.
+
+Use these milestones to confirm that the page title, description, and local layout render before expensive sections resolve. Backend feature composition should still happen only after the section makes the relevant preload/IPC request; route import or page shell render alone should not compose Python, ComfyUI, GPU detection, Hugging Face browse, training, validation, publish, or remote artifact features.
+
+A regression usually appears as a burst of section start milestones for every remote/runtime panel immediately after opening a page, followed by matching backend compose milestones before the user expands, searches, selects an item, refreshes runtime status, or starts an explicit action. Expected Prompt 6 behavior is narrower: initial sections such as local model/artifact/asset definitions may load on page open, while remote browse, runtime readiness, artifact detail/media, resource-backed views, training, validation, publish, install, repair, and generation milestones appear only for the visible or user-triggered section.

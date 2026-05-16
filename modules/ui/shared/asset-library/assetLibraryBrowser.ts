@@ -157,18 +157,20 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient, wor
       return;
     }
     const result = await client.listAssetDefinitions(query);
-    const resourceResult = await client.listAssetResourceBackedViews({
-      searchText: query.searchText,
-      assetTypes: query.assetTypes,
-      assetFamilies: query.assetFamilies,
-      lifecycleStatuses: query.lifecycleStatuses,
-      limit: query.limit,
-      cursor: query.cursor,
-      ...(workspaceId ? { workspaceId } : {}),
-    });
+    const resourceResult = activeTab === "resource-views"
+      ? await client.listAssetResourceBackedViews({
+        searchText: query.searchText,
+        assetTypes: query.assetTypes,
+        assetFamilies: query.assetFamilies,
+        lifecycleStatuses: query.lifecycleStatuses,
+        limit: query.limit,
+        cursor: query.cursor,
+        ...(workspaceId ? { workspaceId } : {}),
+      })
+      : undefined;
     if (result.ok === false) {
       setDefinitions([]);
-      setResourceBackedViews(resourceResult.ok === true ? resourceResult.value.items : []);
+      setResourceBackedViews(resourceResult?.ok === true ? resourceResult.value.items : []);
       setDiagnostics([]);
       setListError(result.error.message || "Unable to load Asset Library.");
       setSelectedDefinition(undefined);
@@ -179,16 +181,18 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient, wor
 
     const filteredDefinitions = applyLocalDefinitionFilters(result.value.items, filters);
     setDefinitions(filteredDefinitions);
-    if (resourceResult.ok === true) {
+    if (resourceResult?.ok === true) {
       setResourceBackedViews(resourceResult.value.items);
-    } else {
+    } else if (activeTab === "resource-views") {
       setResourceBackedViews([]);
     }
     setDiagnostics([
       ...safeDiagnosticMessages((result.value.diagnostics ?? []).map((diagnostic) => diagnostic.message)),
-      ...(resourceResult.ok === true
+      ...(resourceResult?.ok === true
         ? safeDiagnosticMessages((resourceResult.value.diagnostics ?? []).map((diagnostic) => diagnostic.message))
-        : [safeDisplayText(resourceResult.error.message) ?? "Unable to load resource-backed views."]),
+        : activeTab === "resource-views" && resourceResult?.ok === false
+          ? [safeDisplayText(resourceResult.error.message) ?? "Unable to load resource-backed views."]
+          : []),
     ]);
     setIsLoadingList(false);
 
@@ -198,13 +202,13 @@ export function useAssetLibraryDefinitionBrowser(client: AssetLibraryClient, wor
       setDetailError(undefined);
       setValidationError(undefined);
     }
-    if (selectedResourceBackedView && resourceResult.ok === true && !resourceResult.value.items.some((item) => item.id === selectedResourceBackedView.id)) {
+    if (selectedResourceBackedView && resourceResult?.ok === true && !resourceResult.value.items.some((item) => item.id === selectedResourceBackedView.id)) {
       setSelectedResourceBackedView(undefined);
       setSelectedResourceBackedViewDetail(undefined);
       setDetailError(undefined);
       setValidationError(undefined);
     }
-  }, [client, filters, query, selectedDefinition, selectedResourceBackedView, workspaceId]);
+  }, [activeTab, client, filters, query, selectedDefinition, selectedResourceBackedView, workspaceId]);
 
   useEffect(() => {
     void loadList();

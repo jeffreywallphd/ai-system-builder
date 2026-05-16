@@ -4,6 +4,7 @@ import type { ModelArtifactForm, ModelLifecycleStatus, ModelSource, ModelTaskTag
 import { createWorkspaceId } from "../../../../../../../modules/contracts/workspace";
 import type { DesktopModelBrowseItem, DesktopModelDetailsResult, DesktopModelInventoryRecord } from "../../../lib/desktopApi";
 import type { DesktopModelsClient } from "../api/desktopModelsClient";
+import { recordSectionLoadMilestone } from "../../../diagnostics/sectionLoadDiagnostics";
 import { useModelsClient } from "./useModelsClient";
 
 interface ViewState {
@@ -56,6 +57,7 @@ export function useModelsFeature(client?: DesktopModelsClient, workspaceId?: str
   const [publishRepository, setPublishRepository] = useState("");
 
   const searchModels = useCallback(async () => {
+    recordSectionLoadMilestone("renderer.section.load.start", { pageKey: "models", sectionKey: "models.remote-browse", trigger: "search" });
     setBrowseState({ status: "loading", message: "Searching models..." });
     try {
       const taskTag = normalizeOptionalTaskTag(browseTaskTag);
@@ -70,8 +72,10 @@ export function useModelsFeature(client?: DesktopModelsClient, workspaceId?: str
       setSelectedBrowseModelDetails(undefined);
       setDetailsState({ status: "idle" });
       setBrowseState({ status: "success", message: result.models.length > 0 ? "Loaded model results." : "No model results found." });
+      recordSectionLoadMilestone("renderer.section.load.resolved", { pageKey: "models", sectionKey: "models.remote-browse", trigger: "search" });
     } catch (error) {
       setBrowseState({ status: "error", message: error instanceof Error ? error.message : "Failed to browse models." });
+      recordSectionLoadMilestone("renderer.section.load.failed", { pageKey: "models", sectionKey: "models.remote-browse", trigger: "search" });
     }
   }, [browseLimit, browseQuery, browseTaskTag, modelClient]);
 
@@ -139,6 +143,7 @@ export function useModelsFeature(client?: DesktopModelsClient, workspaceId?: str
   }, [modelClient, selectedBrowseModel, workspaceId]);
 
   const refreshModels = useCallback(async () => {
+    recordSectionLoadMilestone("renderer.section.load.start", { pageKey: "models", sectionKey: "models.local-list", trigger: "initial" });
     setManageState({ status: "loading", message: "Loading model inventory..." });
     try {
       const listed = workspaceId ? await modelClient.listModels({
@@ -151,8 +156,10 @@ export function useModelsFeature(client?: DesktopModelsClient, workspaceId?: str
       setModels(listed);
       setSelectedManagedModel((current) => listed.find((item) => item.modelRecordId === current?.modelRecordId));
       setManageState({ status: "success", message: listed.length > 0 ? "Loaded model inventory." : "No model records found." });
+      recordSectionLoadMilestone("renderer.section.load.resolved", { pageKey: "models", sectionKey: "models.local-list", trigger: "initial" });
     } catch (error) {
       setManageState({ status: "error", message: error instanceof Error ? error.message : "Failed to list model records." });
+      recordSectionLoadMilestone("renderer.section.load.failed", { pageKey: "models", sectionKey: "models.local-list", trigger: "initial" });
     }
   }, [manageArtifactForm, manageLifecycleStatus, manageSearch, manageSource, modelClient, workspaceId]);
 
@@ -161,8 +168,11 @@ export function useModelsFeature(client?: DesktopModelsClient, workspaceId?: str
   }, [refreshModels]);
 
   useEffect(() => {
-    void loadPopularModels();
-  }, [loadPopularModels]);
+    recordSectionLoadMilestone("renderer.section.load.skipped", { pageKey: "models", sectionKey: "models.remote-browse", trigger: "initial" });
+    recordSectionLoadMilestone("renderer.section.load.skipped", { pageKey: "models", sectionKey: "models.training", trigger: "initial" });
+    recordSectionLoadMilestone("renderer.section.load.skipped", { pageKey: "models", sectionKey: "models.validation", trigger: "initial" });
+    recordSectionLoadMilestone("renderer.section.load.skipped", { pageKey: "models", sectionKey: "models.publish", trigger: "initial" });
+  }, []);
 
   const downloadModel = useCallback(async (model?: DesktopModelBrowseItem) => {
     const modelToDownload = model ?? selectedBrowseModel;
