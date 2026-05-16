@@ -21,6 +21,7 @@ export interface ComposeDesktopArtifactRemoteFeatureOptions {
 }
 
 export function composeDesktopArtifactRemoteFeature(options: ComposeDesktopArtifactRemoteFeatureOptions): any {
+  let disposed = false;
   const huggingFaceArtifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter({
     accessTokenProvider: options.tokenProvider,
     fetchImplementation: options.huggingFaceFetchImplementation,
@@ -28,6 +29,8 @@ export function composeDesktopArtifactRemoteFeature(options: ComposeDesktopArtif
   const artifactRepoStorage = createArtifactRepoStorageAdapter({ providers: [{ provider: "huggingface", adapter: huggingFaceArtifactRepoStorage }] });
   const foundation = options.artifacts;
   return {
+    dispose() { disposed = true; },
+    get disposed() { return disposed; },
     huggingFaceArtifactRepoStorage,
     artifactRepoStorage,
     publishArtifactToRepoUseCase: new PublishArtifactToRepoUseCase({ artifactStorage: foundation.storage, artifactRepoStorage, artifactBindingStorage: foundation.artifactBindings, now: options.now }),

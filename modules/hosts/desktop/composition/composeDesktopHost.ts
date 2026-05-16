@@ -22,6 +22,7 @@ import { createHuggingFaceTokenConfigStore, type HuggingFaceTokenStatus } from "
 import type { InternalAssetRegistryComposition } from "../../shared/composition/composeInternalAssetRegistry";
 import { recordDesktopMemorySnapshot } from "../diagnostics";
 import { createDesktopRuntimeReadinessService } from "./composeDesktopRuntimeReadiness";
+import { createDesktopFeatureLifecycleRegistry, type DesktopFeatureDisposeReason, type DesktopFeatureDisposeResult, type DesktopFeatureLifecycleStateEntry } from "./featureLifecycle";
 import { createUnavailablePythonRuntimeStatus, resolvePythonRuntimeBaseUrl, type DesktopPythonRuntimeFeature } from "./desktopPythonRuntimeHelpers";
 export { createDesktopRuntimeReadinessService, type CreateDesktopRuntimeReadinessServiceOptions } from "./composeDesktopRuntimeReadiness";
 
@@ -102,27 +103,15 @@ export interface DesktopHostComposition {
   registerDesktopIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
   registerArtifactUploadIpc: (options: RegisterDesktopArtifactUploadIpcOptions) => void;
   getInternalAssetRegistry: () => InternalAssetRegistryComposition | undefined;
+  getFeatureLifecycleState: () => DesktopFeatureLifecycleStateEntry[];
+  disposeFeature: (featureKey: string, reason?: DesktopFeatureDisposeReason) => Promise<DesktopFeatureDisposeResult>;
+  markFeatureIdle: (featureKey: string, reason?: DesktopFeatureDisposeReason) => boolean;
+  disposeIdleFeatures: (reason?: DesktopFeatureDisposeReason) => Promise<DesktopFeatureDisposeResult[]>;
 }
 
 
 export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): DesktopHostComposition {
   const recordHostMemorySnapshot = (milestone: string, detail?: Record<string, unknown>) => recordDesktopMemorySnapshot({ milestone, component: "desktop-host-composition", detail });
-  const memoizeAsyncFeature = <T>(milestoneBase: string, importFeature: () => Promise<() => T | Promise<T>>): (() => Promise<T>) => {
-    let promise: Promise<T> | undefined;
-    return async () => {
-      if (promise) return promise;
-      promise = (async () => {
-        recordHostMemorySnapshot(`${milestoneBase}.import.before`);
-        const compose = await importFeature();
-        recordHostMemorySnapshot(`${milestoneBase}.import.after`);
-        recordHostMemorySnapshot(`${milestoneBase}.compose.before`);
-        const value = await compose();
-        recordHostMemorySnapshot(`${milestoneBase}.compose.after`);
-        return value;
-      })();
-      return promise;
-    };
-  };
   const memoizeSyncFeature = <T>(milestoneBase: string, compose: () => T): (() => T) => {
     let value: T | undefined;
     return () => {
@@ -138,6 +127,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
   const loggingConfig = createLoggingConfig({ verbosity: options.logging?.verbosity, fallbackVerbosity: options.logging?.fallbackVerbosity, level: options.logging?.level, includeDiagnostics: options.logging?.includeDiagnostics });
   const loggingPort = createLogger({ config: loggingConfig, host: "desktop", component: "desktop-host", sink: options.logSink, now: options.now });
   recordHostMemorySnapshot("desktop.host.logging.ready");
+  const featureLifecycle = createDesktopFeatureLifecycleRegistry({ loggingPort, recordMilestone: recordHostMemorySnapshot });
 
   const now = options.now ?? (() => new Date().toISOString());
   const runtimeLogs: DesktopPythonRuntimeLogEntry[] = [];
@@ -253,6 +243,10 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
     readPythonRuntimeStatus,
     async getPythonRuntimeDiagnostics() { const status = await readPythonRuntimeStatus(); return { status: status.runtimeStatus, healthy: status.healthy, capabilities: status.capabilities }; },
     getInternalAssetRegistry() { return internalAssetRegistry; },
+    getFeatureLifecycleState: featureLifecycle.getFeatureLifecycleState,
+    disposeFeature: featureLifecycle.disposeFeature,
+    markFeatureIdle: featureLifecycle.markFeatureIdle,
+    disposeIdleFeatures: featureLifecycle.disposeIdleFeatures,
     registerDesktopIpc(registerOptions) {
       recordHostMemorySnapshot("desktop.host.ipc-registration.enter", { hasRuntimeRootDirectory: Boolean(registerOptions.runtimeRootDirectory), hasStorageRootDirectory: Boolean(registerOptions.storageRootDirectory) });
       const getStartupWorkspaceShell = memoizeSyncFeature("desktop.host.startup-workspace-shell.compose", () => {
@@ -269,46 +263,46 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
         async readComfyUiInstallStatus() { return "unknown"; },
         now,
       });
-      const getArtifactFeatures = memoizeAsyncFeature("desktop.host.artifact-features", async () => {
+      const getArtifactFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "artifact-local", policy: "retained", milestoneBase: "desktop.host.artifact-features", importFeature: async () => {
         const module = await import("./composeDesktopArtifactFeature");
         return () => module.composeDesktopArtifactFeature({ storageRootDirectory: registerOptions.storageRootDirectory, loggingPort, now: options.now, workspaceShell: startupWorkspaceShell });
-      });
-      const getArtifactRemoteFeatures = memoizeAsyncFeature("desktop.host.artifact-remote-features", async () => {
+      }});
+      const getArtifactRemoteFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "artifact-remote", policy: "disposable", milestoneBase: "desktop.host.artifact-remote-features", importFeature: async () => {
         const module = await import("./composeDesktopArtifactRemoteFeature");
         return async () => module.composeDesktopArtifactRemoteFeature({ artifacts: await getArtifactFeatures(), loggingPort, now: options.now, tokenProvider: () => tokenConfigStore.getToken(), huggingFaceFetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation });
-      });
-      const getAssetFeatures = memoizeAsyncFeature("desktop.host.asset-features", async () => {
+      }});
+      const getAssetFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "asset-registry", policy: "retained", milestoneBase: "desktop.host.asset-features", importFeature: async () => {
         const module = await import("./composeDesktopAssetFeature");
         return async () => module.composeDesktopAssetFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, artifacts: await getArtifactFeatures(), onInternalAssetRegistry: (registry) => { internalAssetRegistry = registry; } });
-      });
-      const getComfyUiInstallFeatures = memoizeAsyncFeature("desktop.host.comfyui-install-features", async () => {
+      }});
+      const getComfyUiInstallFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "comfyui-install", policy: "retained", milestoneBase: "desktop.host.comfyui-install-features", importFeature: async () => {
         const module = await import("./composeDesktopComfyUiInstallFeature");
         return () => module.composeDesktopComfyUiInstallFeature({ runtimeRootDirectory: registerOptions.runtimeRootDirectory, loggingPort });
-      });
-      const getComfyUiImageRuntimeFeatures = memoizeAsyncFeature("desktop.host.comfyui-image-runtime-features", async () => {
+      }});
+      const getComfyUiImageRuntimeFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "comfyui-image-runtime", policy: "explicit-unload-only", milestoneBase: "desktop.host.comfyui-image-runtime-features", importFeature: async () => {
         const module = await import("./composeDesktopComfyUiImageRuntimeFeature");
         return () => module.composeDesktopComfyUiImageRuntimeFeature({ runtimeRootDirectory: registerOptions.runtimeRootDirectory, loggingPort, applicationSettings, readRuntimeSettingString, getArtifacts: getArtifactFeatures });
-      });
-      const getRuntimeTaskFeatures = memoizeAsyncFeature("desktop.host.runtime-task-features", async () => {
+      }});
+      const getRuntimeTaskFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "runtime-task-registry", policy: "explicit-unload-only", milestoneBase: "desktop.host.runtime-task-features", importFeature: async () => {
         const module = await import("./composeDesktopRuntimeTaskFeature");
         return async () => module.composeDesktopRuntimeTaskFeature({ pythonRuntimeFoundation: await getPythonRuntimeFoundation(), imageRuntimeTaskRegistry: (await getComfyUiImageRuntimeFeatures()).imageRuntimeTaskRegistry, runtimeReadiness, recordMilestone: recordHostMemorySnapshot });
-      });
-      const getModelFeatures = memoizeAsyncFeature("desktop.host.model-features", async () => {
+      }});
+      const getModelFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "model-registry", policy: "retained", milestoneBase: "desktop.host.model-features", importFeature: async () => {
         const module = await import("./composeDesktopModelFeature");
         return () => module.composeDesktopModelFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, tokenProvider: () => tokenConfigStore.getToken(), getArtifacts: getArtifactFeatures, getRuntimeTaskFeatures, getPythonRuntimeFoundation });
-      });
-      const getImageGenerationFeatures = memoizeAsyncFeature("desktop.host.image-generation-features", async () => {
+      }});
+      const getImageGenerationFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "image-generation", policy: "disposable", milestoneBase: "desktop.host.image-generation-features", importFeature: async () => {
         const module = await import("./composeDesktopImageGenerationFeature");
         return async () => module.composeDesktopImageGenerationFeature({ storageRootDirectory: registerOptions.storageRootDirectory, loggingPort, now, recordRuntimeLog, artifacts: await getArtifactFeatures(), assets: await getAssetFeatures(), runtime: await getRuntimeTaskFeatures(), comfyUi: await getComfyUiImageRuntimeFeatures() });
-      });
-      const getIngestionFeatures = memoizeAsyncFeature("desktop.host.ingestion-features", async () => {
+      }});
+      const getIngestionFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "website-ingestion", policy: "disposable", milestoneBase: "desktop.host.ingestion-features", importFeature: async () => {
         const module = await import("./composeDesktopIngestionFeature");
         return async () => module.composeDesktopIngestionFeature({ artifacts: await getArtifactFeatures(), now: options.now });
-      });
-      const getDatasetPreparationFeatures = memoizeAsyncFeature("desktop.host.dataset-preparation-features", async () => {
+      }});
+      const getDatasetPreparationFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "dataset-preparation", policy: "disposable", milestoneBase: "desktop.host.dataset-preparation-features", importFeature: async () => {
         const module = await import("./composeDesktopDatasetPreparationFeature");
         return async () => module.composeDesktopDatasetPreparationFeature({ artifacts: await getArtifactFeatures(), runtime: await getRuntimeTaskFeatures(), getArtifactRemoteFeatures, now: options.now });
-      });
+      }});
       const settingsUseCases = {
         listSettingsDefinitionsUseCase: new ListSettingsDefinitionsUseCase({ settings: applicationSettings }),
         readSettingsUseCase: new ReadSettingsUseCase({ settings: applicationSettings, secrets: applicationSecrets }),

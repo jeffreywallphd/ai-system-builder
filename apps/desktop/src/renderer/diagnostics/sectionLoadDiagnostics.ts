@@ -5,7 +5,10 @@ export type SectionLoadMilestone =
   | "renderer.section.load.resolved"
   | "renderer.section.load.failed"
   | "renderer.section.load.skipped"
-  | "renderer.section.load.retry";
+  | "renderer.section.load.retry"
+  | "renderer.section.cleanup.started"
+  | "renderer.section.cleanup.completed"
+  | "renderer.section.request.aborted";
 
 export interface SectionLoadDiagnosticDetail {
   readonly pageKey: string;

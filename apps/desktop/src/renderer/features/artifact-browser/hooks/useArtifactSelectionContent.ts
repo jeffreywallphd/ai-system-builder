@@ -7,6 +7,7 @@ import type {
 } from "../../../lib/desktopApi";
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
 import { decodeHtmlArtifactPreview } from "../helpers/htmlArtifactPreview";
+import { recordRendererMemorySnapshot } from "../../../diagnostics/rendererMemoryDiagnostics";
 
 export interface UseArtifactSelectionContentResult {
   selectedStorageKey?: string;
@@ -33,6 +34,11 @@ export function useArtifactSelectionContent(
   const revokeObjectUrl = useCallback((url: string) => {
     if (typeof URL.revokeObjectURL === "function") {
       URL.revokeObjectURL(url);
+      recordRendererMemorySnapshot({
+        milestone: "renderer.preview.object-url.revoked",
+        component: "desktop-renderer-preview-cleanup",
+        detail: { pageKey: "artifacts", sectionKey: "artifact-browser.preview", reason: "page-unmount" },
+      });
     }
   }, []);
 
