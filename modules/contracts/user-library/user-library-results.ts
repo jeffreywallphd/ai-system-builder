@@ -17,38 +17,45 @@ export const USER_LIBRARY_OPERATION_RESULT_STATUSES = [
 export type UserLibraryOperationResultStatus =
   (typeof USER_LIBRARY_OPERATION_RESULT_STATUSES)[number];
 
-export interface UserLibraryOperationResultBase {
-  readonly ok: boolean;
-  readonly status?: UserLibraryOperationResultStatus;
+type UserLibraryOperationSuccess<TStatus extends UserLibraryOperationResultStatus, TPayload> = {
+  readonly ok: true;
+  readonly status: TStatus;
+  readonly payload: TPayload;
   readonly provenance?: UserLibraryProvenanceSummary;
   readonly diagnostics?: readonly UserLibraryDiagnostic[];
-  readonly failure?: UserLibraryFailure;
-}
+};
 
-export interface PromoteWorkspaceAssetToUserLibraryResult
-  extends UserLibraryOperationResultBase {
-  readonly userLibraryAssetReference?: UserLibraryAssetReference;
-}
+type UserLibraryOperationFailureResult = {
+  readonly ok: false;
+  readonly failure: UserLibraryFailure;
+  readonly diagnostics?: readonly UserLibraryDiagnostic[];
+  readonly provenance?: UserLibraryProvenanceSummary;
+};
 
-export interface LinkUserLibraryAssetToWorkspaceResult
-  extends UserLibraryOperationResultBase {
-  readonly linkRecord?: WorkspaceUserLibraryLinkRecord;
-}
+export type PromoteWorkspaceAssetToUserLibraryResult =
+  | UserLibraryOperationSuccess<"created" | "existing" | "skipped", { readonly userLibraryAssetReference: UserLibraryAssetReference }>
+  | UserLibraryOperationFailureResult;
 
-export interface CopyUserLibraryAssetToWorkspaceResult
-  extends UserLibraryOperationResultBase {
-  readonly targetWorkspaceId?: WorkspaceId;
-  readonly copiedAssetReference?: AssetReference;
-  readonly relationshipStatus?: "detached-workspace-owned-copy";
-}
+export type LinkUserLibraryAssetToWorkspaceResult =
+  | UserLibraryOperationSuccess<"linked" | "existing" | "skipped", { readonly linkRecord: WorkspaceUserLibraryLinkRecord }>
+  | UserLibraryOperationFailureResult;
 
-export interface ImportWorkspaceAssetToWorkspaceResult
-  extends UserLibraryOperationResultBase {
-  readonly sourceWorkspaceId?: WorkspaceId;
-  readonly targetWorkspaceId?: WorkspaceId;
-  readonly importedAssetReference?: AssetReference;
-  readonly relationshipStatus?: "detached-workspace-owned-copy";
-}
+export type CopyUserLibraryAssetToWorkspaceResult =
+  | UserLibraryOperationSuccess<"copied" | "existing" | "skipped", {
+      readonly targetWorkspaceId: WorkspaceId;
+      readonly copiedAssetReference: AssetReference;
+      readonly relationshipStatus: "detached-workspace-owned-copy";
+    }>
+  | UserLibraryOperationFailureResult;
+
+export type ImportWorkspaceAssetToWorkspaceResult =
+  | UserLibraryOperationSuccess<"imported" | "existing" | "skipped", {
+      readonly sourceWorkspaceId: WorkspaceId;
+      readonly targetWorkspaceId: WorkspaceId;
+      readonly importedAssetReference: AssetReference;
+      readonly relationshipStatus: "detached-workspace-owned-copy";
+    }>
+  | UserLibraryOperationFailureResult;
 
 export function isUserLibraryOperationResultStatus(
   value: string,

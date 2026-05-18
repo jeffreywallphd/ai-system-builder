@@ -24,11 +24,12 @@ export type UserLibraryRelationshipId = string & {
 };
 
 const USER_LIBRARY_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+const USER_LIBRARY_VERSION_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
 const SHELL_METACHARACTER_PATTERN = /[;&|`$<>*?()[\]{}'"!#~]/;
 const URL_LIKE_PATTERN = /^[a-z][a-z0-9+.-]*:\/\//i;
 const DRIVE_QUALIFIED_PATTERN = /^[a-zA-Z]:/;
-const TOKEN_LIKE_PATTERN = /^(?:gh[pousr]_|github_pat_|sk-[a-zA-Z0-9]|xox[baprs]-|secret[_-]?|token[_-]?)/i;
+const TOKEN_LIKE_PATTERN = /^(?:gh[pousr]_|github_pat_|sk-[a-zA-Z0-9]|xox[baprs]-|secret[_-]?|token[_-]?|api[_-]?key)/i;
 
 function invalidUserLibraryIdentifierMessage(kind: string): string {
   return `${kind} must be ${USER_LIBRARY_ID_FORMAT_DESCRIPTION}.`;
@@ -84,15 +85,33 @@ export function createUserLibraryAssetId(input: string): UserLibraryAssetId {
   return createSafeUserLibraryIdentifier(input, "User-library asset id") as UserLibraryAssetId;
 }
 
+function isSafeUserLibraryVersion(input: unknown): input is string {
+  if (typeof input !== "string") {
+    return false;
+  }
+
+  const normalized = input.trim();
+
+  return (
+    normalized.length > 0 &&
+    normalized.length <= USER_LIBRARY_ID_MAX_LENGTH &&
+    normalized === input &&
+    USER_LIBRARY_VERSION_PATTERN.test(normalized) &&
+    !looksLikeUnsafePathUrlOrLocator(normalized)
+  );
+}
+
 export function isUserLibraryAssetVersion(input: unknown): input is UserLibraryAssetVersion {
-  return typeof input === "string" && input.trim().length > 0 && input.trim() === input;
+  return isSafeUserLibraryVersion(input);
 }
 
 export function createUserLibraryAssetVersion(input: string): UserLibraryAssetVersion {
   const normalized = input.trim();
 
-  if (!isUserLibraryAssetVersion(normalized)) {
-    const error = new Error("User-library asset version must be a non-empty, trimmed string.");
+  if (!isSafeUserLibraryVersion(normalized)) {
+    const error = new Error(
+      "User-library asset version must be a non-empty, trimmed, safe identifier-like string.",
+    );
     error.stack = undefined;
     throw error;
   }
