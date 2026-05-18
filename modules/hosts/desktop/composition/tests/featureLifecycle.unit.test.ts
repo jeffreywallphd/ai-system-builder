@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 import { createDesktopFeatureLifecycleRegistry } from "../featureLifecycle";
 import type { LoggingPort } from "../../../../application/ports/logging";
@@ -198,5 +200,24 @@ describe("desktop feature lifecycle registry", () => {
     expect(comfy.blockedReason).toBe("policy-explicit-unload-only");
     expect(pythonStopped).toBe(false);
     expect(comfyStopped).toBe(false);
+  });
+});
+
+describe("desktop feature lifecycle safety policy map", () => {
+  it("keeps active-task features protected by canDispose or explicit-unload-only policy", () => {
+    const hostSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopHost.ts"), "utf8");
+    const imageSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopImageGenerationFeature.ts"), "utf8");
+    const datasetSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopDatasetPreparationFeature.ts"), "utf8");
+
+    expect(hostSource).toContain('featureKey: "runtime-task-registry", policy: "explicit-unload-only"');
+    expect(hostSource).toContain('featureKey: "comfyui-image-runtime", policy: "explicit-unload-only"');
+    expect(hostSource).toContain('featureKey: "image-generation", policy: "disposable"');
+    expect(hostSource).toContain('featureKey: "dataset-preparation", policy: "disposable"');
+    expect(hostSource).toContain('featureKey: "artifact-remote", policy: "disposable"');
+    expect(hostSource).toContain('featureKey: "website-ingestion", policy: "disposable"');
+    expect(imageSource).toContain("async canDispose()");
+    expect(imageSource).toContain("TaskType.IMAGE_GENERATION");
+    expect(datasetSource).toContain("async canDispose()");
+    expect(datasetSource).toContain("TaskType.DATASET_PREPARATION");
   });
 });

@@ -6,10 +6,63 @@ import { SectionLoadingState } from "../components/ui/SectionLoadingState";
 import { createDesktopImageGenerationClient } from "../features/image-generation/api";
 import { PythonRuntimeFooter } from "../features/python-runtime/components/PythonRuntimeFooter";
 import { useAsyncSection } from "../hooks/useAsyncSection";
+import { getDesktopApi } from "../lib/desktopApi";
+
+interface LifecycleEntry {
+  readonly featureKey: string;
+  readonly policy: string;
+  readonly loaded: boolean;
+  readonly idle: boolean;
+  readonly idleTimeoutScheduled: boolean;
+}
+
+function normalizeLifecycleEntries(response: unknown): LifecycleEntry[] {
+  if (!response || typeof response !== "object" || !("ok" in response) || (response as { ok?: unknown }).ok !== true) {
+    throw new Error("Unable to read lifecycle diagnostics.");
+  }
+  const value = (response as { value?: { entries?: unknown } }).value;
+  if (!value || !Array.isArray(value.entries)) return [];
+  return value.entries
+    .filter((entry): entry is LifecycleEntry => Boolean(entry) && typeof entry === "object" && typeof (entry as LifecycleEntry).featureKey === "string")
+    .map((entry) => ({
+      featureKey: entry.featureKey,
+      policy: String(entry.policy),
+      loaded: Boolean(entry.loaded),
+      idle: Boolean(entry.idle),
+      idleTimeoutScheduled: Boolean(entry.idleTimeoutScheduled),
+    }));
+}
+
+function normalizeDisposeResults(response: unknown): string {
+  if (!response || typeof response !== "object" || !("ok" in response) || (response as { ok?: unknown }).ok !== true) {
+    return "Unable to dispose idle disposable features.";
+  }
+  const results = (response as { value?: { results?: unknown } }).value?.results;
+  if (!Array.isArray(results) || results.length === 0) return "No idle disposable features were disposed.";
+  const disposed = results.filter((result) => Boolean((result as { disposed?: unknown }).disposed)).length;
+  const blocked = results.length - disposed;
+  return `Disposed ${disposed} idle feature(s); ${blocked} blocked or unchanged.`;
+}
 
 export function SystemPage() {
+  const diagnosticsEnabled = getDesktopApi().memoryDiagnosticsEnabled === true;
   const [pythonExpanded, setPythonExpanded] = useState(false);
   const [comfyExpanded, setComfyExpanded] = useState(false);
+  const [lifecycleExpanded, setLifecycleExpanded] = useState(false);
+  const [disposeMessage, setDisposeMessage] = useState<string | undefined>();
+  const [disposingIdle, setDisposingIdle] = useState(false);
+  const lifecycleState = useAsyncSection({
+    pageKey: "system",
+    sectionKey: "system.feature-lifecycle",
+    initialTrigger: "expanded",
+    loadOnMount: false,
+    loader: async () => {
+      const api = getDesktopApi();
+      if (!api.readFeatureLifecycleState) throw new Error("Feature lifecycle diagnostics are unavailable.");
+      const response = await api.readFeatureLifecycleState();
+      return normalizeLifecycleEntries(response);
+    },
+  });
   const comfyStatus = useAsyncSection({
     pageKey: "system",
     sectionKey: "system.comfyui-runtime",
@@ -25,6 +78,22 @@ export function SystemPage() {
     },
   });
 
+  const disposeIdleFeatures = async () => {
+    const api = getDesktopApi();
+    if (!api.disposeIdleFeatures) {
+      setDisposeMessage("Feature lifecycle idle disposal is unavailable.");
+      return;
+    }
+    setDisposingIdle(true);
+    try {
+      const response = await api.disposeIdleFeatures();
+      setDisposeMessage(normalizeDisposeResults(response));
+      void lifecycleState.load("refresh");
+    } finally {
+      setDisposingIdle(false);
+    }
+  };
+
   return (
     <section className="ui-stack ui-stack--sm">
       <h1>System</h1>
@@ -39,6 +108,48 @@ export function SystemPage() {
         <h2 className="ui-panel__title">Runtime readiness</h2>
         <p>Python and ComfyUI controls are idle until you expand a runtime section or choose an explicit action.</p>
       </section>
+
+      {diagnosticsEnabled ? (
+        <CollapsiblePanel
+          title="Feature lifecycle diagnostics"
+          isExpanded={lifecycleExpanded}
+          onToggle={() => {
+            setLifecycleExpanded((expanded) => {
+              const next = !expanded;
+              if (next && lifecycleState.status === "idle") void lifecycleState.load("expanded");
+              return next;
+            });
+          }}
+        >
+          <p className="ui-text-muted">Developer diagnostics only. This read-only table does not compose unloaded feature graphs. The dispose action only asks the host to dispose idle disposable entries.</p>
+          {lifecycleState.status === "idle" ? <p>Open this section to read host feature lifecycle state.</p> : null}
+          {lifecycleState.status === "loading" ? <SectionLoadingState message="Loading feature lifecycle diagnostics..." /> : null}
+          {lifecycleState.status === "error" ? <SectionErrorState message={lifecycleState.error ?? "Failed to load feature lifecycle diagnostics."} onRetry={() => { void lifecycleState.retry(); }} /> : null}
+          {lifecycleState.status === "success" ? (
+            <section className="ui-stack ui-stack--sm" aria-label="Feature lifecycle state">
+              <div className="ui-actions">
+                <button className="ui-button" type="button" onClick={() => { void lifecycleState.load("refresh"); }}>Refresh</button>
+                <button className="ui-button ui-button--secondary" type="button" disabled={disposingIdle} onClick={() => { void disposeIdleFeatures(); }}>Dispose idle disposable features</button>
+              </div>
+              {disposeMessage ? <p role="status">{disposeMessage}</p> : null}
+              <table className="ui-table">
+                <thead><tr><th>Feature</th><th>Policy</th><th>Loaded</th><th>Idle</th><th>Idle timeout</th></tr></thead>
+                <tbody>
+                  {lifecycleState.data?.map((entry) => (
+                    <tr key={entry.featureKey}>
+                      <td>{entry.featureKey}</td>
+                      <td>{entry.policy}</td>
+                      <td>{entry.loaded ? "yes" : "no"}</td>
+                      <td>{entry.idle ? "yes" : "no"}</td>
+                      <td>{entry.idleTimeoutScheduled ? "scheduled" : "none"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          ) : null}
+        </CollapsiblePanel>
+      ) : null}
 
       <CollapsiblePanel
         title="Python runtime controls"

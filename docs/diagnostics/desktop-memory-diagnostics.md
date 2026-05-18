@@ -206,3 +206,25 @@ To verify release behavior, start the desktop app with diagnostics enabled, open
 ```bash
 DESKTOP_MEMORY_DIAGNOSTICS=1 npm run dev:desktop
 ```
+
+## How to verify load-size invariants
+
+Baseline command:
+
+```bash
+DESKTOP_MEMORY_DIAGNOSTICS=1 npm run dev:desktop
+```
+
+Expected startup milestones include the Electron bootstrap, desktop host composition, startup workspace shell composition, IPC group `register.before`/`register.after` pairs, lazy handler registration, BrowserWindow load/show, renderer shell activation, workspace provider reads, and the active route lazy-load milestones.
+
+Deferred feature import/compose milestones must **not** appear at startup. In particular, startup and IPC registration should not log model, artifact-remote, asset resource-backed, image-generation, ComfyUI image-runtime, runtime-task, Python runtime foundation, Hugging Face remote, website-ingestion, dataset-preparation, training, validation, publishing, or power-blocker composition milestones. Feature-group IPC registration attaches channel handlers only; it must not resolve lazy feature providers, resolve the ComfyUI install root, start Python/ComfyUI, or run GPU detection.
+
+Renderer route lazy-load milestones should appear only for the active page. `renderer.page.lazy-load.start` and `renderer.page.lazy-load.resolved` identify the page module being requested. Workspace-blocked routes should show the workspace gate/fallback and should not show the blocked page module's lazy-load milestone.
+
+Section load milestones use `renderer.section.load.*` and include `pageKey`, `sectionKey`, and `trigger`. Treat `initial` as intentional page-open work, `expanded`/`deferred` as work delayed behind UI disclosure, `selected-item` as selection-driven work, `search-triggered` as remote search work, `refresh` as explicit refresh work, `user-action` as command work, and `task-driven` as work following a user-created task. Cleanup diagnostics use `renderer.section.request.ignored-after-unmount` because current section loaders ignore late results after unmount rather than aborting with an `AbortController`.
+
+Lifecycle milestones include `desktop.host.feature.idle.marked`, `desktop.host.feature.idle.cancelled`, `desktop.host.feature.dispose.requested`, `desktop.host.feature.dispose.started`, `desktop.host.feature.dispose.blocked`, `desktop.host.feature.memoized.cleared`, and `desktop.host.feature.dispose.completed`. Generic lifecycle disposal may only dispose idle `disposable` features. It must not stop Python, stop ComfyUI, cancel active runtime tasks, or delete persisted artifacts, models, settings, workspace records, or files.
+
+Electron Forge and Webpack development processes can inflate total memory. Compare adjacent milestones inside one dev run first. To compare development mode against a packaged app, run both with `DESKTOP_MEMORY_DIAGNOSTICS=1`, follow the same manual route/section sequence, and compare the same milestone pairs rather than total operating-system process trees.
+
+If opening a page triggers runtime or remote operations too early, check for the first unexpected milestone or IPC call. A Models page regression usually appears as Hugging Face browse/train/validate/publish calls before search or action. An Artifacts regression appears as website ingestion or remote artifact import/publish/localize before expansion/search/action. An Image Generation or System regression appears as Python start/status, ComfyUI start/deep runtime status, or GPU detection before explicit expansion, refresh, or start/generate actions.

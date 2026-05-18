@@ -419,6 +419,8 @@ interface DesktopApiBridge {
   cancelPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readRuntimeReadiness?: (context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readRuntimeCapabilityStatus?: (input: { capabilityId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readFeatureLifecycleState?: (context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  disposeIdleFeatures?: (context?: DesktopBridgeRequestContext) => Promise<unknown>;
 
   listWorkspaces?: (context?: DesktopBridgeRequestContext) => Promise<unknown>;
   createWorkspace?: (input: { command: CreateWorkspaceCommand; selectAfterCreate?: boolean }, context?: DesktopBridgeRequestContext) => Promise<unknown>;

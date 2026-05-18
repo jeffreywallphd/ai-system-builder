@@ -10,6 +10,7 @@ import { ImageGenerationPage } from "../pages/ImageGenerationPage";
 import { ModelsPage } from "../pages/ModelsPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { SystemPage } from "../pages/SystemPage";
+import { pageSectionLoadingPolicy } from "../pageSectionLoadingPolicy";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
 (globalThis as any).window = dom.window;
@@ -81,6 +82,8 @@ function createDesktopApiMock(): DesktopApiMock {
     cancelImageGeneration: vi.fn().mockResolvedValue(envelope({ cancelled: true })),
     readComfyUiInstallStatus: vi.fn().mockResolvedValue(envelope({ targetId: "comfyui", status: "installed" })),
     repairComfyUiInstall: vi.fn().mockResolvedValue(envelope({ targetId: "comfyui", status: "installed" })),
+    readFeatureLifecycleState: vi.fn().mockResolvedValue(envelope({ entries: [{ featureKey: "artifact-remote", policy: "disposable", loaded: false, idle: false, idleTimeoutScheduled: false }] })),
+    disposeIdleFeatures: vi.fn().mockResolvedValue(envelope({ results: [] })),
   };
 }
 
@@ -179,15 +182,78 @@ describe("desktop page section loading", () => {
     expect(api.readComfyUiInstallStatus).not.toHaveBeenCalled();
   });
 
+
+  it("loads System lifecycle diagnostics only when diagnostics are enabled and expanded", async () => {
+    const api = createDesktopApiMock();
+    api.memoryDiagnosticsEnabled = true;
+    const { container: c } = await mount(<SystemPage />, api);
+    expect(c.textContent).toContain("Feature lifecycle diagnostics");
+    expect(api.readFeatureLifecycleState).not.toHaveBeenCalled();
+    expect(api.readPythonRuntimeStatus).not.toHaveBeenCalled();
+    expect(api.readComfyUiInstallStatus).not.toHaveBeenCalled();
+    const lifecycleButton = Array.from(c.querySelectorAll("button")).find((button) => button.textContent?.includes("Feature lifecycle diagnostics"));
+    await act(async () => { lifecycleButton?.click(); await Promise.resolve(); });
+    expect(api.readFeatureLifecycleState).toHaveBeenCalledTimes(1);
+    expect(api.readPythonRuntimeStatus).not.toHaveBeenCalled();
+    expect(api.readComfyUiInstallStatus).not.toHaveBeenCalled();
+  });
+
   it("defers System runtime controls until expanded", async () => {
     const { container: c, api } = await mount(<SystemPage />);
     expect(c.textContent).toContain("System");
     expect(api.readPythonRuntimeStatus).not.toHaveBeenCalled();
     expect(api.controlPythonRuntime).not.toHaveBeenCalled();
     expect(api.readComfyUiInstallStatus).not.toHaveBeenCalled();
+    expect(api.readFeatureLifecycleState).not.toHaveBeenCalled();
     const comfyButton = Array.from(c.querySelectorAll("button")).find((button) => button.textContent?.includes("ComfyUI"));
     await act(async () => { comfyButton?.click(); await Promise.resolve(); });
     expect(api.readComfyUiInstallStatus).toHaveBeenCalledTimes(1);
     expect(api.controlPythonRuntime).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("page section loading policy classification", () => {
+  it("classifies every final cleanup page section with an explicit trigger", () => {
+    const policy = new Map(pageSectionLoadingPolicy.map((entry) => [`${entry.page}:${entry.section}`, entry.trigger]));
+    for (const key of [
+      "models:local model list",
+      "models:remote browse",
+      "models:details",
+      "models:download",
+      "models:training",
+      "models:validation",
+      "models:publish",
+      "artifacts:upload form",
+      "artifacts:local artifact list",
+      "artifacts:artifact detail/media",
+      "artifacts:website scraping",
+      "artifacts:Hugging Face remote import/publish/localize",
+      "asset-library:shell",
+      "asset-library:definitions",
+      "asset-library:resource-backed views",
+      "asset-library:mutations",
+      "image-generation:prompt form",
+      "image-generation:model selector",
+      "image-generation:artifact/gallery selector",
+      "image-generation:runtime readiness",
+      "image-generation:generate",
+      "image-generation:preview/finalization",
+      "image-generation:install/repair",
+      "settings:token/basic settings",
+      "settings:model defaults",
+      "settings:runtime settings",
+      "settings:dataset settings",
+      "settings:publishing settings",
+      "system:basic shell",
+      "system:lifecycle diagnostics",
+      "system:Python runtime controls",
+      "system:ComfyUI install status",
+      "system:ComfyUI repair/install/start",
+    ]) {
+      expect(policy.has(key)).toBe(true);
+    }
+    expect(policy.get("system:lifecycle diagnostics")).toEqual(["expanded", "refresh"]);
+    expect(policy.get("image-generation:generate")).toBe("user-action");
   });
 });
