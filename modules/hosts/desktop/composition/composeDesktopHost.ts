@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { cpus, freemem, totalmem } from "node:os";
 import type { LoggingPort } from "../../../application/ports/logging";
 import type { ApplicationSecretsPort, ApplicationSettingsPort, ModelDefaultResolverPort } from "../../../application/ports/settings";
@@ -9,9 +10,11 @@ import { ReadSettingsUseCase } from "../../../application/use-cases/settings/rea
 import { ResolveModelDefaultUseCase } from "../../../application/use-cases/settings/resolve-model-default.use-case";
 import { UpdateSettingUseCase } from "../../../application/use-cases/settings/update-setting.use-case";
 import { CreateWorkspaceUseCase } from "../../../application/use-cases/workspace";
+import { LinkUserLibraryAssetToWorkspaceUseCase } from "../../../application/use-cases/user-library";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
 import { createLocalWorkspaceRepository, createLocalWorkspaceSelectionRepository, createLocalWorkspaceSystemPackActivationRepository } from "../../../adapters/persistence/workspace";
+import { createLocalUserLibraryAssetRepositoryAdapter, createLocalWorkspaceUserLibraryLinkRepositoryAdapter } from "../../../adapters/persistence/user-library";
 import { registerElectronIpc } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
@@ -319,6 +322,9 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
         const module = await import("./composeDesktopDatasetPreparationFeature");
         return async () => module.composeDesktopDatasetPreparationFeature({ artifacts: await getArtifactFeatures(), runtime: await getRuntimeTaskFeatures(), getArtifactRemoteFeatures, now: options.now });
       }});
+      const userLibraryAssetRepository = createLocalUserLibraryAssetRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const workspaceUserLibraryLinkRepository = createLocalWorkspaceUserLibraryLinkRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+
       const settingsUseCases = {
         listSettingsDefinitionsUseCase: new ListSettingsDefinitionsUseCase({ settings: applicationSettings }),
         readSettingsUseCase: new ReadSettingsUseCase({ settings: applicationSettings, secrets: applicationSecrets }),
@@ -364,6 +370,16 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
         runtime: { ipcMain: registerOptions.ipcMain, getComfyUiFeature: getComfyUiInstallFeatures },
         ingestion: { ipcMain: registerOptions.ipcMain, getIngestionFeature: getIngestionFeatures, lifecycle: markDisposableFeatureReleased("website-ingestion") },
         datasetPreparation: { ipcMain: registerOptions.ipcMain, getDatasetPreparationFeature: getDatasetPreparationFeatures, lifecycle: markDisposableFeatureReleased("dataset-preparation") },
+        userLibrary: {
+          ipcMain: registerOptions.ipcMain,
+          userLibraryAssetRepository,
+          workspaceUserLibraryLinkRepository,
+          linkUseCase: new LinkUserLibraryAssetToWorkspaceUseCase({ userLibraryAssetRepository, workspaceLinkRepository: workspaceUserLibraryLinkRepository, now: options.now, generateUserLibraryLinkId: () => `link.${randomUUID()}` }),
+          assetRegistryRead: {
+            listDefinitionCards: async (query) => (await getAssetFeatures()).assetRegistryRead.listDefinitionCards(query),
+            readDefinitionDetail: async (reference, options) => (await getAssetFeatures()).assetRegistryRead.readDefinitionDetail(reference, options),
+          },
+        },
       });
       recordHostMemorySnapshot("desktop.host.ipc-registration.lazy-handlers.after");
       recordHostMemorySnapshot("desktop.host.ipc-registration.return");

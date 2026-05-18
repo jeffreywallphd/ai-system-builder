@@ -91,8 +91,9 @@ export class LocalUserLibraryRecordStore {
     records: readonly UserLibraryCollectionMap[Name][],
   ): Promise<void> {
     await this.ensureStoreDirectory();
-    assertSafeUserLibraryRecord(records);
-    await this.writeJsonFile(COLLECTION_FILES[name], cloneJson(records));
+    const jsonRecords = cloneJson(records);
+    assertSafeUserLibraryRecord(jsonRecords);
+    await this.writeJsonFile(COLLECTION_FILES[name], jsonRecords);
     await this.writeJsonFile("user-library-manifest.json", this.createManifest());
   }
 
@@ -198,29 +199,25 @@ function validateManifest(value: unknown): LocalUserLibraryManifest {
   return cloneJson(manifest as LocalUserLibraryManifest);
 }
 
-function assertJsonCompatibleValue(value: unknown, seen: Set<object>): void {
+function assertJsonCompatibleValue(value: unknown, seen: Set<object>, path = "$root"): void {
   if (value === null || typeof value === "string" || typeof value === "boolean") return;
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new LocalUserLibraryRecordStoreError("User Library local store record must be JSON-compatible.");
+    if (!Number.isFinite(value)) throw new LocalUserLibraryRecordStoreError(`User Library local store record must be JSON-compatible at ${path}.`);
     return;
   }
   if (typeof value === "undefined" || typeof value === "function" || typeof value === "symbol" || typeof value === "bigint") {
-    throw new LocalUserLibraryRecordStoreError("User Library local store record must be JSON-compatible.");
+    throw new LocalUserLibraryRecordStoreError(`User Library local store record must be JSON-compatible at ${path}: ${typeof value}.`);
   }
   if (typeof value !== "object") return;
   if (value instanceof Date || Buffer.isBuffer(value) || value instanceof Stream) {
-    throw new LocalUserLibraryRecordStoreError("User Library local store record must be JSON-compatible.");
+    throw new LocalUserLibraryRecordStoreError(`User Library local store record must be JSON-compatible at ${path}: object.`);
   }
-  if (seen.has(value)) throw new LocalUserLibraryRecordStoreError("User Library local store record must be JSON-compatible.");
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== Array.prototype && prototype !== null) {
-    throw new LocalUserLibraryRecordStoreError("User Library local store record must be JSON-compatible.");
-  }
+  if (seen.has(value)) throw new LocalUserLibraryRecordStoreError(`User Library local store record must be JSON-compatible at ${path}: circular.`);
   seen.add(value);
   if (Array.isArray(value)) {
-    for (const entry of value) assertJsonCompatibleValue(entry, seen);
+    for (const [index, entry] of value.entries()) assertJsonCompatibleValue(entry, seen, `${path}[${index}]`);
   } else {
-    for (const entry of Object.values(value as Record<string, unknown>)) assertJsonCompatibleValue(entry, seen);
+    for (const [entryKey, entry] of Object.entries(value as Record<string, unknown>)) assertJsonCompatibleValue(entry, seen, `${path}.${entryKey}`);
   }
   seen.delete(value);
 }

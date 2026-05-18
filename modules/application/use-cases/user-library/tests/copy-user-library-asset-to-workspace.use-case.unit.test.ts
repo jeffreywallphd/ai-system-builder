@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { CopyUserLibraryAssetToWorkspaceCommand, UserLibraryAssetRecord } from "../../../../../contracts/user-library";
+import type { CopyUserLibraryAssetToWorkspaceCommand, UserLibraryAssetRecord } from "../../../../contracts/user-library";
 import { CopyUserLibraryAssetToWorkspaceUseCase } from "..";
 import type { UserLibraryAssetRepositoryPort, WorkspaceUserLibraryDetachedCopyRecord, WorkspaceUserLibraryDetachedCopyRepositoryPort } from "../../../../ports/user-library";
 

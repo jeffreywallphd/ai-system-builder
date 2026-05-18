@@ -1,5 +1,5 @@
 import type { AssetReference } from "../asset";
-import { normalizeAssetReference } from "../asset";
+import { normalizeAssetId, normalizeAssetReferenceKind, normalizeAssetVersion } from "../asset";
 import { createWorkspaceId } from "../workspace";
 import type {
   CopyUserLibraryAssetToWorkspaceCommand,
@@ -62,7 +62,14 @@ function normalizeTimestamp(value: unknown, label: string): string {
 
 function normalizeAssetRef(value: AssetReference, label: string): AssetReference {
   try {
-    return normalizeAssetReference(value);
+    const normalized: AssetReference = {
+      kind: normalizeAssetReferenceKind(value.kind),
+      id: normalizeAssetId(value.id),
+      ...(value.version ? { version: normalizeAssetVersion(value.version) } : {}),
+      ...(value.label ? { label: requiredText(value.label, `${label} label`) } : {}),
+      ...(value.metadata ? { metadata: value.metadata } : {}),
+    };
+    return normalized;
   } catch {
     const error = new Error(`${label} is invalid.`);
     error.stack = undefined;

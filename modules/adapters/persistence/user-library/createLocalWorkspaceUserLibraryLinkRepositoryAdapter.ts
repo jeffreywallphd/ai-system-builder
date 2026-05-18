@@ -1,7 +1,7 @@
 import type { WorkspaceUserLibraryLinkAssetListQuery, WorkspaceUserLibraryLinkFindExistingQuery, WorkspaceUserLibraryLinkListQuery, WorkspaceUserLibraryLinkRepositoryPort } from "../../../application/ports/user-library";
-import type { WorkspaceId } from "../../../contracts/workspace";
+import { createWorkspaceId, type WorkspaceId } from "../../../contracts/workspace";
 import type { UserLibraryLinkId, WorkspaceUserLibraryLinkRecord } from "../../../contracts/user-library";
-import { createUserLibraryLinkId, createWorkspaceId, normalizeWorkspaceUserLibraryLinkRecord } from "../../../contracts/user-library";
+import { createUserLibraryLinkId, normalizeWorkspaceUserLibraryLinkRecord } from "../../../contracts/user-library";
 import { cloneJson, LocalUserLibraryRecordStore, type LocalUserLibraryRecordStoreOptions } from "./local-user-library-record-store";
 import { pageRecords, replaceRecord, textValuesMatch, upsertRecord, userLibraryAssetReferenceEquals } from "./local-user-library-repository-helpers";
 
@@ -36,7 +36,7 @@ export function createLocalWorkspaceUserLibraryLinkRepositoryAdapter(options: Lo
     },
   };
 }
-function matchesWorkspaceLink(link: WorkspaceUserLibraryLinkRecord, query: WorkspaceUserLibraryLinkListQuery | WorkspaceUserLibraryLinkFindExistingQuery): boolean { if (link.targetWorkspaceId !== query.targetWorkspaceId) return false; if (query.status && link.status !== query.status) return false; if (query.propagationPolicy && link.propagationPolicy !== query.propagationPolicy) return false; if (query.userLibraryAssetReference && !userLibraryAssetReferenceEquals(link.userLibraryAssetReference, query.userLibraryAssetReference)) return false; return textValuesMatch([String(link.linkId), String(link.userLibraryAssetReference.assetId), link.userLibraryAssetReference.label, link.displayLabel], query.text); }
+function matchesWorkspaceLink(link: WorkspaceUserLibraryLinkRecord, query: WorkspaceUserLibraryLinkListQuery | WorkspaceUserLibraryLinkFindExistingQuery): boolean { if (link.targetWorkspaceId !== query.targetWorkspaceId) return false; const status = "status" in query ? query.status : undefined; const text = "text" in query ? query.text : undefined; if (status && link.status !== status) return false; if (query.propagationPolicy && link.propagationPolicy !== query.propagationPolicy) return false; if (query.userLibraryAssetReference && !userLibraryAssetReferenceEquals(link.userLibraryAssetReference, query.userLibraryAssetReference)) return false; return textValuesMatch([String(link.linkId), String(link.userLibraryAssetReference.assetId), link.userLibraryAssetReference.label, link.displayLabel], text); }
 function matchesAssetLink(link: WorkspaceUserLibraryLinkRecord, query: WorkspaceUserLibraryLinkAssetListQuery): boolean { if (link.targetWorkspaceId !== query.targetWorkspaceId) return false; if (query.status && link.status !== query.status) return false; return userLibraryAssetReferenceEquals(link.userLibraryAssetReference, query.userLibraryAssetReference); }
 function sortLinks(records: readonly WorkspaceUserLibraryLinkRecord[]): WorkspaceUserLibraryLinkRecord[] { return [...records].sort((a,b)=>String(a.targetWorkspaceId).localeCompare(String(b.targetWorkspaceId)) || b.updatedAt.localeCompare(a.updatedAt) || String(a.linkId).localeCompare(String(b.linkId))); }
 function linkStorageKey(record: WorkspaceUserLibraryLinkRecord): string { return `${record.targetWorkspaceId}::${record.linkId}`; }

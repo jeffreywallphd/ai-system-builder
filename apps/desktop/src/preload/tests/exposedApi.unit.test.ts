@@ -91,6 +91,27 @@ import {
   createDesktopModelTrainSuccessResponse,
   createDesktopModelTrainStatusSuccessResponse,
 } from "../../../../../modules/contracts/ipc";
+import {
+  DESKTOP_USER_LIBRARY_PROMOTE_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_COPY_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_IMPORT_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_ASSET_LIST_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_ASSET_READ_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_LIST_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_READ_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_PROMOTE_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_COPY_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_IMPORT_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_ASSET_LIST_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_ASSET_READ_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_LIST_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_READ_RESPONSE_CHANNEL,
+  DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_RESPONSE_CHANNEL,
+  createDesktopUserLibraryOperationSuccessResponse,
+} from "../../../../../modules/contracts/ipc";
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
 describe("desktop preload exposedApi bridge", () => {
@@ -890,4 +911,47 @@ it("maps model management bridge calls to dedicated model channels", async () =>
   expect(invoke.mock.calls[6]?.[0]).toBe(DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[7]?.[0]).toBe("ipc.model.train.request");
   expect(invoke.mock.calls[8]?.[0]).toBe(DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL.value);
+});
+
+
+describe("desktop preload user-library bridge", () => {
+  it("exposes narrow Phase 7 user-library methods on dedicated IPC channels", async () => {
+    const responseByRequestChannel = new Map<string, unknown>([
+      [DESKTOP_USER_LIBRARY_PROMOTE_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_PROMOTE_RESPONSE_CHANNEL, { ok: true })],
+      [DESKTOP_USER_LIBRARY_LINK_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_LINK_RESPONSE_CHANNEL, { ok: true })],
+      [DESKTOP_USER_LIBRARY_COPY_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_COPY_RESPONSE_CHANNEL, { ok: true })],
+      [DESKTOP_USER_LIBRARY_IMPORT_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_IMPORT_RESPONSE_CHANNEL, { ok: true })],
+      [DESKTOP_USER_LIBRARY_ASSET_LIST_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_ASSET_LIST_RESPONSE_CHANNEL, { assets: [] })],
+      [DESKTOP_USER_LIBRARY_ASSET_READ_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_ASSET_READ_RESPONSE_CHANNEL, { userLibraryAssetId: "library.asset", version: "1.0.0", displayName: "Asset", status: "active" })],
+      [DESKTOP_USER_LIBRARY_LINK_LIST_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_LINK_LIST_RESPONSE_CHANNEL, { links: [] })],
+      [DESKTOP_USER_LIBRARY_LINK_READ_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_LINK_READ_RESPONSE_CHANNEL, { linkId: "link.alpha", targetWorkspaceId: "workspace.target", status: "active" })],
+      [DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_RESPONSE_CHANNEL, { items: [] })],
+    ]);
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async (channel: string) => responseByRequestChannel.get(channel));
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+    await api.promoteWorkspaceAssetToUserLibrary({ sourceWorkspaceId: "workspace.source" as never, sourceAssetReference: { kind: "asset-definition", id: "asset.alpha" } as never, originWorkspaceBehavior: "keep-independent-workspace-copy" });
+    await api.linkUserLibraryAssetToWorkspace({ targetWorkspaceId: "workspace.target" as never, userLibraryAssetReference: { assetId: "library.asset" as never, version: "1.0.0" as never }, versionSelection: { kind: "pinned-version", version: "1.0.0" }, propagationPolicy: "pinned-version" });
+    await api.copyUserLibraryAssetToWorkspace({ targetWorkspaceId: "workspace.target" as never, userLibraryAssetReference: { assetId: "library.asset" as never, version: "1.0.0" as never }, selectedVersion: "1.0.0" as never });
+    await api.importWorkspaceAssetToWorkspace({ sourceWorkspaceId: "workspace.source" as never, targetWorkspaceId: "workspace.target" as never, sourceAssetReference: { kind: "asset-definition", id: "asset.alpha" } as never });
+    await api.listUserLibraryAssets();
+    await api.readUserLibraryAsset({ userLibraryAssetId: "library.asset" });
+    await api.listWorkspaceUserLibraryLinks({ workspaceId: "workspace.target" });
+    await api.readWorkspaceUserLibraryLink({ workspaceId: "workspace.target", linkId: "link.alpha" });
+    await api.readWorkspaceEffectiveAssetSources({ workspaceId: "workspace.target" });
+
+    expect(invoke.mock.calls.map((call) => call[0])).toEqual([
+      DESKTOP_USER_LIBRARY_PROMOTE_REQUEST_CHANNEL.value,
+      DESKTOP_USER_LIBRARY_LINK_REQUEST_CHANNEL.value,
+      DESKTOP_USER_LIBRARY_COPY_REQUEST_CHANNEL.value,
+      DESKTOP_USER_LIBRARY_IMPORT_REQUEST_CHANNEL.value,
+      DESKTOP_USER_LIBRARY_ASSET_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_USER_LIBRARY_ASSET_READ_REQUEST_CHANNEL.value,
+      DESKTOP_USER_LIBRARY_LINK_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_USER_LIBRARY_LINK_READ_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_REQUEST_CHANNEL.value,
+    ]);
+    expect(Object.keys(api)).not.toContain("invoke");
+    expect(Object.keys(api)).not.toContain("userLibraryAssetRepository");
+  });
 });

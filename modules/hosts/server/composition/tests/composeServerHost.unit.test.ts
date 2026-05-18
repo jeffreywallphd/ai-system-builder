@@ -169,8 +169,8 @@ describe("composeServerHost", () => {
       runtimeRootDirectory,
     });
 
-    expect(app.post).toHaveBeenCalledTimes(40);
-    expect(app.get).toHaveBeenCalledTimes(12);
+    expect(app.post).toHaveBeenCalledTimes(44);
+    expect(app.get).toHaveBeenCalledTimes(17);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
       "/api/artifact/upload",
@@ -208,6 +208,10 @@ describe("composeServerHost", () => {
       "/api/workspaces",
       "/api/workspaces/active-selection",
       "/api/workspaces/active-selection/clear",
+      "/api/user-library/assets/promote",
+      "/api/user-library/workspace-links",
+      "/api/workspaces/:workspaceId/user-library/copies",
+      "/api/workspaces/:targetWorkspaceId/imports/workspace-asset",
       "/api/assets/register-resource-backed-view",
       "/api/assets/finalize-generated-output",
       "/api/assets/import-external-repository-object",
@@ -251,6 +255,11 @@ describe("composeServerHost", () => {
       "/api/config/huggingface-token",
       "/api/workspaces",
       "/api/workspaces/active-selection",
+      "/api/user-library/assets",
+      "/api/user-library/assets/:assetId",
+      "/api/workspaces/:workspaceId/user-library/links",
+      "/api/workspaces/:workspaceId/user-library/links/:linkId",
+      "/api/workspaces/:workspaceId/effective-asset-sources",
       "/api/assets/definitions",
       "/api/assets/resource-backed-views",
       "/api/assets/resource-backed-views/:viewId",
