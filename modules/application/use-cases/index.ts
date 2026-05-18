@@ -36,3 +36,5 @@ export * from "./image-generation";
 export * from "./workspace";
 
 export * from "./asset";
+
+export * from "./user-library";
