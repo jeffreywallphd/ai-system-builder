@@ -1,7 +1,7 @@
 import type { LoggingPort } from "../../../application/ports/logging";
 
 export type DesktopFeatureLifecyclePolicy = "always-resident" | "retained" | "disposable" | "explicit-unload-only";
-export type DesktopFeatureDisposeReason = "page-unmount" | "idle-timeout" | "explicit-user-action" | "explicit-dev-action" | "test";
+export type DesktopFeatureDisposeReason = "page-unmount" | "idle-timeout" | "explicit-user-action" | "explicit-dev-action" | "feature-release" | "test";
 
 export interface FeatureDisposeBlock {
   readonly blockedReason: string;
@@ -158,6 +158,8 @@ export function createDesktopFeatureLifecycleRegistry(options: DesktopFeatureLif
       entry.idleTimer = undefined;
       void disposeFeature(featureKey, "idle-timeout");
     }, entry.idleTimeoutMs);
+    const maybeNodeTimer = entry.idleTimer as { unref?: () => void };
+    maybeNodeTimer.unref?.();
     return true;
   }
 

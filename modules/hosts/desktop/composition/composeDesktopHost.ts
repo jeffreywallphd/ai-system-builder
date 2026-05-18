@@ -310,6 +310,10 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
         clearSettingUseCase: new ClearSettingUseCase({ settings: applicationSettings, secrets: applicationSecrets }),
         resolveModelDefaultUseCase: new ResolveModelDefaultUseCase({ modelDefaultResolver }),
       };
+
+      const markDisposableFeatureReleased = (featureKey: string) => ({
+        afterCall: () => { featureLifecycle.markFeatureIdle(featureKey, "feature-release"); },
+      });
       recordHostMemorySnapshot("desktop.host.ipc-registration.lazy-handlers.before");
       registerElectronIpc({
         recordMilestone: recordHostMemorySnapshot,
@@ -332,13 +336,14 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           tokens: { getHuggingFaceTokenStatus: () => tokenConfigStore.getStatus(), setHuggingFaceToken: (token) => tokenConfigStore.setToken(token), clearHuggingFaceToken: () => tokenConfigStore.clearToken() },
           getArtifactFeature: getArtifactFeatures,
           getArtifactRemoteFeature: getArtifactRemoteFeatures,
+          remoteLifecycle: markDisposableFeatureReleased("artifact-remote"),
         },
         asset: { ipcMain: registerOptions.ipcMain, getAssetFeature: getAssetFeatures },
         model: { ipcMain: registerOptions.ipcMain, getModelFeature: getModelFeatures },
-        imageGeneration: { ipcMain: registerOptions.ipcMain, getImageGenerationFeature: getImageGenerationFeatures },
+        imageGeneration: { ipcMain: registerOptions.ipcMain, getImageGenerationFeature: getImageGenerationFeatures, lifecycle: markDisposableFeatureReleased("image-generation") },
         runtime: { ipcMain: registerOptions.ipcMain, getComfyUiFeature: getComfyUiInstallFeatures },
-        ingestion: { ipcMain: registerOptions.ipcMain, getIngestionFeature: getIngestionFeatures },
-        datasetPreparation: { ipcMain: registerOptions.ipcMain, getDatasetPreparationFeature: getDatasetPreparationFeatures },
+        ingestion: { ipcMain: registerOptions.ipcMain, getIngestionFeature: getIngestionFeatures, lifecycle: markDisposableFeatureReleased("website-ingestion") },
+        datasetPreparation: { ipcMain: registerOptions.ipcMain, getDatasetPreparationFeature: getDatasetPreparationFeatures, lifecycle: markDisposableFeatureReleased("dataset-preparation") },
       });
       recordHostMemorySnapshot("desktop.host.ipc-registration.lazy-handlers.after");
       recordHostMemorySnapshot("desktop.host.ipc-registration.return");

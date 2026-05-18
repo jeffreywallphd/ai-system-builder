@@ -1,7 +1,7 @@
 import { registerArtifactUploadIpc, type StoreArtifactUploadUseCasePort } from "./artifact-upload/registerArtifactUploadIpc";
 import { registerArtifactBrowserIpc, type RegisterArtifactBrowserIpcDependencies } from "./artifact-browser/registerArtifactBrowserIpc";
 import type { IpcMainHandlePort } from "./ipcMainHandlePort";
-import { lazyProvidedObject, type AsyncFeatureProvider } from "./lazyFeatureProvider";
+import { lazyProvidedObject, type AsyncFeatureProvider, type LazyProvidedObjectOptions } from "./lazyFeatureProvider";
 
 type HuggingFaceTokenStatus = { configured: boolean; maskedToken?: string };
 export interface DesktopArtifactIpcFeature {
@@ -30,6 +30,7 @@ export interface RegisterDesktopArtifactIpcDependencies {
   ipcMain: IpcMainHandlePort;
   getArtifactFeature: AsyncFeatureProvider<DesktopArtifactIpcFeature>;
   getArtifactRemoteFeature: AsyncFeatureProvider<DesktopArtifactRemoteIpcFeature>;
+  remoteLifecycle?: LazyProvidedObjectOptions;
   tokens: {
     getHuggingFaceTokenStatus: () => HuggingFaceTokenStatus;
     setHuggingFaceToken: (token: string) => HuggingFaceTokenStatus;
@@ -52,12 +53,12 @@ export function registerDesktopArtifactIpc(dependencies: RegisterDesktopArtifact
     readArtifactDetailUseCase: lazyProvidedObject(dependencies.getArtifactFeature, (feature) => feature.readArtifactDetailUseCase),
     readArtifactContentUseCase: lazyProvidedObject(dependencies.getArtifactFeature, (feature) => feature.readArtifactContentUseCase),
     artifactMediaViewRetrieval: lazyProvidedObject(dependencies.getArtifactFeature, (feature) => feature.artifactMediaViewRetrieval),
-    publishArtifactToRepoUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.publishArtifactToRepoUseCase),
-    browseHuggingFaceNamespaceDatasetsUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.browseHuggingFaceNamespaceDatasetsUseCase),
-    browseHuggingFaceDatasetParquetFilesUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.browseHuggingFaceDatasetParquetFilesUseCase),
-    verifyPublishedArtifactBackingUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.verifyPublishedArtifactBackingUseCase),
-    verifyImportedArtifactSourceBackingUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.verifyImportedArtifactSourceBackingUseCase),
-    registerArtifactFromRepoUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.registerArtifactFromRepoUseCase),
-    localizeArtifactFromRepoUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.localizeArtifactFromRepoUseCase),
+    publishArtifactToRepoUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.publishArtifactToRepoUseCase, dependencies.remoteLifecycle),
+    browseHuggingFaceNamespaceDatasetsUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.browseHuggingFaceNamespaceDatasetsUseCase, dependencies.remoteLifecycle),
+    browseHuggingFaceDatasetParquetFilesUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.browseHuggingFaceDatasetParquetFilesUseCase, dependencies.remoteLifecycle),
+    verifyPublishedArtifactBackingUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.verifyPublishedArtifactBackingUseCase, dependencies.remoteLifecycle),
+    verifyImportedArtifactSourceBackingUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.verifyImportedArtifactSourceBackingUseCase, dependencies.remoteLifecycle),
+    registerArtifactFromRepoUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.registerArtifactFromRepoUseCase, dependencies.remoteLifecycle),
+    localizeArtifactFromRepoUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.localizeArtifactFromRepoUseCase, dependencies.remoteLifecycle),
   });
 }
