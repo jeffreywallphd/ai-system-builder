@@ -22,7 +22,7 @@ import { createHuggingFaceTokenConfigStore, type HuggingFaceTokenStatus } from "
 import type { InternalAssetRegistryComposition } from "../../shared/composition/composeInternalAssetRegistry";
 import { recordDesktopMemorySnapshot } from "../diagnostics";
 import { createDesktopRuntimeReadinessService } from "./composeDesktopRuntimeReadiness";
-import { createDesktopFeatureLifecycleRegistry, type DesktopFeatureDisposeReason, type DesktopFeatureDisposeResult, type DesktopFeatureLifecycleStateEntry } from "./featureLifecycle";
+import { createDesktopFeatureLifecycleRegistry, type DesktopFeatureDisposeReason, type DesktopFeatureDisposeResult, type DesktopFeatureLifecyclePolicy, type DesktopFeatureLifecycleStateEntry } from "./featureLifecycle";
 import { createUnavailablePythonRuntimeStatus, resolvePythonRuntimeBaseUrl, type DesktopPythonRuntimeFeature } from "./desktopPythonRuntimeHelpers";
 export { createDesktopRuntimeReadinessService, type CreateDesktopRuntimeReadinessServiceOptions } from "./composeDesktopRuntimeReadiness";
 
@@ -57,6 +57,22 @@ function readCpuUsagePercent(): number {
   const totalDelta = idleDelta + activeDelta;
   return totalDelta <= 0 ? 0 : clampPercent((activeDelta / totalDelta) * 100);
 }
+
+
+export const DESKTOP_FEATURE_LIFECYCLE_POLICIES = {
+  "artifact-local": "retained",
+  "artifact-remote": "disposable",
+  "asset-registry": "retained",
+  "comfyui-install": "retained",
+  "comfyui-image-runtime": "explicit-unload-only",
+  "runtime-task-registry": "explicit-unload-only",
+  "model-registry": "retained",
+  "image-generation": "disposable",
+  "website-ingestion": "disposable",
+  "dataset-preparation": "disposable",
+} as const satisfies Record<string, DesktopFeatureLifecyclePolicy>;
+
+export type DesktopFeatureLifecycleKey = keyof typeof DESKTOP_FEATURE_LIFECYCLE_POLICIES;
 
 export interface ComposeDesktopHostLoggingOptions {
   verbosity?: string;
@@ -263,43 +279,43 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
         async readComfyUiInstallStatus() { return "unknown"; },
         now,
       });
-      const getArtifactFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "artifact-local", policy: "retained", milestoneBase: "desktop.host.artifact-features", importFeature: async () => {
+      const getArtifactFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "artifact-local", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["artifact-local"], milestoneBase: "desktop.host.artifact-features", importFeature: async () => {
         const module = await import("./composeDesktopArtifactFeature");
         return () => module.composeDesktopArtifactFeature({ storageRootDirectory: registerOptions.storageRootDirectory, loggingPort, now: options.now, workspaceShell: startupWorkspaceShell });
       }});
-      const getArtifactRemoteFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "artifact-remote", policy: "disposable", milestoneBase: "desktop.host.artifact-remote-features", importFeature: async () => {
+      const getArtifactRemoteFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "artifact-remote", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["artifact-remote"], milestoneBase: "desktop.host.artifact-remote-features", importFeature: async () => {
         const module = await import("./composeDesktopArtifactRemoteFeature");
         return async () => module.composeDesktopArtifactRemoteFeature({ artifacts: await getArtifactFeatures(), loggingPort, now: options.now, tokenProvider: () => tokenConfigStore.getToken(), huggingFaceFetchImplementation: options.artifactRepo?.huggingFaceFetchImplementation });
       }});
-      const getAssetFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "asset-registry", policy: "retained", milestoneBase: "desktop.host.asset-features", importFeature: async () => {
+      const getAssetFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "asset-registry", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["asset-registry"], milestoneBase: "desktop.host.asset-features", importFeature: async () => {
         const module = await import("./composeDesktopAssetFeature");
         return async () => module.composeDesktopAssetFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, artifacts: await getArtifactFeatures(), onInternalAssetRegistry: (registry) => { internalAssetRegistry = registry; } });
       }});
-      const getComfyUiInstallFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "comfyui-install", policy: "retained", milestoneBase: "desktop.host.comfyui-install-features", importFeature: async () => {
+      const getComfyUiInstallFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "comfyui-install", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["comfyui-install"], milestoneBase: "desktop.host.comfyui-install-features", importFeature: async () => {
         const module = await import("./composeDesktopComfyUiInstallFeature");
         return () => module.composeDesktopComfyUiInstallFeature({ runtimeRootDirectory: registerOptions.runtimeRootDirectory, loggingPort });
       }});
-      const getComfyUiImageRuntimeFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "comfyui-image-runtime", policy: "explicit-unload-only", milestoneBase: "desktop.host.comfyui-image-runtime-features", importFeature: async () => {
+      const getComfyUiImageRuntimeFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "comfyui-image-runtime", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["comfyui-image-runtime"], milestoneBase: "desktop.host.comfyui-image-runtime-features", importFeature: async () => {
         const module = await import("./composeDesktopComfyUiImageRuntimeFeature");
         return () => module.composeDesktopComfyUiImageRuntimeFeature({ runtimeRootDirectory: registerOptions.runtimeRootDirectory, loggingPort, applicationSettings, readRuntimeSettingString, getArtifacts: getArtifactFeatures });
       }});
-      const getRuntimeTaskFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "runtime-task-registry", policy: "explicit-unload-only", milestoneBase: "desktop.host.runtime-task-features", importFeature: async () => {
+      const getRuntimeTaskFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "runtime-task-registry", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["runtime-task-registry"], milestoneBase: "desktop.host.runtime-task-features", importFeature: async () => {
         const module = await import("./composeDesktopRuntimeTaskFeature");
         return async () => module.composeDesktopRuntimeTaskFeature({ pythonRuntimeFoundation: await getPythonRuntimeFoundation(), imageRuntimeTaskRegistry: (await getComfyUiImageRuntimeFeatures()).imageRuntimeTaskRegistry, runtimeReadiness, recordMilestone: recordHostMemorySnapshot });
       }});
-      const getModelFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "model-registry", policy: "retained", milestoneBase: "desktop.host.model-features", importFeature: async () => {
+      const getModelFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "model-registry", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["model-registry"], milestoneBase: "desktop.host.model-features", importFeature: async () => {
         const module = await import("./composeDesktopModelFeature");
         return () => module.composeDesktopModelFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, tokenProvider: () => tokenConfigStore.getToken(), getArtifacts: getArtifactFeatures, getRuntimeTaskFeatures, getPythonRuntimeFoundation });
       }});
-      const getImageGenerationFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "image-generation", policy: "disposable", milestoneBase: "desktop.host.image-generation-features", importFeature: async () => {
+      const getImageGenerationFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "image-generation", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["image-generation"], milestoneBase: "desktop.host.image-generation-features", importFeature: async () => {
         const module = await import("./composeDesktopImageGenerationFeature");
         return async () => module.composeDesktopImageGenerationFeature({ storageRootDirectory: registerOptions.storageRootDirectory, loggingPort, now, recordRuntimeLog, artifacts: await getArtifactFeatures(), assets: await getAssetFeatures(), runtime: await getRuntimeTaskFeatures(), comfyUi: await getComfyUiImageRuntimeFeatures() });
       }});
-      const getIngestionFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "website-ingestion", policy: "disposable", milestoneBase: "desktop.host.ingestion-features", importFeature: async () => {
+      const getIngestionFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "website-ingestion", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["website-ingestion"], milestoneBase: "desktop.host.ingestion-features", importFeature: async () => {
         const module = await import("./composeDesktopIngestionFeature");
         return async () => module.composeDesktopIngestionFeature({ artifacts: await getArtifactFeatures(), now: options.now });
       }});
-      const getDatasetPreparationFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "dataset-preparation", policy: "disposable", milestoneBase: "desktop.host.dataset-preparation-features", importFeature: async () => {
+      const getDatasetPreparationFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "dataset-preparation", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["dataset-preparation"], milestoneBase: "desktop.host.dataset-preparation-features", importFeature: async () => {
         const module = await import("./composeDesktopDatasetPreparationFeature");
         return async () => module.composeDesktopDatasetPreparationFeature({ artifacts: await getArtifactFeatures(), runtime: await getRuntimeTaskFeatures(), getArtifactRemoteFeatures, now: options.now });
       }});
