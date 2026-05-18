@@ -1,15 +1,20 @@
 import type { AssetMetadata, AssetReference } from "../../../contracts/asset";
 import type { WorkspaceId } from "../../../contracts/workspace";
-import type { UserLibraryAssetReference, UserLibraryProvenanceSummary } from "../../../contracts/user-library";
+import type {
+  UserLibraryAssetReference,
+  UserLibraryAssetVersion,
+  UserLibraryProvenanceSummary,
+  UserLibraryRelationshipId,
+} from "../../../contracts/user-library";
 
 export type WorkspaceUserLibraryDetachedCopyStatus = "active" | "archived" | "deleting";
 
 export interface WorkspaceUserLibraryDetachedCopyRecord {
-  readonly copyId: string;
+  readonly copyId: UserLibraryRelationshipId;
   readonly targetWorkspaceId: WorkspaceId;
   readonly copiedAssetReference: AssetReference;
   readonly sourceUserLibraryAssetReference: UserLibraryAssetReference;
-  readonly selectedVersion: string;
+  readonly selectedVersion: UserLibraryAssetVersion;
   readonly relationshipStatus: "detached-workspace-owned-copy";
   readonly status: WorkspaceUserLibraryDetachedCopyStatus;
   readonly provenance: UserLibraryProvenanceSummary;
@@ -21,7 +26,7 @@ export interface WorkspaceUserLibraryDetachedCopyRecord {
 export interface WorkspaceUserLibraryDetachedCopyFindQuery {
   readonly targetWorkspaceId: WorkspaceId;
   readonly sourceUserLibraryAssetReference: UserLibraryAssetReference;
-  readonly selectedVersion: string;
+  readonly selectedVersion: UserLibraryAssetVersion;
 }
 
 export interface WorkspaceUserLibraryDetachedCopyRepositoryPort {
