@@ -22,7 +22,7 @@ type ExpandedPanelsState = {
 };
 
 let persistedExpandedPanels: ExpandedPanelsState = {
-  uploadData: false,
+  uploadData: true,
   scrapeWebData: false,
   importFromHuggingFace: false,
 };
@@ -30,7 +30,7 @@ let persistedExpandedPanels: ExpandedPanelsState = {
 export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComplete, workspaceId, workspaceName }: ArtifactIngestionFeatureProps) {
   const shouldPersistPanelState = client === undefined && ingestionClient === undefined;
   const [expandedPanels, setExpandedPanels] = useState<ExpandedPanelsState>(shouldPersistPanelState ? persistedExpandedPanels : {
-    uploadData: false,
+    uploadData: true,
     scrapeWebData: false,
     importFromHuggingFace: false,
   });
@@ -94,20 +94,22 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
         isExpanded={expandedPanels.scrapeWebData}
         onToggle={() => togglePanel("scrapeWebData")}
       >
-        <ArtifactScrapeForm
-          websiteSingleUrl={websiteSingleUrl}
-          websiteSingleMode={websiteSingleMode}
-          websiteBatchInput={websiteBatchInput}
-          websiteBatchMode={websiteBatchMode}
-          websiteSingleViewState={websiteSingleViewState}
-          websiteBatchViewState={websiteBatchViewState}
-          setWebsiteSingleUrl={setWebsiteSingleUrl}
-          setWebsiteSingleMode={setWebsiteSingleMode}
-          setWebsiteBatchInput={setWebsiteBatchInput}
-          setWebsiteBatchMode={setWebsiteBatchMode}
-          ingestWebsiteSingle={ingestWebsiteSingle}
-          ingestWebsiteBatch={ingestWebsiteBatch}
-        />
+        {expandedPanels.scrapeWebData ? (
+          <ArtifactScrapeForm
+            websiteSingleUrl={websiteSingleUrl}
+            websiteSingleMode={websiteSingleMode}
+            websiteBatchInput={websiteBatchInput}
+            websiteBatchMode={websiteBatchMode}
+            websiteSingleViewState={websiteSingleViewState}
+            websiteBatchViewState={websiteBatchViewState}
+            setWebsiteSingleUrl={setWebsiteSingleUrl}
+            setWebsiteSingleMode={setWebsiteSingleMode}
+            setWebsiteBatchInput={setWebsiteBatchInput}
+            setWebsiteBatchMode={setWebsiteBatchMode}
+            ingestWebsiteSingle={ingestWebsiteSingle}
+            ingestWebsiteBatch={ingestWebsiteBatch}
+          />
+        ) : <p>Open this section to configure website scraping.</p>}
       </CollapsiblePanel>
 
       <CollapsiblePanel
@@ -116,7 +118,9 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
         isExpanded={expandedPanels.importFromHuggingFace}
         onToggle={() => togglePanel("importFromHuggingFace")}
       >
-        <ArtifactHuggingFaceForm client={ingestionClient} onRegistered={() => onUploadComplete?.()} />
+        {expandedPanels.importFromHuggingFace ? (
+          <ArtifactHuggingFaceForm client={ingestionClient} onRegistered={() => onUploadComplete?.()} />
+        ) : <p>Open this section to register or import Hugging Face artifacts.</p>}
       </CollapsiblePanel>
     </section>
   );

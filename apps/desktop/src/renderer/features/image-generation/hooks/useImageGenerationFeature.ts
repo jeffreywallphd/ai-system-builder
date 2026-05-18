@@ -51,8 +51,60 @@ export function useImageGenerationFeature(client?: DesktopImageGenerationClient,
     previewUrlsRef.current = [];
   }, []);
   useEffect(() => { mountedRef.current = true; recordSectionLoadMilestone("renderer.section.load.skipped", { pageKey: "image-generation", sectionKey: "image-generation.runtime-readiness", trigger: "initial" }); return () => { mountedRef.current = false; activePollRef.current = undefined; }; }, []);
-  useEffect(() => { let cancelled = false; void (async () => { setModelLoadStatus("loading"); setModelLoadMessage("Loading model inventory..."); try { const models = await modelInventoryClient.listModels({}); if (cancelled) return; const optionByValue = new Map<string, ImageGenerationModelOption>(); for (const model of models) { const option = toImageGenerationModelDropdownOption(model); if (option && !optionByValue.has(option.value)) optionByValue.set(option.value, option); } const options = Array.from(optionByValue.values()); setAvailableModels(options); setModelLoadStatus("success"); setModelLoadMessage(options.length > 0 ? `Loaded ${options.length} image generation model${options.length===1?"":"s"}.` : `Loaded ${models.length} model record${models.length===1?"":"s"}; found zero compatible image-generation models.`); } catch (e) { if (!cancelled) { setAvailableModels([]); setModelLoadStatus("error"); setModelLoadMessage(e instanceof Error ? `Failed to load model inventory for image generation: ${e.message}` : "Failed to load model inventory for image generation."); } } })(); return () => { cancelled = true; }; }, [modelInventoryClient]);
-  useEffect(() => { let cancelled = false; void (async () => { try { if (typeof artifacts.browseArtifacts !== "function") return; const items = await artifacts.browseArtifacts({ artifactFamily: "image" }); if (cancelled) return; setAvailableImageArtifacts(items.filter((item) => item.artifactFamily === "image" || item.mediaType?.startsWith("image/")).map((item) => ({ value: item.storageKey, label: item.originalName ?? item.storageKey }))); setArtifactLoadMessage(undefined); } catch (e) { if (!cancelled) { setAvailableImageArtifacts([]); setArtifactLoadMessage(e instanceof Error ? e.message : "Failed to load image artifacts."); } } })(); return () => { cancelled = true; }; }, [artifacts]);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      recordSectionLoadMilestone("renderer.section.load.start", { pageKey: "image-generation", sectionKey: "image-generation.model-selector", trigger: "initial" });
+      setModelLoadStatus("loading");
+      setModelLoadMessage("Loading model inventory...");
+      try {
+        const models = await modelInventoryClient.listModels({});
+        if (cancelled) return;
+        const optionByValue = new Map<string, ImageGenerationModelOption>();
+        for (const model of models) {
+          const option = toImageGenerationModelDropdownOption(model);
+          if (option && !optionByValue.has(option.value)) optionByValue.set(option.value, option);
+        }
+        const options = Array.from(optionByValue.values());
+        setAvailableModels(options);
+        setModelLoadStatus("success");
+        setModelLoadMessage(options.length > 0 ? `Loaded ${options.length} image generation model${options.length===1?"":"s"}.` : `Loaded ${models.length} model record${models.length===1?"":"s"}; found zero compatible image-generation models.`);
+        recordSectionLoadMilestone("renderer.section.load.resolved", { pageKey: "image-generation", sectionKey: "image-generation.model-selector", trigger: "initial" });
+      } catch (e) {
+        if (!cancelled) {
+          setAvailableModels([]);
+          setModelLoadStatus("error");
+          setModelLoadMessage(e instanceof Error ? `Failed to load model inventory for image generation: ${e.message}` : "Failed to load model inventory for image generation.");
+          recordSectionLoadMilestone("renderer.section.load.failed", { pageKey: "image-generation", sectionKey: "image-generation.model-selector", trigger: "initial" });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [modelInventoryClient]);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      recordSectionLoadMilestone("renderer.section.load.start", { pageKey: "image-generation", sectionKey: "image-generation.gallery", trigger: "initial" });
+      try {
+        if (typeof artifacts.browseArtifacts !== "function") {
+          recordSectionLoadMilestone("renderer.section.load.skipped", { pageKey: "image-generation", sectionKey: "image-generation.gallery", trigger: "initial" });
+          return;
+        }
+        const items = await artifacts.browseArtifacts({ artifactFamily: "image" });
+        if (cancelled) return;
+        setAvailableImageArtifacts(items.filter((item) => item.artifactFamily === "image" || item.mediaType?.startsWith("image/")).map((item) => ({ value: item.storageKey, label: item.originalName ?? item.storageKey })));
+        setArtifactLoadMessage(undefined);
+        recordSectionLoadMilestone("renderer.section.load.resolved", { pageKey: "image-generation", sectionKey: "image-generation.gallery", trigger: "initial" });
+      } catch (e) {
+        if (!cancelled) {
+          setAvailableImageArtifacts([]);
+          setArtifactLoadMessage(e instanceof Error ? e.message : "Failed to load image artifacts.");
+          recordSectionLoadMilestone("renderer.section.load.failed", { pageKey: "image-generation", sectionKey: "image-generation.gallery", trigger: "initial" });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [artifacts]);
   const validationError = useMemo(() => { if (!form.prompt.trim()) return "Prompt is required."; if (!parsePositiveNumber(form.width) || !parsePositiveNumber(form.height) || !parsePositiveNumber(form.steps) || !parsePositiveNumber(form.numImages)) return "Width, height, steps, and number of images must be positive finite numbers."; if (form.seed.trim() && parseSeed(form.seed) === undefined) return "Seed must be a finite integer when provided."; const cfg = Number(form.cfg); if (!Number.isFinite(cfg) || cfg <= 0) return "CFG must be a positive number."; const denoise = Number(form.denoise); if (!Number.isFinite(denoise) || denoise < 0 || denoise > 1) return "Denoise must be between 0 and 1."; return undefined; }, [form]);
   const isStartDisabled = ACTIVE_STATUSES.includes(status);
 

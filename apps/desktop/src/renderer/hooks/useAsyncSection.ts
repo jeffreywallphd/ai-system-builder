@@ -76,7 +76,7 @@ export function useAsyncSection<TData>({
 
   const retry = useCallback(async () => {
     const trigger = lastTriggerRef.current || "retry";
-    recordSectionLoadMilestone("renderer.section.load.retry", detail(trigger));
+    recordSectionLoadMilestone("renderer.section.load.retry", detail("retry"));
     return load(trigger);
   }, [detail, load]);
 
