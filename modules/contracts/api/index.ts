@@ -22,3 +22,5 @@ export * from "./runtime-readiness-api-contract";
 export * from "./asset-registry-api-contract";
 
 export * from "./workspace-api-contract";
+
+export * from "./user-library-api-contract";

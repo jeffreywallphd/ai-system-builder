@@ -35,3 +35,5 @@ export * from "./desktop-image-generation-contract";
 export * from "./desktop-comfyui-runtime-contract";
 
 export * from "./desktop-workspace-contract";
+
+export * from "./desktop-user-library-contract";

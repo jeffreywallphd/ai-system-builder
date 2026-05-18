@@ -19,6 +19,7 @@ import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/m
 import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/model/huggingface";
 import { createLocalImageAssetRegistryAdapter } from "../../../adapters/persistence/image";
 import { createLocalModelCheckpointResolverAdapter } from "../../../adapters/model/local";
+import { createLocalUserLibraryAssetRepositoryAdapter, createLocalWorkspaceUserLibraryLinkRepositoryAdapter } from "../../../adapters/persistence/user-library";
 import type { LoggingPort } from "../../../application/ports/logging";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
@@ -1000,6 +1001,10 @@ export function composeServerHost(
           createWorkspaceUseCase: workspaceFoundation.workspaceUseCases.createWorkspace,
         },
         assetMutationUseCases,
+        userLibraryServices: {
+          userLibraryAssetRepository: createLocalUserLibraryAssetRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now }),
+          workspaceUserLibraryLinkRepository: createLocalWorkspaceUserLibraryLinkRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now }),
+        },
       });
     },
   };

@@ -18,6 +18,7 @@ import { registerRuntimeReadinessApiRoutes, type RegisterRuntimeReadinessApiRout
 import { registerAssetRegistryApiRoutes, type RegisterAssetRegistryApiRoutesDependencies } from "./asset-registry/registerAssetRegistryApiRoutes";
 import { registerAssetMutationApiRoutes, type RegisterAssetMutationApiRoutesDependencies } from "./asset-registry/registerAssetMutationApiRoutes";
 import { registerWorkspaceApiRoutes, type RegisterWorkspaceApiRoutesDependencies } from "./workspace/registerWorkspaceApiRoutes";
+import { registerUserLibraryApiRoutes, type RegisterUserLibraryApiRoutesDependencies } from "./user-library/registerUserLibraryApiRoutes";
 
 export interface RegisterExpressApiDependencies {
   app: RegisterArtifactUploadApiRouteDependencies["app"]
@@ -70,6 +71,7 @@ export interface RegisterExpressApiDependencies {
   assetRegistryRead?: RegisterAssetRegistryApiRoutesDependencies["assetRegistryRead"];
   assetMutationUseCases?: Omit<RegisterAssetMutationApiRoutesDependencies, "app">;
   workspaceServices?: Omit<RegisterWorkspaceApiRoutesDependencies, "app">;
+  userLibraryServices?: Omit<RegisterUserLibraryApiRoutesDependencies, "app">;
 }
 
 export function registerExpressApi(
@@ -143,6 +145,10 @@ export function registerExpressApi(
 
   if (dependencies.workspaceServices) {
     registerWorkspaceApiRoutes({ app: dependencies.app, ...dependencies.workspaceServices });
+  }
+
+  if (dependencies.userLibraryServices) {
+    registerUserLibraryApiRoutes({ app: dependencies.app, ...dependencies.userLibraryServices });
   }
 
   if (dependencies.assetRegistryRead) {
