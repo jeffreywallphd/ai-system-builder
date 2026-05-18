@@ -27,6 +27,8 @@ const CONTRACT_FAMILIES = [
   "storage",
   "transform",
   "transport",
+  "workspace",
+  "userLibrary",
 ] as const;
 
 const IMPORT_SCAN_ROOTS = [
