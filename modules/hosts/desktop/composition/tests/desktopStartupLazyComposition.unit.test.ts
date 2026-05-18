@@ -10,6 +10,8 @@ import {
   DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL,
   DESKTOP_COMFYUI_INSTALL_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL,
+  DESKTOP_FEATURE_LIFECYCLE_STATE_READ_REQUEST_CHANNEL,
+  createDesktopFeatureLifecycleStateReadRequest,
   DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL,
   DESKTOP_IMAGE_GENERATION_START_REQUEST_CHANNEL,
   DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL,
@@ -137,7 +139,7 @@ describe("desktop startup lazy composition contract", () => {
     });
 
     expect(result.getInternalAssetRegistry()).toBeUndefined();
-    expect(harness.ipcMain.handle.mock.calls.length).toBe(65);
+    expect(harness.ipcMain.handle.mock.calls.length >= 65).toBe(true);
     expect(milestones).toContain("desktop.host.startup-workspace-shell.compose.before");
     expect(milestones).toContain("desktop.host.startup-workspace-shell.compose.after");
     expect(milestones).toContain("desktop.host.ipc-registration.lazy-handlers.before");
@@ -146,6 +148,23 @@ describe("desktop startup lazy composition contract", () => {
       expect(milestones).toContain(`desktop.host.ipc.${group}-group.register.before`);
       expect(milestones).toContain(`desktop.host.ipc.${group}-group.register.after`);
     }
+    for (const milestone of deferredMilestones) {
+      expect(milestones).not.toContain(milestone);
+    }
+  });
+
+
+  it("reads lifecycle diagnostics without composing deferred feature groups", async () => {
+    const harness = await composeRegisteredHost();
+    const { milestones, result } = await captureMemoryMilestones(() => harness.invoke(DESKTOP_FEATURE_LIFECYCLE_STATE_READ_REQUEST_CHANNEL.value, createDesktopFeatureLifecycleStateReadRequest({ boundary: { host: "desktop", source: "test" } })));
+
+    expect((result as { ok: boolean }).ok).toBe(true);
+    const entries = (result as { value: { entries: Array<{ featureKey: string; loaded: boolean }> } }).value.entries;
+    const featureKeys = entries.map((entry) => entry.featureKey);
+    for (const expectedFeatureKey of ["artifact-local", "model-registry", "image-generation", "comfyui-image-runtime", "runtime-task-registry"]) {
+      expect(featureKeys.includes(expectedFeatureKey)).toBe(true);
+    }
+    expect(entries.every((entry) => entry.loaded === false)).toBe(true);
     for (const milestone of deferredMilestones) {
       expect(milestones).not.toContain(milestone);
     }

@@ -330,6 +330,10 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           runtimeReadiness,
           workspaceServices: startupWorkspaceShell,
           settingsUseCases,
+          featureLifecycle: {
+            getFeatureLifecycleState: featureLifecycle.getFeatureLifecycleState,
+            disposeIdleFeatures: () => featureLifecycle.disposeIdleFeatures("explicit-dev-action"),
+          },
         },
         artifact: {
           ipcMain: registerOptions.ipcMain,

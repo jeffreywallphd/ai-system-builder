@@ -31,6 +31,8 @@ import {
   DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL,
   DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL,
   DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_REQUEST_CHANNEL,
+  DESKTOP_FEATURE_LIFECYCLE_STATE_READ_REQUEST_CHANNEL,
+  DESKTOP_FEATURE_LIFECYCLE_IDLE_DISPOSE_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL,
@@ -269,7 +271,6 @@ describe("composeDesktopHost", () => {
       runtimeRootDirectory,
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(65);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
     const expectedChannels = [
       DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL.value,
@@ -337,7 +338,10 @@ describe("composeDesktopHost", () => {
       "ipc.comfyui-runtime.repair-install.request",
       DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value,
       DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
+      DESKTOP_FEATURE_LIFECYCLE_STATE_READ_REQUEST_CHANNEL.value,
+      DESKTOP_FEATURE_LIFECYCLE_IDLE_DISPOSE_REQUEST_CHANNEL.value,
     ];
+    expect(ipcMain.handle).toHaveBeenCalledTimes(expectedChannels.length);
     expect(new Set(channels)).toEqual(new Set(expectedChannels));
     expect(channels.filter((channel) => String(channel).startsWith("ipc.asset."))).toEqual([
       DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL.value,

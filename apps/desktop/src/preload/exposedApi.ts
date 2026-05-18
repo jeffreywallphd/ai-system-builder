@@ -261,6 +261,16 @@ import {
   type DesktopImageGenerationCancelResponse,
   type DesktopImageGenerationFinalizeRequest,
   type DesktopImageGenerationFinalizeResponse,
+  DESKTOP_FEATURE_LIFECYCLE_STATE_READ_OPERATION,
+  DESKTOP_FEATURE_LIFECYCLE_STATE_READ_REQUEST_CHANNEL,
+  DESKTOP_FEATURE_LIFECYCLE_STATE_READ_RESPONSE_CHANNEL,
+  DESKTOP_FEATURE_LIFECYCLE_IDLE_DISPOSE_OPERATION,
+  DESKTOP_FEATURE_LIFECYCLE_IDLE_DISPOSE_REQUEST_CHANNEL,
+  DESKTOP_FEATURE_LIFECYCLE_IDLE_DISPOSE_RESPONSE_CHANNEL,
+  createDesktopFeatureLifecycleStateReadRequest,
+  createDesktopFeatureLifecycleIdleDisposeRequest,
+  type DesktopFeatureLifecycleStateReadResponse,
+  type DesktopFeatureLifecycleIdleDisposeResponse,
   DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_OPERATION,
   DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_RESPONSE_CHANNEL,
@@ -452,6 +462,12 @@ export interface DesktopPreloadApi {
     input: { capabilityId: RuntimeCapabilityId },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopRuntimeCapabilityStatusReadResponse>;
+  readFeatureLifecycleState: (
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopFeatureLifecycleStateReadResponse>;
+  disposeIdleFeatures: (
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopFeatureLifecycleIdleDisposeResponse>;
 
   listWorkspaces: (context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceListResponse>;
   createWorkspace: (input: { command: CreateWorkspaceCommand; selectAfterCreate?: boolean }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceCreateResponse>;
@@ -1006,6 +1022,50 @@ export function createDesktopPreloadApi(
       });
     },
 
+
+    async readFeatureLifecycleState(context = {}) {
+      const request = createDesktopFeatureLifecycleStateReadRequest(
+        {
+          boundary: {
+            host: "desktop",
+            source: "desktop.renderer.system.lifecycle-diagnostics",
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_FEATURE_LIFECYCLE_STATE_READ_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopFeatureLifecycleStateReadResponse>(response, {
+        operation: DESKTOP_FEATURE_LIFECYCLE_STATE_READ_OPERATION,
+        channel: DESKTOP_FEATURE_LIFECYCLE_STATE_READ_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop feature lifecycle state IPC response envelope.",
+      });
+    },
+
+    async disposeIdleFeatures(context = {}) {
+      const request = createDesktopFeatureLifecycleIdleDisposeRequest(
+        {
+          boundary: {
+            host: "desktop",
+            source: "desktop.renderer.system.lifecycle-diagnostics",
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_FEATURE_LIFECYCLE_IDLE_DISPOSE_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopFeatureLifecycleIdleDisposeResponse>(response, {
+        operation: DESKTOP_FEATURE_LIFECYCLE_IDLE_DISPOSE_OPERATION,
+        channel: DESKTOP_FEATURE_LIFECYCLE_IDLE_DISPOSE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop feature lifecycle idle disposal IPC response envelope.",
+      });
+    },
 
     async listWorkspaces(context = {}) {
       const response = await dependencies.ipcRenderer.invoke(DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL.value, createDesktopWorkspaceListRequest({}, context));

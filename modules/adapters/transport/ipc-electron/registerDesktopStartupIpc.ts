@@ -2,6 +2,7 @@ import { registerRuntimeReadinessIpc } from "./runtime-readiness/registerRuntime
 import { registerPythonRuntimeIpc, type PythonRuntimeControlPort } from "./python-runtime/registerPythonRuntimeIpc";
 import { registerApplicationSettingsIpc } from "./settings/registerApplicationSettingsIpc";
 import { registerWorkspaceIpc, type RegisterWorkspaceIpcDependencies } from "./workspace/registerWorkspaceIpc";
+import { registerFeatureLifecycleDiagnosticsIpc, type FeatureLifecycleDiagnosticsPort } from "./feature-lifecycle/registerFeatureLifecycleDiagnosticsIpc";
 import type { IpcMainHandlePort } from "./ipcMainHandlePort";
 
 export interface RegisterDesktopStartupIpcDependencies {
@@ -10,6 +11,7 @@ export interface RegisterDesktopStartupIpcDependencies {
   runtimeReadiness: any;
   workspaceServices?: Omit<RegisterWorkspaceIpcDependencies, "ipcMain">;
   settingsUseCases: any;
+  featureLifecycle?: FeatureLifecycleDiagnosticsPort;
 }
 
 export function registerDesktopStartupIpc(dependencies: RegisterDesktopStartupIpcDependencies): void {
@@ -17,4 +19,5 @@ export function registerDesktopStartupIpc(dependencies: RegisterDesktopStartupIp
   if (dependencies.workspaceServices) registerWorkspaceIpc({ ipcMain: dependencies.ipcMain, ...dependencies.workspaceServices });
   registerApplicationSettingsIpc({ ipcMain: dependencies.ipcMain, ...dependencies.settingsUseCases });
   registerPythonRuntimeIpc({ ipcMain: dependencies.ipcMain, ...dependencies.pythonRuntime });
+  if (dependencies.featureLifecycle) registerFeatureLifecycleDiagnosticsIpc({ ipcMain: dependencies.ipcMain, featureLifecycle: dependencies.featureLifecycle });
 }
