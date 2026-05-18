@@ -1,9 +1,18 @@
+require.extensions[".svg"] = (module: NodeModule) => {
+  module.exports = "logo.svg";
+};
+
 import { JSDOM } from "jsdom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, testDouble } from "../../../../../modules/testing/node-test";
 
-import { App } from "../App";
+let AppComponent: typeof import("../App").App | undefined;
+
+async function loadApp() {
+  AppComponent ??= (await import("../App")).App;
+  return AppComponent;
+}
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
 (globalThis as any).window = dom.window;
@@ -32,26 +41,26 @@ function installDesktopApi(options: {
   const workspaces = [...(options.workspaces ?? [])];
   let resolveList: ((value: unknown) => void) | undefined;
   const listWorkspaces = options.loading
-    ? vi.fn(() => new Promise((resolve) => { resolveList = resolve; }))
-    : vi.fn(async () => ({ ok: true, value: { workspaces } }));
+    ? testDouble.fn(() => new Promise((resolve) => { resolveList = resolve; }))
+    : testDouble.fn(async () => ({ ok: true, value: { workspaces } }));
 
   window.desktopApi = {
     listWorkspaces,
-    readActiveWorkspaceSelection: vi.fn(async () => ({ ok: true, value: selectedWorkspaceId ? { workspaceId: selectedWorkspaceId } : {} })),
-    saveActiveWorkspaceSelection: vi.fn(async (selection: { workspaceId?: string }) => { selectedWorkspaceId = selection.workspaceId; return { ok: true, value: { selection } }; }),
-    clearActiveWorkspaceSelection: vi.fn(async () => { selectedWorkspaceId = undefined; return { ok: true, value: {} }; }),
-    createWorkspace: vi.fn(async (input: { command: { displayName: string; includeSystemFoundationAssets?: boolean } }) => {
+    readActiveWorkspaceSelection: testDouble.fn(async () => ({ ok: true, value: selectedWorkspaceId ? { workspaceId: selectedWorkspaceId } : {} })),
+    saveActiveWorkspaceSelection: testDouble.fn(async (selection: { workspaceId?: string }) => { selectedWorkspaceId = selection.workspaceId; return { ok: true, value: { selection } }; }),
+    clearActiveWorkspaceSelection: testDouble.fn(async () => { selectedWorkspaceId = undefined; return { ok: true, value: {} }; }),
+    createWorkspace: testDouble.fn(async (input: { command: { displayName: string; includeSystemFoundationAssets?: boolean } }) => {
       const workspace = workspaceRecord("workspace.created", input.command.displayName);
       workspaces.push(workspace);
       selectedWorkspaceId = workspace.workspaceId;
       return { ok: true, value: { workspace } };
     }),
-    browseModels: vi.fn().mockResolvedValue({ ok: true, value: { models: [] } }),
-    getModelDetails: vi.fn().mockResolvedValue({ ok: true, value: { model: { provider: "huggingface", modelId: "org/demo", displayName: "Demo" } } }),
-    listModels: vi.fn().mockResolvedValue({ ok: true, value: { models: [] } }),
-    saveModelReference: vi.fn().mockResolvedValue({ ok: true, value: { model: { modelRecordId: "m1", displayName: "Demo", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-04-27T00:00:00.000Z" } } }),
-    updateModelRecord: vi.fn().mockResolvedValue({ ok: true, value: { model: { modelRecordId: "m1", displayName: "Demo", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-04-27T00:00:00.000Z" } } }),
-    deleteModelRecord: vi.fn().mockResolvedValue({ ok: true, value: { deletedModelRecordId: "m1", deletedRegistryRecord: true, deletedLocalFiles: false, deletedBackingArtifactIds: [] } }),
+    browseModels: testDouble.fn().mockResolvedValue({ ok: true, value: { models: [] } }),
+    getModelDetails: testDouble.fn().mockResolvedValue({ ok: true, value: { model: { provider: "huggingface", modelId: "org/demo", displayName: "Demo" } } }),
+    listModels: testDouble.fn().mockResolvedValue({ ok: true, value: { models: [] } }),
+    saveModelReference: testDouble.fn().mockResolvedValue({ ok: true, value: { model: { modelRecordId: "m1", displayName: "Demo", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-04-27T00:00:00.000Z" } } }),
+    updateModelRecord: testDouble.fn().mockResolvedValue({ ok: true, value: { model: { modelRecordId: "m1", displayName: "Demo", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-04-27T00:00:00.000Z" } } }),
+    deleteModelRecord: testDouble.fn().mockResolvedValue({ ok: true, value: { deletedModelRecordId: "m1", deletedRegistryRecord: true, deletedLocalFiles: false, deletedBackingArtifactIds: [] } }),
   };
 
   return { resolveList };
@@ -68,6 +77,7 @@ async function waitForText(container: HTMLElement, text: string) {
 
 async function renderAndNavigateToModels(container: HTMLDivElement) {
   const root = createRoot(container);
+  const App = await loadApp();
   await act(async () => { root.render(<App />); });
   const modelsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Models");
   await act(async () => { modelsButton?.dispatchEvent(new Event("click", { bubbles: true })); });
@@ -127,16 +137,17 @@ describe("desktop app workspace route boundary", () => {
     expect(container.querySelector("button[aria-current='page']")?.textContent).not.toBe("Models");
   });
 
-  it("shows the page loading fallback for a pending workspace page once the workspace is ready", async () => {
+  it("loads the workspace page once the workspace is ready", async () => {
     installDesktopApi({ workspaces: [workspaceRecord()], selectedWorkspaceId: "workspace.ready" });
     container = document.createElement("div");
     document.body.appendChild(container);
     root = await renderAndNavigateToModels(container);
     await act(async () => {});
 
-    expect(container.textContent).toContain("Loading page…");
+    await waitForText(container, "Model Management");
+    expect(container.textContent).toContain("Model Management");
     expect(container.textContent).not.toContain("No workspace selected");
-    expect(window.desktopApi?.listModels).not.toHaveBeenCalled();
+    expect(window.desktopApi?.listModels).toHaveBeenCalled();
     expect(container.querySelector("button[aria-current='page']")?.textContent).toBe("Models");
   });
 });

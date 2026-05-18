@@ -216,7 +216,13 @@ describe("desktop renderer lazy page loading", () => {
     mountedRoot = enabledMount.root;
     mountedContainer = enabledMount.container;
 
-    expect(lines.map((line) => JSON.parse(line).milestone)).toContain("renderer.page.lazy-load.start");
+    const startSnapshot = lines.map((line) => JSON.parse(line)).find((snapshot) => snapshot.milestone === "renderer.page.lazy-load.start");
+    expect(startSnapshot?.detail).toMatchObject({
+      activePage: "home",
+      visibleActivePage: "home",
+      workspaceStatus: "loading",
+      routeRequiresWorkspace: false,
+    });
     expect(lines.map((line) => JSON.parse(line).milestone)).toContain("renderer.page.lazy-render.fallback");
     await act(async () => enabledRegistry.resolve("home", "home"));
     await settle();
