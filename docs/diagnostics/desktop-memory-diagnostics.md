@@ -156,6 +156,14 @@ Use these milestones to confirm that the page title, description, and local layo
 
 A regression usually appears as a burst of section start milestones for every remote/runtime panel immediately after opening a page, followed by matching backend compose milestones before the user expands, searches, selects an item, refreshes runtime status, or starts an explicit action. Expected Prompt 6 behavior is narrower: initial sections such as local model/artifact/asset definitions may load on page open, while remote browse, runtime readiness, artifact detail/media, resource-backed views, training, validation, publish, install, repair, and generation milestones appear only for the visible or user-triggered section.
 
+Collect a Prompt 6 comparison baseline with:
+
+```bash
+DESKTOP_MEMORY_DIAGNOSTICS=1 npm run dev:desktop
+```
+
+In that baseline, initial renderer startup should show app/page route milestones, opening a page should reveal the shell promptly, and section milestones should appear only for sections that load because they are initial, expanded, selected, searched, refreshed, or explicitly actioned. Remote/runtime section milestones should not appear merely because the route module imported; backend compose milestones should line up with section-triggered IPC requests.
+
 ## Prompt 7 safe feature lifecycle and disposal policy
 
 Prompt 7 adds conservative lifecycle handling for host-owned lazy features and renderer-owned preview resources. Disposal is intentionally scoped: it releases memoized feature objects, subscriptions, temporary caches, and renderer object URLs when safe, but it does **not** delete persisted artifacts, model records, settings, workspace data, or local files.

@@ -1,11 +1,21 @@
 // @vitest-environment jsdom
+import { JSDOM } from "jsdom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "../../../../../modules/testing/node-test";
 
 import { SectionErrorState } from "../components/ui/SectionErrorState";
 import { SectionLoadingState } from "../components/ui/SectionLoadingState";
 import { useAsyncSection } from "../hooks/useAsyncSection";
+
+const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
+(globalThis as any).window = dom.window;
+(globalThis as any).document = dom.window.document;
+(globalThis as any).Event = dom.window.Event;
+(globalThis as any).HTMLInputElement = dom.window.HTMLInputElement;
+(globalThis as any).localStorage = dom.window.localStorage;
+(globalThis as any).sessionStorage = dom.window.sessionStorage;
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
 function DeferredSection({ loader }: { loader: () => Promise<string> }) {
   const section = useAsyncSection({
@@ -67,9 +77,12 @@ describe("section loading boundaries", () => {
   });
 
   it("shows a localized retry error and retries only the failed section", async () => {
-    const loader = vi.fn()
-      .mockRejectedValueOnce(new Error("Nope"))
-      .mockResolvedValueOnce("Loaded after retry");
+    let attempt = 0;
+    const loader = vi.fn(async () => {
+      attempt += 1;
+      if (attempt === 1) throw new Error("Nope");
+      return "Loaded after retry";
+    });
     const c = mount(loader);
     await act(async () => { (c.querySelector("button") as HTMLButtonElement).click(); await Promise.resolve(); });
     expect(c.textContent).toContain("Nope");
