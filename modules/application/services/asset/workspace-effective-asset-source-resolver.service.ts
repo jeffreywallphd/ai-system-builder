@@ -80,7 +80,7 @@ export class WorkspaceEffectiveAssetSourceResolver {
     const repo = this.dependencies.detachedCopyRepository as (WorkspaceUserLibraryDetachedCopyRepositoryPort & { readonly listWorkspaceUserLibraryDetachedCopyRecords?: (query: { targetWorkspaceId: WorkspaceId; limit?: number }) => Promise<{ records: readonly WorkspaceUserLibraryDetachedCopyRecord[] }> }) | undefined;
     const listFn = repo?.listWorkspaceUserLibraryDetachedCopyRecords;
     if (!listFn) return undefined;
-    const list = await listFn({ targetWorkspaceId: workspaceId, limit: 250 });
+    const list = await listFn.call(repo, { targetWorkspaceId: workspaceId, limit: 250 });
     const record = list.records.find((item) => sameRef(item.copiedAssetReference, ref) && item.status === "active");
     if (!record) return undefined;
     return { effectiveSourceKind: "user-library-copied", targetWorkspaceId: workspaceId, assetReference: ref, userLibraryAssetReference: record.sourceUserLibraryAssetReference, relationshipKind: "copy", provenance: record.provenance, diagnostics: hasRequiredCopyProvenance(record) ? undefined : [diag("effective-source-copy-provenance-incomplete", "Detached copy provenance is incomplete.")] };
@@ -90,8 +90,8 @@ export class WorkspaceEffectiveAssetSourceResolver {
     const repo = this.dependencies.workspaceImportRepository as (WorkspaceToWorkspaceImportRepositoryPort & { readonly listWorkspaceToWorkspaceImportRecords?: (query: { targetWorkspaceId: WorkspaceId; limit?: number }) => Promise<{ records: readonly WorkspaceToWorkspaceImportRecord[] }> }) | undefined;
     const listFn = repo?.listWorkspaceToWorkspaceImportRecords;
     if (!listFn) return undefined;
-    const list = await listFn({ targetWorkspaceId: workspaceId, limit: 250 });
-    const record = list.records.find((item) => sameRef(item.importedAssetReference, ref) && item.status === "active");
+    const list = await listFn.call(repo, { targetWorkspaceId: workspaceId, limit: 250 });
+    const record = list.records.find((item) => sameAssetIdentity(item.importedAssetReference, ref) && item.status === "active");
     if (!record) return undefined;
     return { effectiveSourceKind: "workspace-imported", targetWorkspaceId: workspaceId, sourceWorkspaceId: record.sourceWorkspaceId, assetReference: ref, sourceAssetReference: record.sourceAssetReference, relationshipKind: "workspace-import", provenance: record.provenance };
   }
@@ -111,4 +111,8 @@ function sameRef(left: AssetReference, right: AssetReference): boolean {
 
 function diag(code: string, message: string): UserLibraryDiagnostic {
   return { severity: "warning", code, message };
+}
+
+function sameAssetIdentity(left: AssetReference, right: AssetReference): boolean {
+  return left.kind === right.kind && left.id === right.id;
 }

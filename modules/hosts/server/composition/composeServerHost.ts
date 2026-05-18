@@ -20,6 +20,7 @@ import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/mo
 import { createLocalImageAssetRegistryAdapter } from "../../../adapters/persistence/image";
 import { createLocalModelCheckpointResolverAdapter } from "../../../adapters/model/local";
 import { createLocalUserLibraryAssetRepositoryAdapter, createLocalWorkspaceUserLibraryLinkRepositoryAdapter } from "../../../adapters/persistence/user-library";
+import { LinkUserLibraryAssetToWorkspaceUseCase } from "../../../application/use-cases/user-library";
 import type { LoggingPort } from "../../../application/ports/logging";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
@@ -1001,10 +1002,16 @@ export function composeServerHost(
           createWorkspaceUseCase: workspaceFoundation.workspaceUseCases.createWorkspace,
         },
         assetMutationUseCases,
-        userLibraryServices: {
-          userLibraryAssetRepository: createLocalUserLibraryAssetRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now }),
-          workspaceUserLibraryLinkRepository: createLocalWorkspaceUserLibraryLinkRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now }),
-        },
+        userLibraryServices: (() => {
+          const userLibraryAssetRepository = createLocalUserLibraryAssetRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+          const workspaceUserLibraryLinkRepository = createLocalWorkspaceUserLibraryLinkRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+          return {
+            userLibraryAssetRepository,
+            workspaceUserLibraryLinkRepository,
+            linkUseCase: new LinkUserLibraryAssetToWorkspaceUseCase({ userLibraryAssetRepository, workspaceLinkRepository: workspaceUserLibraryLinkRepository, now: options.now, generateUserLibraryLinkId: () => `link.${randomUUID()}` }),
+            assetRegistryRead: internalAssetRegistry.workspaceReadFacade,
+          };
+        })(),
       });
     },
   };

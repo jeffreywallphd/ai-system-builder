@@ -64,3 +64,9 @@ This pack does not authorize broad asset authoring, arbitrary asset editing, ove
 - Prompt 9 owns API/IPC/preload/server transport exposure.
 - Prompt 10 owns minimal desktop/thin-client UI.
 - Prompt 11 owns final docs, tests, and Phase 8 handoff.
+
+### Phase 7 Prompt 9 transport exposure
+
+Phase 7 user-library operations are now exposed at narrow API, Electron IPC, and desktop preload boundaries for future UI work. Transport requests keep workspace context explicit (`sourceWorkspaceId`, `targetWorkspaceId`, or `workspaceId` depending on operation) and missing workspace context fails at the boundary with sanitized validation responses. The exposed operations are promote, link, detached copy, workspace-to-workspace import, user-library asset reads, workspace user-library link reads, and effective asset source summary reads where the workspace asset read facade provides them.
+
+This transport exposure does not add desktop or thin-client UI, propagation execution, live workspace-to-workspace linking, broad authoring, override editing, pack import/export, marketplace behavior, or Phase 8/9 behavior.

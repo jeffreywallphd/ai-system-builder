@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { normalizeAssetId, type AssetReference } from "../../../../../contracts/asset";
-import { createWorkspaceId } from "../../../../../contracts/workspace";
-import { createUserLibraryAssetId, type UserLibraryAssetRecord } from "../../../../../contracts/user-library";
+import { normalizeAssetId, type AssetReference } from "../../../../contracts/asset";
+import { createWorkspaceId } from "../../../../contracts/workspace";
+import { createUserLibraryAssetId, type UserLibraryAssetRecord } from "../../../../contracts/user-library";
 import type { UserLibraryAssetRepositoryPort, WorkspaceAssetForUserLibraryDescriptor } from "../../../../ports/user-library";
 import { PromoteWorkspaceAssetToUserLibraryUseCase } from "../promote-workspace-asset-to-user-library.use-case";
 

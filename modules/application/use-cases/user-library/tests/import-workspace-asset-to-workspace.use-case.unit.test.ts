@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { ImportWorkspaceAssetToWorkspaceCommand } from "../../../../../contracts/user-library";
+import type { ImportWorkspaceAssetToWorkspaceCommand } from "../../../../contracts/user-library";
 import type { WorkspaceAssetForUserLibraryDescriptor, WorkspaceAssetForUserLibraryReadPort, WorkspaceToWorkspaceImportRecord, WorkspaceToWorkspaceImportRepositoryPort } from "../../../../ports/user-library";
 import { ImportWorkspaceAssetToWorkspaceUseCase } from "..";
 

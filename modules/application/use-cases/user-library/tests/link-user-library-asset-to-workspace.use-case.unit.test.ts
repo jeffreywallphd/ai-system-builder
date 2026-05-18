@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { createWorkspaceId } from "../../../../../contracts/workspace";
+import { createWorkspaceId } from "../../../../contracts/workspace";
 import {
   createUserLibraryAssetId,
   createUserLibraryLinkId,
   type UserLibraryAssetRecord,
   type WorkspaceUserLibraryLinkRecord,
-} from "../../../../../contracts/user-library";
+} from "../../../../contracts/user-library";
 import type {
   UserLibraryAssetRepositoryPort,
   WorkspaceUserLibraryLinkRepositoryPort,

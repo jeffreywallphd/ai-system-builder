@@ -40,20 +40,22 @@ export function textValuesMatch(values: readonly (string | undefined)[], text?: 
 }
 
 export function upsertRecord<T>(records: readonly T[], nextRecord: T, keyFor: (record: T) => string): T[] {
-  assertSafeUserLibraryRecord(nextRecord);
+  const jsonRecord = cloneJson(nextRecord);
+  assertSafeUserLibraryRecord(jsonRecord);
   const nextKey = keyFor(nextRecord);
-  return [...records.filter((record) => keyFor(record) !== nextKey), cloneJson(nextRecord)];
+  return [...records.filter((record) => keyFor(record) !== nextKey), jsonRecord];
 }
 
 export function replaceRecord<T>(records: readonly T[], nextRecord: T, keyFor: (record: T) => string, missingMessage: string): T[] {
-  assertSafeUserLibraryRecord(nextRecord);
+  const jsonRecord = cloneJson(nextRecord);
+  assertSafeUserLibraryRecord(jsonRecord);
   const nextKey = keyFor(nextRecord);
   if (!records.some((record) => keyFor(record) === nextKey)) {
     const error = new Error(missingMessage);
     error.stack = undefined;
     throw error;
   }
-  return records.map((record) => (keyFor(record) === nextKey ? cloneJson(nextRecord) : record));
+  return records.map((record) => (keyFor(record) === nextKey ? jsonRecord : record));
 }
 
 export function encodeCursor(offset: number): string {

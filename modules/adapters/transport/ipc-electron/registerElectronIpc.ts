@@ -6,6 +6,7 @@ import { registerDesktopIngestionIpc, type RegisterDesktopIngestionIpcDependenci
 import { registerDesktopModelIpc, type RegisterDesktopModelIpcDependencies } from "./registerDesktopModelIpc";
 import { registerDesktopRuntimeIpc, type RegisterDesktopRuntimeIpcDependencies } from "./registerDesktopRuntimeIpc";
 import { registerDesktopStartupIpc, type RegisterDesktopStartupIpcDependencies } from "./registerDesktopStartupIpc";
+import { registerUserLibraryIpc, type RegisterUserLibraryIpcDependencies } from "./user-library/registerUserLibraryIpc";
 export type { AsyncFeatureProvider, LazyProvidedObjectOptions } from "./lazyFeatureProvider";
 
 export type DesktopIpcRegistrationMilestoneRecorder = (milestone: string) => void;
@@ -19,6 +20,7 @@ export interface RegisterElectronIpcDependencies {
   runtime: RegisterDesktopRuntimeIpcDependencies;
   ingestion: RegisterDesktopIngestionIpcDependencies;
   datasetPreparation: RegisterDesktopDatasetPreparationIpcDependencies;
+  userLibrary?: RegisterUserLibraryIpcDependencies;
   recordMilestone?: DesktopIpcRegistrationMilestoneRecorder;
 }
 
@@ -37,6 +39,9 @@ export function registerElectronIpc(dependencies: RegisterElectronIpcDependencie
   registerGroup(dependencies.recordMilestone, "runtime-group", () => registerDesktopRuntimeIpc(dependencies.runtime));
   registerGroup(dependencies.recordMilestone, "ingestion-group", () => registerDesktopIngestionIpc(dependencies.ingestion));
   registerGroup(dependencies.recordMilestone, "dataset-preparation-group", () => registerDesktopDatasetPreparationIpc(dependencies.datasetPreparation));
+  if (dependencies.userLibrary) {
+    registerGroup(dependencies.recordMilestone, "user-library-group", () => registerUserLibraryIpc(dependencies.userLibrary!));
+  }
 }
 
 export type {
@@ -48,4 +53,5 @@ export type {
   RegisterDesktopModelIpcDependencies,
   RegisterDesktopRuntimeIpcDependencies,
   RegisterDesktopStartupIpcDependencies,
+  RegisterUserLibraryIpcDependencies,
 };

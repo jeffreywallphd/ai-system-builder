@@ -161,3 +161,9 @@ This sequence is guidance for later prompts, not code implemented by this prompt
 - Does provenance avoid raw paths, resource bytes, prompts, provider payloads, secrets, commands, environment values, and stack traces?
 - Does the implementation avoid mutating or copying `system.foundation@1.0.0` definitions?
 - Does the change avoid hidden/default workspaces, startup seeding, and legacy/global auto-migration?
+
+### Phase 7 Prompt 9 transport exposure
+
+Phase 7 user-library operations are now exposed at narrow API, Electron IPC, and desktop preload boundaries for future UI work. Transport requests keep workspace context explicit (`sourceWorkspaceId`, `targetWorkspaceId`, or `workspaceId` depending on operation) and missing workspace context fails at the boundary with sanitized validation responses. The exposed operations are promote, link, detached copy, workspace-to-workspace import, user-library asset reads, workspace user-library link reads, and effective asset source summary reads where the workspace asset read facade provides them.
+
+This transport exposure does not add desktop or thin-client UI, propagation execution, live workspace-to-workspace linking, broad authoring, override editing, pack import/export, marketplace behavior, or Phase 8/9 behavior.

@@ -474,6 +474,15 @@ export interface DesktopPreloadApi {
   readActiveWorkspaceSelection: (context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceSelectionReadResponse>;
   saveActiveWorkspaceSelection: (selection: ActiveWorkspaceSelection, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceSelectionSaveResponse>;
   clearActiveWorkspaceSelection: (context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceSelectionClearResponse>;
+  promoteWorkspaceAssetToUserLibrary: (command: PromoteWorkspaceAssetToUserLibraryCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopUserLibraryPromoteResponse>;
+  linkUserLibraryAssetToWorkspace: (command: LinkUserLibraryAssetToWorkspaceCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopUserLibraryLinkResponse>;
+  copyUserLibraryAssetToWorkspace: (command: CopyUserLibraryAssetToWorkspaceCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopUserLibraryCopyResponse>;
+  importWorkspaceAssetToWorkspace: (command: ImportWorkspaceAssetToWorkspaceCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopUserLibraryImportResponse>;
+  listUserLibraryAssets: (input?: DesktopUserLibraryAssetListRequest["payload"], context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopUserLibraryAssetListResponse>;
+  readUserLibraryAsset: (input: { userLibraryAssetId: string; version?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopUserLibraryAssetReadResponse>;
+  listWorkspaceUserLibraryLinks: (input: { workspaceId: string; status?: string; propagationPolicy?: string; text?: string; limit?: number; cursor?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceUserLibraryLinkListResponse>;
+  readWorkspaceUserLibraryLink: (input: { workspaceId: string; linkId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceUserLibraryLinkReadResponse>;
+  readWorkspaceEffectiveAssetSources: (input: { workspaceId: string; limit?: number; cursor?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceEffectiveAssetSourceListResponse>;
   listAssetDefinitions: (
     input?: DesktopAssetDefinitionsListBridgeInput,
     context?: DesktopArtifactUploadBridgeContext,
@@ -1090,6 +1099,51 @@ export function createDesktopPreloadApi(
     async clearActiveWorkspaceSelection(context = {}) {
       const response = await dependencies.ipcRenderer.invoke(DESKTOP_WORKSPACE_SELECTION_CLEAR_REQUEST_CHANNEL.value, createDesktopWorkspaceSelectionClearRequest(context));
       return assertDesktopEnvelopeResponse<DesktopWorkspaceSelectionClearResponse>(response, { operation: DESKTOP_WORKSPACE_SELECTION_CLEAR_OPERATION, channel: DESKTOP_WORKSPACE_SELECTION_CLEAR_RESPONSE_CHANNEL.value, message: "Received invalid desktop workspace selection clear IPC response envelope." });
+    },
+
+    async promoteWorkspaceAssetToUserLibrary(command, context = {}) {
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_USER_LIBRARY_PROMOTE_REQUEST_CHANNEL.value, createDesktopUserLibraryPromoteRequest(command, context));
+      return assertDesktopEnvelopeResponse<DesktopUserLibraryPromoteResponse>(response, { operation: DESKTOP_USER_LIBRARY_PROMOTE_OPERATION, channel: DESKTOP_USER_LIBRARY_PROMOTE_RESPONSE_CHANNEL.value, message: "Received invalid desktop user-library promotion IPC response envelope." });
+    },
+
+    async linkUserLibraryAssetToWorkspace(command, context = {}) {
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_USER_LIBRARY_LINK_REQUEST_CHANNEL.value, createDesktopUserLibraryLinkRequest(command, context));
+      return assertDesktopEnvelopeResponse<DesktopUserLibraryLinkResponse>(response, { operation: DESKTOP_USER_LIBRARY_LINK_OPERATION, channel: DESKTOP_USER_LIBRARY_LINK_RESPONSE_CHANNEL.value, message: "Received invalid desktop user-library link IPC response envelope." });
+    },
+
+    async copyUserLibraryAssetToWorkspace(command, context = {}) {
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_USER_LIBRARY_COPY_REQUEST_CHANNEL.value, createDesktopUserLibraryCopyRequest(command, context));
+      return assertDesktopEnvelopeResponse<DesktopUserLibraryCopyResponse>(response, { operation: DESKTOP_USER_LIBRARY_COPY_OPERATION, channel: DESKTOP_USER_LIBRARY_COPY_RESPONSE_CHANNEL.value, message: "Received invalid desktop user-library copy IPC response envelope." });
+    },
+
+    async importWorkspaceAssetToWorkspace(command, context = {}) {
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_USER_LIBRARY_IMPORT_REQUEST_CHANNEL.value, createDesktopUserLibraryImportRequest(command, context));
+      return assertDesktopEnvelopeResponse<DesktopUserLibraryImportResponse>(response, { operation: DESKTOP_USER_LIBRARY_IMPORT_OPERATION, channel: DESKTOP_USER_LIBRARY_IMPORT_RESPONSE_CHANNEL.value, message: "Received invalid desktop workspace import IPC response envelope." });
+    },
+
+    async listUserLibraryAssets(input = {}, context = {}) {
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_USER_LIBRARY_ASSET_LIST_REQUEST_CHANNEL.value, createDesktopUserLibraryAssetListRequest(input, context));
+      return assertDesktopEnvelopeResponse<DesktopUserLibraryAssetListResponse>(response, { operation: DESKTOP_USER_LIBRARY_ASSET_LIST_OPERATION, channel: DESKTOP_USER_LIBRARY_ASSET_LIST_RESPONSE_CHANNEL.value, message: "Received invalid desktop user-library asset list IPC response envelope." });
+    },
+
+    async readUserLibraryAsset(input, context = {}) {
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_USER_LIBRARY_ASSET_READ_REQUEST_CHANNEL.value, createDesktopUserLibraryAssetReadRequest(input as never, context));
+      return assertDesktopEnvelopeResponse<DesktopUserLibraryAssetReadResponse>(response, { operation: DESKTOP_USER_LIBRARY_ASSET_READ_OPERATION, channel: DESKTOP_USER_LIBRARY_ASSET_READ_RESPONSE_CHANNEL.value, message: "Received invalid desktop user-library asset read IPC response envelope." });
+    },
+
+    async listWorkspaceUserLibraryLinks(input, context = {}) {
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_USER_LIBRARY_LINK_LIST_REQUEST_CHANNEL.value, createDesktopWorkspaceUserLibraryLinkListRequest(input as never, context));
+      return assertDesktopEnvelopeResponse<DesktopWorkspaceUserLibraryLinkListResponse>(response, { operation: DESKTOP_USER_LIBRARY_LINK_LIST_OPERATION, channel: DESKTOP_USER_LIBRARY_LINK_LIST_RESPONSE_CHANNEL.value, message: "Received invalid desktop workspace user-library link list IPC response envelope." });
+    },
+
+    async readWorkspaceUserLibraryLink(input, context = {}) {
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_USER_LIBRARY_LINK_READ_REQUEST_CHANNEL.value, createDesktopWorkspaceUserLibraryLinkReadRequest(input as never, context));
+      return assertDesktopEnvelopeResponse<DesktopWorkspaceUserLibraryLinkReadResponse>(response, { operation: DESKTOP_USER_LIBRARY_LINK_READ_OPERATION, channel: DESKTOP_USER_LIBRARY_LINK_READ_RESPONSE_CHANNEL.value, message: "Received invalid desktop workspace user-library link read IPC response envelope." });
+    },
+
+    async readWorkspaceEffectiveAssetSources(input, context = {}) {
+      const response = await dependencies.ipcRenderer.invoke(DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_REQUEST_CHANNEL.value, createDesktopWorkspaceEffectiveAssetSourceListRequest(input as never, context));
+      return assertDesktopEnvelopeResponse<DesktopWorkspaceEffectiveAssetSourceListResponse>(response, { operation: DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_OPERATION, channel: DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_RESPONSE_CHANNEL.value, message: "Received invalid desktop effective asset source IPC response envelope." });
     },
 
     async listAssetDefinitions(input = {}, context = {}) {
@@ -1842,3 +1896,58 @@ export function createDesktopPreloadApi(
     },
   };
 }
+import {
+  DESKTOP_USER_LIBRARY_ASSET_LIST_OPERATION,
+  DESKTOP_USER_LIBRARY_ASSET_LIST_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_ASSET_LIST_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_ASSET_READ_OPERATION,
+  DESKTOP_USER_LIBRARY_ASSET_READ_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_ASSET_READ_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_COPY_OPERATION,
+  DESKTOP_USER_LIBRARY_COPY_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_COPY_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_IMPORT_OPERATION,
+  DESKTOP_USER_LIBRARY_IMPORT_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_IMPORT_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_LIST_OPERATION,
+  DESKTOP_USER_LIBRARY_LINK_LIST_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_LIST_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_READ_OPERATION,
+  DESKTOP_USER_LIBRARY_LINK_READ_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_READ_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_OPERATION,
+  DESKTOP_USER_LIBRARY_LINK_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_PROMOTE_OPERATION,
+  DESKTOP_USER_LIBRARY_PROMOTE_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_PROMOTE_RESPONSE_CHANNEL,
+  DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_OPERATION,
+  DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_RESPONSE_CHANNEL,
+  createDesktopUserLibraryAssetListRequest,
+  createDesktopUserLibraryAssetReadRequest,
+  createDesktopUserLibraryCopyRequest,
+  createDesktopUserLibraryImportRequest,
+  createDesktopUserLibraryLinkRequest,
+  createDesktopUserLibraryPromoteRequest,
+  createDesktopWorkspaceEffectiveAssetSourceListRequest,
+  createDesktopWorkspaceUserLibraryLinkListRequest,
+  createDesktopWorkspaceUserLibraryLinkReadRequest,
+  type DesktopUserLibraryAssetListRequest,
+  type DesktopUserLibraryAssetListResponse,
+  type DesktopUserLibraryAssetReadResponse,
+  type DesktopUserLibraryCopyResponse,
+  type DesktopUserLibraryImportResponse,
+  type DesktopUserLibraryLinkResponse,
+  type DesktopUserLibraryPromoteResponse,
+  type DesktopWorkspaceEffectiveAssetSourceListResponse,
+  type DesktopWorkspaceUserLibraryLinkListResponse,
+  type DesktopWorkspaceUserLibraryLinkReadResponse,
+} from "../../../../modules/contracts/ipc";
+import type {
+  CopyUserLibraryAssetToWorkspaceCommand,
+  ImportWorkspaceAssetToWorkspaceCommand,
+  LinkUserLibraryAssetToWorkspaceCommand,
+  PromoteWorkspaceAssetToUserLibraryCommand,
+} from "../../../../modules/contracts/user-library";
+

@@ -74,12 +74,11 @@ export class WorkspaceAssetRegistryReadFacade implements AssetRegistryDefinition
 
     const globalResult = await this.dependencies.assetRegistryRead.listDefinitionCards(query);
     const activeSystemPacks = activations.activeSystemPacks;
-    const items = await Promise.all(globalResult.items
-      .filter((card) => isInWorkspaceEffectiveView(card, activeSystemPacks))
-      .map(async (card) => ({
-        ...card,
-        effectiveSourceSummary: await this.sourceResolver.resolve(context.workspaceId, card),
-      } as AssetDefinitionCard)));
+    const resolvedItems = await Promise.all(globalResult.items.map(async (card) => ({
+      ...card,
+      effectiveSourceSummary: await this.sourceResolver.resolve(context.workspaceId, card),
+    } as AssetDefinitionCard)));
+    const items = resolvedItems.filter((card) => isInWorkspaceEffectiveView(card, activeSystemPacks) || isUserLibraryOrWorkspaceReuseSource(card.effectiveSourceSummary?.effectiveSourceKind));
     items.sort(compareDefinitionCards);
 
     return {
@@ -178,6 +177,10 @@ export class WorkspaceAssetRegistryReadFacade implements AssetRegistryDefinition
       diagnostics: result.diagnostics.map((entry) => diagnostic(entry.code, entry.severity, entry.message)),
     };
   }
+}
+
+function isUserLibraryOrWorkspaceReuseSource(kind: string | undefined): boolean {
+  return kind === "user-library-linked" || kind === "user-library-copied" || kind === "workspace-imported";
 }
 
 function isInWorkspaceEffectiveView(card: AssetDefinitionCard, activeSystemPacks: readonly ActiveSystemPackKey[]): boolean {
