@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
+import { DESKTOP_FEATURE_LIFECYCLE_POLICIES } from "../composeDesktopHost";
 import { createDesktopFeatureLifecycleRegistry } from "../featureLifecycle";
 import type { LoggingPort } from "../../../../application/ports/logging";
 
@@ -205,16 +206,16 @@ describe("desktop feature lifecycle registry", () => {
 
 describe("desktop feature lifecycle safety policy map", () => {
   it("keeps active-task features protected by canDispose or explicit-unload-only policy", () => {
-    const hostSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopHost.ts"), "utf8");
     const imageSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopImageGenerationFeature.ts"), "utf8");
     const datasetSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopDatasetPreparationFeature.ts"), "utf8");
 
-    expect(hostSource).toContain('featureKey: "runtime-task-registry", policy: "explicit-unload-only"');
-    expect(hostSource).toContain('featureKey: "comfyui-image-runtime", policy: "explicit-unload-only"');
-    expect(hostSource).toContain('featureKey: "image-generation", policy: "disposable"');
-    expect(hostSource).toContain('featureKey: "dataset-preparation", policy: "disposable"');
-    expect(hostSource).toContain('featureKey: "artifact-remote", policy: "disposable"');
-    expect(hostSource).toContain('featureKey: "website-ingestion", policy: "disposable"');
+    expect(DESKTOP_FEATURE_LIFECYCLE_POLICIES["runtime-task-registry"]).toBe("explicit-unload-only");
+    expect(DESKTOP_FEATURE_LIFECYCLE_POLICIES["comfyui-image-runtime"]).toBe("explicit-unload-only");
+    expect("python-runtime" in DESKTOP_FEATURE_LIFECYCLE_POLICIES).toBe(false);
+    expect(DESKTOP_FEATURE_LIFECYCLE_POLICIES["image-generation"]).toBe("disposable");
+    expect(DESKTOP_FEATURE_LIFECYCLE_POLICIES["dataset-preparation"]).toBe("disposable");
+    expect(DESKTOP_FEATURE_LIFECYCLE_POLICIES["artifact-remote"]).toBe("disposable");
+    expect(DESKTOP_FEATURE_LIFECYCLE_POLICIES["website-ingestion"]).toBe("disposable");
     expect(imageSource).toContain("async canDispose()");
     expect(imageSource).toContain("TaskType.IMAGE_GENERATION");
     expect(datasetSource).toContain("async canDispose()");
