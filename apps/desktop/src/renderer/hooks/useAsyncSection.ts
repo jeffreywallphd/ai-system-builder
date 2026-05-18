@@ -97,7 +97,7 @@ export function useAsyncSection<TData>({
     sequenceRef.current += 1;
     inFlightRef.current = false;
     if (hadInFlightRequest) {
-      recordSectionLoadMilestone("renderer.section.request.aborted", cleanupDetail("unmount"));
+      recordSectionLoadMilestone("renderer.section.request.ignored-after-unmount", cleanupDetail("unmount"));
       recordSectionLoadMilestone("renderer.section.cleanup.completed", cleanupDetail("unmount"));
     }
   }, []);

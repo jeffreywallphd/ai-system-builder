@@ -1,10 +1,27 @@
 // @vitest-environment jsdom
+// @ts-expect-error jsdom test helper types are not installed in this repo.
+import { JSDOM } from "jsdom";
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, testDouble as vi } from "../../../../../modules/testing/node-test";
 
 import { useAsyncSection } from "../hooks/useAsyncSection";
 import { useArtifactSelectionContent } from "../features/artifact-browser/hooks/useArtifactSelectionContent";
+
+const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
+(globalThis as any).window = dom.window;
+(globalThis as any).document = dom.window.document;
+(globalThis as any).Event = dom.window.Event;
+(globalThis as any).HTMLInputElement = dom.window.HTMLInputElement;
+(globalThis as any).HTMLSelectElement = dom.window.HTMLSelectElement;
+(globalThis as any).InputEvent = dom.window.InputEvent;
+(globalThis as any).FormData = dom.window.FormData;
+(globalThis as any).Blob = dom.window.Blob;
+(globalThis as any).URL = dom.window.URL;
+(globalThis as any).localStorage = dom.window.localStorage;
+(globalThis as any).sessionStorage = dom.window.sessionStorage;
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+
 
 async function flushAsync() {
   await Promise.resolve();
@@ -62,7 +79,7 @@ describe("renderer cleanup policies", () => {
     expect(c.textContent).toBe("");
     const lines = log.mock.calls.map(([line]) => String(line)).join("\n");
     expect(lines).toContain("renderer.section.cleanup.started");
-    expect(lines).toContain("renderer.section.request.aborted");
+    expect(lines).toContain("renderer.section.request.ignored-after-unmount");
     expect(lines).toContain("renderer.section.cleanup.completed");
   });
 
@@ -105,8 +122,8 @@ describe("renderer cleanup policies", () => {
   it("revokes artifact preview object URLs on unmount", async () => {
     window.desktopApi = { memoryDiagnosticsEnabled: true } as never;
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
-    const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const revoke = vi.fn();
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, writable: true, value: revoke });
     const client = {
       readArtifactDetail: vi.fn().mockResolvedValue({ storageKey: "artifact.cleanup", artifactId: "artifact.cleanup" }),
       readArtifactContent: vi.fn().mockResolvedValue({ mediaType: "image/png", availability: "available" }),

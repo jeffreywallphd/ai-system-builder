@@ -91,7 +91,12 @@ describe("desktop feature lifecycle registry", () => {
   });
 
   it("blocks unsafe disposable feature disposal while active runtime tasks exist", async () => {
-    const registry = createDesktopFeatureLifecycleRegistry({ loggingPort: createLoggingPort() });
+    const milestones: string[] = [];
+    const details: Record<string, unknown>[] = [];
+    const registry = createDesktopFeatureLifecycleRegistry({
+      loggingPort: createLoggingPort(),
+      recordMilestone: (milestone, detail) => { milestones.push(milestone); details.push(detail ?? {}); },
+    });
     let disposed = false;
     const getFeature = registry.registerAsyncFeature({
       featureKey: "dataset-preparation",
@@ -108,6 +113,10 @@ describe("desktop feature lifecycle registry", () => {
 
     expect(result).toMatchObject({ disposed: false, blockedReason: "active-runtime-tasks", activeTaskCount: 1 });
     expect(disposed).toBe(false);
+    expect(milestones).toContain("desktop.host.feature.dispose.requested");
+    expect(milestones).toContain("desktop.host.feature.dispose.blocked");
+    expect(milestones).toContain("desktop.host.feature.dispose.completed");
+    expect(details.some((detail) => detail.blockedReason === "active-runtime-tasks" && detail.activeTaskCount === 1)).toBe(true);
   });
 
 
@@ -161,5 +170,33 @@ describe("desktop feature lifecycle registry", () => {
     expect(milestones).toContain("desktop.host.feature.idle.marked");
     expect(milestones).toContain("desktop.host.feature.idle.cancelled");
     expect(registry.getFeatureLifecycleState().find((entry) => entry.featureKey === "artifact-remote")).toMatchObject({ idleTimeoutScheduled: false });
+  });
+
+  it("keeps Python and ComfyUI process features explicit-unload-only under generic disposal", async () => {
+    const registry = createDesktopFeatureLifecycleRegistry({ loggingPort: createLoggingPort() });
+    let pythonStopped = false;
+    let comfyStopped = false;
+    const getPython = registry.registerAsyncFeature({
+      featureKey: "python-runtime",
+      policy: "explicit-unload-only",
+      milestoneBase: "desktop.host.python-runtime",
+      importFeature: async () => async () => ({ dispose: () => { pythonStopped = true; } }),
+    });
+    const getComfy = registry.registerAsyncFeature({
+      featureKey: "comfyui-image-runtime",
+      policy: "explicit-unload-only",
+      milestoneBase: "desktop.host.comfyui-image-runtime-features",
+      importFeature: async () => async () => ({ dispose: () => { comfyStopped = true; } }),
+    });
+
+    await getPython();
+    await getComfy();
+    const python = await registry.disposeFeature("python-runtime", "explicit-dev-action");
+    const comfy = await registry.disposeFeature("comfyui-image-runtime", "explicit-dev-action");
+
+    expect(python.blockedReason).toBe("policy-explicit-unload-only");
+    expect(comfy.blockedReason).toBe("policy-explicit-unload-only");
+    expect(pythonStopped).toBe(false);
+    expect(comfyStopped).toBe(false);
   });
 });
