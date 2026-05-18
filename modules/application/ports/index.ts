@@ -24,3 +24,4 @@ export * from "./security";
 
 export * from "./asset";
 export * from "./workspace";
+export * from "./user-library";
