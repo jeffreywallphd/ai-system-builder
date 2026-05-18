@@ -74,6 +74,26 @@ class FakeActivationRepo implements WorkspaceSystemPackActivationRepository {
   async updateWorkspaceSystemPackActivation(activation: WorkspaceSystemPackActivation) { await this.saveWorkspaceSystemPackActivation(activation); }
 }
 
+class FakeLinkRepo {
+  public links: Record<string, any[]> = {};
+  async listWorkspaceUserLibraryLinkRecords(query: { targetWorkspaceId: WorkspaceId }) { return { links: this.links[query.targetWorkspaceId] ?? [] }; }
+}
+
+class FakeUserLibraryAssetRepo {
+  public assets = new Map<string, any>();
+  async readUserLibraryAssetRecord(reference: { assetId: string; version?: string }) { return this.assets.get(`${reference.assetId}@${reference.version ?? ""}`); }
+}
+
+class FakeDetachedCopyRepo {
+  public records: Record<string, any[]> = {};
+  async listWorkspaceUserLibraryDetachedCopyRecords(query: { targetWorkspaceId: WorkspaceId }) { return { records: this.records[query.targetWorkspaceId] ?? [] }; }
+}
+
+class FakeImportRepo {
+  public records: Record<string, any[]> = {};
+  async listWorkspaceToWorkspaceImportRecords(query: { targetWorkspaceId: WorkspaceId }) { return { records: this.records[query.targetWorkspaceId] ?? [] }; }
+}
+
 test("Workspace A with active system.foundation@1.0.0 sees strict foundation cards", async () => {
   const { facade, activations } = setup();
   activations.activations.set(workspaceA, [activation(workspaceA, "active")]);
@@ -160,6 +180,24 @@ test("results are deterministic and diagnostics are sanitized", async () => {
   assert.equal(JSON.stringify(first).includes("/tmp"), false);
 });
 
+test("effective source summaries include linked, copied, and imported kinds with workspace isolation", async () => {
+  const { facade, activations, readPort, links, libraryAssets, detachedCopies, imports } = setup();
+  activations.activations.set(workspaceA, [activation(workspaceA, "active")]);
+  readPort.cards = [foundationCard(), { ...customCard(), definitionRef: { kind: "asset-definition", id: "a.linked", version: "1.0.0" } as AssetReference, definitionId: "a.linked" }, { ...customCard(), definitionRef: { kind: "asset-definition", id: "a.copy", version: "1.0.0" } as AssetReference, definitionId: "a.copy" }, { ...customCard(), definitionRef: { kind: "asset-definition", id: "a.import", version: "1.0.0" } as AssetReference, definitionId: "a.import" }];
+  links.links[workspaceA] = [{ linkId: "link.1", targetWorkspaceId: workspaceA, userLibraryAssetReference: { assetId: "library.a", version: "1.0.0" }, versionSelection: { kind: "pinned-version", version: "1.0.0" }, propagationPolicy: "pinned-version", status: "active", createdAt: "2026", updatedAt: "2026", provenance: { kind: "linked-from-user-library-asset", operationAt: "2026" } }];
+  libraryAssets.assets.set("library.a@1.0.0", { status: "active", assetReference: { kind: "asset-definition", id: "a.linked", version: "1.0.0" } });
+  detachedCopies.records[workspaceA] = [{ targetWorkspaceId: workspaceA, copiedAssetReference: { kind: "asset-definition", id: "a.copy", version: "1.0.0" }, sourceUserLibraryAssetReference: { assetId: "library.copy", version: "1.0.0" }, status: "active", provenance: { kind: "copied-from-user-library-asset", sourceUserLibraryAssetReference: { assetId: "library.copy", version: "1.0.0" }, operationAt: "2026" } }];
+  imports.records[workspaceA] = [{ sourceWorkspaceId: workspaceB, targetWorkspaceId: workspaceA, sourceAssetReference: { kind: "asset-definition", id: "b.src", version: "2.0.0" }, importedAssetReference: { kind: "asset-definition", id: "a.import", version: "2.0.0" }, status: "active", provenance: { kind: "imported-from-workspace-asset", operationAt: "2026" } }];
+  const result = await facade.listDefinitionCards({ workspaceId: workspaceA });
+  const kinds = Object.fromEntries(result.items.map((item) => [item.definitionId, item.effectiveSourceSummary?.effectiveSourceKind]));
+  assert.equal(kinds[foundationRef.id], "system-activated");
+  assert.equal(kinds["a.linked"], "user-library-linked");
+  assert.equal(kinds["a.copy"], "user-library-copied");
+  assert.equal(kinds["a.import"], "workspace-imported");
+  const bResult = await facade.listDefinitionCards({ workspaceId: workspaceB });
+  assert.equal(bResult.items.some((item) => item.definitionId === "a.linked"), false);
+});
+
 async function assertWorkspaceError(action: () => Promise<unknown>, code: string): Promise<void> {
   await assert.rejects(action, (error) => {
     assert.equal((error as WorkspaceAssetRegistryReadFacadeError).code, code);
@@ -170,12 +208,20 @@ async function assertWorkspaceError(action: () => Promise<unknown>, code: string
 function setup() {
   const readPort = new FakeReadPort();
   const activations = new FakeActivationRepo();
+  const links = new FakeLinkRepo();
+  const libraryAssets = new FakeUserLibraryAssetRepo();
+  const detachedCopies = new FakeDetachedCopyRepo();
+  const imports = new FakeImportRepo();
   const facade = new WorkspaceAssetRegistryReadFacade({
     assetRegistryRead: readPort,
     listWorkspaceSystemPackActivations: new ListWorkspaceSystemPackActivationsUseCase({ systemPackActivationRepository: activations }),
     workspaceRepository: new FakeWorkspaceRepo(),
+    workspaceUserLibraryLinkRepository: links as any,
+    userLibraryAssetRepository: libraryAssets as any,
+    detachedCopyRepository: detachedCopies as any,
+    workspaceImportRepository: imports as any,
   });
-  return { facade, activations, readPort };
+  return { facade, activations, readPort, links, libraryAssets, detachedCopies, imports };
 }
 
 function foundationCard(): AssetDefinitionCard {
