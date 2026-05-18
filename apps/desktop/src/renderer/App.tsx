@@ -5,7 +5,7 @@ import { DesktopPageLoadingFallback } from "./components/layout/DesktopPageLoadi
 import { useDesktopPage } from "./hooks/useDesktopPage";
 import { ActiveWorkspaceProvider, WorkspaceGate, WorkspaceRequiredSurface, useActiveWorkspace, type WorkspaceUiRecord } from "./features/workspace";
 import { desktopPageDefinitions, desktopPageRequiresWorkspace, type DesktopPageKey } from "./routes/desktopPages";
-import { desktopLazyPages, setDesktopLazyPageDiagnosticContext, type DesktopLazyPageRegistry } from "./routes/lazyDesktopPages";
+import { desktopLazyPages, type DesktopLazyPageDiagnosticContext, type DesktopLazyPageRegistry } from "./routes/lazyDesktopPages";
 import { resolveDesktopWorkspaceRouteBoundary } from "./routes/workspaceRouteBoundary";
 import { recordRendererMemorySnapshot } from "./diagnostics/rendererMemoryDiagnostics";
 
@@ -38,12 +38,12 @@ export function WorkspaceAwareDesktopApp({ lazyPages = desktopLazyPages }: Works
   const activePageDefinition = desktopPageDefinitions.find((page) => page.key === activePage);
   const routeRequiresWorkspace = desktopPageRequiresWorkspace(activePage);
   const routeBoundary = resolveDesktopWorkspaceRouteBoundary(activePage, workspace.status);
-  setDesktopLazyPageDiagnosticContext({
+  const lazyLoadContext: DesktopLazyPageDiagnosticContext = {
     activePage,
     visibleActivePage: routeBoundary.visibleActivePage,
     workspaceStatus: workspace.status,
     routeRequiresWorkspace,
-  });
+  };
 
   const lazyPageFallback = (
     <DesktopPageLoadingFallback
@@ -60,6 +60,7 @@ export function WorkspaceAwareDesktopApp({ lazyPages = desktopLazyPages }: Works
         const ArtifactsPage = lazyPages.artifacts;
         return (
           <ArtifactsPage
+            __lazyLoadContext={lazyLoadContext}
             workspaceId={activeWorkspace.id}
             workspaceName={activeWorkspace.displayName}
             refreshToken={artifactRefreshToken}
@@ -71,15 +72,15 @@ export function WorkspaceAwareDesktopApp({ lazyPages = desktopLazyPages }: Works
       }
       case "assets": {
         const AssetLibraryPage = lazyPages.assets;
-        return <AssetLibraryPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
+        return <AssetLibraryPage __lazyLoadContext={lazyLoadContext} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
       }
       case "models": {
         const ModelsPage = lazyPages.models;
-        return <ModelsPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
+        return <ModelsPage __lazyLoadContext={lazyLoadContext} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
       }
       case "image-generation": {
         const ImageGenerationPage = lazyPages["image-generation"];
-        return <ImageGenerationPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
+        return <ImageGenerationPage __lazyLoadContext={lazyLoadContext} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
       }
     }
   };
@@ -88,15 +89,15 @@ export function WorkspaceAwareDesktopApp({ lazyPages = desktopLazyPages }: Works
     switch (page) {
       case "home": {
         const HomePage = lazyPages.home;
-        return <HomePage onGoToArtifacts={() => setActivePage("artifacts")} />;
+        return <HomePage __lazyLoadContext={lazyLoadContext} onGoToArtifacts={() => setActivePage("artifacts")} />;
       }
       case "settings": {
         const SettingsPage = lazyPages.settings;
-        return <SettingsPage />;
+        return <SettingsPage __lazyLoadContext={lazyLoadContext} />;
       }
       case "system": {
         const SystemPage = lazyPages.system;
-        return <SystemPage />;
+        return <SystemPage __lazyLoadContext={lazyLoadContext} />;
       }
       default:
         return <WorkspaceRequiredSurface />;

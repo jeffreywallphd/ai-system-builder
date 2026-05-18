@@ -1,4 +1,4 @@
-import { lazy, type ComponentType, type LazyExoticComponent } from "react";
+import { type ComponentType } from "react";
 
 import { recordRendererMemorySnapshot } from "../diagnostics/rendererMemoryDiagnostics";
 import type { ActiveWorkspaceReadinessStatus } from "../features/workspace";
@@ -24,12 +24,19 @@ export type DesktopLazyPagePropsByKey = {
   readonly assets: WorkspaceScopedPageProps;
   readonly models: WorkspaceScopedPageProps;
   readonly "image-generation": WorkspaceScopedPageProps;
-  readonly settings: Record<string, never>;
-  readonly system: Record<string, never>;
+  readonly settings: object;
+  readonly system: object;
 };
 
-export type DesktopLazyPageComponent<TKey extends DesktopPageKey> = LazyExoticComponent<
-  ComponentType<DesktopLazyPagePropsByKey[TKey]>
+export type DesktopLazyPageDiagnosticContext = {
+  readonly activePage: DesktopPageKey;
+  readonly visibleActivePage?: DesktopPageKey;
+  readonly workspaceStatus?: ActiveWorkspaceReadinessStatus;
+  readonly routeRequiresWorkspace?: boolean;
+};
+
+export type DesktopLazyPageComponent<TKey extends DesktopPageKey> = ComponentType<
+  DesktopLazyPagePropsByKey[TKey] & { readonly __lazyLoadContext?: DesktopLazyPageDiagnosticContext }
 >;
 
 export type DesktopLazyPageModule<TKey extends DesktopPageKey> = {
@@ -42,25 +49,15 @@ export type DesktopLazyPageRegistry = {
   readonly [TKey in DesktopPageKey]: DesktopLazyPageComponent<TKey>;
 };
 
-export interface DesktopLazyPageDiagnosticContext {
-  readonly activePage: DesktopPageKey;
-  readonly visibleActivePage?: DesktopPageKey;
-  readonly workspaceStatus?: ActiveWorkspaceReadinessStatus;
-  readonly routeRequiresWorkspace?: boolean;
-}
-
-let desktopLazyPageDiagnosticContext: DesktopLazyPageDiagnosticContext | undefined;
-
-export function setDesktopLazyPageDiagnosticContext(context: DesktopLazyPageDiagnosticContext): void {
-  desktopLazyPageDiagnosticContext = context;
-}
-
-function createLazyPageDiagnosticDetail(pageKey: DesktopPageKey): Record<string, unknown> {
+function createLazyPageDiagnosticDetail(
+  pageKey: DesktopPageKey,
+  context?: DesktopLazyPageDiagnosticContext,
+): Record<string, unknown> {
   return {
-    activePage: desktopLazyPageDiagnosticContext?.activePage ?? pageKey,
-    visibleActivePage: desktopLazyPageDiagnosticContext?.visibleActivePage,
-    workspaceStatus: desktopLazyPageDiagnosticContext?.workspaceStatus,
-    routeRequiresWorkspace: desktopLazyPageDiagnosticContext?.routeRequiresWorkspace,
+    activePage: context?.activePage ?? pageKey,
+    visibleActivePage: context?.visibleActivePage,
+    workspaceStatus: context?.workspaceStatus,
+    routeRequiresWorkspace: context?.routeRequiresWorkspace,
   };
 }
 
@@ -68,33 +65,54 @@ function lazyDesktopPage<TKey extends DesktopPageKey>(
   pageKey: TKey,
   loadPage: DesktopLazyPageLoader<TKey>,
 ): DesktopLazyPageComponent<TKey> {
-  return lazy(async () => {
-    recordRendererMemorySnapshot({
-      milestone: "renderer.page.lazy-load.start",
-      component: "desktop-renderer",
-      detail: createLazyPageDiagnosticDetail(pageKey),
-    });
+  let loadedPage: DesktopLazyPageModule<TKey> | undefined;
+  let loadError: unknown;
+  let loadPromise: Promise<void> | undefined;
 
-    try {
-      const loadedPage = await loadPage();
-      recordRendererMemorySnapshot({
-        milestone: "renderer.page.lazy-load.resolved",
-        component: "desktop-renderer",
-        detail: createLazyPageDiagnosticDetail(pageKey),
-      });
-      return loadedPage;
-    } catch (error) {
-      recordRendererMemorySnapshot({
-        milestone: "renderer.page.lazy-load.failed",
-        component: "desktop-renderer",
-        detail: {
-          ...createLazyPageDiagnosticDetail(pageKey),
-          error: error instanceof Error ? error.message : "unknown lazy page load failure",
-        },
-      });
-      throw error;
+  return function DesktopLazyPage(props: DesktopLazyPagePropsByKey[TKey] & { readonly __lazyLoadContext?: DesktopLazyPageDiagnosticContext }) {
+    if (loadError) {
+      throw loadError;
     }
-  });
+
+    if (loadedPage) {
+      const Page = loadedPage.default;
+      const { __lazyLoadContext: _context, ...pageProps } = props;
+      return <Page {...(pageProps as DesktopLazyPagePropsByKey[TKey])} />;
+    }
+
+    if (!loadPromise) {
+      const context = props.__lazyLoadContext;
+      recordRendererMemorySnapshot({
+        milestone: "renderer.page.lazy-load.start",
+        component: "desktop-renderer",
+        detail: createLazyPageDiagnosticDetail(pageKey, context),
+      });
+
+      loadPromise = loadPage()
+        .then((module) => {
+          loadedPage = module;
+          recordRendererMemorySnapshot({
+            milestone: "renderer.page.lazy-load.resolved",
+            component: "desktop-renderer",
+            detail: createLazyPageDiagnosticDetail(pageKey, context),
+          });
+        })
+        .catch((error) => {
+          loadError = error;
+          recordRendererMemorySnapshot({
+            milestone: "renderer.page.lazy-load.failed",
+            component: "desktop-renderer",
+            detail: {
+              ...createLazyPageDiagnosticDetail(pageKey, context),
+              error: error instanceof Error ? error.message : "unknown lazy page load failure",
+            },
+          });
+          throw error;
+        });
+    }
+
+    throw loadPromise;
+  };
 }
 
 export function createLazyDesktopPageRegistry(

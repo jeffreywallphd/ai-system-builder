@@ -80,13 +80,19 @@ export function createDesktopFeatureLifecycleRegistry(options: DesktopFeatureLif
   async function disposeFeature(featureKey: string, reason: DesktopFeatureDisposeReason = "explicit-dev-action"): Promise<DesktopFeatureDisposeResult> {
     const entry = entries.get(featureKey);
     record("desktop.host.feature.dispose.requested", { featureKey, reason });
-    if (!entry) return { featureKey, disposed: false, blockedReason: "unknown-feature" };
+    if (!entry) {
+      record("desktop.host.feature.dispose.blocked", { featureKey, reason, blockedReason: "unknown-feature" });
+      return { featureKey, disposed: false, blockedReason: "unknown-feature" };
+    }
     if (entry.policy !== "disposable") {
-      return { featureKey, disposed: false, policy: entry.policy, blockedReason: `policy-${entry.policy}` };
+      const blockedReason = `policy-${entry.policy}`;
+      record("desktop.host.feature.dispose.blocked", { featureKey, reason, blockedReason, policy: entry.policy });
+      return { featureKey, disposed: false, policy: entry.policy, blockedReason };
     }
     clearIdleTimer(entry, reason);
     const loaded = entry.promise ? await entry.promise.catch(() => undefined) : undefined;
     if (!loaded) {
+      record("desktop.host.feature.dispose.blocked", { featureKey, reason, blockedReason: "already-disposed" });
       return { featureKey, disposed: false, policy: entry.policy, alreadyDisposed: true };
     }
 
@@ -94,6 +100,7 @@ export function createDesktopFeatureLifecycleRegistry(options: DesktopFeatureLif
       if (isDisposableFeature(loaded) && loaded.canDispose) {
         const block = await loaded.canDispose(reason);
         if (block) {
+          record("desktop.host.feature.dispose.blocked", { featureKey, reason, blockedReason: block.blockedReason, activeTaskCount: block.activeTaskCount });
           record("desktop.host.feature.dispose.completed", { featureKey, reason, blockedReason: block.blockedReason, activeTaskCount: block.activeTaskCount });
           return { featureKey, disposed: false, policy: entry.policy, blockedReason: block.blockedReason, activeTaskCount: block.activeTaskCount };
         }

@@ -180,8 +180,8 @@ describe("desktop renderer page composition", () => {
       systemButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    await waitForText(container, "System workspace scaffolding");
-    expect(container.textContent).toContain("System workspace scaffolding");
+    await waitForText(container, "Basic diagnostics");
+    expect(container.textContent).toContain("Basic diagnostics");
     expect(container.querySelector("button[aria-current='page']")?.textContent).toBe("System");
   });
 });

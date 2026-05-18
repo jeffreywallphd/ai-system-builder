@@ -150,11 +150,18 @@ On initial startup, expect `renderer.app.mounted`, `renderer.page.active.changed
 
 ## Prompt 6 page-section loading diagnostics
 
-Route-level lazy loading and page-section loading are separate checks. A route import should make only the page shell available; expensive panels inside that page should emit their own section milestones when they actually load data. With `DESKTOP_MEMORY_DIAGNOSTICS=1`, section boundaries log `renderer.section.load.start`, `renderer.section.load.resolved`, `renderer.section.load.failed`, `renderer.section.load.skipped`, and `renderer.section.load.retry` with small details such as `pageKey`, `sectionKey`, `trigger`, `activePage`, and workspace status when available.
+Route-level lazy loading and page-section loading are separate checks. A route import should make only the page shell available; expensive panels inside that page should emit their own section milestones when they actually load data. With `DESKTOP_MEMORY_DIAGNOSTICS=1`, section boundaries log `renderer.section.load.start`, `renderer.section.load.resolved`, `renderer.section.load.failed`, `renderer.section.load.skipped`, and `renderer.section.load.retry` with small details such as `pageKey`, `sectionKey`, `trigger`, `activePage`, and workspace status when available. Cleanup of local-only async work records `renderer.section.request.ignored-after-unmount`; this means the renderer ignored a stale result after unmount and does not claim transport-level request cancellation.
+
+Section ownership uses four classifications:
+
+- **Initial:** primary local data intentionally loads on page open, such as local model inventory, artifact browser lists when the browser tab is selected, asset definitions, image-generation model choices, and image artifact choices.
+- **Deferred:** data loads only after expansion, tab selection, selection, search, or refresh, such as Hugging Face browse/search, model details, artifact detail/content/media, website scraping controls, Hugging Face artifact import/publish/localize panels, resource-backed asset views, runtime readiness, Python footer status, and ComfyUI install status.
+- **User-action:** mutating or runtime work runs only from explicit submit/start/download/publish/validate/repair controls.
+- **Intentionally eager and cheap:** settings definitions for Hugging Face and Models are local settings reads and may render immediately; runtime, dataset, publishing, and advanced settings remain collapsed/deferred.
 
 Use these milestones to confirm that the page title, description, and local layout render before expensive sections resolve. Backend feature composition should still happen only after the section makes the relevant preload/IPC request; route import or page shell render alone should not compose Python, ComfyUI, GPU detection, Hugging Face browse, training, validation, publish, or remote artifact features.
 
-A regression usually appears as a burst of section start milestones for every remote/runtime panel immediately after opening a page, followed by matching backend compose milestones before the user expands, searches, selects an item, refreshes runtime status, or starts an explicit action. Expected Prompt 6 behavior is narrower: initial sections such as local model/artifact/asset definitions may load on page open, while remote browse, runtime readiness, artifact detail/media, resource-backed views, training, validation, publish, install, repair, and generation milestones appear only for the visible or user-triggered section.
+A regression usually appears as a burst of section start milestones for every remote/runtime panel immediately after opening a page, followed by matching backend compose milestones before the user expands, searches, selects an item, refreshes runtime status, or starts an explicit action. Expected behavior is narrower: initial sections may load on page open only when they are the primary local content listed above, while remote browse, runtime readiness, artifact detail/media, resource-backed views, training, validation, publish, install, repair, and generation milestones appear only for the visible or user-triggered section.
 
 Collect a Prompt 6 comparison baseline with:
 
@@ -183,15 +190,18 @@ Lifecycle diagnostics remain gated by `DESKTOP_MEMORY_DIAGNOSTICS=1`. Relevant m
 - `desktop.host.feature.dispose.started`
 - `desktop.host.feature.dispose.completed`
 - `desktop.host.feature.dispose.failed`
+- `desktop.host.feature.dispose.blocked`
 - `desktop.host.feature.idle.marked`
 - `desktop.host.feature.idle.cancelled`
 - `desktop.host.feature.memoized.cleared`
 - `renderer.section.cleanup.started`
 - `renderer.section.cleanup.completed`
 - `renderer.preview.object-url.revoked`
-- `renderer.section.request.aborted`
+- `renderer.section.request.ignored-after-unmount`
 
-To verify release behavior, start the desktop app with diagnostics enabled, open a feature page that loads a disposable feature, navigate away or trigger developer lifecycle disposal, confirm the lifecycle milestones above, then return to the feature page and confirm the feature composes again and remains functional. Python and ComfyUI should remain running unless the user uses the existing explicit stop/unload controls.
+To detect early-work regressions, start the app with diagnostics enabled and open each page shell without expanding optional sections or pressing action buttons. Opening Models must not emit Hugging Face browse, training, validation, or publish IPC milestones. Opening Image Generation must not start Python, start ComfyUI, run GPU detection, or read runtime readiness. Opening Settings must not read runtime status or browse remote Hugging Face data. Opening collapsed System must not read Python or ComfyUI status; expanding the ComfyUI section may read install status but must not start ComfyUI.
+
+To verify release behavior, start the desktop app with diagnostics enabled, open a feature page that loads a disposable feature, navigate away or trigger developer lifecycle disposal, confirm the lifecycle milestones above, then return to the feature page and confirm the feature composes again and remains functional. Blocked disposal should include `blockedReason` and `activeTaskCount` when a runtime task guard can report it. Python and ComfyUI should remain running unless the user uses the existing explicit stop/unload controls; generic feature disposal must not stop them because process/runtime features are explicit-unload-only.
 
 ```bash
 DESKTOP_MEMORY_DIAGNOSTICS=1 npm run dev:desktop

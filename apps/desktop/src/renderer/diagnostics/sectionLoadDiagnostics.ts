@@ -8,7 +8,7 @@ export type SectionLoadMilestone =
   | "renderer.section.load.retry"
   | "renderer.section.cleanup.started"
   | "renderer.section.cleanup.completed"
-  | "renderer.section.request.aborted";
+  | "renderer.section.request.ignored-after-unmount";
 
 export interface SectionLoadDiagnosticDetail {
   readonly pageKey: string;
