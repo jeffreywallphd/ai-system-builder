@@ -6,6 +6,7 @@ import { describe, it } from "node:test";
 import type {
   UserLibraryAssetRepositoryPort,
   WorkspaceAssetForUserLibraryReadPort,
+  WorkspaceUserLibraryDetachedCopyRepositoryPort,
   WorkspaceUserLibraryLinkRepositoryPort,
 } from "..";
 import { createUserLibraryAssetId, createUserLibraryLinkId } from "../../../../contracts/user-library";
@@ -33,6 +34,12 @@ describe("user-library application ports", () => {
     type SourceReadKeys = keyof WorkspaceAssetForUserLibraryReadPort;
     const sourceReadKeys = ["readWorkspaceAssetForUserLibrary"] satisfies readonly SourceReadKeys[];
 
+    type DetachedCopyRepositoryKeys = keyof WorkspaceUserLibraryDetachedCopyRepositoryPort;
+    const detachedCopyKeys = [
+      "saveWorkspaceUserLibraryDetachedCopyRecord",
+      "findWorkspaceUserLibraryDetachedCopyRecord",
+    ] satisfies readonly DetachedCopyRepositoryKeys[];
+
     type LinkRepositoryKeys = keyof WorkspaceUserLibraryLinkRepositoryPort;
     const linkKeys = [
       "saveWorkspaceUserLibraryLinkRecord",
@@ -54,6 +61,10 @@ describe("user-library application ports", () => {
       "archiveUserLibraryAssetRecord",
     ]);
     assert.deepEqual(sourceReadKeys, ["readWorkspaceAssetForUserLibrary"]);
+    assert.deepEqual(detachedCopyKeys, [
+      "saveWorkspaceUserLibraryDetachedCopyRecord",
+      "findWorkspaceUserLibraryDetachedCopyRecord",
+    ]);
     assert.deepEqual(linkKeys, [
       "saveWorkspaceUserLibraryLinkRecord",
       "updateWorkspaceUserLibraryLinkRecord",
@@ -73,6 +84,7 @@ describe("user-library application ports", () => {
     const source = [
       read("modules/application/ports/user-library/user-library-asset-repository.port.ts"),
       read("modules/application/ports/user-library/workspace-user-library-link-repository.port.ts"),
+      read("modules/application/ports/user-library/workspace-user-library-detached-copy-repository.port.ts"),
       read("modules/application/ports/user-library/workspace-asset-for-user-library-read.port.ts"),
       read("modules/application/ports/user-library/index.ts"),
     ].join("\n");
