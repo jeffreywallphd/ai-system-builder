@@ -136,7 +136,7 @@ Renderer page lazy-load diagnostics are gated by `DESKTOP_MEMORY_DIAGNOSTICS=1` 
 - `renderer.page.lazy-load.failed`: the lazy page module request rejected.
 - `renderer.page.lazy-render.fallback`: the content-area page loading fallback rendered while a lazy page is pending.
 
-The lazy-load details intentionally stay small: active page key, visible active page when known, workspace status, and whether the route requires a workspace. Workspace-required routes still pass through the existing route boundary and workspace gate before rendering the lazy page component, so a blocked route can show the workspace-required surface without importing the feature page implementation.
+The lazy-load details intentionally stay small: active page key, visible active page when known, workspace status, and whether the route requires a workspace; the same route context is attached to start, resolved, failed, and fallback milestones when available. Workspace-required routes still pass through the existing route boundary and workspace gate before rendering the lazy page component, so a blocked route can show the workspace-required surface without importing the feature page implementation.
 
 Lazy page import is not a backend feature composition signal. Backend feature composition should still occur only when the page's mounted components make their existing preload/IPC requests, not when the renderer registers a lazy page loader or resolves a page module.
 

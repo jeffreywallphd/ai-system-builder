@@ -5,7 +5,7 @@ import { DesktopPageLoadingFallback } from "./components/layout/DesktopPageLoadi
 import { useDesktopPage } from "./hooks/useDesktopPage";
 import { ActiveWorkspaceProvider, WorkspaceGate, WorkspaceRequiredSurface, useActiveWorkspace, type WorkspaceUiRecord } from "./features/workspace";
 import { desktopPageDefinitions, desktopPageRequiresWorkspace, type DesktopPageKey } from "./routes/desktopPages";
-import { desktopLazyPages, type DesktopLazyPageRegistry } from "./routes/lazyDesktopPages";
+import { desktopLazyPages, setDesktopLazyPageDiagnosticContext, type DesktopLazyPageRegistry } from "./routes/lazyDesktopPages";
 import { resolveDesktopWorkspaceRouteBoundary } from "./routes/workspaceRouteBoundary";
 import { recordRendererMemorySnapshot } from "./diagnostics/rendererMemoryDiagnostics";
 
@@ -38,6 +38,13 @@ export function WorkspaceAwareDesktopApp({ lazyPages = desktopLazyPages }: Works
   const activePageDefinition = desktopPageDefinitions.find((page) => page.key === activePage);
   const routeRequiresWorkspace = desktopPageRequiresWorkspace(activePage);
   const routeBoundary = resolveDesktopWorkspaceRouteBoundary(activePage, workspace.status);
+  setDesktopLazyPageDiagnosticContext({
+    activePage,
+    visibleActivePage: routeBoundary.visibleActivePage,
+    workspaceStatus: workspace.status,
+    routeRequiresWorkspace,
+  });
+
   const lazyPageFallback = (
     <DesktopPageLoadingFallback
       activePage={activePage}

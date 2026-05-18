@@ -1,9 +1,18 @@
+require.extensions[".svg"] = (module: NodeModule) => {
+  module.exports = "logo.svg";
+};
+
 import { JSDOM } from "jsdom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, testDouble } from "../../../../../modules/testing/node-test";
 
-import { App } from "../App";
+let AppComponent: typeof import("../App").App | undefined;
+
+async function loadApp() {
+  AppComponent ??= (await import("../App")).App;
+  return AppComponent;
+}
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
 (globalThis as any).window = dom.window;
@@ -49,36 +58,37 @@ describe("desktop renderer page composition", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
+    const App = await loadApp();
     mountedRoot = root;
     mountedContainer = container;
 
     const workspaces = [{ workspaceId: "research-workspace", displayName: "Research Workspace", status: "active", createdAt: "2026-05-14T00:00:00.000Z" }];
     let selectedWorkspaceId: string | undefined;
     window.desktopApi = {
-      listWorkspaces: vi.fn(async () => ({ ok: true, value: { workspaces } })),
-      readActiveWorkspaceSelection: vi.fn(async () => ({ ok: true, value: selectedWorkspaceId ? { workspaceId: selectedWorkspaceId } : {} })),
-      saveActiveWorkspaceSelection: vi.fn(async (selection: { workspaceId?: string }) => { selectedWorkspaceId = selection.workspaceId; return { ok: true, value: { selection } }; }),
-      clearActiveWorkspaceSelection: vi.fn(async () => { selectedWorkspaceId = undefined; return { ok: true, value: {} }; }),
-      createWorkspace: vi.fn(async (input: { command: { displayName: string; includeSystemFoundationAssets?: boolean } }) => { const workspace = { workspaceId: "workspace.created", displayName: input.command.displayName, status: "active", createdAt: "2026-05-14T00:00:00.000Z", settings: { defaultIncludeSystemFoundationAssets: input.command.includeSystemFoundationAssets } }; workspaces.push(workspace); selectedWorkspaceId = workspace.workspaceId; return { ok: true, value: { workspace } }; }),
-      uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
-      browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
-      readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
-      readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
-      readArtifactViewerMedia: vi.fn().mockRejectedValue(new Error("unused")),
-      publishArtifactToRepo: vi.fn().mockRejectedValue(new Error("unused")),
-      verifyPublishedArtifactBacking: vi.fn().mockRejectedValue(new Error("unused")),
-      registerArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
-      localizeArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
-      listAssetDefinitions: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
-      readAssetDefinition: vi.fn().mockRejectedValue(new Error("unused")),
-      readAssetDefinitionVersion: vi.fn().mockRejectedValue(new Error("unused")),
-      listAssetResourceBackedViews: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
-      readAssetResourceBackedView: vi.fn().mockRejectedValue(new Error("unused")),
-      registerResourceBackedViewAsAsset: vi.fn().mockRejectedValue(new Error("unused")),
-      finalizeGeneratedOutputAsAsset: vi.fn().mockRejectedValue(new Error("unused")),
-      importExternalRepositoryObjectAsAsset: vi.fn().mockRejectedValue(new Error("unused")),
-      localizeExternalRepositoryObjectAsAsset: vi.fn().mockRejectedValue(new Error("unused")),
-      readPythonRuntimeStatus: vi.fn().mockResolvedValue({
+      listWorkspaces: testDouble.fn(async () => ({ ok: true, value: { workspaces } })),
+      readActiveWorkspaceSelection: testDouble.fn(async () => ({ ok: true, value: selectedWorkspaceId ? { workspaceId: selectedWorkspaceId } : {} })),
+      saveActiveWorkspaceSelection: testDouble.fn(async (selection: { workspaceId?: string }) => { selectedWorkspaceId = selection.workspaceId; return { ok: true, value: { selection } }; }),
+      clearActiveWorkspaceSelection: testDouble.fn(async () => { selectedWorkspaceId = undefined; return { ok: true, value: {} }; }),
+      createWorkspace: testDouble.fn(async (input: { command: { displayName: string; includeSystemFoundationAssets?: boolean } }) => { const workspace = { workspaceId: "workspace.created", displayName: input.command.displayName, status: "active", createdAt: "2026-05-14T00:00:00.000Z", settings: { defaultIncludeSystemFoundationAssets: input.command.includeSystemFoundationAssets } }; workspaces.push(workspace); selectedWorkspaceId = workspace.workspaceId; return { ok: true, value: { workspace } }; }),
+      uploadArtifact: testDouble.fn().mockRejectedValue(new Error("unused")),
+      browseArtifacts: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readArtifactDetail: testDouble.fn().mockRejectedValue(new Error("unused")),
+      readArtifactContentDescriptor: testDouble.fn().mockRejectedValue(new Error("unused")),
+      readArtifactViewerMedia: testDouble.fn().mockRejectedValue(new Error("unused")),
+      publishArtifactToRepo: testDouble.fn().mockRejectedValue(new Error("unused")),
+      verifyPublishedArtifactBacking: testDouble.fn().mockRejectedValue(new Error("unused")),
+      registerArtifactFromRepo: testDouble.fn().mockRejectedValue(new Error("unused")),
+      localizeArtifactFromRepo: testDouble.fn().mockRejectedValue(new Error("unused")),
+      listAssetDefinitions: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readAssetDefinition: testDouble.fn().mockRejectedValue(new Error("unused")),
+      readAssetDefinitionVersion: testDouble.fn().mockRejectedValue(new Error("unused")),
+      listAssetResourceBackedViews: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readAssetResourceBackedView: testDouble.fn().mockRejectedValue(new Error("unused")),
+      registerResourceBackedViewAsAsset: testDouble.fn().mockRejectedValue(new Error("unused")),
+      finalizeGeneratedOutputAsAsset: testDouble.fn().mockRejectedValue(new Error("unused")),
+      importExternalRepositoryObjectAsAsset: testDouble.fn().mockRejectedValue(new Error("unused")),
+      localizeExternalRepositoryObjectAsAsset: testDouble.fn().mockRejectedValue(new Error("unused")),
+      readPythonRuntimeStatus: testDouble.fn().mockResolvedValue({
         ok: true,
         value: {
           supervisorStatus: "stopped",
@@ -88,7 +98,7 @@ describe("desktop renderer page composition", () => {
           logs: [],
         },
       }),
-      controlPythonRuntime: vi.fn().mockResolvedValue({
+      controlPythonRuntime: testDouble.fn().mockResolvedValue({
         ok: true,
         value: {
           supervisorStatus: "starting",
@@ -98,12 +108,12 @@ describe("desktop renderer page composition", () => {
           logs: [],
         },
       }),
-      browseModels: vi.fn().mockResolvedValue({ ok: true, value: { models: [] } }),
-      getModelDetails: vi.fn().mockResolvedValue({ ok: true, value: { model: { provider: "huggingface", modelId: "org/demo", displayName: "Demo" } } }),
-      listModels: vi.fn().mockResolvedValue({ ok: true, value: { models: [] } }),
-      saveModelReference: vi.fn().mockResolvedValue({ ok: true, value: { model: { modelRecordId: "m1", displayName: "Demo", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-04-27T00:00:00.000Z" } } }),
-      updateModelRecord: vi.fn().mockResolvedValue({ ok: true, value: { model: { modelRecordId: "m1", displayName: "Demo", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-04-27T00:00:00.000Z" } } }),
-      deleteModelRecord: vi.fn().mockResolvedValue({ ok: true, value: { deletedModelRecordId: "m1", deletedRegistryRecord: true, deletedLocalFiles: false, deletedBackingArtifactIds: [] } }),
+      browseModels: testDouble.fn().mockResolvedValue({ ok: true, value: { models: [] } }),
+      getModelDetails: testDouble.fn().mockResolvedValue({ ok: true, value: { model: { provider: "huggingface", modelId: "org/demo", displayName: "Demo" } } }),
+      listModels: testDouble.fn().mockResolvedValue({ ok: true, value: { models: [] } }),
+      saveModelReference: testDouble.fn().mockResolvedValue({ ok: true, value: { model: { modelRecordId: "m1", displayName: "Demo", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-04-27T00:00:00.000Z" } } }),
+      updateModelRecord: testDouble.fn().mockResolvedValue({ ok: true, value: { model: { modelRecordId: "m1", displayName: "Demo", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-04-27T00:00:00.000Z" } } }),
+      deleteModelRecord: testDouble.fn().mockResolvedValue({ ok: true, value: { deletedModelRecordId: "m1", deletedRegistryRecord: true, deletedLocalFiles: false, deletedBackingArtifactIds: [] } }),
     };
 
     await act(async () => {
@@ -144,9 +154,10 @@ describe("desktop renderer page composition", () => {
     await act(async () => {
       assetsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
-    expect(container.textContent).toContain("Loading page…");
+    await waitForText(container, "Asset Library");
+    expect(container.textContent).toContain("Asset Library");
     expect(container.querySelector("button[aria-current='page']")?.textContent).toBe("Assets");
-    expect(window.desktopApi?.listAssetDefinitions).not.toHaveBeenCalled();
+    expect(window.desktopApi?.listAssetDefinitions).toHaveBeenCalled();
 
     const settingsButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Settings",
@@ -156,7 +167,8 @@ describe("desktop renderer page composition", () => {
     await act(async () => {
       settingsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
-    expect(container.textContent).toContain("Loading page…");
+    await waitForText(container, "Settings");
+    expect(container.textContent).toContain("Settings");
     expect(container.querySelector("button[aria-current='page']")?.getAttribute("aria-label")).toBe("Settings");
 
     const systemButton = Array.from(container.querySelectorAll("button")).find(
@@ -168,7 +180,8 @@ describe("desktop renderer page composition", () => {
       systemButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("Loading page…");
+    await waitForText(container, "System workspace scaffolding");
+    expect(container.textContent).toContain("System workspace scaffolding");
     expect(container.querySelector("button[aria-current='page']")?.textContent).toBe("System");
   });
 });

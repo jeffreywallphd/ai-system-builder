@@ -1,6 +1,7 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 
 import { recordRendererMemorySnapshot } from "../diagnostics/rendererMemoryDiagnostics";
+import type { ActiveWorkspaceReadinessStatus } from "../features/workspace";
 import type { DesktopPageKey } from "./desktopPages";
 
 export interface WorkspaceScopedPageProps {
@@ -41,6 +42,28 @@ export type DesktopLazyPageRegistry = {
   readonly [TKey in DesktopPageKey]: DesktopLazyPageComponent<TKey>;
 };
 
+export interface DesktopLazyPageDiagnosticContext {
+  readonly activePage: DesktopPageKey;
+  readonly visibleActivePage?: DesktopPageKey;
+  readonly workspaceStatus?: ActiveWorkspaceReadinessStatus;
+  readonly routeRequiresWorkspace?: boolean;
+}
+
+let desktopLazyPageDiagnosticContext: DesktopLazyPageDiagnosticContext | undefined;
+
+export function setDesktopLazyPageDiagnosticContext(context: DesktopLazyPageDiagnosticContext): void {
+  desktopLazyPageDiagnosticContext = context;
+}
+
+function createLazyPageDiagnosticDetail(pageKey: DesktopPageKey): Record<string, unknown> {
+  return {
+    activePage: desktopLazyPageDiagnosticContext?.activePage ?? pageKey,
+    visibleActivePage: desktopLazyPageDiagnosticContext?.visibleActivePage,
+    workspaceStatus: desktopLazyPageDiagnosticContext?.workspaceStatus,
+    routeRequiresWorkspace: desktopLazyPageDiagnosticContext?.routeRequiresWorkspace,
+  };
+}
+
 function lazyDesktopPage<TKey extends DesktopPageKey>(
   pageKey: TKey,
   loadPage: DesktopLazyPageLoader<TKey>,
@@ -49,7 +72,7 @@ function lazyDesktopPage<TKey extends DesktopPageKey>(
     recordRendererMemorySnapshot({
       milestone: "renderer.page.lazy-load.start",
       component: "desktop-renderer",
-      detail: { activePage: pageKey },
+      detail: createLazyPageDiagnosticDetail(pageKey),
     });
 
     try {
@@ -57,7 +80,7 @@ function lazyDesktopPage<TKey extends DesktopPageKey>(
       recordRendererMemorySnapshot({
         milestone: "renderer.page.lazy-load.resolved",
         component: "desktop-renderer",
-        detail: { activePage: pageKey },
+        detail: createLazyPageDiagnosticDetail(pageKey),
       });
       return loadedPage;
     } catch (error) {
@@ -65,7 +88,7 @@ function lazyDesktopPage<TKey extends DesktopPageKey>(
         milestone: "renderer.page.lazy-load.failed",
         component: "desktop-renderer",
         detail: {
-          activePage: pageKey,
+          ...createLazyPageDiagnosticDetail(pageKey),
           error: error instanceof Error ? error.message : "unknown lazy page load failure",
         },
       });

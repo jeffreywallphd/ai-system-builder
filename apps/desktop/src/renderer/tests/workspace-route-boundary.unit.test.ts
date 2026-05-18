@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "../../../../../modules/testing/node-test";
 
 import { resolveDesktopWorkspaceRouteBoundary } from "../routes/workspaceRouteBoundary";
 
