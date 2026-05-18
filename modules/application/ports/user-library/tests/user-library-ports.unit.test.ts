@@ -8,6 +8,7 @@ import type {
   WorkspaceAssetForUserLibraryReadPort,
   WorkspaceUserLibraryDetachedCopyRepositoryPort,
   WorkspaceUserLibraryLinkRepositoryPort,
+  WorkspaceToWorkspaceImportRepositoryPort,
 } from "..";
 import { createUserLibraryAssetId, createUserLibraryLinkId } from "../../../../contracts/user-library";
 import { createWorkspaceId } from "../../../../contracts/workspace";
@@ -41,6 +42,13 @@ describe("user-library application ports", () => {
     ] satisfies readonly DetachedCopyRepositoryKeys[];
 
     type LinkRepositoryKeys = keyof WorkspaceUserLibraryLinkRepositoryPort;
+
+    type WorkspaceImportRepositoryKeys = keyof WorkspaceToWorkspaceImportRepositoryPort;
+    const workspaceImportKeys = [
+      "saveWorkspaceToWorkspaceImportRecord",
+      "findWorkspaceToWorkspaceImportRecord",
+    ] satisfies readonly WorkspaceImportRepositoryKeys[];
+
     const linkKeys = [
       "saveWorkspaceUserLibraryLinkRecord",
       "updateWorkspaceUserLibraryLinkRecord",
@@ -65,6 +73,11 @@ describe("user-library application ports", () => {
       "saveWorkspaceUserLibraryDetachedCopyRecord",
       "findWorkspaceUserLibraryDetachedCopyRecord",
     ]);
+    assert.deepEqual(workspaceImportKeys, [
+      "saveWorkspaceToWorkspaceImportRecord",
+      "findWorkspaceToWorkspaceImportRecord",
+    ]);
+
     assert.deepEqual(linkKeys, [
       "saveWorkspaceUserLibraryLinkRecord",
       "updateWorkspaceUserLibraryLinkRecord",
@@ -86,6 +99,7 @@ describe("user-library application ports", () => {
       read("modules/application/ports/user-library/workspace-user-library-link-repository.port.ts"),
       read("modules/application/ports/user-library/workspace-user-library-detached-copy-repository.port.ts"),
       read("modules/application/ports/user-library/workspace-asset-for-user-library-read.port.ts"),
+      read("modules/application/ports/user-library/workspace-to-workspace-import-repository.port.ts"),
       read("modules/application/ports/user-library/index.ts"),
     ].join("\n");
 
