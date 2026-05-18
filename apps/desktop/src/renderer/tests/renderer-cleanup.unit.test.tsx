@@ -66,6 +66,20 @@ describe("renderer cleanup policies", () => {
     expect(lines).toContain("renderer.section.cleanup.completed");
   });
 
+
+  it("keeps renderer cleanup diagnostics gated when memory diagnostics are disabled", async () => {
+    window.desktopApi = { memoryDiagnosticsEnabled: false } as never;
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const pending = deferred<string>();
+    mount(<SectionHarness loader={() => pending.promise} />);
+
+    await act(async () => root?.unmount());
+    root = undefined;
+    await act(async () => { pending.resolve("late data"); await pending.promise; });
+
+    expect(log).not.toHaveBeenCalled();
+  });
+
   it("keeps section retry functional after a failed load", async () => {
     let loadCount = 0;
     function RetryHarness() {

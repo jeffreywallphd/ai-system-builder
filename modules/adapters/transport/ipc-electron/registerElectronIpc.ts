@@ -6,7 +6,7 @@ import { registerDesktopIngestionIpc, type RegisterDesktopIngestionIpcDependenci
 import { registerDesktopModelIpc, type RegisterDesktopModelIpcDependencies } from "./registerDesktopModelIpc";
 import { registerDesktopRuntimeIpc, type RegisterDesktopRuntimeIpcDependencies } from "./registerDesktopRuntimeIpc";
 import { registerDesktopStartupIpc, type RegisterDesktopStartupIpcDependencies } from "./registerDesktopStartupIpc";
-export type { AsyncFeatureProvider } from "./lazyFeatureProvider";
+export type { AsyncFeatureProvider, LazyProvidedObjectOptions } from "./lazyFeatureProvider";
 
 export type DesktopIpcRegistrationMilestoneRecorder = (milestone: string) => void;
 

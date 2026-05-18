@@ -110,6 +110,31 @@ describe("desktop feature lifecycle registry", () => {
     expect(disposed).toBe(false);
   });
 
+
+  it("does not dispose always-resident features through idle cleanup", async () => {
+    const registry = createDesktopFeatureLifecycleRegistry({ loggingPort: createLoggingPort() });
+    let disposed = false;
+    const getFeature = registry.registerAsyncFeature({
+      featureKey: "diagnostics",
+      policy: "always-resident",
+      milestoneBase: "desktop.host.diagnostics",
+      importFeature: async () => async () => ({ dispose: () => { disposed = true; } }),
+    });
+
+    await getFeature();
+    expect(registry.markFeatureIdle("diagnostics", "feature-release")).toBe(false);
+    const results = await registry.disposeIdleFeatures("explicit-dev-action");
+
+    expect(results).toEqual([]);
+    expect(disposed).toBe(false);
+    expect(registry.getFeatureLifecycleState().find((entry) => entry.featureKey === "diagnostics")).toMatchObject({
+      policy: "always-resident",
+      loaded: true,
+      idle: false,
+      idleTimeoutScheduled: false,
+    });
+  });
+
   it("uses one scoped idle timeout per disposable feature and cancels it on reuse", async () => {
     const loggingPort = createLoggingPort();
     const milestones: string[] = [];
