@@ -1,6 +1,7 @@
 import type {
   WorkspaceId,
 } from "../../../contracts/workspace";
+import type { UserLibraryEffectiveSourceSummary } from "../../../contracts/user-library";
 import type {
   AssetBinding,
   AssetComposition,
@@ -99,12 +100,14 @@ export interface AssetDefinitionCard {
   readonly effectiveResolutionStatus?: string;
   readonly resolutionSummary?: string;
   readonly metadata?: AssetMetadata;
+  readonly effectiveSourceSummary?: UserLibraryEffectiveSourceSummary;
 }
 
 export interface AssetDefinitionDetail {
   readonly definition: AssetDefinition;
   readonly builtIn?: boolean;
   readonly validationSummary?: AssetValidationResult;
+  readonly effectiveSourceSummary?: UserLibraryEffectiveSourceSummary;
 }
 
 export interface AssetInstanceCard {

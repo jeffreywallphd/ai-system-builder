@@ -2,6 +2,7 @@ import type { AssetReference } from "../../../contracts/asset";
 import type { WorkspaceId } from "../../../contracts/workspace";
 import { isWorkspaceId } from "../../../contracts/workspace";
 import type { AssetRegistryDefinitionReadPort } from "../../ports/asset";
+import type { UserLibraryAssetRepositoryPort, WorkspaceToWorkspaceImportRepositoryPort, WorkspaceUserLibraryDetachedCopyRepositoryPort, WorkspaceUserLibraryLinkRepositoryPort } from "../../ports/user-library";
 import type { WorkspaceRepository } from "../../ports/workspace";
 import type { ListWorkspaceSystemPackActivationsUseCase } from "../../use-cases/workspace";
 import type {
@@ -14,6 +15,7 @@ import type {
   AssetRegistryResourceBackedViewCard,
   AssetRegistryResourceBackedViewDetail,
 } from "./asset-registry-read-facade.types";
+import { WorkspaceEffectiveAssetSourceResolver } from "./workspace-effective-asset-source-resolver.service";
 
 export type WorkspaceAssetRegistryReadFailureCode =
   | "workspace-required"
@@ -40,6 +42,10 @@ export interface WorkspaceAssetRegistryReadFacadeDependencies {
   readonly assetRegistryRead: AssetRegistryDefinitionReadPort;
   readonly listWorkspaceSystemPackActivations: ListWorkspaceSystemPackActivationsUseCase;
   readonly workspaceRepository?: WorkspaceRepository;
+  readonly workspaceUserLibraryLinkRepository?: WorkspaceUserLibraryLinkRepositoryPort;
+  readonly userLibraryAssetRepository?: UserLibraryAssetRepositoryPort;
+  readonly detachedCopyRepository?: WorkspaceUserLibraryDetachedCopyRepositoryPort;
+  readonly workspaceImportRepository?: WorkspaceToWorkspaceImportRepositoryPort;
 }
 
 interface ActiveSystemPackKey {
@@ -48,7 +54,16 @@ interface ActiveSystemPackKey {
 }
 
 export class WorkspaceAssetRegistryReadFacade implements AssetRegistryDefinitionReadPort {
-  public constructor(private readonly dependencies: WorkspaceAssetRegistryReadFacadeDependencies) {}
+  private readonly sourceResolver: WorkspaceEffectiveAssetSourceResolver;
+
+  public constructor(private readonly dependencies: WorkspaceAssetRegistryReadFacadeDependencies) {
+    this.sourceResolver = new WorkspaceEffectiveAssetSourceResolver({
+      workspaceUserLibraryLinkRepository: dependencies.workspaceUserLibraryLinkRepository,
+      userLibraryAssetRepository: dependencies.userLibraryAssetRepository,
+      detachedCopyRepository: dependencies.detachedCopyRepository,
+      workspaceImportRepository: dependencies.workspaceImportRepository,
+    });
+  }
 
   public async listDefinitionCards(query: AssetRegistryListQuery = {}): Promise<AssetRegistryListResult<AssetDefinitionCard>> {
     const context = await this.resolveWorkspaceContext(query.workspaceId);
@@ -59,9 +74,13 @@ export class WorkspaceAssetRegistryReadFacade implements AssetRegistryDefinition
 
     const globalResult = await this.dependencies.assetRegistryRead.listDefinitionCards(query);
     const activeSystemPacks = activations.activeSystemPacks;
-    const items = globalResult.items
+    const items = await Promise.all(globalResult.items
       .filter((card) => isInWorkspaceEffectiveView(card, activeSystemPacks))
-      .sort(compareDefinitionCards);
+      .map(async (card) => ({
+        ...card,
+        effectiveSourceSummary: await this.sourceResolver.resolve(context.workspaceId, card),
+      } as AssetDefinitionCard)));
+    items.sort(compareDefinitionCards);
 
     return {
       items,
@@ -89,7 +108,18 @@ export class WorkspaceAssetRegistryReadFacade implements AssetRegistryDefinition
       );
     }
 
-    return detail;
+    return {
+      ...detail,
+      effectiveSourceSummary: await this.sourceResolver.resolve(context.workspaceId, {
+        definitionRef: ref,
+        sourcePackId: readStringMetadata(detail.definition.metadata, "sourcePackId"),
+        sourcePackVersion: readStringMetadata(detail.definition.metadata, "sourcePackVersion"),
+        sourceKind: readStringMetadata(detail.definition.metadata, "sourceKind"),
+        sourceLayer: readStringMetadata(detail.definition.metadata, "sourceLayer"),
+        trustStatus: readStringMetadata(detail.definition.metadata, "trustStatus"),
+        systemDefault: readBooleanMetadata(detail.definition.metadata, "systemDefault"),
+      }),
+    };
   }
 
   public async listResourceBackedViewCards(query: AssetRegistryListQuery = {}): Promise<AssetRegistryListResult<AssetRegistryResourceBackedViewCard>> {
@@ -203,4 +233,16 @@ function compareDefinitionCards(left: AssetDefinitionCard, right: AssetDefinitio
   const id = left.definitionId.localeCompare(right.definitionId);
   if (id !== 0) return id;
   return left.version.localeCompare(right.version);
+}
+
+function readStringMetadata(metadata: unknown, key: string): string | undefined {
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function readBooleanMetadata(metadata: unknown, key: string): boolean | undefined {
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "boolean" ? value : undefined;
 }
