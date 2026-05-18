@@ -8,3 +8,5 @@ export * from "./user-library-commands";
 export * from "./user-library-results";
 export * from "./user-library-diagnostics";
 export * from "./user-library-effective-source";
+
+export * from "./user-library-normalization";
