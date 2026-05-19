@@ -217,3 +217,10 @@ Phase 8 must not assume hidden propagation, live workspace-to-workspace links, s
 - Verify effective-source summaries do not leak cross-workspace records.
 - Verify desktop/thin-client UI keeps linked vs copied semantics distinct and never treats localStorage as workspace source of truth.
 - Verify boundary/import-discipline tests continue preventing cross-layer dependency drift.
+
+
+## Phase 7 implementation status (Prompt 11 cleanup, 2026-05-19)
+- Implemented in minimal desktop/thin-client UI: list saved reusable assets, list workspace links, list effective asset sources, and explicit link/copy actions with conservative pinned-version defaults.
+- Deferred/unavailable in minimal UI: promote and import action flows, advanced editing, propagation execution, live workspace-to-workspace links, collaboration, pack import/export, marketplace, hidden/default workspaces, startup seeding, and legacy/global auto-migration.
+- Transport and preload exposure may include promote/import operations, but minimal UI intentionally does not present them as available actions in this phase cleanup.
+- Documentation and tests must stay aligned with implemented behavior; do not claim unsupported actions as complete.
