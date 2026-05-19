@@ -169,8 +169,8 @@ describe("composeServerHost", () => {
       runtimeRootDirectory,
     });
 
-    expect(app.post).toHaveBeenCalledTimes(44);
-    expect(app.get).toHaveBeenCalledTimes(17);
+    expect(app.post).toHaveBeenCalledTimes(51);
+    expect(app.get).toHaveBeenCalledTimes(26);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
       "/api/artifact/upload",
@@ -216,6 +216,13 @@ describe("composeServerHost", () => {
       "/api/assets/finalize-generated-output",
       "/api/assets/import-external-repository-object",
       "/api/assets/localize-external-repository-object",
+      "/api/asset-authoring/create-workspace-authored-asset",
+      "/api/asset-authoring/create-draft",
+      "/api/asset-authoring/update-draft",
+      "/api/asset-authoring/publish-draft",
+      "/api/asset-authoring/create-override",
+      "/api/asset-authoring/update-override",
+      "/api/asset-authoring/disable-override",
       "/api/server/restart",
     ]);
     expect(registeredPaths.filter((path) => String(path).startsWith("/api/assets"))).toEqual([
@@ -261,6 +268,15 @@ describe("composeServerHost", () => {
       "/api/workspaces/:workspaceId/user-library/links/:linkId",
       "/api/workspaces/:workspaceId/effective-asset-sources",
       "/api/assets/definitions",
+      "/api/asset-authoring/authored-assets",
+      "/api/asset-authoring/authored-assets/:authoredAssetId",
+      "/api/asset-authoring/drafts",
+      "/api/asset-authoring/drafts/:draftId",
+      "/api/asset-authoring/revisions",
+      "/api/asset-authoring/revisions/:revisionId",
+      "/api/asset-authoring/overrides",
+      "/api/asset-authoring/overrides/:overrideId",
+      "/api/asset-authoring/effective-summaries",
       "/api/assets/resource-backed-views",
       "/api/assets/resource-backed-views/:viewId",
       "/api/assets/definitions/:definitionId",
