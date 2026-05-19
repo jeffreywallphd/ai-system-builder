@@ -1,6 +1,7 @@
 import { normalizeAssetOverrideId, normalizeAssetOverrideRecord, normalizeCreateAssetOverrideCommand, type AssetAuthoringFailure, type CreateAssetOverrideCommand, type CreateAssetOverrideResult } from "../../../contracts/asset-authoring";
 import type { AssetCustomizationTargetReaderPort, AssetOverrideRepositoryPort } from "../../ports/asset-authoring";
 import { mapOverrideScopeForSourceKind, validateOverrideTargetSemantics } from "./asset-authoring-use-case-safety";
+import { expectedBaseRevisionMatches } from "./asset-authoring-conflict.service";
 
 const nowIso = () => new Date().toISOString();
 const fail = (code: AssetAuthoringFailure["code"], message: string): CreateAssetOverrideResult => ({ kind: "failure", failure: { code, message } });
@@ -15,6 +16,7 @@ export class CreateAssetOverrideUseCase {
     if (!found) return fail("not-found", "Customization target relationship was not found.");
     const invalid = validateOverrideTargetSemantics(c.target, found); if (invalid) return fail(invalid.includes("deferred") ? "unsupported" : "conflict", invalid);
     if (c.target.sourceKind === "system-owned-asset" && mapOverrideScopeForSourceKind(c.target.sourceKind) !== "system-derived") return fail("validation", "System-owned target requires system-derived override scope.");
+    if (!expectedBaseRevisionMatches(c.baseRevision, c.target.baseRevision)) return fail("conflict", "Override base revision has changed.");
     const existing = await this.d.assetOverrideRepository.findActiveOverrideForTarget(c.targetWorkspaceId, c.target.effectiveAssetReference);
     if (existing) return fail("conflict", "An active override already exists for the customization target.");
     const at = (this.d.now ?? nowIso)();
