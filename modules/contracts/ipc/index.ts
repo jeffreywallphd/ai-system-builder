@@ -37,3 +37,5 @@ export * from "./desktop-comfyui-runtime-contract";
 export * from "./desktop-workspace-contract";
 
 export * from "./desktop-user-library-contract";
+
+export * from "./desktop-asset-authoring-contract";

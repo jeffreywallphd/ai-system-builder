@@ -8,3 +8,5 @@ export * from "./asset-authoring-commands";
 export * from "./asset-authoring-results";
 export * from "./asset-authoring-normalization";
 
+
+export * from "./asset-authoring-effective-source";
