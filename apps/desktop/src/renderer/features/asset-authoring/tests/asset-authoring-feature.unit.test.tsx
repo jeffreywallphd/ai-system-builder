@@ -13,9 +13,9 @@ import { AssetAuthoringFeature } from '../components/AssetAuthoringFeature';
 describe('AssetAuthoringFeature desktop', () => {
   afterEach(() => vi.resetAllMocks());
   it('renders deferred summaries message and result-aware actions', async () => {
-    client.listAuthoredAssets.mockResolvedValue({ ok: true, value: { items: [{ authoredAssetId: 'a1', status: 'active', editableFields: { displayName: 'Writer Agent' } }] } });
-    client.listDrafts.mockResolvedValue({ ok: true, value: { items: [{ draftId: 'd1', status: 'draft', editableFields: { displayName: 'Draft One' } }] } });
-    client.listOverrides.mockResolvedValue({ ok: true, value: { items: [{ overrideId: 'o1', status: 'active', displayLabel: 'Custom One' }] } });
+    client.listAuthoredAssets.mockResolvedValue({ ok: true, value: { items: [{ authoredAssetId: 'a1', status: 'active', editableValues: { 'display-name': 'Writer Agent' }, assetReference: { kind: 'asset-instance', id: 'a1' } }] } });
+    client.listDrafts.mockResolvedValue({ ok: true, value: { items: [{ draftId: 'd1', status: 'draft', draftEditableValues: { 'display-name': 'Draft One' } }] } });
+    client.listOverrides.mockResolvedValue({ ok: true, value: { items: [{ overrideId: 'o1', status: 'active', overrideValues: { 'display-name': 'Custom One' }, baseAssetReference: { kind: 'asset-instance', id: 'base-1' } }] } });
     client.listEffectiveSummaries.mockResolvedValue({ ok: false, error: { code: 'unavailable', message: 'nope' } });
     client.updateDraft.mockResolvedValue({ ok: false, error: { code: 'validation', message: 'bad update' } });
     const c = document.createElement('div'); document.body.appendChild(c);

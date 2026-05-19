@@ -1,14 +1,66 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { AssetAuthoringEffectiveSourceSummary, AssetOverrideRecord, AuthoredAssetDraftRecord, AuthoredAssetRecord } from '../../../../../../../modules/contracts/asset-authoring';
+import type {
+  AssetAuthoringEffectiveSourceSummary,
+  AssetOverrideRecord,
+  AuthoredAssetDraftRecord,
+  AuthoredAssetRecord,
+} from '../../../../../../../modules/contracts/asset-authoring';
 import { createDesktopAssetAuthoringClient } from '../api/desktopAssetAuthoringClient';
 
-type RowVm = { id: string; label: string; statusLabel: string; description?: string; diagnosticLabel?: string; canPublish?: boolean; canUpdate?: boolean; canDisable?: boolean };
-const safe = (value: unknown, fallback: string) => typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
-const mapAuthored = (r: AuthoredAssetRecord): RowVm => ({ id: r.authoredAssetId, label: safe(r.editableFields?.displayName, 'Authored asset'), statusLabel: safe(r.status, 'Active'), description: safe(r.editableFields?.summary, '') || undefined });
-const mapDraft = (r: AuthoredAssetDraftRecord): RowVm => ({ id: r.draftId, label: safe(r.editableFields?.displayName, 'Draft'), statusLabel: safe(r.status, 'Draft'), description: safe(r.editableFields?.summary, '') || undefined, canPublish: true, canUpdate: true });
-const mapOverride = (r: AssetOverrideRecord): RowVm => ({ id: r.overrideId, label: safe(r.displayLabel, 'Customization'), statusLabel: safe(r.status, 'Active'), canDisable: r.status !== 'disabled' });
-const sourceLabel = (k: unknown) => k === 'workspace-authored' ? 'Workspace authored' : k === 'workspace-customized' ? 'Workspace customization' : k === 'linked-with-workspace-override' ? 'Linked with workspace customization' : k === 'system-derived-override' ? 'System-derived customization' : 'Workspace usage';
-const mapSummary = (r: AssetAuthoringEffectiveSourceSummary, index: number): RowVm => ({ id: `${r.assetId ?? 'summary'}-${index}`, label: sourceLabel(r.effectiveSourceKind), statusLabel: r.hasConflict ? 'Conflict' : r.disabled ? 'Disabled' : 'Active' });
+type RowVm = {
+  id: string;
+  label: string;
+  statusLabel: string;
+  description?: string;
+  diagnosticLabel?: string;
+  canPublish?: boolean;
+  canUpdate?: boolean;
+  canDisable?: boolean;
+};
+
+const safe = (value: unknown, fallback: string) =>
+  typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
+
+const mapAuthored = (record: AuthoredAssetRecord): RowVm => ({
+  id: record.authoredAssetId,
+  label: safe(record.editableValues['display-name'], record.assetReference.label ?? 'Authored asset'),
+  statusLabel: safe(record.status, 'Active'),
+  description: safe(record.editableValues.summary, '') || undefined,
+});
+
+const mapDraft = (record: AuthoredAssetDraftRecord): RowVm => ({
+  id: record.draftId,
+  label: safe(record.draftEditableValues['display-name'], record.baseAssetReference?.label ?? 'Draft'),
+  statusLabel: safe(record.status, 'Draft'),
+  description: safe(record.draftEditableValues.summary, '') || undefined,
+  canPublish: true,
+  canUpdate: true,
+});
+
+const mapOverride = (record: AssetOverrideRecord): RowVm => ({
+  id: record.overrideId,
+  label: safe(record.overrideValues['display-name'], record.baseAssetReference.label ?? 'Customization'),
+  statusLabel: safe(record.status, 'Active'),
+  canDisable: record.status !== 'disabled',
+});
+
+const sourceLabel = (kind: unknown) =>
+  kind === 'workspace-authored'
+    ? 'Workspace authored'
+    : kind === 'workspace-customized'
+      ? 'Workspace customization'
+      : kind === 'linked-with-workspace-override'
+        ? 'Linked with workspace customization'
+        : kind === 'system-derived-override'
+          ? 'System-derived customization'
+          : 'Workspace usage';
+
+const mapSummary = (record: AssetAuthoringEffectiveSourceSummary, index: number): RowVm => ({
+  id: `${record.effectiveAssetReference?.id ?? record.assetReference.id ?? 'summary'}-${index}`,
+  label: sourceLabel(record.effectiveSourceKind),
+  statusLabel:
+    record.conflictStatus === 'open' ? 'Conflict' : record.overrideStatus === 'disabled' ? 'Disabled' : 'Active',
+});
 
 export function AssetAuthoringFeature({ workspaceId }: { workspaceId: string }) {
   const client = useMemo(() => createDesktopAssetAuthoringClient(), []);
@@ -18,16 +70,151 @@ export function AssetAuthoringFeature({ workspaceId }: { workspaceId: string }) 
   const [summaries, setSummaries] = useState<RowVm[]>([]);
   const [summariesUnavailable, setSummariesUnavailable] = useState(false);
   const [message, setMessage] = useState('');
-  const [name, setName] = useState(''); const [summary, setSummary] = useState('');
+  const [name, setName] = useState('');
+  const [summary, setSummary] = useState('');
+
   const refresh = async () => {
-    const [a, d, o, s] = await Promise.all([client.listAuthoredAssets(workspaceId), client.listDrafts(workspaceId), client.listOverrides(workspaceId), client.listEffectiveSummaries(workspaceId)]);
-    if (a.ok) setAuthored(a.value.items.map(mapAuthored));
-    if (d.ok) setDrafts(d.value.items.map(mapDraft));
-    if (o.ok) setOverrides(o.value.items.map(mapOverride));
-    if (s.ok) { setSummaries(s.value.items.map(mapSummary)); setSummariesUnavailable(false); }
-    else if (s.error.code === 'unavailable') { setSummaries([]); setSummariesUnavailable(true); }
-    if (!a.ok || !d.ok || !o.ok) setMessage('Some data is not available yet.');
+    const [authoredResult, draftsResult, overridesResult, summariesResult] = await Promise.all([
+      client.listAuthoredAssets(workspaceId),
+      client.listDrafts(workspaceId),
+      client.listOverrides(workspaceId),
+      client.listEffectiveSummaries(workspaceId),
+    ]);
+
+    if (authoredResult.ok === true) setAuthored(authoredResult.value.items.map(mapAuthored));
+    if (draftsResult.ok === true) setDrafts(draftsResult.value.items.map(mapDraft));
+    if (overridesResult.ok === true) setOverrides(overridesResult.value.items.map(mapOverride));
+    if (summariesResult.ok === true) {
+      setSummaries(summariesResult.value.items.map(mapSummary));
+      setSummariesUnavailable(false);
+    } else if (summariesResult.error.code === 'unavailable') {
+      setSummaries([]);
+      setSummariesUnavailable(true);
+    }
+    if (authoredResult.ok === false || draftsResult.ok === false || overridesResult.ok === false) {
+      setMessage('Some data is not available yet.');
+    }
   };
-  useEffect(() => { void refresh(); }, [workspaceId]);
-  return <section><h2>Asset Authoring</h2><h3>Custom Assets</h3><ul>{authored.length ? authored.map((a) => <li key={a.id}><strong>{a.label}</strong> — {a.statusLabel}</li>) : <li>No custom assets yet.</li>}</ul><h3>Drafts</h3><ul>{drafts.length ? drafts.map((d) => <li key={d.id}><strong>{d.label}</strong> — {d.statusLabel} <button onClick={async () => { const r=await client.publishDraft(workspaceId, d.id); setMessage(r.ok?'Publish requested.':r.error.message); if (r.ok) await refresh(); }}>Publish draft</button> <button onClick={async () => { const r=await client.updateDraft({ workspaceId, draftId: d.id, summary: 'Updated in workspace' }); setMessage(r.ok?'Draft updated.':r.error.message); if (r.ok) await refresh(); }}>Save safe edit</button></li>) : <li>No drafts yet.</li>}</ul><h3>Create draft</h3><form onSubmit={async (e) => { e.preventDefault(); if (!name.trim()) { setMessage('Display name is required.'); return; } const r=await client.createDraft({ workspaceId, displayName: name, summary }); if (r.ok) { setName(''); setSummary(''); setMessage('Draft created.'); await refresh(); } else setMessage(r.error.message); }}><input aria-label='Display name' value={name} onChange={(e) => setName(e.target.value)} /><input aria-label='Summary' value={summary} onChange={(e) => setSummary(e.target.value)} /><button type='submit'>Create draft</button></form><h3>Workspace customizations</h3><p><small>Creating new customizations is not available yet.</small></p><ul>{overrides.length ? overrides.map((o) => <li key={o.id}>{o.label} — {o.statusLabel} {o.canDisable ? <button onClick={async () => { const r=await client.disableOverride(workspaceId, o.id); setMessage(r.ok?'Customization disabled.':r.error.message); if (r.ok) await refresh(); }}>Disable customization</button> : null}</li>) : <li>No workspace customizations yet.</li>}</ul><h3>What this workspace is using</h3>{summariesUnavailable ? <p>Workspace usage summaries are not available yet.</p> : <ul>{summaries.length ? summaries.map((s) => <li key={s.id}>{s.label} — {s.statusLabel}</li>) : <li>No workspace usage summaries yet.</li>}</ul>}{message ? <p>{message}</p> : null}</section>;
+
+  useEffect(() => {
+    void refresh();
+  }, [workspaceId]);
+
+  return (
+    <section>
+      <h2>Asset Authoring</h2>
+      <h3>Custom Assets</h3>
+      <ul>
+        {authored.length ? (
+          authored.map((asset) => (
+            <li key={asset.id}>
+              <strong>{asset.label}</strong> - {asset.statusLabel}
+            </li>
+          ))
+        ) : (
+          <li>No custom assets yet.</li>
+        )}
+      </ul>
+      <h3>Drafts</h3>
+      <ul>
+        {drafts.length ? (
+          drafts.map((draft) => (
+            <li key={draft.id}>
+              <strong>{draft.label}</strong> - {draft.statusLabel}{' '}
+              <button
+                onClick={async () => {
+                  const result = await client.publishDraft(workspaceId, draft.id);
+                  setMessage(result.ok === true ? 'Publish requested.' : result.error.message);
+                  if (result.ok === true) await refresh();
+                }}
+              >
+                Publish draft
+              </button>{' '}
+              <button
+                onClick={async () => {
+                  const result = await client.updateDraft({
+                    workspaceId,
+                    draftId: draft.id,
+                    summary: 'Updated in workspace',
+                  });
+                  setMessage(result.ok === true ? 'Draft updated.' : result.error.message);
+                  if (result.ok === true) await refresh();
+                }}
+              >
+                Save safe edit
+              </button>
+            </li>
+          ))
+        ) : (
+          <li>No drafts yet.</li>
+        )}
+      </ul>
+      <h3>Create draft</h3>
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault();
+          if (!name.trim()) {
+            setMessage('Display name is required.');
+            return;
+          }
+          const result = await client.createDraft({ workspaceId, displayName: name, summary });
+          if (result.ok === true) {
+            setName('');
+            setSummary('');
+            setMessage('Draft created.');
+            await refresh();
+          } else {
+            setMessage(result.error.message);
+          }
+        }}
+      >
+        <input aria-label="Display name" value={name} onChange={(event) => setName(event.target.value)} />
+        <input aria-label="Summary" value={summary} onChange={(event) => setSummary(event.target.value)} />
+        <button type="submit">Create draft</button>
+      </form>
+      <h3>Workspace customizations</h3>
+      <p>
+        <small>Creating new customizations is not available yet.</small>
+      </p>
+      <ul>
+        {overrides.length ? (
+          overrides.map((override) => (
+            <li key={override.id}>
+              {override.label} - {override.statusLabel}{' '}
+              {override.canDisable ? (
+                <button
+                  onClick={async () => {
+                    const result = await client.disableOverride(workspaceId, override.id);
+                    setMessage(result.ok === true ? 'Customization disabled.' : result.error.message);
+                    if (result.ok === true) await refresh();
+                  }}
+                >
+                  Disable customization
+                </button>
+              ) : null}
+            </li>
+          ))
+        ) : (
+          <li>No workspace customizations yet.</li>
+        )}
+      </ul>
+      <h3>What this workspace is using</h3>
+      {summariesUnavailable ? (
+        <p>Workspace usage summaries are not available yet.</p>
+      ) : (
+        <ul>
+          {summaries.length ? (
+            summaries.map((summaryItem) => (
+              <li key={summaryItem.id}>
+                {summaryItem.label} - {summaryItem.statusLabel}
+              </li>
+            ))
+          ) : (
+            <li>No workspace usage summaries yet.</li>
+          )}
+        </ul>
+      )}
+      {message ? <p>{message}</p> : null}
+    </section>
+  );
 }
