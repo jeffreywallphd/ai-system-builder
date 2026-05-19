@@ -43,6 +43,13 @@ test("create override validates workspace/target/unsafe/duplicate/id generation"
   const unsafe = await uc.execute({ targetWorkspaceId: ws, target: target(), overrideValues: { "safe-metadata": { nested: { path: "/tmp" } } as any } } as any);
   assert.equal((unsafe as any).failure.code, "validation");
 });
+test("create override returns unavailable when target reader unavailable", async () => {
+  const r = repo();
+  const uc = new CreateAssetOverrideUseCase({ assetOverrideRepository: r.port as any, targetReader: { async readCustomizationTargetByReference(){ throw new Error("offline"); } }, generateAssetOverrideId: () => "override.2", now: () => "2026-05-19T00:00:00.000Z" });
+  const result = await uc.execute({ targetWorkspaceId: ws, target: target(), overrideValues: { summary: "custom" } } as any);
+  assert.equal(result.kind, "failure");
+  assert.equal((result as any).failure.code, "unavailable");
+});
 
 test("update override preserves protected fields and updates timestamp", async () => {
   const r = repo();

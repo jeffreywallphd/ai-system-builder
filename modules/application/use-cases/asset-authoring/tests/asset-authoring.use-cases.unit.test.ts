@@ -22,6 +22,14 @@ test('create authored asset rejects base target', async()=>{
   const r=await uc.execute({workspaceId:ws,initialEditableValues:{'display-name':'n'},baseTarget:{} as any} as any);
   assert.equal(r.kind,'failure'); assert.equal((r as any).failure.code,'unsupported');
 });
+test("create authored asset draft does not set missing current revision", async () => {
+  let saved: any;
+  const uc=new CreateWorkspaceAuthoredAssetUseCase({authoredAssetRepository:{saveAuthoredAssetRecord:async(r:any)=>{saved=r;return r;},updateAuthoredAssetRecord:async(r:any)=>r,readAuthoredAssetRecordById:async()=>undefined,readAuthoredAssetRecordByWorkspace:async()=>undefined,listAuthoredAssetRecords:async()=>({records:[]}),findAuthoredAssetByBaseReference:async()=>undefined},generateAuthoredAssetId:()=> 'a1', generateAssetRevisionId:()=> 'bad id'});
+  const r=await uc.execute({workspaceId:ws,initialEditableValues:{'display-name':'n'}} as any);
+  assert.equal(r.kind,'success');
+  assert.equal(saved.status, "draft");
+  assert.equal(saved.currentRevisionId, undefined);
+});
 
 test('publish draft marks published', async()=>{
   let updated:any;
