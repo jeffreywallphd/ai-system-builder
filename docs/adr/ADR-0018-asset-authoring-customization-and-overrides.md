@@ -92,3 +92,10 @@ If Phase 7 Review D truthfulness/composition checks regress, impacted Phase 8 pr
 ## Phase 9 handoff implications
 
 Phase 9 composition planning should consume Phase 8 authored/customized/override vocabulary as explicit inputs and should not bypass override safety, ownership isolation, or conflict visibility rules.
+
+## Phase 8 closeout addendum
+
+Phase 8 closeout confirms UI/client/docs truthfulness constraints:
+- implemented: workspace draft lifecycle (create/update/publish-new), override listing, override disabling;
+- deferred: create override with safe target validation, existing-authored revision publishing, guaranteed workspace-wide effective-summary listing;
+- out of scope: workflow execution, materialization, propagation, conflict rebase/resolution workflows, source mutation, `system.foundation` mutation.

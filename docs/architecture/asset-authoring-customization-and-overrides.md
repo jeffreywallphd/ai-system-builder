@@ -264,3 +264,35 @@ Prompt 1 defines vocabulary only; contract implementation is deferred.
 10. Prompt 8 — API/IPC/preload/server exposure.
 11. Prompt 9 — Minimal desktop/thin-client UI.
 12. Review C — Final Phase 8 closeout review.
+
+## Phase 8 final closeout status (after Cleanup Prompt 2)
+
+- Implemented and available through API + IPC/preload + desktop/thin-client UI: workspace-authored asset listing, draft creation, draft update, draft publication, override listing, and override disabling.
+- Draft publication currently creates new workspace-authored assets only; publishing into an existing authored-asset revision chain is deferred.
+- Authored asset revision amendment flows are deferred.
+- Effective-summary support is transport-dependent and may return unavailable; UI must show an unavailable/deferred message when unavailable.
+- Override creation is intentionally deferred in UI and transport where safe target selection/validation is not implemented.
+- No workflow execution, no materialized effective-asset generation, no propagation execution, and no conflict rebase/resolution workflows in Phase 8.
+- No linked-source mutation and no `system.foundation` mutation/copy behavior.
+
+### Required status checklist
+
+1. Workspace-authored asset creation: implemented via draft -> publish path.
+2. Draft creation: implemented.
+3. Draft update: implemented for safe editable fields.
+4. Draft publication: implemented.
+5. Draft publication target: creates new authored assets only.
+6. Existing authored-asset revision publishing: deferred.
+7. Effective summaries: partial/deferred; unavailable is a valid final-state response.
+8. Override creation: deferred (safe target validation missing).
+9. Override listing: implemented.
+10. Override disabling: implemented.
+11. API exposure: implemented for current Phase 8 operations.
+12. IPC/preload exposure: implemented for current Phase 8 operations.
+13. Desktop UI support: implemented for listing/draft actions/override disable + truthful deferred messaging.
+14. Thin-client UI support: implemented for listing/draft actions/override disable + truthful deferred messaging.
+15. Workflow execution from authored/customized assets: not implemented.
+16. Materialization from override patches: not implemented.
+17. Conflict rebase/resolution workflow: not implemented.
+18. Source mutation: not implemented.
+19. `system.foundation` mutation: not implemented.
