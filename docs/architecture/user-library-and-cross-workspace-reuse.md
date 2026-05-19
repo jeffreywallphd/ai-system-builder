@@ -4,7 +4,7 @@
 
 Phase 7 is **User Library and Cross-Workspace Asset Reuse**. It defines the ownership vocabulary and architecture boundaries for moving reusable assets out of a single workspace into a user-owned library, then making those reusable assets available to workspaces through explicit link, copy, or import workflows.
 
-This document is a documentation/architecture baseline. It does not implement contracts, ports, persistence, API routes, IPC channels, preload bridges, UI, resolver behavior, or use cases. Later Phase 7 prompts must implement those seams incrementally and must keep this document and ADR-0017 aligned when decisions change.
+This document is the final Phase 7 architecture reference after Prompt 11 closeout. It summarizes the implemented contracts, application seams, persistence adapters, transport/preload exposure, and minimal UI status while preserving accepted constraints and deferrals for Phase 8+.
 
 Correct roadmap placement:
 
@@ -167,3 +167,53 @@ This sequence is guidance for later prompts, not code implemented by this prompt
 Phase 7 user-library operations are now exposed at narrow API, Electron IPC, and desktop preload boundaries for future UI work. Transport requests keep workspace context explicit (`sourceWorkspaceId`, `targetWorkspaceId`, or `workspaceId` depending on operation) and missing workspace context fails at the boundary with sanitized validation responses. The exposed operations are promote, link, detached copy, workspace-to-workspace import, user-library asset reads, workspace user-library link reads, and effective asset source summary reads where the workspace asset read facade provides them.
 
 This transport exposure does not add desktop or thin-client UI, propagation execution, live workspace-to-workspace linking, broad authoring, override editing, pack import/export, marketplace behavior, or Phase 8/9 behavior.
+
+
+## Phase 7 closeout status (Prompt 11)
+
+### Completed surfaces
+
+- User-library contract vocabulary is implemented for identity normalization, command normalization (promote/link/copy/import), propagation policy validation, provenance, diagnostics, result/failure envelopes, and effective-source summaries.
+- Application ports and use cases are implemented for promote, link, detached copy, and workspace-to-workspace detached import flows with safe validation and duplicate/idempotency handling.
+- Local persistence adapters are implemented for user-library records and workspace-scoped link/copy/import relationship records.
+- Effective-source read summaries are integrated through workspace asset resolver/read-facade seams with workspace isolation preserved.
+- Transport exposure exists for API + Electron IPC + desktop preload with explicit workspace identifiers and sanitized error mapping.
+- Minimal desktop and thin-client User Library UI/client surfaces exist for list/read and explicit reuse actions that require workspace context.
+
+### Partially implemented or deferred surfaces
+
+- No live workspace-to-workspace links. Workspace import remains detached copy semantics.
+- No automatic propagation execution or hidden latest-follow behavior.
+- No broad asset authoring, customization editing, override editing, or composition authoring in Phase 7.
+- No collaboration/permissions/invites/sync/remote auth/organization libraries.
+- No pack import/export or marketplace behavior.
+
+### Known safe limitations
+
+- Workspace isolation remains default and mandatory.
+- User Library remains a separate user-owned scope (not a workspace and not system foundation).
+- Promotion is explicit; linking is references; copying/importing are detached by default.
+- System-owned assets remain system-owned; `system.foundation@1.0.0` is activated by reference only.
+- No hidden/default workspace creation, startup seeding, or legacy/global auto-migration is introduced by this phase.
+
+### Phase 8 handoff: Asset Authoring, Customization, and Override Management
+
+Phase 8 should build on these explicit Phase 7 reuse relationships by adding controlled authoring/customization surfaces and explicit override records without weakening Phase 7 safety boundaries.
+
+Phase 8 may add:
+
+- user-facing asset editing surfaces,
+- workspace-local customization records,
+- explicit override records for controlled divergence,
+- version/conflict rules for customized linked/copied/imported assets,
+- safe promotion of authored/customized assets,
+- clear UX distinctions between editing a detached copy and updating a link relationship.
+
+Phase 8 must not assume hidden propagation, live workspace-to-workspace links, system foundation mutation, automatic default workspaces, collaboration permissions, pack import/export, or marketplace behavior.
+
+### Review D risk checklist
+
+- Verify every public promote/copy/import claim remains transport-composed in both server and desktop host composition.
+- Verify effective-source summaries do not leak cross-workspace records.
+- Verify desktop/thin-client UI keeps linked vs copied semantics distinct and never treats localStorage as workspace source of truth.
+- Verify boundary/import-discipline tests continue preventing cross-layer dependency drift.

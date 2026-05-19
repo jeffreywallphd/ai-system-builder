@@ -70,3 +70,22 @@ This pack does not authorize broad asset authoring, arbitrary asset editing, ove
 Phase 7 user-library operations are now exposed at narrow API, Electron IPC, and desktop preload boundaries for future UI work. Transport requests keep workspace context explicit (`sourceWorkspaceId`, `targetWorkspaceId`, or `workspaceId` depending on operation) and missing workspace context fails at the boundary with sanitized validation responses. The exposed operations are promote, link, detached copy, workspace-to-workspace import, user-library asset reads, workspace user-library link reads, and effective asset source summary reads where the workspace asset read facade provides them.
 
 This transport exposure does not add desktop or thin-client UI, propagation execution, live workspace-to-workspace linking, broad authoring, override editing, pack import/export, marketplace behavior, or Phase 8/9 behavior.
+
+
+## Transport/UI status (Phase 7 final)
+
+- API routes, Electron IPC handlers, and desktop preload methods expose promote/link/copy/import + user-library/effective-source reads with explicit workspace IDs where required.
+- Desktop renderer and thin-client UIs provide minimal safe User Library actions and status display for Phase 7 reuse workflows only.
+- Missing workspace context must fail safely at transport/UI boundaries; UI gating alone is not treated as authoritative enforcement.
+
+## Deferrals and Phase 8 boundary guidance
+
+Still deferred after Phase 7 closeout:
+
+- broad authoring/customization/override editing,
+- live workspace-to-workspace links,
+- hidden propagation execution/scheduling,
+- collaboration/permissions/invites/sync/remote auth,
+- pack import/export and marketplace behavior.
+
+Phase 8 should add **Asset Authoring, Customization, and Override Management** on top of explicit Phase 7 relationships, while preserving: workspace isolation default, explicit promotion, link vs copy distinction, detached import/copy defaults, system-owned foundation immutability, and no hidden/default workspaces.
