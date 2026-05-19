@@ -1061,6 +1061,7 @@ export function composeServerHost(
             ...assetAuthoringRepositories,
             createWorkspaceAuthoredAssetUseCase: new CreateWorkspaceAuthoredAssetUseCase({
               authoredAssetRepository: assetAuthoringRepositories.authoredAssetRepository,
+              assetRevisionRepository: assetAuthoringRepositories.assetRevisionRepository,
               now: options.now,
               generateAuthoredAssetId: () => randomUUID(),
               generateAssetRevisionId: () => randomUUID(),

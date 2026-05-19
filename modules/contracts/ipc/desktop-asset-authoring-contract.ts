@@ -18,6 +18,7 @@ import type {
   PublishAssetDraftCommand,
   UpdateAssetDraftCommand,
   UpdateAssetOverrideCommand,
+  AssetAuthoringFailureCode,
 } from "../asset-authoring";
 import type { WorkspaceId } from "../workspace";
 import { createTransportOperation } from "../transport";
@@ -108,4 +109,4 @@ type DesktopAssetAuthoringResponseChannel =
   | typeof DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_CREATE_DRAFT_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_UPDATE_DRAFT_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_PUBLISH_DRAFT_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_CREATE_OVERRIDE_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_UPDATE_OVERRIDE_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_DISABLE_OVERRIDE_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_READ_AUTHORED_ASSET_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_LIST_DRAFTS_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_READ_DRAFT_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_LIST_REVISIONS_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_READ_REVISION_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_LIST_OVERRIDES_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_READ_OVERRIDE_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_AUTHORING_LIST_EFFECTIVE_SUMMARIES_RESPONSE_CHANNEL;
 
 export const createDesktopAssetAuthoringOperationSuccessResponse = <TValue>(responseChannel: DesktopAssetAuthoringResponseChannel, value: TValue, options?: { requestId?: string; correlationId?: string }) => createIpcSuccessResponse(responseChannel as never, value, options);
-export const createDesktopAssetAuthoringFailureResponse = (responseChannel: DesktopAssetAuthoringResponseChannel, operation: string, code: "validation"|"internal"|"not-found"|"unavailable", message: string, options?: { requestId?: string; correlationId?: string }) => createIpcFailureResponse(createIpcError(responseChannel as never, code, message, { requestId: options?.requestId, correlationId: options?.correlationId, details: { operation } }) as never);
+export const createDesktopAssetAuthoringFailureResponse = (responseChannel: DesktopAssetAuthoringResponseChannel, operation: string, code: AssetAuthoringFailureCode, message: string, options?: { requestId?: string; correlationId?: string }) => createIpcFailureResponse(createIpcError(responseChannel as never, code === "unsupported" ? "not-supported" : code, message, { requestId: options?.requestId, correlationId: options?.correlationId, details: { operation } }) as never);
