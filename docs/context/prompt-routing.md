@@ -15,6 +15,8 @@ Use this guide to select **minimum-sufficient** context packs for prompts.
 | cross-layer architecture or boundary decisions | `docs/context/packs/architecture.pack.md` |
 | assets, asset packs/catalogs/manifests, asset definitions/instances/bindings/compositions, systems/subsystems/features as composable assets, UI components/pages as assets, workflows/tools as assets, resource-backed assets, generated outputs as assets, Hugging Face objects as asset/resource backings, AI-readable asset context, asset validation, asset configuration, asset ports/composition rules, Asset Registry read-facade transport wrappers, or Asset Library UI | `docs/context/packs/asset-kernel.pack.md` |
 | user library scope, user-library assets, promote/link/copy/import reuse workflows, cross-workspace asset reuse, provenance, propagation policy, effective asset source, effective resolution summaries, accidental propagation prevention | `docs/context/packs/user-library.pack.md` |
+
+When prompts involve promotion, linking, copying, workspace import, reusable library assets, effective-source summaries, provenance, propagation policy, cross-workspace reuse, or user-library transport/UI, include the `user-library` pack and then read canonical Phase 7 architecture + ADR docs for truthful status checks.
 | authn/authz, credential handling, transport encryption, storage security, audit, runtime/process security policy | `docs/context/packs/security.pack.md` |
 | runtime adapters, runtime contract shape, runtime execution flow | `docs/context/packs/runtime.pack.md` |
 | runtime task registry lifecycle for long-running runtime tasks (start/read/cancel, shared lifecycle/progress/retention semantics) | `docs/context/packs/runtime-task-registry.pack.md` |

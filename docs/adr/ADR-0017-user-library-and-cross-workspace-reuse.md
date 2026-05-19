@@ -1,6 +1,6 @@
 # ADR-0017: User Library and Cross-Workspace Asset Reuse
 
-- Status: accepted
+- Status: accepted (finalized after Phase 7 Prompt 11 implementation closeout)
 - Date: 2026-05-15
 - Deciders: ai-system-builder maintainers
 - Related: docs/adr/ADR-0005-builder-core-platform-capabilities-and-user-composable-assets.md, docs/adr/ADR-0016-asset-kernel-terminology-and-architecture-baseline.md, docs/architecture/asset-kernel.md, docs/architecture/workspace-model.md, docs/architecture/user-library-and-cross-workspace-reuse.md, docs/context/packs/user-library.pack.md
@@ -74,3 +74,10 @@ Phase 7 decisions:
 - Add application ports and persistence adapters only after contract vocabulary is reviewed.
 - Implement promotion, linking, copying, workspace import, effective-view integration, transports, and UI in later prompts following the Phase 7 sequence.
 - Keep pack import/export, broad authoring, override editing, visual composition, execution expansion, collaboration permissions, organization libraries, legacy auto-migration, system foundation mutation, and raw resource byte/content reads out of this baseline.
+
+
+## Finalization note (2026-05-19)
+
+This ADR was initially accepted as a Phase 7 baseline before all implementation prompts completed. After Prompt 11 closeout, implemented Phase 7 surfaces now include contracts, application ports/use cases, local persistence adapters, effective-source read integration, API/IPC/preload exposure, and minimal desktop/thin-client UI for explicit promote/link/copy/import reuse workflows.
+
+The accepted constraints remain unchanged: no live workspace-to-workspace linking, no hidden propagation execution, no hidden/default workspace creation, no legacy/global auto-migration, no system foundation mutation, and no Phase 8 authoring/customization/override behavior in Phase 7.

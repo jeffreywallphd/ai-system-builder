@@ -28,7 +28,7 @@
 - Use best practices in code commenting in all code files.
 - Keep IPC channels operation-derived (`ipc.<operation>.<kind>`) via shared helpers.
 - Update canonical docs in the same change when documented behavior/architecture/standards change.
-- Current roadmap: Phase 6 is Workspace Foundations; Phase 7 is User Library and Cross-Workspace Asset Reuse; Phase 8 is Asset Authoring, Customization, and Override Management; Phase 9 is Composition Planning and Authoring; Phase 10 is Execution Binding and Runtime-Orchestrated Systems; Phase 11 is Pack Import/Export, Sharing, and Distribution; Phase 12 is Collaboration, Permissions, and Multi-User Workspaces.
+- Current roadmap: Phase 6 is Workspace Foundations; Phase 7 is User Library and Cross-Workspace Asset Reuse (finalized in Prompt 11; use `docs/context/packs/user-library.pack.md` plus canonical architecture/ADR docs for any reuse work); Phase 8 is Asset Authoring, Customization, and Override Management; Phase 9 is Composition Planning and Authoring; Phase 10 is Execution Binding and Runtime-Orchestrated Systems; Phase 11 is Pack Import/Export, Sharing, and Distribution; Phase 12 is Collaboration, Permissions, and Multi-User Workspaces.
 - For workspace-owned operations, UI gating is not enough: carry explicit workspace context through contracts, clients, transports, use cases, ports, providers, and persistence; do not invent default/global workspace ids or add legacy global fallback.
 - Use structured, meaningful logs with configurable verbosity and stage-level timing for long operations.
 - Keep runtime diagnostics as a strict specialization of shared structured logging contracts (`runtime.*` events, mechanical mapping).
