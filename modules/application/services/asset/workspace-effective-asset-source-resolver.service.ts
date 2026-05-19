@@ -77,20 +77,18 @@ export class WorkspaceEffectiveAssetSourceResolver {
   }
 
   private async resolveCopied(workspaceId: WorkspaceId, ref: AssetReference): Promise<UserLibraryEffectiveSourceSummary | undefined> {
-    const repo = this.dependencies.detachedCopyRepository as (WorkspaceUserLibraryDetachedCopyRepositoryPort & { readonly listWorkspaceUserLibraryDetachedCopyRecords?: (query: { targetWorkspaceId: WorkspaceId; limit?: number }) => Promise<{ records: readonly WorkspaceUserLibraryDetachedCopyRecord[] }> }) | undefined;
-    const listFn = repo?.listWorkspaceUserLibraryDetachedCopyRecords;
-    if (!listFn) return undefined;
-    const list = await listFn.call(repo, { targetWorkspaceId: workspaceId, limit: 250 });
+    const repo = this.dependencies.detachedCopyRepository;
+    if (!repo) return undefined;
+    const list = await repo.listWorkspaceUserLibraryDetachedCopyRecords({ targetWorkspaceId: workspaceId, limit: 250 });
     const record = list.records.find((item) => sameRef(item.copiedAssetReference, ref) && item.status === "active");
     if (!record) return undefined;
     return { effectiveSourceKind: "user-library-copied", targetWorkspaceId: workspaceId, assetReference: ref, userLibraryAssetReference: record.sourceUserLibraryAssetReference, relationshipKind: "copy", provenance: record.provenance, diagnostics: hasRequiredCopyProvenance(record) ? undefined : [diag("effective-source-copy-provenance-incomplete", "Detached copy provenance is incomplete.")] };
   }
 
   private async resolveImported(workspaceId: WorkspaceId, ref: AssetReference): Promise<UserLibraryEffectiveSourceSummary | undefined> {
-    const repo = this.dependencies.workspaceImportRepository as (WorkspaceToWorkspaceImportRepositoryPort & { readonly listWorkspaceToWorkspaceImportRecords?: (query: { targetWorkspaceId: WorkspaceId; limit?: number }) => Promise<{ records: readonly WorkspaceToWorkspaceImportRecord[] }> }) | undefined;
-    const listFn = repo?.listWorkspaceToWorkspaceImportRecords;
-    if (!listFn) return undefined;
-    const list = await listFn.call(repo, { targetWorkspaceId: workspaceId, limit: 250 });
+    const repo = this.dependencies.workspaceImportRepository;
+    if (!repo) return undefined;
+    const list = await repo.listWorkspaceToWorkspaceImportRecords({ targetWorkspaceId: workspaceId, limit: 250 });
     const record = list.records.find((item) => sameAssetIdentity(item.importedAssetReference, ref) && item.status === "active");
     if (!record) return undefined;
     return { effectiveSourceKind: "workspace-imported", targetWorkspaceId: workspaceId, sourceWorkspaceId: record.sourceWorkspaceId, assetReference: ref, sourceAssetReference: record.sourceAssetReference, relationshipKind: "workspace-import", provenance: record.provenance };

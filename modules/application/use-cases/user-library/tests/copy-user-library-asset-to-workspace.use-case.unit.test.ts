@@ -19,6 +19,7 @@ class FakeCopyRepo implements WorkspaceUserLibraryDetachedCopyRepositoryPort {
   public saved: WorkspaceUserLibraryDetachedCopyRecord[] = [];
   async saveWorkspaceUserLibraryDetachedCopyRecord(record: WorkspaceUserLibraryDetachedCopyRecord) { this.saved.push(record); return record; }
   async findWorkspaceUserLibraryDetachedCopyRecord() { return this.existing; }
+  async listWorkspaceUserLibraryDetachedCopyRecords() { return { records: this.existing ? [this.existing] : [] }; }
 }
 const baseCommand: CopyUserLibraryAssetToWorkspaceCommand = {
   targetWorkspaceId: "workspace.target",

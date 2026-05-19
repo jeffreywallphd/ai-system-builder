@@ -30,6 +30,11 @@ export interface WorkspaceToWorkspaceImportFindQuery {
   readonly sourceAssetVersion?: UserLibraryAssetVersion;
 }
 
+export interface WorkspaceToWorkspaceImportListQuery {
+  readonly targetWorkspaceId: WorkspaceId;
+  readonly limit?: number;
+}
+
 export interface WorkspaceToWorkspaceImportRepositoryPort {
   saveWorkspaceToWorkspaceImportRecord(
     record: WorkspaceToWorkspaceImportRecord,
@@ -37,4 +42,7 @@ export interface WorkspaceToWorkspaceImportRepositoryPort {
   findWorkspaceToWorkspaceImportRecord(
     query: WorkspaceToWorkspaceImportFindQuery,
   ): Promise<WorkspaceToWorkspaceImportRecord | undefined>;
+  listWorkspaceToWorkspaceImportRecords(
+    query: WorkspaceToWorkspaceImportListQuery,
+  ): Promise<{ readonly records: readonly WorkspaceToWorkspaceImportRecord[] }>;
 }
