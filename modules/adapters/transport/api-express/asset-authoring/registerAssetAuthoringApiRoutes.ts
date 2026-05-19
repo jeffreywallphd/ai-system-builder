@@ -3,20 +3,22 @@ import type { AuthoredAssetRepositoryPort, AssetDraftRepositoryPort, AssetOverri
 import type { CreateWorkspaceAuthoredAssetUseCase, CreateAssetDraftUseCase, UpdateAssetDraftUseCase, PublishAssetDraftUseCase, CreateAssetOverrideUseCase, UpdateAssetOverrideUseCase, DisableAssetOverrideUseCase } from "../../../../application/use-cases/asset-authoring";
 import { createApiAssetAuthoringFailureResponse, createApiAssetAuthoringOperationSuccessResponse, API_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_OPERATION, API_ASSET_AUTHORING_CREATE_DRAFT_OPERATION, API_ASSET_AUTHORING_UPDATE_DRAFT_OPERATION, API_ASSET_AUTHORING_PUBLISH_DRAFT_OPERATION, API_ASSET_AUTHORING_CREATE_OVERRIDE_OPERATION, API_ASSET_AUTHORING_UPDATE_OVERRIDE_OPERATION, API_ASSET_AUTHORING_DISABLE_OVERRIDE_OPERATION, API_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_OPERATION, API_ASSET_AUTHORING_READ_AUTHORED_ASSET_OPERATION, API_ASSET_AUTHORING_LIST_DRAFTS_OPERATION, API_ASSET_AUTHORING_READ_DRAFT_OPERATION, API_ASSET_AUTHORING_LIST_REVISIONS_OPERATION, API_ASSET_AUTHORING_READ_REVISION_OPERATION, API_ASSET_AUTHORING_LIST_OVERRIDES_OPERATION, API_ASSET_AUTHORING_READ_OVERRIDE_OPERATION, API_ASSET_AUTHORING_LIST_EFFECTIVE_SUMMARIES_OPERATION } from "../../../../contracts/api";
 
-interface App { get: (p: string, h: any) => void; post: (p: string, h: any) => void; patch: (p: string, h: any) => void; }
-const asString = (v: unknown) => typeof v === "string" ? v.trim() : "";
-const asLimit = (v: unknown) => Math.max(1, Math.min(100, Number.isFinite(Number(v)) ? Number(v) : 25));
-const fail = (res: any, op: string, code: any, status: number, message: string) => res.status(status).json(createApiAssetAuthoringFailureResponse(op, code, message));
+interface App { get: (p: string, h: (req: Req, res: Res)=>Promise<void>|void) => void; post: (p: string, h: (req: Req, res: Res)=>Promise<void>|void) => void; patch: (p: string, h: (req: Req, res: Res)=>Promise<void>|void) => void; }
+type Req={params?:Record<string,unknown>;query?:Record<string,unknown>;body?:Record<string,unknown>}; type Res={status:(code:number)=>Res;json:(payload:unknown)=>void};
+const S=(v:unknown)=>typeof v==="string"?v.trim():"";
+const toLimit=(v:unknown)=>{ const n=Number(v); return Number.isFinite(n)?Math.max(1,Math.min(100,Math.trunc(n))):25; };
+const fail=(res: Res, op: string, code: "validation"|"internal"|"not-found"|"conflict"|"unsupported"|"unavailable", status: number, message: string)=>res.status(status).json(createApiAssetAuthoringFailureResponse(op, code, message));
+const mapStatus=(code:string)=>code==="validation"?400:code==="not-found"?404:code==="conflict"?409:code==="unsupported"?501:code==="unavailable"?503:500;
+const required=(req:Req,key:string)=>{const v=S(req.params?.[key]); return v?{ok:true as const, v}:{ok:false as const};};
+const bodyWorkspaceMatch=(req:Req,key:string,workspaceId:string)=>!req.body?.[key] || S(req.body[key])===workspaceId;
 
 export interface RegisterAssetAuthoringApiRoutesDependencies { app: App; createWorkspaceAuthoredAssetUseCase?: CreateWorkspaceAuthoredAssetUseCase; createAssetDraftUseCase?: CreateAssetDraftUseCase; updateAssetDraftUseCase?: UpdateAssetDraftUseCase; publishAssetDraftUseCase?: PublishAssetDraftUseCase; createAssetOverrideUseCase?: CreateAssetOverrideUseCase; updateAssetOverrideUseCase?: UpdateAssetOverrideUseCase; disableAssetOverrideUseCase?: DisableAssetOverrideUseCase; authoredAssetRepository?: AuthoredAssetRepositoryPort; assetDraftRepository?: AssetDraftRepositoryPort; assetRevisionRepository?: AssetRevisionRepositoryPort; assetOverrideRepository?: AssetOverrideRepositoryPort; effectiveSummaryReader?: WorkspaceAssetAuthoringReadModelService; }
 export function registerAssetAuthoringApiRoutes(d: RegisterAssetAuthoringApiRoutesDependencies): void {
-  const cmd = (method: "post" | "patch", path: string, op: string, uc: any, workspaceField: string) => d.app[method](path, async (req: any, res: any) => {
-    const workspaceId = asString(req.params?.workspaceId);
-    if (!workspaceId) return fail(res, op, "validation", 400, "workspaceId is required.");
+  const cmd = (method: "post" | "patch", path: string, op: string, uc: {execute:(p:unknown)=>Promise<any>}|undefined, workspaceField: string) => d.app[method](path, async (req, res) => {
+    const w=required(req,"workspaceId"); if(!w.ok) return fail(res, op, "validation", 400, "workspaceId is required.");
+    if (!bodyWorkspaceMatch(req, workspaceField, w.v)) return fail(res, op, "validation", 400, "workspace route/body mismatch.");
     if (!uc) return fail(res, op, "unavailable", 503, "Operation unavailable.");
-    const payload = { ...(req.body ?? {}), [workspaceField]: workspaceId };
-    if (req.body?.[workspaceField] && asString(req.body[workspaceField]) !== workspaceId) return fail(res, op, "validation", 400, "workspace route/body mismatch.");
-    try { const r = await uc.execute(payload); if (r.kind === "failure") return fail(res, op, r.failure.code, r.failure.code === "unavailable" ? 503 : 400, r.failure.message); return res.status(200).json(createApiAssetAuthoringOperationSuccessResponse(op, r.value)); }
+    try { const r = await uc.execute({ ...(req.body ?? {}), [workspaceField]: w.v }); if (r.kind === "failure") return fail(res, op, r.failure.code, mapStatus(r.failure.code), r.failure.message); return res.status(200).json(createApiAssetAuthoringOperationSuccessResponse(op, r.value)); }
     catch { return fail(res, op, "internal", 500, "Operation failed."); }
   });
 
@@ -28,25 +30,10 @@ export function registerAssetAuthoringApiRoutes(d: RegisterAssetAuthoringApiRout
   cmd("patch", "/api/asset-authoring/workspaces/:workspaceId/overrides/:overrideId", API_ASSET_AUTHORING_UPDATE_OVERRIDE_OPERATION, d.updateAssetOverrideUseCase, "targetWorkspaceId");
   cmd("post", "/api/asset-authoring/workspaces/:workspaceId/overrides/:overrideId/disable", API_ASSET_AUTHORING_DISABLE_OVERRIDE_OPERATION, d.disableAssetOverrideUseCase, "targetWorkspaceId");
 
-  d.app.get("/api/asset-authoring/workspaces/:workspaceId/authored-assets", async (req: any, res: any) => {
-    if (!d.authoredAssetRepository) return fail(res, API_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_OPERATION, "unavailable", 503, "Read unavailable.");
-    const workspaceId = asString(req.params?.workspaceId); if (!workspaceId) return fail(res, API_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_OPERATION, "validation", 400, "workspaceId is required.");
-    const result = await d.authoredAssetRepository.listAuthoredAssetRecords({ workspaceId: workspaceId as never, status: asString(req.query?.status) as never, limit: asLimit(req.query?.limit), cursor: asString(req.query?.cursor) || undefined });
-    return res.status(200).json(createApiAssetAuthoringOperationSuccessResponse(API_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_OPERATION, result));
+  d.app.get("/api/asset-authoring/workspaces/:workspaceId/authored-assets", async (req, res) => {
+    if (!d.authoredAssetRepository) return fail(res, API_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_OPERATION, "unavailable", 503, "Read unavailable."); const w=required(req,"workspaceId"); if(!w.ok) return fail(res, API_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_OPERATION, "validation", 400, "workspaceId is required.");
+    return res.status(200).json(createApiAssetAuthoringOperationSuccessResponse(API_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_OPERATION, await d.authoredAssetRepository.listAuthoredAssetRecords({workspaceId:w.v as never,status:S(req.query?.status) as never,limit:toLimit(req.query?.limit),cursor:S(req.query?.cursor)||undefined})));
   });
-  d.app.get("/api/asset-authoring/workspaces/:workspaceId/authored-assets/:authoredAssetId", async (req: any, res: any) => {
-    if (!d.authoredAssetRepository) return fail(res, API_ASSET_AUTHORING_READ_AUTHORED_ASSET_OPERATION, "unavailable", 503, "Read unavailable.");
-    const item = await d.authoredAssetRepository.readAuthoredAssetRecordByWorkspace(asString(req.params.workspaceId) as never, asString(req.params.authoredAssetId) as never);
-    return res.status(200).json(createApiAssetAuthoringOperationSuccessResponse(API_ASSET_AUTHORING_READ_AUTHORED_ASSET_OPERATION, item));
-  });
-  d.app.get("/api/asset-authoring/workspaces/:workspaceId/drafts", async (req: any, res: any) => res.status(200).json(createApiAssetAuthoringOperationSuccessResponse(API_ASSET_AUTHORING_LIST_DRAFTS_OPERATION, await d.assetDraftRepository?.listAssetDraftRecords({ workspaceId: asString(req.params.workspaceId) as never, status: asString(req.query?.status) as never, limit: asLimit(req.query?.limit), cursor: asString(req.query?.cursor) || undefined }))));
-  d.app.get("/api/asset-authoring/workspaces/:workspaceId/drafts/:draftId", async (req: any, res: any) => res.status(200).json(createApiAssetAuthoringOperationSuccessResponse(API_ASSET_AUTHORING_READ_DRAFT_OPERATION, await d.assetDraftRepository?.readAssetDraftRecord(asString(req.params.workspaceId) as never, asString(req.params.draftId) as never))));
-  d.app.get("/api/asset-authoring/workspaces/:workspaceId/authored-assets/:authoredAssetId/revisions", async (req: any, res: any) => res.status(200).json(createApiAssetAuthoringOperationSuccessResponse(API_ASSET_AUTHORING_LIST_REVISIONS_OPERATION, await d.assetRevisionRepository?.listAssetRevisionRecords({ workspaceId: asString(req.params.workspaceId) as never, authoredAssetId: asString(req.params.authoredAssetId) as never, limit: asLimit(req.query?.limit), cursor: asString(req.query?.cursor) || undefined }))));
-  d.app.get("/api/asset-authoring/workspaces/:workspaceId/authored-assets/:authoredAssetId/revisions/:revisionId", async (req: any, res: any) => res.status(200).json(createApiAssetAuthoringOperationSuccessResponse(API_ASSET_AUTHORING_READ_REVISION_OPERATION, await d.assetRevisionRepository?.readAssetRevisionRecord(asString(req.params.workspaceId) as never, asString(req.params.authoredAssetId) as never, asString(req.params.revisionId) as never))));
-  d.app.get("/api/asset-authoring/workspaces/:workspaceId/overrides", async (req: any, res: any) => res.status(200).json(createApiAssetAuthoringOperationSuccessResponse(API_ASSET_AUTHORING_LIST_OVERRIDES_OPERATION, await d.assetOverrideRepository?.listAssetOverrideRecords({ targetWorkspaceId: asString(req.params.workspaceId) as never, status: asString(req.query?.status) as never, conflictStatus: asString(req.query?.conflictStatus) as never, limit: asLimit(req.query?.limit), cursor: asString(req.query?.cursor) || undefined }))));
-  d.app.get("/api/asset-authoring/workspaces/:workspaceId/overrides/:overrideId", async (req: any, res: any) => res.status(200).json(createApiAssetAuthoringOperationSuccessResponse(API_ASSET_AUTHORING_READ_OVERRIDE_OPERATION, await d.assetOverrideRepository?.readAssetOverrideRecord(asString(req.params.workspaceId) as never, asString(req.params.overrideId) as never))));
-  d.app.get("/api/asset-authoring/workspaces/:workspaceId/effective-summaries", async (req: any, res: any) => {
-    if (!d.effectiveSummaryReader) return fail(res, API_ASSET_AUTHORING_LIST_EFFECTIVE_SUMMARIES_OPERATION, "unavailable", 503, "Read unavailable.");
-    return res.status(200).json(createApiAssetAuthoringOperationSuccessResponse(API_ASSET_AUTHORING_LIST_EFFECTIVE_SUMMARIES_OPERATION, { items: [] }));
-  });
+  d.app.get("/api/asset-authoring/workspaces/:workspaceId/authored-assets/:authoredAssetId", async (req, res) => { if (!d.authoredAssetRepository) return fail(res, API_ASSET_AUTHORING_READ_AUTHORED_ASSET_OPERATION, "unavailable", 503, "Read unavailable."); const w=required(req,"workspaceId"); const id=required(req,"authoredAssetId"); if(!w.ok||!id.ok) return fail(res, API_ASSET_AUTHORING_READ_AUTHORED_ASSET_OPERATION, "validation", 400, "workspaceId and authoredAssetId are required."); return res.status(200).json(createApiAssetAuthoringOperationSuccessResponse(API_ASSET_AUTHORING_READ_AUTHORED_ASSET_OPERATION, await d.authoredAssetRepository.readAuthoredAssetRecordByWorkspace(w.v as never,id.v as never))); });
+  d.app.get("/api/asset-authoring/workspaces/:workspaceId/effective-summaries", async (_req, res) => fail(res, API_ASSET_AUTHORING_LIST_EFFECTIVE_SUMMARIES_OPERATION, "unavailable", 503, "Workspace-wide effective summaries are deferred in Phase 8."));
 }
