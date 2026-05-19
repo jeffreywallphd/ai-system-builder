@@ -363,6 +363,8 @@ import type {
   PublishAssetDraftCommand,
   UpdateAssetDraftCommand,
   UpdateAssetOverrideCommand,
+} from "../../../../modules/contracts/asset-authoring";
+import type {
   FinalizeGeneratedOutputCommand,
   ImportExternalRepositoryObjectCommand,
   LocalizeExternalRepositoryObjectCommand,
