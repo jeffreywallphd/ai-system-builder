@@ -587,3 +587,8 @@ Resource-backed descriptors require workspace context through contracts, clients
 Phase 7 adds the architecture baseline for User Library and Cross-Workspace Asset Reuse in `docs/architecture/user-library-and-cross-workspace-reuse.md` and ADR-0017. User-library assets, workspace linked references, copied user-library assets, and imported workspace assets build on the Asset Kernel; they do not replace `AssetDefinition`, `AssetInstance`, `AssetReference`, `AssetComposition`, resource-backed views, or system foundation packs. Promotion, link, copy, import, provenance, propagation policy, and effective-source behavior must remain explicit and must not introduce accidental propagation.
 
 Phase 8 should add Asset Authoring, Customization, and Override Management. Phase 9 should add Composition Planning and Authoring. Phase 10 should add Execution Binding and Runtime-Orchestrated Systems. Phase 11 should add Pack Import/Export, Sharing, and Distribution. Phase 12 should add Collaboration, Permissions, and Multi-User Workspaces.
+
+
+## Phase 8 cross-reference
+
+Phase 8 authoring/customization/override architecture builds on Asset Kernel vocabulary and is defined in `docs/architecture/asset-authoring-customization-and-overrides.md` (ADR-0018).

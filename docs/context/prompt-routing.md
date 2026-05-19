@@ -15,8 +15,14 @@ Use this guide to select **minimum-sufficient** context packs for prompts.
 | cross-layer architecture or boundary decisions | `docs/context/packs/architecture.pack.md` |
 | assets, asset packs/catalogs/manifests, asset definitions/instances/bindings/compositions, systems/subsystems/features as composable assets, UI components/pages as assets, workflows/tools as assets, resource-backed assets, generated outputs as assets, Hugging Face objects as asset/resource backings, AI-readable asset context, asset validation, asset configuration, asset ports/composition rules, Asset Registry read-facade transport wrappers, or Asset Library UI | `docs/context/packs/asset-kernel.pack.md` |
 | user library scope, user-library assets, promote/link/copy/import reuse workflows, cross-workspace asset reuse, provenance, propagation policy, effective asset source, effective resolution summaries, accidental propagation prevention | `docs/context/packs/user-library.pack.md` |
+| asset authoring, customized assets, override records, editable drafts, authored revisions, customization conflicts, linked/customized user-library assets, customized detached copies/imported workspace copies, workspace-local asset creation, or promotion-readiness of authored/customized assets | `docs/context/packs/asset-authoring.pack.md` |
 
 When prompts involve promotion, linking, copying, workspace import, reusable library assets, effective-source summaries, provenance, propagation policy, cross-workspace reuse, or user-library transport/UI, include the `user-library` pack and then read canonical Phase 7 architecture + ADR docs for truthful status checks.
+
+For tasks combining Phase 7 reuse and Phase 8 customization, include both:
+
+- `docs/context/packs/user-library.pack.md`
+- `docs/context/packs/asset-authoring.pack.md`
 | authn/authz, credential handling, transport encryption, storage security, audit, runtime/process security policy | `docs/context/packs/security.pack.md` |
 | runtime adapters, runtime contract shape, runtime execution flow | `docs/context/packs/runtime.pack.md` |
 | runtime task registry lifecycle for long-running runtime tasks (start/read/cancel, shared lifecycle/progress/retention semantics) | `docs/context/packs/runtime-task-registry.pack.md` |
@@ -232,3 +238,9 @@ Phase 7 should be **User Library and Cross-Workspace Asset Reuse**: promote work
 For Phase 7 prompts about promoting workspace assets, linking user-library assets, copying user-library assets, importing from another workspace, provenance, propagation policy, effective asset source, effective resolution summaries, or preventing accidental cross-workspace propagation, include `index`, `user-library`, `asset-kernel`, `persistence-storage`, `security`, and `testing`; add `desktop-host`, `server-host`, and `ipc-electron` only when the prompt owns transport/host exposure. Read `docs/architecture/user-library-and-cross-workspace-reuse.md`, ADR-0017, `docs/architecture/workspace-model.md`, and `docs/architecture/asset-kernel.md` before implementing.
 
 Phase 7 work must not assume user-library behavior already exists. Prompt 1 is documentation-only. Later prompts own contract vocabulary, ports/adapters, promote/link/copy/import use cases, effective-view integration, transports, and minimal UI in that order. Keep workspace isolation as the default, do not rely on UI gating alone, do not mutate/copy `system.foundation@1.0.0`, do not create hidden/default workspaces, do not auto-migrate legacy/global resources, and do not introduce live Workspace A to Workspace B links by default.
+
+## Phase 8: asset authoring/customization/override routing
+
+For Phase 8 prompts about authored assets, editable drafts, customization, override records, revisions/conflicts, linked-customization semantics, detached customization, imported customization, or authored/customized promotion readiness, include `index`, `asset-authoring`, `asset-kernel`, `persistence-storage`, `security`, and `testing`; add transport/host packs only when the prompt owns API/IPC/preload/UI exposure. Read `docs/architecture/asset-authoring-customization-and-overrides.md`, ADR-0018, `docs/architecture/user-library-and-cross-workspace-reuse.md`, and ADR-0017 before implementation.
+
+Do not assume unresolved/unavailable Phase 7 surfaces are complete. If a Phase 8 prompt depends on missing Phase 7 composition/truthfulness items, mark them as prerequisites or explicit deferrals.
