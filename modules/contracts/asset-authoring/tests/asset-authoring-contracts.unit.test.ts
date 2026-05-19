@@ -1,5 +1,5 @@
 import { describe, expect, it } from "../../../testing/node-test";
-import { normalizeAssetDraftId, normalizeAssetOverrideId, normalizeAuthoredAssetId, normalizeSafeAssetEditableField, normalizeSafeAssetEditableFieldPatch, normalizeAssetAuthoringStatus, normalizeAssetOverrideStatus, normalizeCreateAssetDraftCommand, normalizeAssetOverrideRecord } from "..";
+import { normalizeAssetDraftId, normalizeAssetOverrideId, normalizeAuthoredAssetId, normalizeSafeAssetEditableField, normalizeSafeAssetEditableFieldPatch, normalizeAssetAuthoringStatus, normalizeAssetOverrideStatus, normalizeCreateAssetDraftCommand, normalizeAssetOverrideRecord, tryNormalizeAuthoredAssetRecord, normalizeAssetAuthoringProvenance } from "..";
 
 describe("asset-authoring contracts", () => {
   it("normalizes valid identifiers and rejects unsafe identifiers", () => {
@@ -59,4 +59,11 @@ describe("asset-authoring contracts", () => {
       }),
     ).toThrow(/system-derived/);
   });
+});
+
+
+describe("asset-authoring safe normalization",()=>{
+ it("returns sanitized failures",()=>{ const r=tryNormalizeAuthoredAssetRecord({} as never); expect(r.ok).toBe(false); if(!r.ok) expect(r.code).toMatch(/asset-authoring/); });
+ it("rejects unsafe nested metadata",()=>{ expect(()=>normalizeSafeAssetEditableFieldPatch({"safe-metadata":{nested:{path:"/tmp/secret"}} as never})).toThrow(); });
+ it("validates provenance",()=>{ expect(()=>normalizeAssetAuthoringProvenance({kind:"system-derived-override",operationAt:"2026-01-01T00:00:00.000Z"})).toThrow(); });
 });
