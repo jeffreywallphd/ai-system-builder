@@ -356,6 +356,13 @@ import type { ActiveWorkspaceSelection, CreateWorkspaceCommand } from "../../../
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
 import type { RuntimeCapabilityId } from "../../../../modules/contracts/runtime";
 import type {
+  CreateAssetDraftCommand,
+  CreateAssetOverrideCommand,
+  CreateWorkspaceAuthoredAssetCommand,
+  DisableAssetOverrideCommand,
+  PublishAssetDraftCommand,
+  UpdateAssetDraftCommand,
+  UpdateAssetOverrideCommand,
   FinalizeGeneratedOutputCommand,
   ImportExternalRepositoryObjectCommand,
   LocalizeExternalRepositoryObjectCommand,
@@ -483,6 +490,22 @@ export interface DesktopPreloadApi {
   listWorkspaceUserLibraryLinks: (input: { workspaceId: string; status?: string; propagationPolicy?: string; text?: string; limit?: number; cursor?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceUserLibraryLinkListResponse>;
   readWorkspaceUserLibraryLink: (input: { workspaceId: string; linkId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceUserLibraryLinkReadResponse>;
   readWorkspaceEffectiveAssetSources: (input: { workspaceId: string; limit?: number; cursor?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceEffectiveAssetSourceListResponse>;
+  createWorkspaceAuthoredAsset: (command: CreateWorkspaceAuthoredAssetCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringCreateWorkspaceAuthoredAssetResponse>;
+  createAssetDraft: (command: CreateAssetDraftCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringCreateDraftResponse>;
+  updateAssetDraft: (command: UpdateAssetDraftCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringUpdateDraftResponse>;
+  publishAssetDraft: (command: PublishAssetDraftCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringPublishDraftResponse>;
+  createAssetOverride: (command: CreateAssetOverrideCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringCreateOverrideResponse>;
+  updateAssetOverride: (command: UpdateAssetOverrideCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringUpdateOverrideResponse>;
+  disableAssetOverride: (command: DisableAssetOverrideCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringDisableOverrideResponse>;
+  listAuthoredAssets: (input: { workspaceId: string; status?: string; assetKind?: string; authoredAssetId?: string; text?: string; limit?: number; cursor?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringListAuthoredAssetsResponse>;
+  readAuthoredAsset: (input: { workspaceId: string; authoredAssetId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringReadAuthoredAssetResponse>;
+  listAssetDrafts: (input: { targetWorkspaceId: string; status?: string; assetKind?: string; authoredAssetId?: string; draftId?: string; text?: string; limit?: number; cursor?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringListDraftsResponse>;
+  readAssetDraft: (input: { targetWorkspaceId: string; draftId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringReadDraftResponse>;
+  listAssetRevisions: (input: { workspaceId: string; status?: string; assetKind?: string; authoredAssetId?: string; revisionId?: string; text?: string; limit?: number; cursor?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringListRevisionsResponse>;
+  readAssetRevision: (input: { workspaceId: string; revisionId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringReadRevisionResponse>;
+  listAssetOverrides: (input: { targetWorkspaceId: string; status?: string; conflictStatus?: string; assetKind?: string; authoredAssetId?: string; draftId?: string; overrideId?: string; sourceKind?: string; text?: string; limit?: number; cursor?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringListOverridesResponse>;
+  readAssetOverride: (input: { targetWorkspaceId: string; overrideId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringReadOverrideResponse>;
+  listAssetAuthoringEffectiveSummaries: (input: { targetWorkspaceId: string; sourceKind?: string; conflictStatus?: string; assetKind?: string; authoredAssetId?: string; draftId?: string; overrideId?: string; text?: string; limit?: number; cursor?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringListEffectiveSummariesResponse>;
   listAssetDefinitions: (
     input?: DesktopAssetDefinitionsListBridgeInput,
     context?: DesktopArtifactUploadBridgeContext,
@@ -1146,6 +1169,22 @@ export function createDesktopPreloadApi(
       return assertDesktopEnvelopeResponse<DesktopWorkspaceEffectiveAssetSourceListResponse>(response, { operation: DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_OPERATION, channel: DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_RESPONSE_CHANNEL.value, message: "Received invalid desktop effective asset source IPC response envelope." });
     },
 
+    async createWorkspaceAuthoredAsset(command, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_REQUEST_CHANNEL.value, { payload: command, operation: DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_OPERATION, channel: DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringCreateWorkspaceAuthoredAssetResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_OPERATION, channel: DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring create workspace-authored asset IPC response envelope." }); },
+    async createAssetDraft(command, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_CREATE_DRAFT_REQUEST_CHANNEL.value, { payload: command, operation: DESKTOP_ASSET_AUTHORING_CREATE_DRAFT_OPERATION, channel: DESKTOP_ASSET_AUTHORING_CREATE_DRAFT_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringCreateDraftResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_CREATE_DRAFT_OPERATION, channel: DESKTOP_ASSET_AUTHORING_CREATE_DRAFT_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring create draft IPC response envelope." }); },
+    async updateAssetDraft(command, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_UPDATE_DRAFT_REQUEST_CHANNEL.value, { payload: command, operation: DESKTOP_ASSET_AUTHORING_UPDATE_DRAFT_OPERATION, channel: DESKTOP_ASSET_AUTHORING_UPDATE_DRAFT_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringUpdateDraftResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_UPDATE_DRAFT_OPERATION, channel: DESKTOP_ASSET_AUTHORING_UPDATE_DRAFT_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring update draft IPC response envelope." }); },
+    async publishAssetDraft(command, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_PUBLISH_DRAFT_REQUEST_CHANNEL.value, { payload: command, operation: DESKTOP_ASSET_AUTHORING_PUBLISH_DRAFT_OPERATION, channel: DESKTOP_ASSET_AUTHORING_PUBLISH_DRAFT_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringPublishDraftResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_PUBLISH_DRAFT_OPERATION, channel: DESKTOP_ASSET_AUTHORING_PUBLISH_DRAFT_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring publish draft IPC response envelope." }); },
+    async createAssetOverride(command, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_CREATE_OVERRIDE_REQUEST_CHANNEL.value, { payload: command, operation: DESKTOP_ASSET_AUTHORING_CREATE_OVERRIDE_OPERATION, channel: DESKTOP_ASSET_AUTHORING_CREATE_OVERRIDE_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringCreateOverrideResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_CREATE_OVERRIDE_OPERATION, channel: DESKTOP_ASSET_AUTHORING_CREATE_OVERRIDE_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring create override IPC response envelope." }); },
+    async updateAssetOverride(command, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_UPDATE_OVERRIDE_REQUEST_CHANNEL.value, { payload: command, operation: DESKTOP_ASSET_AUTHORING_UPDATE_OVERRIDE_OPERATION, channel: DESKTOP_ASSET_AUTHORING_UPDATE_OVERRIDE_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringUpdateOverrideResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_UPDATE_OVERRIDE_OPERATION, channel: DESKTOP_ASSET_AUTHORING_UPDATE_OVERRIDE_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring update override IPC response envelope." }); },
+    async disableAssetOverride(command, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_DISABLE_OVERRIDE_REQUEST_CHANNEL.value, { payload: command, operation: DESKTOP_ASSET_AUTHORING_DISABLE_OVERRIDE_OPERATION, channel: DESKTOP_ASSET_AUTHORING_DISABLE_OVERRIDE_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringDisableOverrideResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_DISABLE_OVERRIDE_OPERATION, channel: DESKTOP_ASSET_AUTHORING_DISABLE_OVERRIDE_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring disable override IPC response envelope." }); },
+    async listAuthoredAssets(input, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_REQUEST_CHANNEL.value, { payload: input, operation: DESKTOP_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_OPERATION, channel: DESKTOP_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringListAuthoredAssetsResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_OPERATION, channel: DESKTOP_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring list authored assets IPC response envelope." }); },
+    async readAuthoredAsset(input, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_READ_AUTHORED_ASSET_REQUEST_CHANNEL.value, { payload: input, operation: DESKTOP_ASSET_AUTHORING_READ_AUTHORED_ASSET_OPERATION, channel: DESKTOP_ASSET_AUTHORING_READ_AUTHORED_ASSET_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringReadAuthoredAssetResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_READ_AUTHORED_ASSET_OPERATION, channel: DESKTOP_ASSET_AUTHORING_READ_AUTHORED_ASSET_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring read authored asset IPC response envelope." }); },
+    async listAssetDrafts(input, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_LIST_DRAFTS_REQUEST_CHANNEL.value, { payload: input, operation: DESKTOP_ASSET_AUTHORING_LIST_DRAFTS_OPERATION, channel: DESKTOP_ASSET_AUTHORING_LIST_DRAFTS_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringListDraftsResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_LIST_DRAFTS_OPERATION, channel: DESKTOP_ASSET_AUTHORING_LIST_DRAFTS_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring list drafts IPC response envelope." }); },
+    async readAssetDraft(input, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_READ_DRAFT_REQUEST_CHANNEL.value, { payload: input, operation: DESKTOP_ASSET_AUTHORING_READ_DRAFT_OPERATION, channel: DESKTOP_ASSET_AUTHORING_READ_DRAFT_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringReadDraftResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_READ_DRAFT_OPERATION, channel: DESKTOP_ASSET_AUTHORING_READ_DRAFT_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring read draft IPC response envelope." }); },
+    async listAssetRevisions(input, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_LIST_REVISIONS_REQUEST_CHANNEL.value, { payload: input, operation: DESKTOP_ASSET_AUTHORING_LIST_REVISIONS_OPERATION, channel: DESKTOP_ASSET_AUTHORING_LIST_REVISIONS_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringListRevisionsResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_LIST_REVISIONS_OPERATION, channel: DESKTOP_ASSET_AUTHORING_LIST_REVISIONS_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring list revisions IPC response envelope." }); },
+    async readAssetRevision(input, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_READ_REVISION_REQUEST_CHANNEL.value, { payload: input, operation: DESKTOP_ASSET_AUTHORING_READ_REVISION_OPERATION, channel: DESKTOP_ASSET_AUTHORING_READ_REVISION_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringReadRevisionResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_READ_REVISION_OPERATION, channel: DESKTOP_ASSET_AUTHORING_READ_REVISION_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring read revision IPC response envelope." }); },
+    async listAssetOverrides(input, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_LIST_OVERRIDES_REQUEST_CHANNEL.value, { payload: input, operation: DESKTOP_ASSET_AUTHORING_LIST_OVERRIDES_OPERATION, channel: DESKTOP_ASSET_AUTHORING_LIST_OVERRIDES_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringListOverridesResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_LIST_OVERRIDES_OPERATION, channel: DESKTOP_ASSET_AUTHORING_LIST_OVERRIDES_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring list overrides IPC response envelope." }); },
+    async readAssetOverride(input, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_READ_OVERRIDE_REQUEST_CHANNEL.value, { payload: input, operation: DESKTOP_ASSET_AUTHORING_READ_OVERRIDE_OPERATION, channel: DESKTOP_ASSET_AUTHORING_READ_OVERRIDE_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringReadOverrideResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_READ_OVERRIDE_OPERATION, channel: DESKTOP_ASSET_AUTHORING_READ_OVERRIDE_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring read override IPC response envelope." }); },
+    async listAssetAuthoringEffectiveSummaries(input, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_LIST_EFFECTIVE_SUMMARIES_REQUEST_CHANNEL.value, { payload: input, operation: DESKTOP_ASSET_AUTHORING_LIST_EFFECTIVE_SUMMARIES_OPERATION, channel: DESKTOP_ASSET_AUTHORING_LIST_EFFECTIVE_SUMMARIES_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringListEffectiveSummariesResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_LIST_EFFECTIVE_SUMMARIES_OPERATION, channel: DESKTOP_ASSET_AUTHORING_LIST_EFFECTIVE_SUMMARIES_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring list effective summaries IPC response envelope." }); },
     async listAssetDefinitions(input = {}, context = {}) {
       const request = createDesktopAssetDefinitionsListRequest(
         {
@@ -1943,6 +1982,72 @@ import {
   type DesktopWorkspaceEffectiveAssetSourceListResponse,
   type DesktopWorkspaceUserLibraryLinkListResponse,
   type DesktopWorkspaceUserLibraryLinkReadResponse,
+} from "../../../../modules/contracts/ipc";
+import {
+  DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_OPERATION,
+  DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_CREATE_DRAFT_OPERATION,
+  DESKTOP_ASSET_AUTHORING_CREATE_DRAFT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_CREATE_DRAFT_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_UPDATE_DRAFT_OPERATION,
+  DESKTOP_ASSET_AUTHORING_UPDATE_DRAFT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_UPDATE_DRAFT_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_PUBLISH_DRAFT_OPERATION,
+  DESKTOP_ASSET_AUTHORING_PUBLISH_DRAFT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_PUBLISH_DRAFT_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_CREATE_OVERRIDE_OPERATION,
+  DESKTOP_ASSET_AUTHORING_CREATE_OVERRIDE_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_CREATE_OVERRIDE_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_UPDATE_OVERRIDE_OPERATION,
+  DESKTOP_ASSET_AUTHORING_UPDATE_OVERRIDE_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_UPDATE_OVERRIDE_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_DISABLE_OVERRIDE_OPERATION,
+  DESKTOP_ASSET_AUTHORING_DISABLE_OVERRIDE_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_DISABLE_OVERRIDE_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_OPERATION,
+  DESKTOP_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_LIST_AUTHORED_ASSETS_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_READ_AUTHORED_ASSET_OPERATION,
+  DESKTOP_ASSET_AUTHORING_READ_AUTHORED_ASSET_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_READ_AUTHORED_ASSET_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_LIST_DRAFTS_OPERATION,
+  DESKTOP_ASSET_AUTHORING_LIST_DRAFTS_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_LIST_DRAFTS_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_READ_DRAFT_OPERATION,
+  DESKTOP_ASSET_AUTHORING_READ_DRAFT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_READ_DRAFT_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_LIST_REVISIONS_OPERATION,
+  DESKTOP_ASSET_AUTHORING_LIST_REVISIONS_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_LIST_REVISIONS_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_READ_REVISION_OPERATION,
+  DESKTOP_ASSET_AUTHORING_READ_REVISION_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_READ_REVISION_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_LIST_OVERRIDES_OPERATION,
+  DESKTOP_ASSET_AUTHORING_LIST_OVERRIDES_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_LIST_OVERRIDES_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_READ_OVERRIDE_OPERATION,
+  DESKTOP_ASSET_AUTHORING_READ_OVERRIDE_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_READ_OVERRIDE_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_LIST_EFFECTIVE_SUMMARIES_OPERATION,
+  DESKTOP_ASSET_AUTHORING_LIST_EFFECTIVE_SUMMARIES_REQUEST_CHANNEL,
+  DESKTOP_ASSET_AUTHORING_LIST_EFFECTIVE_SUMMARIES_RESPONSE_CHANNEL,
+  type DesktopAssetAuthoringCreateWorkspaceAuthoredAssetResponse,
+  type DesktopAssetAuthoringCreateDraftResponse,
+  type DesktopAssetAuthoringUpdateDraftResponse,
+  type DesktopAssetAuthoringPublishDraftResponse,
+  type DesktopAssetAuthoringCreateOverrideResponse,
+  type DesktopAssetAuthoringUpdateOverrideResponse,
+  type DesktopAssetAuthoringDisableOverrideResponse,
+  type DesktopAssetAuthoringListAuthoredAssetsResponse,
+  type DesktopAssetAuthoringReadAuthoredAssetResponse,
+  type DesktopAssetAuthoringListDraftsResponse,
+  type DesktopAssetAuthoringReadDraftResponse,
+  type DesktopAssetAuthoringListRevisionsResponse,
+  type DesktopAssetAuthoringReadRevisionResponse,
+  type DesktopAssetAuthoringListOverridesResponse,
+  type DesktopAssetAuthoringReadOverrideResponse,
+  type DesktopAssetAuthoringListEffectiveSummariesResponse,
 } from "../../../../modules/contracts/ipc";
 import type {
   CopyUserLibraryAssetToWorkspaceCommand,
