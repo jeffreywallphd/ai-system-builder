@@ -38,3 +38,5 @@ export * from "./workspace";
 export * from "./asset";
 
 export * from "./user-library";
+
+export * from "./asset-authoring";
