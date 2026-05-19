@@ -4,12 +4,17 @@ import { createThinClientAssetAuthoringClient } from '../api/thinClientAssetAuth
 const resp=(b:unknown)=>({status:200,json:vi.fn().mockResolvedValue(b)});
 
 describe('thinClientAssetAuthoringClient',()=>{
-  it('uses workspace scoped routes and parses status/payload envelope',async()=>{
-    const f=vi.fn().mockResolvedValue(resp({status:'success',payload:{drafts:[]}}));
+  it('calls workspace routes and keeps route/body aligned',async()=>{
+    const f=vi.fn()
+      .mockResolvedValueOnce(resp({status:'success',payload:{drafts:[]}}))
+      .mockResolvedValueOnce(resp({status:'success',payload:{}}));
     (globalThis as any).fetch=f;
     const c=createThinClientAssetAuthoringClient('/api');
     const result=await c.listDrafts('w1');
+    await c.updateDraft({workspaceId:'w1',draftId:'d1',displayName:'N',summary:'S'});
     expect(result.ok).toBe(true);
     expect(String(f.mock.calls[0][0])).toContain('/asset-authoring/workspaces/w1/drafts');
+    expect(String(f.mock.calls[1][0])).toContain('/asset-authoring/workspaces/w1/drafts/d1');
+    expect(JSON.parse(String(f.mock.calls[1][1].body)).editableFieldsPatch.displayName).toBe('N');
   });
 });

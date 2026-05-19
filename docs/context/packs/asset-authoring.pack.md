@@ -73,3 +73,11 @@ Phase 7 closeout constraints remain binding prerequisites.
 ## Non-goals
 
 This pack does not authorize implementation of collaboration permissions, live cross-workspace linking, pack import/export, marketplace behavior, broad arbitrary editor behavior, runtime execution features, or hidden/global migration behavior.
+
+## Phase 8 final truthfulness notes
+
+Use conservative wording in prompts and reviews:
+- treat effective-summary listing as partial/deferred unless the current backend confirms availability;
+- treat create-override flows as deferred until safe target selection/validation exists;
+- treat draft publication as creating new authored assets only;
+- do not claim workflow execution, materialized outputs, rebase/conflict-resolution flows, source mutation, or `system.foundation` mutation.
