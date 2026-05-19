@@ -1,6 +1,6 @@
 # ADR-0017: User Library and Cross-Workspace Asset Reuse
 
-- Status: accepted (finalized after Phase 7 Prompt 11 implementation closeout)
+- Status: accepted (stabilized after Phase 7 Prompt 11 implementation closeout)
 - Date: 2026-05-15
 - Deciders: ai-system-builder maintainers
 - Related: docs/adr/ADR-0005-builder-core-platform-capabilities-and-user-composable-assets.md, docs/adr/ADR-0016-asset-kernel-terminology-and-architecture-baseline.md, docs/architecture/asset-kernel.md, docs/architecture/workspace-model.md, docs/architecture/user-library-and-cross-workspace-reuse.md, docs/context/packs/user-library.pack.md
@@ -81,3 +81,10 @@ Phase 7 decisions:
 This ADR was initially accepted as a Phase 7 baseline before all implementation prompts completed. After Prompt 11 closeout, implemented Phase 7 surfaces now include contracts, application ports/use cases, local persistence adapters, effective-source read integration, API/IPC/preload exposure, and minimal desktop/thin-client UI for explicit promote/link/copy/import reuse workflows.
 
 The accepted constraints remain unchanged: no live workspace-to-workspace linking, no hidden propagation execution, no hidden/default workspace creation, no legacy/global auto-migration, no system foundation mutation, and no Phase 8 authoring/customization/override behavior in Phase 7.
+
+
+## Phase 7 implementation status (Prompt 11 cleanup, 2026-05-19)
+- Implemented in minimal desktop/thin-client UI: list saved reusable assets, list workspace links, list effective asset sources, and explicit link/copy actions with conservative pinned-version defaults.
+- Deferred/unavailable in minimal UI: promote and import action flows, advanced editing, propagation execution, live workspace-to-workspace links, collaboration, pack import/export, marketplace, hidden/default workspaces, startup seeding, and legacy/global auto-migration.
+- Transport and preload exposure may include promote/import operations, but minimal UI intentionally does not present them as available actions in this phase cleanup.
+- Documentation and tests must stay aligned with implemented behavior; do not claim unsupported actions as complete.
