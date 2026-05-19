@@ -9,6 +9,7 @@ This directory is organized into four documentation areas with distinct roles.
 - `docs/architecture/`
   - Current intended system structure, module boundaries, and operating model.
   - `docs/architecture/user-library-and-cross-workspace-reuse.md` is the Phase 7 baseline for User Library reuse, explicit promote/link/copy/import relationships, provenance, and propagation constraints.
+  - `docs/architecture/asset-authoring-customization-and-overrides.md` is the Phase 8 baseline for workspace-scoped asset authoring, customization, and override architecture.
 - `docs/standards/`
   - Canonical implementation and documentation rules.
 - `docs/context/`
@@ -33,7 +34,7 @@ This directory is organized into four documentation areas with distinct roles.
 - Phase 11 is **Pack Import/Export, Sharing, and Distribution**.
 - Phase 12 is **Collaboration, Permissions, and Multi-User Workspaces**.
 
-See `docs/architecture/workspace-model.md` for the Phase 6 workspace model, including reference-only `system.foundation@1.0.0` activation and the no-hidden-workspace/no-auto-migration rule. See `docs/architecture/user-library-and-cross-workspace-reuse.md` and ADR-0017 for the finalized Phase 7 reuse closeout state and Phase 8 handoff constraints.
+See `docs/architecture/workspace-model.md` for the Phase 6 workspace model, including reference-only `system.foundation@1.0.0` activation and the no-hidden-workspace/no-auto-migration rule. See `docs/architecture/user-library-and-cross-workspace-reuse.md` and ADR-0017 for the finalized Phase 7 reuse closeout state and Phase 8 handoff constraints, then `docs/architecture/asset-authoring-customization-and-overrides.md` and ADR-0018 for Phase 8 authoring/customization/override baseline rules.
 
 ## Automation Note
 

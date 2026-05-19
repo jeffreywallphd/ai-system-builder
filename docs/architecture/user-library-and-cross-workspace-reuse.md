@@ -200,7 +200,7 @@ This transport exposure does not add desktop or thin-client UI, propagation exec
 
 ### Phase 8 handoff: Asset Authoring, Customization, and Override Management
 
-Phase 8 should build on these explicit Phase 7 reuse relationships by adding controlled authoring/customization surfaces and explicit override records without weakening Phase 7 safety boundaries.
+Phase 8 should build on these explicit Phase 7 reuse relationships by adding controlled authoring/customization surfaces and explicit override records without weakening Phase 7 safety boundaries. See `docs/architecture/asset-authoring-customization-and-overrides.md` and ADR-0018 for the canonical Phase 8 baseline.
 
 Phase 8 may add:
 
