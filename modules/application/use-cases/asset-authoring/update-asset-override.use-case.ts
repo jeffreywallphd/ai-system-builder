@@ -13,6 +13,7 @@ export class UpdateAssetOverrideUseCase {
     if (!found) return fail("not-found", "Asset override was not found.");
     if (found.targetWorkspaceId !== c.targetWorkspaceId) return fail("conflict", "Override workspace mismatch.");
     if (found.status !== "active") return fail("conflict", "Override status is not editable.");
+    if (c.expectedBaseRevision && found.baseRevision !== c.expectedBaseRevision) return fail("conflict", "Override base revision has changed.");
     const updated = normalizeAssetOverrideRecord({ ...found, overrideValues: { ...found.overrideValues, ...c.overrideValues }, updatedAt: (this.d.now ?? nowIso)(), provenance: found.provenance, customizationTarget: found.customizationTarget, targetWorkspaceId: found.targetWorkspaceId, baseAssetReference: found.baseAssetReference, overrideScope: found.overrideScope });
     return { kind: "success", value: await this.d.assetOverrideRepository.updateAssetOverrideRecord(updated) };
   } catch { return fail("validation", "Update asset override command is invalid."); }}
