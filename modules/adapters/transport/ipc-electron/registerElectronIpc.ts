@@ -6,6 +6,7 @@ import { registerDesktopIngestionIpc, type RegisterDesktopIngestionIpcDependenci
 import { registerDesktopModelIpc, type RegisterDesktopModelIpcDependencies } from "./registerDesktopModelIpc";
 import { registerDesktopRuntimeIpc, type RegisterDesktopRuntimeIpcDependencies } from "./registerDesktopRuntimeIpc";
 import { registerDesktopStartupIpc, type RegisterDesktopStartupIpcDependencies } from "./registerDesktopStartupIpc";
+import { registerAssetAuthoringIpc, type RegisterAssetAuthoringIpcDependencies } from "./asset-authoring/registerAssetAuthoringIpc";
 import { registerUserLibraryIpc, type RegisterUserLibraryIpcDependencies } from "./user-library/registerUserLibraryIpc";
 export type { AsyncFeatureProvider, LazyProvidedObjectOptions } from "./lazyFeatureProvider";
 
@@ -21,6 +22,7 @@ export interface RegisterElectronIpcDependencies {
   ingestion: RegisterDesktopIngestionIpcDependencies;
   datasetPreparation: RegisterDesktopDatasetPreparationIpcDependencies;
   userLibrary?: RegisterUserLibraryIpcDependencies;
+  assetAuthoring?: RegisterAssetAuthoringIpcDependencies;
   recordMilestone?: DesktopIpcRegistrationMilestoneRecorder;
 }
 
@@ -42,6 +44,9 @@ export function registerElectronIpc(dependencies: RegisterElectronIpcDependencie
   if (dependencies.userLibrary) {
     registerGroup(dependencies.recordMilestone, "user-library-group", () => registerUserLibraryIpc(dependencies.userLibrary!));
   }
+  if (dependencies.assetAuthoring) {
+    registerGroup(dependencies.recordMilestone, "asset-authoring-group", () => registerAssetAuthoringIpc(dependencies.assetAuthoring!));
+  }
 }
 
 export type {
@@ -54,4 +59,5 @@ export type {
   RegisterDesktopRuntimeIpcDependencies,
   RegisterDesktopStartupIpcDependencies,
   RegisterUserLibraryIpcDependencies,
+  RegisterAssetAuthoringIpcDependencies,
 };
