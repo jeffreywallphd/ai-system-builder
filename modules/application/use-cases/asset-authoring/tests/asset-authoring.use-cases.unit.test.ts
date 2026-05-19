@@ -19,16 +19,18 @@ test('update draft rejects missing', async()=>{
 
 test('create authored asset rejects base target', async()=>{
   const uc=new CreateWorkspaceAuthoredAssetUseCase({authoredAssetRepository:{saveAuthoredAssetRecord:async(r:any)=>r,updateAuthoredAssetRecord:async(r:any)=>r,readAuthoredAssetRecordById:async()=>undefined,readAuthoredAssetRecordByWorkspace:async()=>undefined,listAuthoredAssetRecords:async()=>({records:[]}),findAuthoredAssetByBaseReference:async()=>undefined},assetRevisionRepository:{saveAssetRevisionRecord:async(r:any)=>r,readAssetRevisionRecord:async()=>undefined,listAssetRevisionRecords:async()=>({records:[]}),findLatestPublishedAssetRevision:async()=>undefined},generateAuthoredAssetId:()=> 'a1', generateAssetRevisionId:()=> 'r1'});
-  const r=await uc.execute({workspaceId:ws,initialEditableValues:{'display-name':'n'},baseTarget:{} as any} as any);
+  const r=await uc.execute({workspaceId:ws,initialEditableValues:{'display-name':'n'},baseTarget:{targetWorkspaceId:ws,sourceKind:"workspace-local-asset",effectiveAssetReference:{kind:"asset-instance",id:"asset.1"}}} as any);
   assert.equal(r.kind,'failure'); assert.equal((r as any).failure.code,'unsupported');
 });
-test("create authored asset draft does not set missing current revision", async () => {
+test("create authored asset draft persists a current revision", async () => {
   let saved: any;
-  const uc=new CreateWorkspaceAuthoredAssetUseCase({authoredAssetRepository:{saveAuthoredAssetRecord:async(r:any)=>{saved=r;return r;},updateAuthoredAssetRecord:async(r:any)=>r,readAuthoredAssetRecordById:async()=>undefined,readAuthoredAssetRecordByWorkspace:async()=>undefined,listAuthoredAssetRecords:async()=>({records:[]}),findAuthoredAssetByBaseReference:async()=>undefined},generateAuthoredAssetId:()=> 'a1', generateAssetRevisionId:()=> 'bad id'});
+  let savedRevision: any;
+  const uc=new CreateWorkspaceAuthoredAssetUseCase({authoredAssetRepository:{saveAuthoredAssetRecord:async(r:any)=>{saved=r;return r;},updateAuthoredAssetRecord:async(r:any)=>r,readAuthoredAssetRecordById:async()=>undefined,readAuthoredAssetRecordByWorkspace:async()=>undefined,listAuthoredAssetRecords:async()=>({records:[]}),findAuthoredAssetByBaseReference:async()=>undefined},assetRevisionRepository:{saveAssetRevisionRecord:async(r:any)=>{savedRevision=r;return r;},readAssetRevisionRecord:async()=>undefined,listAssetRevisionRecords:async()=>({records:[]}),findLatestPublishedAssetRevision:async()=>undefined},generateAuthoredAssetId:()=> 'a1', generateAssetRevisionId:()=> 'r1'});
   const r=await uc.execute({workspaceId:ws,initialEditableValues:{'display-name':'n'}} as any);
   assert.equal(r.kind,'success');
   assert.equal(saved.status, "draft");
-  assert.equal(saved.currentRevisionId, undefined);
+  assert.equal(saved.currentRevisionId, "r1");
+  assert.equal(savedRevision.revisionId, "r1");
 });
 
 test('publish draft marks published', async()=>{

@@ -18,6 +18,7 @@ import type {
   PublishAssetDraftCommand,
   UpdateAssetDraftCommand,
   UpdateAssetOverrideCommand,
+  AssetAuthoringFailureCode,
 } from "../asset-authoring";
 import type { WorkspaceId } from "../workspace";
 import { createTransportOperation } from "../transport";
@@ -87,4 +88,4 @@ export type ApiAssetAuthoringReadOverrideResponse = ApiResponse<AssetOverrideRec
 export type ApiAssetAuthoringListEffectiveSummariesResponse = ApiResponse<{ readonly items: readonly AssetAuthoringEffectiveSourceSummary[]; readonly nextCursor?: string }, Record<string, unknown>, typeof API_ASSET_AUTHORING_LIST_EFFECTIVE_SUMMARIES_OPERATION, Record<string, never>>;
 
 export const createApiAssetAuthoringOperationSuccessResponse = <TOperation extends string, TValue>(operation: TOperation, value: TValue, options?: { requestId?: string; correlationId?: string }) => createApiSuccessResponse(operation as never, value, options);
-export const createApiAssetAuthoringFailureResponse = (operation: string, code: "validation"|"internal"|"not-found"|"unavailable", message: string, options?: { requestId?: string; correlationId?: string; details?: Record<string, unknown> }) => createApiFailureResponse(createApiError(operation as never, code, message, options), options);
+export const createApiAssetAuthoringFailureResponse = (operation: string, code: AssetAuthoringFailureCode, message: string, options?: { requestId?: string; correlationId?: string; details?: Record<string, unknown> }) => createApiFailureResponse(createApiError(operation as never, code === "unsupported" ? "not-supported" : code, message, options), options);
