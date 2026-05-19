@@ -1008,7 +1008,10 @@ export function composeServerHost(
           return {
             userLibraryAssetRepository,
             workspaceUserLibraryLinkRepository,
+            promoteUseCase: undefined,
             linkUseCase: new LinkUserLibraryAssetToWorkspaceUseCase({ userLibraryAssetRepository, workspaceLinkRepository: workspaceUserLibraryLinkRepository, now: options.now, generateUserLibraryLinkId: () => `link.${randomUUID()}` }),
+            copyUseCase: undefined,
+            importUseCase: undefined,
             assetRegistryRead: internalAssetRegistry.workspaceReadFacade,
           };
         })(),
