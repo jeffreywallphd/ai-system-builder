@@ -20,6 +20,12 @@ import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/mo
 import { createLocalImageAssetRegistryAdapter } from "../../../adapters/persistence/image";
 import { createLocalModelCheckpointResolverAdapter } from "../../../adapters/model/local";
 import { createLocalUserLibraryAssetRepositoryAdapter, createLocalWorkspaceUserLibraryLinkRepositoryAdapter } from "../../../adapters/persistence/user-library";
+import {
+  createLocalAssetDraftRepositoryAdapter,
+  createLocalAssetOverrideRepositoryAdapter,
+  createLocalAssetRevisionRepositoryAdapter,
+  createLocalAuthoredAssetRepositoryAdapter,
+} from "../../../adapters/persistence/asset-authoring";
 import { LinkUserLibraryAssetToWorkspaceUseCase } from "../../../application/use-cases/user-library";
 import type { LoggingPort } from "../../../application/ports/logging";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
@@ -53,6 +59,13 @@ import {
   UpdateSettingUseCase,
   ClearSettingUseCase,
   RegisterResourceBackedViewAsAssetInstanceUseCase,
+  CreateAssetDraftUseCase,
+  CreateAssetOverrideUseCase,
+  CreateWorkspaceAuthoredAssetUseCase,
+  DisableAssetOverrideUseCase,
+  PublishAssetDraftUseCase,
+  UpdateAssetDraftUseCase,
+  UpdateAssetOverrideUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import {
@@ -96,6 +109,8 @@ import {
   type InternalAssetRegistryComposition,
 } from "../../shared/composition/composeInternalAssetRegistry";
 import { composeResourceBackedViewProviders } from "../../shared/composition/composeResourceBackedViewProviders";
+import type { AssetCustomizationTargetReaderPort } from "../../../application/ports/asset-authoring";
+import { WorkspaceAssetAuthoringReadModelService } from "../../../application/services/asset/workspace-asset-authoring-read-model.service";
 
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
 const execFile = promisify(nodeExecFile);
@@ -1013,6 +1028,75 @@ export function composeServerHost(
             copyUseCase: undefined,
             importUseCase: undefined,
             assetRegistryRead: internalAssetRegistry.workspaceReadFacade,
+          };
+        })(),
+        assetAuthoringServices: (() => {
+          const assetAuthoringRepositories = {
+            authoredAssetRepository: createLocalAuthoredAssetRepositoryAdapter({
+              rootDir: registerOptions.storageRootDirectory,
+              now: options.now,
+            }),
+            assetDraftRepository: createLocalAssetDraftRepositoryAdapter({
+              rootDir: registerOptions.storageRootDirectory,
+              now: options.now,
+            }),
+            assetRevisionRepository: createLocalAssetRevisionRepositoryAdapter({
+              rootDir: registerOptions.storageRootDirectory,
+              now: options.now,
+            }),
+            assetOverrideRepository: createLocalAssetOverrideRepositoryAdapter({
+              rootDir: registerOptions.storageRootDirectory,
+              now: options.now,
+            }),
+          };
+          const unavailableTargetReader: AssetCustomizationTargetReaderPort = {
+            async readCustomizationTargetByReference() {
+              throw new Error("asset-authoring.customization-target-reader.unavailable");
+            },
+          };
+          const effectiveSummaryReader = new WorkspaceAssetAuthoringReadModelService({
+            ...assetAuthoringRepositories,
+          });
+          return {
+            ...assetAuthoringRepositories,
+            createWorkspaceAuthoredAssetUseCase: new CreateWorkspaceAuthoredAssetUseCase({
+              authoredAssetRepository: assetAuthoringRepositories.authoredAssetRepository,
+              now: options.now,
+              generateAuthoredAssetId: () => randomUUID(),
+              generateAssetRevisionId: () => randomUUID(),
+            }),
+            createAssetDraftUseCase: new CreateAssetDraftUseCase({
+              assetDraftRepository: assetAuthoringRepositories.assetDraftRepository,
+              now: options.now,
+              generateAssetDraftId: () => randomUUID(),
+            }),
+            updateAssetDraftUseCase: new UpdateAssetDraftUseCase({
+              assetDraftRepository: assetAuthoringRepositories.assetDraftRepository,
+              now: options.now,
+            }),
+            publishAssetDraftUseCase: new PublishAssetDraftUseCase({
+              authoredAssetRepository: assetAuthoringRepositories.authoredAssetRepository,
+              assetDraftRepository: assetAuthoringRepositories.assetDraftRepository,
+              assetRevisionRepository: assetAuthoringRepositories.assetRevisionRepository,
+              now: options.now,
+              generateAuthoredAssetId: () => randomUUID(),
+              generateAssetRevisionId: () => randomUUID(),
+            }),
+            createAssetOverrideUseCase: new CreateAssetOverrideUseCase({
+              assetOverrideRepository: assetAuthoringRepositories.assetOverrideRepository,
+              targetReader: unavailableTargetReader,
+              now: options.now,
+              generateAssetOverrideId: () => randomUUID(),
+            }),
+            updateAssetOverrideUseCase: new UpdateAssetOverrideUseCase({
+              assetOverrideRepository: assetAuthoringRepositories.assetOverrideRepository,
+              now: options.now,
+            }),
+            disableAssetOverrideUseCase: new DisableAssetOverrideUseCase({
+              assetOverrideRepository: assetAuthoringRepositories.assetOverrideRepository,
+              now: options.now,
+            }),
+            effectiveSummaryReader,
           };
         })(),
       });
