@@ -22,6 +22,7 @@ export type DesktopLazyPagePropsByKey = {
   readonly home: HomeLazyPageProps;
   readonly artifacts: ArtifactsLazyPageProps;
   readonly assets: WorkspaceScopedPageProps;
+  readonly "asset-authoring": WorkspaceScopedPageProps;
   readonly "user-library": WorkspaceScopedPageProps;
   readonly models: WorkspaceScopedPageProps;
   readonly "image-generation": WorkspaceScopedPageProps;
@@ -123,6 +124,7 @@ export function createLazyDesktopPageRegistry(
     home: lazyDesktopPage("home", loaders.home),
     artifacts: lazyDesktopPage("artifacts", loaders.artifacts),
     assets: lazyDesktopPage("assets", loaders.assets),
+    "asset-authoring": lazyDesktopPage("asset-authoring", loaders["asset-authoring"]),
     "user-library": lazyDesktopPage("user-library", loaders["user-library"]),
     models: lazyDesktopPage("models", loaders.models),
     "image-generation": lazyDesktopPage("image-generation", loaders["image-generation"]),
@@ -143,6 +145,10 @@ export const desktopLazyPages = createLazyDesktopPageRegistry({
   assets: async () => {
     const module = await import("../pages/AssetLibraryPage");
     return { default: module.AssetLibraryPage };
+  },
+  "asset-authoring": async () => {
+    const module = await import("../pages/AssetAuthoringPage");
+    return { default: module.AssetAuthoringPage };
   },
   "user-library": async () => {
     const module = await import("../pages/UserLibraryPage");

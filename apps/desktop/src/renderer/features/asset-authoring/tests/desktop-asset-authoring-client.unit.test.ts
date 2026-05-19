@@ -1,0 +1,4 @@
+// @vitest-environment jsdom
+import { describe,it,expect,vi } from 'vitest';
+import { createDesktopAssetAuthoringClient } from '../api/desktopAssetAuthoringClient';
+describe('desktopAssetAuthoringClient',()=>{it('calls preload with explicit workspace ids', async()=>{const listAuthoredAssets=vi.fn().mockResolvedValue({ok:true,value:{assets:[]}});const listAssetDrafts=vi.fn().mockResolvedValue({ok:true,value:{drafts:[]}});const createAssetDraft=vi.fn().mockResolvedValue({ok:true,value:{}});(window as any).desktopApi={listAuthoredAssets,listAssetDrafts,createAssetDraft}; const c=createDesktopAssetAuthoringClient(); await c.listAuthoredAssets('w1'); await c.listDrafts('w1'); await c.createDraft({workspaceId:'w1',displayName:'A'}); expect(listAuthoredAssets).toHaveBeenCalledWith({workspaceId:'w1'}); expect(listAssetDrafts).toHaveBeenCalledWith({targetWorkspaceId:'w1'}); expect(createAssetDraft.mock.calls[0][0].targetWorkspaceId).toBe('w1');});});
