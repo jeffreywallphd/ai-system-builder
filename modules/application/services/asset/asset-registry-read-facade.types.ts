@@ -2,6 +2,7 @@ import type {
   WorkspaceId,
 } from "../../../contracts/workspace";
 import type { UserLibraryEffectiveSourceSummary } from "../../../contracts/user-library";
+import type { AssetAuthoringEffectiveSourceSummary } from "../../../contracts/asset-authoring/asset-authoring-effective-source";
 import type {
   AssetBinding,
   AssetComposition,
@@ -101,6 +102,7 @@ export interface AssetDefinitionCard {
   readonly resolutionSummary?: string;
   readonly metadata?: AssetMetadata;
   readonly effectiveSourceSummary?: UserLibraryEffectiveSourceSummary;
+  readonly assetAuthoringEffectiveSourceSummary?: AssetAuthoringEffectiveSourceSummary;
 }
 
 export interface AssetDefinitionDetail {
@@ -108,6 +110,7 @@ export interface AssetDefinitionDetail {
   readonly builtIn?: boolean;
   readonly validationSummary?: AssetValidationResult;
   readonly effectiveSourceSummary?: UserLibraryEffectiveSourceSummary;
+  readonly assetAuthoringEffectiveSourceSummary?: AssetAuthoringEffectiveSourceSummary;
 }
 
 export interface AssetInstanceCard {

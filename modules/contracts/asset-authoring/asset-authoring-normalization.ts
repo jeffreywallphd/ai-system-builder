@@ -1,4 +1,4 @@
-import { normalizeAssetReference } from "../asset";
+import { normalizeAssetReferenceKind } from "../asset";
 import { createWorkspaceId } from "../workspace";
 import type { CreateAssetDraftCommand, CreateAssetOverrideCommand, CreateWorkspaceAuthoredAssetCommand, DisableAssetOverrideCommand, PublishAssetDraftCommand, ResolveAssetCustomizationConflictCommand, UpdateAssetDraftCommand, UpdateAssetOverrideCommand } from "./asset-authoring-commands";
 import { normalizeSafeAssetEditableFieldPatch } from "./asset-authoring-editable-fields";
@@ -13,6 +13,14 @@ export const normalizeAssetAuthoringFailure = <T>(code:string):AssetAuthoringNor
 const tryN=<T>(f:()=>T,code:string):AssetAuthoringNormalizationResult<T>=>{try{return normalizeAssetAuthoringSuccess(f());}catch{return normalizeAssetAuthoringFailure(code);}};
 
 const t=(v:unknown,l:string)=>{if(typeof v!=="string"||v.trim().length===0||v!==v.trim()){throw new Error(`${l} is invalid.`);} return v;};
+function normalizeAssetReference(value: any) {
+  if (!value || typeof value !== "object") throw new Error("Asset reference is invalid.");
+  const kind = normalizeAssetReferenceKind(String(value.kind ?? ""));
+  const id = t(String(value.id ?? ""), "Asset reference id");
+  const version = value.version === undefined ? undefined : t(String(value.version), "Asset reference version");
+  return { ...value, kind, id, ...(version ? { version } : {}) };
+}
+
 export function normalizeAssetCustomizationTarget(v:AssetCustomizationTarget):AssetCustomizationTarget{return {...v,targetWorkspaceId:createWorkspaceId(v.targetWorkspaceId),effectiveAssetReference:normalizeAssetReference(v.effectiveAssetReference),...(v.baseRevision?{baseRevision:t(v.baseRevision,"Base revision")}:{})};}
 export function normalizeAuthoredAssetRecord(v:AuthoredAssetRecord):AuthoredAssetRecord{return {...v,authoredAssetId:normalizeAuthoredAssetId(v.authoredAssetId),workspaceId:createWorkspaceId(v.workspaceId),assetReference:normalizeAssetReference(v.assetReference),currentRevisionId:normalizeAssetRevisionId(v.currentRevisionId),status:normalizeAssetAuthoringStatus(v.status),editableValues:normalizeSafeAssetEditableFieldPatch(v.editableValues),provenance:normalizeAssetAuthoringProvenance(v.provenance),createdAt:t(v.createdAt,"Created at"),updatedAt:t(v.updatedAt,"Updated at")};}
 export function normalizeAuthoredAssetDraftRecord(v:AuthoredAssetDraftRecord):AuthoredAssetDraftRecord{return {...v,draftId:normalizeAssetDraftId(v.draftId),targetWorkspaceId:createWorkspaceId(v.targetWorkspaceId),...(v.baseAssetReference?{baseAssetReference:normalizeAssetReference(v.baseAssetReference)}:{}),draftEditableValues:normalizeSafeAssetEditableFieldPatch(v.draftEditableValues),status:normalizeAssetAuthoringStatus(v.status),provenance:normalizeAssetAuthoringProvenance(v.provenance),createdAt:t(v.createdAt,"Created at"),updatedAt:t(v.updatedAt,"Updated at")};}

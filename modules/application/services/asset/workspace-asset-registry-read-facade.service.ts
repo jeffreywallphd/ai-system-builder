@@ -3,6 +3,7 @@ import type { WorkspaceId } from "../../../contracts/workspace";
 import { isWorkspaceId } from "../../../contracts/workspace";
 import type { AssetRegistryDefinitionReadPort } from "../../ports/asset";
 import type { UserLibraryAssetRepositoryPort, WorkspaceToWorkspaceImportRepositoryPort, WorkspaceUserLibraryDetachedCopyRepositoryPort, WorkspaceUserLibraryLinkRepositoryPort } from "../../ports/user-library";
+import type { AssetCustomizationTargetReaderPort, AssetDraftRepositoryPort, AssetOverrideRepositoryPort, AssetRevisionRepositoryPort, AuthoredAssetRepositoryPort } from "../../ports/asset-authoring";
 import type { WorkspaceRepository } from "../../ports/workspace";
 import type { ListWorkspaceSystemPackActivationsUseCase } from "../../use-cases/workspace";
 import type {
@@ -16,6 +17,7 @@ import type {
   AssetRegistryResourceBackedViewDetail,
 } from "./asset-registry-read-facade.types";
 import { WorkspaceEffectiveAssetSourceResolver } from "./workspace-effective-asset-source-resolver.service";
+import { WorkspaceAssetAuthoringReadModelService } from "./workspace-asset-authoring-read-model.service";
 
 export type WorkspaceAssetRegistryReadFailureCode =
   | "workspace-required"
@@ -46,6 +48,11 @@ export interface WorkspaceAssetRegistryReadFacadeDependencies {
   readonly userLibraryAssetRepository?: UserLibraryAssetRepositoryPort;
   readonly detachedCopyRepository?: WorkspaceUserLibraryDetachedCopyRepositoryPort;
   readonly workspaceImportRepository?: WorkspaceToWorkspaceImportRepositoryPort;
+  readonly authoredAssetRepository?: AuthoredAssetRepositoryPort;
+  readonly assetRevisionRepository?: AssetRevisionRepositoryPort;
+  readonly assetDraftRepository?: AssetDraftRepositoryPort;
+  readonly assetOverrideRepository?: AssetOverrideRepositoryPort;
+  readonly customizationTargetReader?: AssetCustomizationTargetReaderPort;
 }
 
 interface ActiveSystemPackKey {
@@ -55,6 +62,7 @@ interface ActiveSystemPackKey {
 
 export class WorkspaceAssetRegistryReadFacade implements AssetRegistryDefinitionReadPort {
   private readonly sourceResolver: WorkspaceEffectiveAssetSourceResolver;
+  private readonly authoringReadModel: WorkspaceAssetAuthoringReadModelService;
 
   public constructor(private readonly dependencies: WorkspaceAssetRegistryReadFacadeDependencies) {
     this.sourceResolver = new WorkspaceEffectiveAssetSourceResolver({
@@ -62,6 +70,13 @@ export class WorkspaceAssetRegistryReadFacade implements AssetRegistryDefinition
       userLibraryAssetRepository: dependencies.userLibraryAssetRepository,
       detachedCopyRepository: dependencies.detachedCopyRepository,
       workspaceImportRepository: dependencies.workspaceImportRepository,
+    });
+    this.authoringReadModel = new WorkspaceAssetAuthoringReadModelService({
+      authoredAssetRepository: dependencies.authoredAssetRepository,
+      assetRevisionRepository: dependencies.assetRevisionRepository,
+      assetDraftRepository: dependencies.assetDraftRepository,
+      assetOverrideRepository: dependencies.assetOverrideRepository,
+      customizationTargetReader: dependencies.customizationTargetReader,
     });
   }
 
@@ -77,6 +92,7 @@ export class WorkspaceAssetRegistryReadFacade implements AssetRegistryDefinition
     const resolvedItems = await Promise.all(globalResult.items.map(async (card) => ({
       ...card,
       effectiveSourceSummary: await this.sourceResolver.resolve(context.workspaceId, card),
+      assetAuthoringEffectiveSourceSummary: await this.authoringReadModel.readEffectiveSourceSummary(context.workspaceId, card.definitionRef),
     } as AssetDefinitionCard)));
     const items = resolvedItems.filter((card) => isInWorkspaceEffectiveView(card, activeSystemPacks) || isUserLibraryOrWorkspaceReuseSource(card.effectiveSourceSummary?.effectiveSourceKind));
     items.sort(compareDefinitionCards);
@@ -118,6 +134,7 @@ export class WorkspaceAssetRegistryReadFacade implements AssetRegistryDefinition
         trustStatus: readStringMetadata(detail.definition.metadata, "trustStatus"),
         systemDefault: readBooleanMetadata(detail.definition.metadata, "systemDefault"),
       }),
+      assetAuthoringEffectiveSourceSummary: await this.authoringReadModel.readEffectiveSourceSummary(context.workspaceId, ref),
     };
   }
 
