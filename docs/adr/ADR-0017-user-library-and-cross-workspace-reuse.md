@@ -23,7 +23,7 @@ The canonical terms are:
 - **User-library asset**: an asset owned by the User Library scope.
 - **Workspace-local asset**: an asset owned by exactly one workspace.
 - **System-owned asset**: an asset owned by the system foundation or another system scope; `system.foundation@1.0.0` remains system-owned.
-- **Promotion**: an explicit future operation that creates a user-library asset from a workspace-local source asset.
+- **Promotion**: an explicit operation that creates a user-library asset from a workspace-local source asset.
 - **Link**: an explicit workspace reference relationship to a user-library asset.
 - **Copy**: an explicit operation that creates an independent workspace-owned asset or record from a user-library asset.
 - **Import from another workspace**: an explicit operation that creates an independent target-workspace copy from another workspace's source asset.
@@ -50,7 +50,7 @@ Phase 7 decisions:
 6. Workspace-to-workspace reuse begins as import/copy, not live linking. Phase 7 must not default to live Workspace A to Workspace B links.
 7. System-owned assets remain system-owned. Phase 7 must not mutate system definitions, copy system definitions into workspace storage, call the Phase 5 installer, seed on startup, or create hidden/default workspaces.
 8. Legacy/global assets and resources are not auto-migrated into a workspace or User Library. Any migration/import behavior must be explicit and separately scoped.
-9. Resolver/effective-view behavior is planned, not implemented by this ADR. Later prompts should distinguish system-owned activation, workspace-local assets, linked user-library assets, copied user-library assets, and imported workspace assets.
+9. Resolver/effective-view behavior is partially implemented: base registry cards can be annotated with effective-source summaries; synthesized effective-view entries remain deferred. Later prompts should distinguish system-owned activation, workspace-local assets, linked user-library assets, copied user-library assets, and imported workspace assets.
 10. Collaboration and permissions remain deferred. Actor/member/role fields may remain passive placeholders; invites, sharing permissions, sync, remote auth, organization libraries, and multi-user workspace behavior belong to Phase 12 or later.
 
 ## Consequences
@@ -78,13 +78,13 @@ Phase 7 decisions:
 
 ## Finalization note (2026-05-19)
 
-This ADR was initially accepted as a Phase 7 baseline before all implementation prompts completed. After Prompt 11 closeout, implemented Phase 7 surfaces now include contracts, application ports/use cases, local persistence adapters, effective-source read integration, API/IPC/preload exposure, and minimal desktop/thin-client UI for explicit promote/link/copy/import reuse workflows.
+This ADR was initially accepted as a Phase 7 baseline before all implementation prompts completed. After Prompt 11 closeout, implemented Phase 7 surfaces now include contracts, application ports/use cases, local persistence adapters, effective-source read integration, API/IPC/preload exposure, and minimal desktop/thin-client UI for explicit promote/link/copy/import transport workflows (UI currently surfaces only link).
 
 The accepted constraints remain unchanged: no live workspace-to-workspace linking, no hidden propagation execution, no hidden/default workspace creation, no legacy/global auto-migration, no system foundation mutation, and no Phase 8 authoring/customization/override behavior in Phase 7.
 
 
 ## Phase 7 implementation status (Prompt 11 cleanup, 2026-05-19)
-- Implemented in minimal desktop/thin-client UI: list saved reusable assets, list workspace links, list effective asset sources, and explicit link/copy actions with conservative pinned-version defaults.
+- Implemented in minimal desktop/thin-client UI: list saved reusable assets, list workspace links, list effective asset sources, and explicit link actions with conservative pinned-version defaults.
 - Deferred/unavailable in minimal UI: promote and import action flows, advanced editing, propagation execution, live workspace-to-workspace links, collaboration, pack import/export, marketplace, hidden/default workspaces, startup seeding, and legacy/global auto-migration.
 - Transport and preload exposure may include promote/import operations, but minimal UI intentionally does not present them as available actions in this phase cleanup.
 - Documentation and tests must stay aligned with implemented behavior; do not claim unsupported actions as complete.

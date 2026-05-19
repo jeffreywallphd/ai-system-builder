@@ -75,7 +75,7 @@ This transport exposure does not add desktop or thin-client UI, propagation exec
 ## Transport/UI status (Phase 7 final)
 
 - API routes, Electron IPC handlers, and desktop preload methods expose promote/link/copy/import + user-library/effective-source reads with explicit workspace IDs where required.
-- Desktop renderer and thin-client UIs provide minimal safe User Library actions and status display for Phase 7 reuse workflows only.
+- Desktop renderer and thin-client UIs provide minimal safe User Library actions and status display; only link execution is surfaced in Phase 7 UI.
 - Missing workspace context must fail safely at transport/UI boundaries; UI gating alone is not treated as authoritative enforcement.
 
 ## Deferrals and Phase 8 boundary guidance
@@ -92,7 +92,7 @@ Phase 8 should add **Asset Authoring, Customization, and Override Management** o
 
 
 ## Phase 7 implementation status (Prompt 11 cleanup, 2026-05-19)
-- Implemented in minimal desktop/thin-client UI: list saved reusable assets, list workspace links, list effective asset sources, and explicit link/copy actions with conservative pinned-version defaults.
+- Implemented in minimal desktop/thin-client UI: list saved reusable assets, list workspace links, list effective asset sources, and explicit link actions with conservative pinned-version defaults.
 - Deferred/unavailable in minimal UI: promote and import action flows, advanced editing, propagation execution, live workspace-to-workspace links, collaboration, pack import/export, marketplace, hidden/default workspaces, startup seeding, and legacy/global auto-migration.
 - Transport and preload exposure may include promote/import operations, but minimal UI intentionally does not present them as available actions in this phase cleanup.
 - Documentation and tests must stay aligned with implemented behavior; do not claim unsupported actions as complete.

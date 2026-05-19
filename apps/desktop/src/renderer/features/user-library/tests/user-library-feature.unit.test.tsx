@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { describe, it, expect, vi } from 'vitest';
+import { it, expect, vi } from 'vitest';
 import { UserLibraryFeature } from '../components/UserLibraryFeature';
 
-it('renders friendly source labels and calls link/copy with workspace id', async () => {
+it('renders friendly labels, links with workspace id, and hides unavailable copy UI', async () => {
   const api = {
     listUserLibraryAssets: vi.fn().mockResolvedValue({ ok: true, value: { assets: [{ userLibraryAssetId: 'a1', version: '1.0.0', displayName: 'Asset 1' }] } }),
     listWorkspaceUserLibraryLinks: vi.fn().mockResolvedValue({ ok: true, value: { links: [{ linkId: 'l1', userLibraryAssetReference: { assetId: 'a1', version: '1.0.0' }, propagationPolicy: 'pinned-version' }] } }),
@@ -16,6 +16,12 @@ it('renders friendly source labels and calls link/copy with workspace id', async
   const container = document.createElement('div');
   const root = createRoot(container);
   await act(async () => { root.render(<UserLibraryFeature workspaceId='ws-1' />); });
+  const linkButton = container.querySelector('button');
+  expect(linkButton?.textContent).toContain('Link to this workspace');
+  await act(async () => { linkButton?.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+  expect(api.linkUserLibraryAssetToWorkspace).toHaveBeenCalledWith({ targetWorkspaceId: 'ws-1', userLibraryAssetReference: { assetId: 'a1', version: '1.0.0' }, propagationPolicy: 'pinned-version' });
+  expect(api.copyUserLibraryAssetToWorkspace).not.toHaveBeenCalled();
+  expect(container.textContent).toContain('Detached copy actions are unavailable in Phase 7 UI.');
   expect(container.textContent).toContain('Linked from your reusable library');
   expect(container.textContent).not.toContain('providerPayload');
 });

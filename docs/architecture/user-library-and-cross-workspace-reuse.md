@@ -22,7 +22,7 @@ Correct roadmap placement:
 - **User-library asset**: An asset owned by the User Library scope. It may have provenance back to a workspace asset, imported source, or later authoring workflow, but it is not workspace-local and not system-owned.
 - **Workspace-local asset**: An asset owned by exactly one workspace. It is visible to other workspaces only after an explicit reuse workflow creates a relationship or independent copy.
 - **System-owned asset**: A trusted platform asset owned by the system foundation or another system scope. `system.foundation@1.0.0` remains system-owned and may be activated by workspace reference only.
-- **Promotion**: An explicit future operation that creates a user-library asset from a workspace-local source asset. Promotion preserves provenance but does not automatically share the promoted asset with other workspaces.
+- **Promotion**: An explicit operation that creates a user-library asset from a workspace-local source asset. Promotion preserves provenance but does not automatically share the promoted asset with other workspaces.
 - **Link**: An explicit relationship from a workspace to a user-library asset. A link is not a copy; it remains a reference relationship with explicit propagation semantics.
 - **Copy**: An explicit operation that creates an independent workspace-owned asset or record from a user-library asset. Copying is detached by default.
 - **Import from another workspace**: An explicit operation that creates an independent copy in a target workspace from a source asset in another workspace. Phase 7 begins with import/copy semantics, not live Workspace A to Workspace B linking.
@@ -61,11 +61,11 @@ Phase 7 user-library assets, workspace-linked assets, copied assets, and importe
 
 Legacy/global resources must not be automatically assigned to a workspace or the User Library. Any migration/import behavior must be explicit, user-visible, and deferred unless a later prompt scopes it.
 
-## Reuse workflows to implement later
+## Reuse workflows
 
 ### Promotion to the User Library
 
-Promotion must be explicit. A later prompt may create a user-library asset from a workspace-local source asset only when the request identifies the source workspace and source asset through safe contract vocabulary.
+Promotion must be explicit. It creates a user-library asset from a workspace-local source asset only when the request identifies the source workspace and source asset through safe contract vocabulary.
 
 Promotion should preserve provenance, including:
 
@@ -92,9 +92,9 @@ Copying is detached by default. Copying creates an independent workspace-owned a
 
 Workspace-to-workspace reuse begins as import/copy, not live linking. Direct reuse from another workspace should initially create an independent copy in the target workspace. Do not establish live Workspace A to Workspace B links as default behavior.
 
-## Planned effective-view behavior
+## Effective-view behavior (current, limited)
 
-Later Phase 7 prompts should teach resolver/effective-view read models to distinguish these effective asset sources:
+Current resolver/read-facade integration annotates these source kinds on base registry cards only:
 
 - system-owned asset activated by workspace reference,
 - workspace-local asset,
@@ -102,7 +102,7 @@ Later Phase 7 prompts should teach resolver/effective-view read models to distin
 - copied user-library asset,
 - imported workspace asset.
 
-The effective resolution summary should explain the source classification, provenance, and propagation policy in sanitized terms. This prompt does not implement resolver code, data contracts, read facades, or UI display.
+Synthesizing linked/copied/imported entries that do not already exist in the base registry list is intentionally deferred.
 
 ## Non-goals
 
@@ -171,24 +171,26 @@ This transport exposure does not add desktop or thin-client UI, propagation exec
 
 ## Phase 7 closeout status (Prompt 11)
 
-### Completed surfaces
+### Implemented and composed
 
 - User-library contract vocabulary is implemented for identity normalization, command normalization (promote/link/copy/import), propagation policy validation, provenance, diagnostics, result/failure envelopes, and effective-source summaries.
 - Application ports and use cases are implemented for promote, link, detached copy, and workspace-to-workspace detached import flows with safe validation and duplicate/idempotency handling.
 - Local persistence adapters are implemented for user-library records and workspace-scoped link/copy/import relationship records.
 - Effective-source read summaries are integrated through workspace asset resolver/read-facade seams with workspace isolation preserved.
 - Transport exposure exists for API + Electron IPC + desktop preload with explicit workspace identifiers and sanitized error mapping.
-- Minimal desktop and thin-client User Library UI/client surfaces exist for list/read and explicit reuse actions that require workspace context.
+- Minimal desktop and thin-client User Library UI/client surfaces exist for list/read and explicit link actions that require workspace context.
 
-### Partially implemented or deferred surfaces
+### Implemented but transport/UI unavailable
 
+- Promote, detached copy, and workspace import operations are transport-exposed with typed unavailable behavior when host composition does not wire those use cases.
+- Detached copy actions are unavailable in Phase 7 minimal UI (UI does not offer copy execution).
 - No live workspace-to-workspace links. Workspace import remains detached copy semantics.
 - No automatic propagation execution or hidden latest-follow behavior.
 - No broad asset authoring, customization editing, override editing, or composition authoring in Phase 7.
 - No collaboration/permissions/invites/sync/remote auth/organization libraries.
 - No pack import/export or marketplace behavior.
 
-### Known safe limitations
+### Intentionally deferred
 
 - Workspace isolation remains default and mandatory.
 - User Library remains a separate user-owned scope (not a workspace and not system foundation).
@@ -220,7 +222,7 @@ Phase 8 must not assume hidden propagation, live workspace-to-workspace links, s
 
 
 ## Phase 7 implementation status (Prompt 11 cleanup, 2026-05-19)
-- Implemented in minimal desktop/thin-client UI: list saved reusable assets, list workspace links, list effective asset sources, and explicit link/copy actions with conservative pinned-version defaults.
+- Implemented in minimal desktop/thin-client UI: list saved reusable assets, list workspace links, list effective asset sources, and explicit link actions with conservative pinned-version defaults.
 - Deferred/unavailable in minimal UI: promote and import action flows, advanced editing, propagation execution, live workspace-to-workspace links, collaboration, pack import/export, marketplace, hidden/default workspaces, startup seeding, and legacy/global auto-migration.
 - Transport and preload exposure may include promote/import operations, but minimal UI intentionally does not present them as available actions in this phase cleanup.
 - Documentation and tests must stay aligned with implemented behavior; do not claim unsupported actions as complete.
