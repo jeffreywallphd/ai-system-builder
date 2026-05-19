@@ -29,6 +29,7 @@ const CONTRACT_FAMILIES = [
   "transport",
   "workspace",
   "userLibrary",
+  "assetAuthoring",
 ] as const;
 
 const IMPORT_SCAN_ROOTS = [
