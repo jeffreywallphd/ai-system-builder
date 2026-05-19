@@ -9,6 +9,9 @@ export interface AssetCustomizationTargetDescriptor {
   readonly status?: "active" | "disabled" | "archived" | "invalid";
   readonly sourceWorkspaceId?: WorkspaceId;
   readonly relationshipId?: string;
+  readonly currentBaseRevision?: string;
+  readonly currentBaseVersion?: string;
+  readonly sourceUserLibraryAssetReference?: AssetReference;
   readonly supportsOverride?: boolean;
   readonly supportedScopes?: readonly AssetOverrideScope[];
 }
