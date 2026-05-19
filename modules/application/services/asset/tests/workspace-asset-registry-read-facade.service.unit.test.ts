@@ -94,6 +94,29 @@ class FakeImportRepo {
   async listWorkspaceToWorkspaceImportRecords(query: { targetWorkspaceId: WorkspaceId }) { return { records: this.records[query.targetWorkspaceId] ?? [] }; }
 }
 
+
+class FakeAuthoredAssetRepo {
+  public byWorkspace: Record<string, any[]> = {};
+  async findAuthoredAssetByBaseReference(workspaceId: WorkspaceId, baseAssetReference: AssetReference) {
+    return (this.byWorkspace[workspaceId] ?? []).find((r) => r.assetReference.id === baseAssetReference.id);
+  }
+}
+
+class FakeRevisionRepo {
+  public revisions = new Map<string, any>();
+  async readAssetRevisionRecord(workspaceId: WorkspaceId, authoredAssetId: string, revisionId: string) {
+    return this.revisions.get(`${workspaceId}:${authoredAssetId}:${revisionId}`);
+  }
+}
+
+class FakeOverrideRepo {
+  public active: Record<string, any[]> = {};
+  public conflicted: Record<string, any[]> = {};
+  async findActiveOverrideForTarget(workspaceId: WorkspaceId, targetAssetReference: AssetReference) {
+    return (this.active[workspaceId] ?? []).find((r) => r.customizationTarget.effectiveAssetReference.id === targetAssetReference.id);
+  }
+  async listConflictedOverridesByWorkspace(workspaceId: WorkspaceId) { return this.conflicted[workspaceId] ?? []; }
+}
 test("Workspace A with active system.foundation@1.0.0 sees strict foundation cards", async () => {
   const { facade, activations } = setup();
   activations.activations.set(workspaceA, [activation(workspaceA, "active")]);
@@ -198,6 +221,23 @@ test("effective source summaries include linked, copied, and imported kinds with
   assert.equal(bResult.items.some((item) => item.definitionId === "a.linked"), false);
 });
 
+
+test("phase8 authoring summaries classify authored and override sources", async () => {
+  const { facade, activations, readPort, authoredAssets, revisions, overrides } = setup();
+  activations.activations.set(workspaceA, [activation(workspaceA, "active")]);
+  readPort.cards = [
+    { ...customCard(), definitionRef: { kind: "asset-definition", id: "a.authored", version: "1.0.0" } as AssetReference, definitionId: "a.authored" },
+    { ...customCard(), definitionRef: { kind: "asset-definition", id: "a.link-override", version: "1.0.0" } as AssetReference, definitionId: "a.link-override" },
+  ];
+  authoredAssets.byWorkspace[workspaceA] = [{ authoredAssetId: "auth.1", workspaceId: workspaceA, assetReference: { kind: "asset-definition", id: "a.authored", version: "1.0.0" }, currentRevisionId: "rev.1", provenance: { kind: "authored-from-scratch" } }];
+  revisions.revisions.set(`${workspaceA}:auth.1:rev.1`, { revision: "r1" });
+  overrides.active[workspaceA] = [{ overrideId: "ov.1", status: "active", conflictStatus: undefined, baseAssetReference: { kind: "asset-definition", id: "base", version: "1.0.0" }, customizationTarget: { sourceKind: "user-library-linked-asset", effectiveAssetReference: { kind: "asset-definition", id: "a.link-override", version: "1.0.0" } }, provenance: { kind: "customized-linked-user-library-asset" } }];
+  const result = await facade.listDefinitionCards({ workspaceId: workspaceA });
+  const authored = result.items.find((i) => i.definitionId === "a.authored");
+  const linkedOverride = result.items.find((i) => i.definitionId === "a.link-override");
+  assert.equal(authored?.assetAuthoringEffectiveSourceSummary?.effectiveSourceKind, "workspace-authored");
+  assert.equal(linkedOverride?.assetAuthoringEffectiveSourceSummary?.effectiveSourceKind, "linked-with-workspace-override");
+});
 async function assertWorkspaceError(action: () => Promise<unknown>, code: string): Promise<void> {
   await assert.rejects(action, (error) => {
     assert.equal((error as WorkspaceAssetRegistryReadFacadeError).code, code);
@@ -212,6 +252,9 @@ function setup() {
   const libraryAssets = new FakeUserLibraryAssetRepo();
   const detachedCopies = new FakeDetachedCopyRepo();
   const imports = new FakeImportRepo();
+  const authoredAssets = new FakeAuthoredAssetRepo();
+  const revisions = new FakeRevisionRepo();
+  const overrides = new FakeOverrideRepo();
   const facade = new WorkspaceAssetRegistryReadFacade({
     assetRegistryRead: readPort,
     listWorkspaceSystemPackActivations: new ListWorkspaceSystemPackActivationsUseCase({ systemPackActivationRepository: activations }),
@@ -220,8 +263,11 @@ function setup() {
     userLibraryAssetRepository: libraryAssets as any,
     detachedCopyRepository: detachedCopies as any,
     workspaceImportRepository: imports as any,
+    authoredAssetRepository: authoredAssets as any,
+    assetRevisionRepository: revisions as any,
+    assetOverrideRepository: overrides as any,
   });
-  return { facade, activations, readPort, links, libraryAssets, detachedCopies, imports };
+  return { facade, activations, readPort, links, libraryAssets, detachedCopies, imports, authoredAssets, revisions, overrides };
 }
 
 function foundationCard(): AssetDefinitionCard {
