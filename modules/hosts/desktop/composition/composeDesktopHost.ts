@@ -11,10 +11,12 @@ import { ResolveModelDefaultUseCase } from "../../../application/use-cases/setti
 import { UpdateSettingUseCase } from "../../../application/use-cases/settings/update-setting.use-case";
 import { CreateWorkspaceUseCase } from "../../../application/use-cases/workspace";
 import { LinkUserLibraryAssetToWorkspaceUseCase } from "../../../application/use-cases/user-library";
+import { CreateAssetDraftUseCase, CreateAssetOverrideUseCase, CreateWorkspaceAuthoredAssetUseCase, DisableAssetOverrideUseCase, PublishAssetDraftUseCase, UpdateAssetDraftUseCase, UpdateAssetOverrideUseCase } from "../../../application/use-cases/asset-authoring";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
 import { createLocalWorkspaceRepository, createLocalWorkspaceSelectionRepository, createLocalWorkspaceSystemPackActivationRepository } from "../../../adapters/persistence/workspace";
 import { createLocalUserLibraryAssetRepositoryAdapter, createLocalWorkspaceUserLibraryLinkRepositoryAdapter } from "../../../adapters/persistence/user-library";
+import { createLocalAssetDraftRepositoryAdapter, createLocalAssetOverrideRepositoryAdapter, createLocalAssetRevisionRepositoryAdapter, createLocalAuthoredAssetRepositoryAdapter } from "../../../adapters/persistence/asset-authoring";
 import { registerElectronIpc } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
@@ -323,6 +325,20 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
         return async () => module.composeDesktopDatasetPreparationFeature({ artifacts: await getArtifactFeatures(), runtime: await getRuntimeTaskFeatures(), getArtifactRemoteFeatures, now: options.now });
       }});
       const userLibraryAssetRepository = createLocalUserLibraryAssetRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const authoredAssetRepository = createLocalAuthoredAssetRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const assetDraftRepository = createLocalAssetDraftRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const assetRevisionRepository = createLocalAssetRevisionRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const assetOverrideRepository = createLocalAssetOverrideRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+
+      const assetAuthoringUseCases = {
+        createWorkspaceAuthoredAssetUseCase: new CreateWorkspaceAuthoredAssetUseCase({ authoredAssetRepository, assetRevisionRepository, generateAuthoredAssetId: () => `authored.${randomUUID()}`, generateAssetRevisionId: () => `revision.${randomUUID()}`, now: options.now }),
+        createAssetDraftUseCase: new CreateAssetDraftUseCase({ assetDraftRepository, generateAssetDraftId: () => `draft.${randomUUID()}`, now: options.now }),
+        updateAssetDraftUseCase: new UpdateAssetDraftUseCase({ assetDraftRepository, now: options.now }),
+        publishAssetDraftUseCase: new PublishAssetDraftUseCase({ assetDraftRepository, authoredAssetRepository, assetRevisionRepository, generateAuthoredAssetId: () => `authored.${randomUUID()}`, generateAssetRevisionId: () => `revision.${randomUUID()}`, now: options.now }),
+        createAssetOverrideUseCase: new CreateAssetOverrideUseCase({ assetOverrideRepository, targetReader: { async readCustomizationTargetByReference(){ return undefined; } }, generateAssetOverrideId: () => `override.${randomUUID()}`, now: options.now }),
+        updateAssetOverrideUseCase: new UpdateAssetOverrideUseCase({ assetOverrideRepository, now: options.now }),
+        disableAssetOverrideUseCase: new DisableAssetOverrideUseCase({ assetOverrideRepository, now: options.now }),
+      };
       const workspaceUserLibraryLinkRepository = createLocalWorkspaceUserLibraryLinkRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
 
       const settingsUseCases = {
@@ -370,6 +386,14 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
         runtime: { ipcMain: registerOptions.ipcMain, getComfyUiFeature: getComfyUiInstallFeatures },
         ingestion: { ipcMain: registerOptions.ipcMain, getIngestionFeature: getIngestionFeatures, lifecycle: markDisposableFeatureReleased("website-ingestion") },
         datasetPreparation: { ipcMain: registerOptions.ipcMain, getDatasetPreparationFeature: getDatasetPreparationFeatures, lifecycle: markDisposableFeatureReleased("dataset-preparation") },
+        assetAuthoring: {
+          ipcMain: registerOptions.ipcMain,
+          ...assetAuthoringUseCases,
+          authoredAssetRepository,
+          assetDraftRepository,
+          assetRevisionRepository,
+          assetOverrideRepository,
+        },
         userLibrary: {
           ipcMain: registerOptions.ipcMain,
           userLibraryAssetRepository,
