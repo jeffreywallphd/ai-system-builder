@@ -29,6 +29,11 @@ export interface WorkspaceUserLibraryDetachedCopyFindQuery {
   readonly selectedVersion: UserLibraryAssetVersion;
 }
 
+export interface WorkspaceUserLibraryDetachedCopyListQuery {
+  readonly targetWorkspaceId: WorkspaceId;
+  readonly limit?: number;
+}
+
 export interface WorkspaceUserLibraryDetachedCopyRepositoryPort {
   saveWorkspaceUserLibraryDetachedCopyRecord(
     record: WorkspaceUserLibraryDetachedCopyRecord,
@@ -36,4 +41,7 @@ export interface WorkspaceUserLibraryDetachedCopyRepositoryPort {
   findWorkspaceUserLibraryDetachedCopyRecord(
     query: WorkspaceUserLibraryDetachedCopyFindQuery,
   ): Promise<WorkspaceUserLibraryDetachedCopyRecord | undefined>;
+  listWorkspaceUserLibraryDetachedCopyRecords(
+    query: WorkspaceUserLibraryDetachedCopyListQuery,
+  ): Promise<{ readonly records: readonly WorkspaceUserLibraryDetachedCopyRecord[] }>;
 }
