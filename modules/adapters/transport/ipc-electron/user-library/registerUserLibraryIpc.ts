@@ -56,6 +56,7 @@ export function registerUserLibraryIpc(dependencies: RegisterUserLibraryIpcDepen
     if (!hasText(request.payload?.sourceWorkspaceId)) return failure(DESKTOP_USER_LIBRARY_PROMOTE_RESPONSE_CHANNEL, "user-library.promote-workspace-asset", "validation", "sourceWorkspaceId is required.", context);
     try {
       const result = await dependencies.promoteUseCase.execute({ ...request.payload, sourceWorkspaceId: createWorkspaceId(request.payload.sourceWorkspaceId) });
+      if (!result.ok) return failure(DESKTOP_USER_LIBRARY_PROMOTE_RESPONSE_CHANNEL, "user-library.promote-workspace-asset", "validation", "User-library promotion request failed.", context);
       return createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_PROMOTE_RESPONSE_CHANNEL, sanitizeForTransport(result), context);
     } catch {
       return failure(DESKTOP_USER_LIBRARY_PROMOTE_RESPONSE_CHANNEL, "user-library.promote-workspace-asset", "internal", "Unable to promote workspace asset to the user library.", context);
@@ -68,6 +69,7 @@ export function registerUserLibraryIpc(dependencies: RegisterUserLibraryIpcDepen
     if (!hasText(request.payload?.targetWorkspaceId)) return failure(DESKTOP_USER_LIBRARY_LINK_RESPONSE_CHANNEL, "user-library.link-asset-to-workspace", "validation", "targetWorkspaceId is required.", context);
     try {
       const result = await dependencies.linkUseCase.execute({ ...request.payload, targetWorkspaceId: createWorkspaceId(request.payload.targetWorkspaceId) });
+      if (!result.ok) return failure(DESKTOP_USER_LIBRARY_LINK_RESPONSE_CHANNEL, "user-library.link-asset-to-workspace", "validation", "User-library link request failed.", context);
       return createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_LINK_RESPONSE_CHANNEL, sanitizeForTransport(result), context);
     } catch {
       return failure(DESKTOP_USER_LIBRARY_LINK_RESPONSE_CHANNEL, "user-library.link-asset-to-workspace", "internal", "Unable to link user-library asset into workspace.", context);
@@ -80,6 +82,7 @@ export function registerUserLibraryIpc(dependencies: RegisterUserLibraryIpcDepen
     if (!hasText(request.payload?.targetWorkspaceId)) return failure(DESKTOP_USER_LIBRARY_COPY_RESPONSE_CHANNEL, "user-library.copy-asset-to-workspace", "validation", "targetWorkspaceId is required.", context);
     try {
       const result = await dependencies.copyUseCase.execute({ ...request.payload, targetWorkspaceId: createWorkspaceId(request.payload.targetWorkspaceId) });
+      if (!result.ok) return failure(DESKTOP_USER_LIBRARY_COPY_RESPONSE_CHANNEL, "user-library.copy-asset-to-workspace", "validation", "User-library copy request failed.", context);
       return createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_COPY_RESPONSE_CHANNEL, sanitizeForTransport(result), context);
     } catch {
       return failure(DESKTOP_USER_LIBRARY_COPY_RESPONSE_CHANNEL, "user-library.copy-asset-to-workspace", "internal", "Unable to copy user-library asset into workspace.", context);
@@ -93,6 +96,7 @@ export function registerUserLibraryIpc(dependencies: RegisterUserLibraryIpcDepen
     if (!hasText(request.payload?.targetWorkspaceId)) return failure(DESKTOP_USER_LIBRARY_IMPORT_RESPONSE_CHANNEL, "user-library.import-workspace-asset", "validation", "targetWorkspaceId is required.", context);
     try {
       const result = await dependencies.importUseCase.execute({ ...request.payload, sourceWorkspaceId: createWorkspaceId(request.payload.sourceWorkspaceId), targetWorkspaceId: createWorkspaceId(request.payload.targetWorkspaceId) });
+      if (!result.ok) return failure(DESKTOP_USER_LIBRARY_IMPORT_RESPONSE_CHANNEL, "user-library.import-workspace-asset-to-workspace", "validation", "Workspace import request failed.", context);
       return createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_IMPORT_RESPONSE_CHANNEL, sanitizeForTransport(result), context);
     } catch {
       return failure(DESKTOP_USER_LIBRARY_IMPORT_RESPONSE_CHANNEL, "user-library.import-workspace-asset", "internal", "Unable to import workspace asset into target workspace.", context);

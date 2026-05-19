@@ -374,7 +374,10 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           ipcMain: registerOptions.ipcMain,
           userLibraryAssetRepository,
           workspaceUserLibraryLinkRepository,
-          linkUseCase: new LinkUserLibraryAssetToWorkspaceUseCase({ userLibraryAssetRepository, workspaceLinkRepository: workspaceUserLibraryLinkRepository, now: options.now, generateUserLibraryLinkId: () => `link.${randomUUID()}` }),
+          promoteUseCase: undefined,
+            linkUseCase: new LinkUserLibraryAssetToWorkspaceUseCase({ userLibraryAssetRepository, workspaceLinkRepository: workspaceUserLibraryLinkRepository, now: options.now, generateUserLibraryLinkId: () => `link.${randomUUID()}` }),
+            copyUseCase: undefined,
+            importUseCase: undefined,
           assetRegistryRead: {
             listDefinitionCards: async (query) => (await getAssetFeatures()).assetRegistryRead.listDefinitionCards(query),
             readDefinitionDetail: async (reference, options) => (await getAssetFeatures()).assetRegistryRead.readDefinitionDetail(reference, options),

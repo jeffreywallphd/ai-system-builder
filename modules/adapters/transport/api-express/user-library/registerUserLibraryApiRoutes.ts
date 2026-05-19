@@ -57,7 +57,8 @@ export function registerUserLibraryApiRoutes(dependencies: RegisterUserLibraryAp
 
     try {
       const result = await dependencies.promoteUseCase.execute({ ...body, sourceWorkspaceId: createWorkspaceId(body.sourceWorkspaceId) } as never);
-      response.status(result.ok ? 200 : 400).json(createApiUserLibraryOperationSuccessResponse(API_USER_LIBRARY_PROMOTE_OPERATION, sanitizeForTransport(result), context));
+      if (!result.ok) return failure(response, 400, API_USER_LIBRARY_PROMOTE_OPERATION, "validation", "User-library promotion request failed.", context);
+      response.status(200).json(createApiUserLibraryOperationSuccessResponse(API_USER_LIBRARY_PROMOTE_OPERATION, sanitizeForTransport(result), context));
     } catch {
       failure(response, 500, API_USER_LIBRARY_PROMOTE_OPERATION, "internal", "Unable to promote workspace asset to the user library.", context);
     }
@@ -72,7 +73,8 @@ export function registerUserLibraryApiRoutes(dependencies: RegisterUserLibraryAp
 
     try {
       const result = await dependencies.linkUseCase.execute({ ...body, targetWorkspaceId: createWorkspaceId(body.targetWorkspaceId) } as never);
-      response.status(result.ok ? 200 : 400).json(createApiUserLibraryOperationSuccessResponse(API_USER_LIBRARY_LINK_OPERATION, sanitizeForTransport(result), context));
+      if (!result.ok) return failure(response, 400, API_USER_LIBRARY_LINK_OPERATION, "validation", "User-library link request failed.", context);
+      response.status(200).json(createApiUserLibraryOperationSuccessResponse(API_USER_LIBRARY_LINK_OPERATION, sanitizeForTransport(result), context));
     } catch {
       failure(response, 500, API_USER_LIBRARY_LINK_OPERATION, "internal", "Unable to link user-library asset into workspace.", context);
     }
@@ -86,7 +88,8 @@ export function registerUserLibraryApiRoutes(dependencies: RegisterUserLibraryAp
 
     try {
       const result = await dependencies.copyUseCase.execute({ ...objectPayload(request.body), targetWorkspaceId: createWorkspaceId(request.params.workspaceId) } as never);
-      response.status(result.ok ? 200 : 400).json(createApiUserLibraryOperationSuccessResponse(API_USER_LIBRARY_COPY_OPERATION, sanitizeForTransport(result), context));
+      if (!result.ok) return failure(response, 400, API_USER_LIBRARY_COPY_OPERATION, "validation", "User-library copy request failed.", context);
+      response.status(200).json(createApiUserLibraryOperationSuccessResponse(API_USER_LIBRARY_COPY_OPERATION, sanitizeForTransport(result), context));
     } catch {
       failure(response, 500, API_USER_LIBRARY_COPY_OPERATION, "internal", "Unable to copy user-library asset into workspace.", context);
     }
@@ -102,7 +105,8 @@ export function registerUserLibraryApiRoutes(dependencies: RegisterUserLibraryAp
 
     try {
       const result = await dependencies.importUseCase.execute({ ...body, sourceWorkspaceId: createWorkspaceId(body.sourceWorkspaceId), targetWorkspaceId: createWorkspaceId(request.params.targetWorkspaceId) } as never);
-      response.status(result.ok ? 200 : 400).json(createApiUserLibraryOperationSuccessResponse(API_USER_LIBRARY_IMPORT_OPERATION, sanitizeForTransport(result), context));
+      if (!result.ok) return failure(response, 400, API_USER_LIBRARY_IMPORT_OPERATION, "validation", "Workspace import request failed.", context);
+      response.status(200).json(createApiUserLibraryOperationSuccessResponse(API_USER_LIBRARY_IMPORT_OPERATION, sanitizeForTransport(result), context));
     } catch {
       failure(response, 500, API_USER_LIBRARY_IMPORT_OPERATION, "internal", "Unable to import workspace asset into target workspace.", context);
     }
