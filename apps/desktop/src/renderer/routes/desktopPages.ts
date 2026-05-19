@@ -1,4 +1,4 @@
-export type DesktopPageKey = "home" | "artifacts" | "assets" | "models" | "image-generation" | "settings" | "system";
+export type DesktopPageKey = "home" | "artifacts" | "assets" | "user-library" | "models" | "image-generation" | "settings" | "system";
 
 export interface DesktopPageDefinition {
   key: DesktopPageKey;
@@ -15,6 +15,11 @@ export const desktopPageDefinitions: readonly DesktopPageDefinition[] = [
   {
     key: "assets",
     label: "Assets",
+    requiresWorkspace: true,
+  },
+  {
+    key: "user-library",
+    label: "Reusable Library",
     requiresWorkspace: true,
   },
   {
