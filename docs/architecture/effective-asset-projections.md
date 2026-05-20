@@ -40,8 +40,8 @@ Phase 9 is **not** runtime/workflow execution. It is a safety-first projection l
 - **Projection cache**: Internal storage/read optimization for projection snapshots; never a source-of-truth replacement for source assets.
 - **Safe projected fields**: Conservative allow-list of metadata fields permitted in projection output.
 - **Non-projectable fields**: Deny-list/deferred field classes excluded from Phase 9 projection outputs.
-- **Execution-ready projection**: Projection whose status/readiness indicates it is safe for *later* composition/runtime-readiness planning, not execution itself.
-- **Execution-blocked projection**: Projection with blockers/diagnostics that prevent downstream readiness use.
+- **Ready-for-planning projection**: Projection whose status/readiness indicates it is safe for *later* composition/runtime-readiness planning, not execution itself.
+- **Planning-blocked projection**: Projection with blockers/diagnostics that prevent downstream readiness use.
 
 ## What an effective asset projection is
 
@@ -211,7 +211,7 @@ Baseline status vocabulary:
 Rules:
 
 - `ready` means safe for downstream planning/readiness consumers; it does not mean executed.
-- `draft-only` is not execution-ready unless a later phase explicitly allows it.
+- `draft-only` is not ready for downstream planning.
 - `conflicted` blocks automatic materialization.
 - disabled overrides never silently apply.
 
@@ -299,3 +299,53 @@ Phase 10 should treat Phase 9 projections as inputs for **Asset Composition Plan
 - non-runtime composition plans.
 
 Phase 10 must not assume workflow execution, runtime execution, collaboration, marketplace behavior, live synchronization, or arbitrary prompt/workflow/json editing.
+
+
+## Phase 9 closeout status (Prompt 10)
+
+### Implemented
+
+- Contracts in `modules/contracts/effective-asset-projections` define projection IDs, source/target references, statuses, policies, diagnostics/blockers, provenance, command/result DTOs, normalization helpers, and safe metadata/label validation rules.
+- Application ports and local JSON persistence adapters cover workspace-scoped projection repository behavior, list/read/find-by-reference reads, and blocked/conflicted/stale summaries.
+- Use cases/services are implemented for authored projection create/refresh, override projection create/refresh, draft preview projection, validation, diagnostics/blocking, readiness/consumability checks, and conflict-blocking decisions.
+- Read-model/facade integration exposes workspace-scoped projection list/detail/by-effective-reference reads and safe diagnostic/provenance summaries for consumers.
+- Thin API routes, desktop IPC handlers, and preload methods expose read/create/refresh/preview projection operations with explicit workspace context and shared envelope behavior.
+- Minimal desktop and thin-client UI surfaces expose projection readiness/status summaries, list/detail views, and refresh actions without runtime execution wording.
+- Projection behavior remains metadata-oriented and safe-fields-only by default, with no source mutation and no `system.foundation` mutation/copy behavior.
+
+### Intentionally deferred
+
+- Runtime/workflow execution and any execution orchestration.
+- Visual composition/canvas/wizard-first planning UX.
+- Materialized workflow payload generation.
+- Broad arbitrary JSON projection/editing.
+- Prompt payload, provider payload, and binary/resource projection content.
+- Conflict rebase/resolution workflows and automatic rebasing.
+- Live workspace-to-workspace links or hidden propagation/refresh daemons.
+- Collaboration/permissions, pack import/export, marketplace behavior.
+- Advanced source/target selection UI beyond minimal readiness surfaces.
+- Unsupported source kinds beyond authored-revision/draft-preview/override-safe flows.
+
+### Operational constraints
+
+- Every projection operation must carry an explicit workspace ID.
+- No hidden/global fallback and no hidden/default workspace creation.
+- Projection pipelines do not mutate sources.
+- `system.foundation` remains immutable system-owned reference content.
+- `ready` means projection-consumable for downstream planning, not executed.
+- `draft-only` is not ready for planning consumption.
+- `conflicted`/`blocked`/`disabled`/`stale` projections are never silently applied.
+- Unsafe payload classes remain excluded from projected fields.
+
+### Phase 10 handoff: Asset Composition Planning
+
+Phase 10 should start as a planning layer over Phase 9 safe projections by adding:
+
+- selecting projections for a composition plan,
+- validating compatibility across selected projections,
+- ordering dependency relationships,
+- grouping projected assets into non-runtime composition plans,
+- preparing system/workflow plans without execution,
+- surfacing missing/blocked/conflicted projections before plan construction.
+
+Phase 10 must not begin with runtime execution, workflow execution, visual canvas-first authoring, marketplace/collaboration features, pack import/export, background propagation, or arbitrary JSON/prompt/workflow editing.

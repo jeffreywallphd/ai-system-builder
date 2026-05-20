@@ -256,3 +256,27 @@ Phase 7 work must not assume user-library behavior already exists. Prompt 1 is d
 For Phase 8 prompts about authored assets, editable drafts, customization, override records, revisions/conflicts, linked-customization semantics, detached customization, imported customization, or authored/customized promotion readiness, include `index`, `asset-authoring`, `asset-kernel`, `persistence-storage`, `security`, and `testing`; add transport/host packs only when the prompt owns API/IPC/preload/UI exposure. Read `docs/architecture/asset-authoring-customization-and-overrides.md`, ADR-0018, `docs/architecture/user-library-and-cross-workspace-reuse.md`, and ADR-0017 before implementation.
 
 Do not assume unresolved/unavailable Phase 7 surfaces are complete. If a Phase 8 prompt depends on missing Phase 7 composition/truthfulness items, mark them as prerequisites or explicit deferrals.
+
+
+## Phase 9/10 projection routing (closeout)
+
+Route prompts containing any of the following terms to `docs/context/packs/effective-asset-projections.pack.md`:
+
+- effective asset projection
+- projection readiness
+- projection consumability
+- materialized projection
+- safe projected fields
+- projection blockers
+- projection diagnostics
+- projection provenance
+- projection refresh
+- projection invalidation
+- authored/customized asset projection
+- downstream planning readiness
+
+Routing combinations:
+
+- Phase 10 composition planning prompts: include both `docs/context/packs/effective-asset-projections.pack.md` and the future Phase 10 composition pack once created.
+- Authored/customized + projection prompts: include both `docs/context/packs/asset-authoring.pack.md` and `docs/context/packs/effective-asset-projections.pack.md`.
+- User Library linked/copied + projection prompts: include both `docs/context/packs/user-library.pack.md` and `docs/context/packs/effective-asset-projections.pack.md`.

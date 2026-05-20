@@ -1,74 +1,64 @@
-# Context Pack: Effective Asset Projections (Phase 9)
+# Context Pack: Effective Asset Projections (Phase 9 Closeout)
 
 - Pack name: `effective-asset-projections`
 
 ## Purpose
 
-Provide minimum-sufficient Phase 9 context for materialized/effective asset projection architecture, safety constraints, and implementation sequencing.
+Provide compact, truthful Phase 9 closeout context for effective asset projections, readiness semantics, and Phase 10 planning handoff.
 
 ## Use When
 
-- Materialized/effective asset projection design.
-- Projection records, projection persistence, and projection read surfaces.
-- Safe projected fields, projection readiness, blockers, diagnostics, provenance.
-- Projection refresh/invalidation behavior.
-- Preparing assets for composition/runtime-readiness planning (not execution).
+- Effective asset projection contracts/ports/persistence/use cases/read models.
+- Projection readiness/consumability, blockers, diagnostics, provenance, refresh/invalidation behavior.
+- Authored/customized/user-library source projection behavior.
+- API/IPC/preload/UI projection readiness exposure.
 
-## Canonical docs to inspect
+## Canonical docs/files to inspect
 
 - `docs/architecture/effective-asset-projections.md`
 - `docs/adr/ADR-0019-effective-asset-projections.md`
+- `modules/contracts/effective-asset-projections/`
+- `modules/application/ports/effective-asset-projections/`
+- `modules/adapters/persistence/effective-asset-projections/`
+- `modules/application/use-cases/effective-asset-projections/`
 - `docs/architecture/asset-authoring-customization-and-overrides.md`
 - `docs/architecture/user-library-and-cross-workspace-reuse.md`
-- `docs/architecture/workspace-model.md`
-- `docs/architecture/asset-kernel.md`
 
-## Core constraints
+## Final Phase 9 implemented surfaces
 
-- Workspace isolation default; explicit workspace context required.
-- Projections are workspace-scoped derived outputs.
-- No source mutation (`system.foundation@1.0.0` immutable; linked sources not mutated; detached copies stay detached).
-- No hidden propagation, live workspace links, runtime/workflow execution, auto-rebase, or hidden conflict resolution.
-- Projection outputs remain safe metadata-oriented summaries only.
-- Never expose paths/storage roots/provider payloads/prompt text/workflow JSON/bytes/blobs/base64/tokens/env values/stack traces/command lines/signed URLs in projection public surfaces.
+- Workspace-scoped projection contract vocabulary + normalizers.
+- Projection repository port + local JSON persistence adapter.
+- Authored/override create+refresh and draft-preview use cases.
+- Validation, diagnostics/blockers, readiness/consumability helpers.
+- Projection read facade/list/detail/by-reference summaries.
+- Thin API/IPC/preload wrappers and minimal desktop/thin-client readiness UI.
+
+## Required constraints
+
+- Explicit workspace ID on all projection operations.
+- No hidden/default/global workspace fallback.
+- No source mutation (`system.foundation` immutable).
+- No silent application of blocked/conflicted/disabled/stale projections.
+- Public projection output is safe metadata only (no raw paths/bytes/payload/tokens/secrets).
+- `ready` means ready for downstream planning, not execution.
 
 ## Anti-drift rules
 
-- Keep projection vocabulary/status/policy aligned with ADR-0019 and Phase 9 architecture doc.
-- Do not recast `ready` as executed.
-- Do not silently apply conflicted/disabled overrides.
-- Do not expand safe projected fields without explicit schema + tests in later prompts.
+- Keep status/policy/diagnostic vocabulary aligned with contracts + ADR-0019.
+- Do not claim runtime/workflow execution in Phase 9 docs/UI/transport.
+- Do not expand safe projected field classes without explicit contract + tests.
 
-## Relationship to Phase 7 and Phase 8
+## Deferred items
 
-- Phase 7 provides ownership/reuse/source-relationship foundations.
-- Phase 8 provides authored/draft/revision/override/customization vocabulary and safety constraints.
-- Phase 9 materializes workspace-effective projection outputs from those inputs without execution.
+Runtime/workflow execution, visual composition-first UX, payload/materialized-workflow generation, prompt/provider/binary payload projection, automatic conflict resolution/rebase, background propagation, collaboration/permissions, pack import/export, marketplace, and advanced source/target authoring UX remain deferred.
 
-## Phase 9 prompt ownership
+## Phase 10 handoff guidance
 
-1. Prompt 1 — Architecture baseline, ADR, docs, context pack.
-2. Prompt 2 — Materialized/effective asset projection contract vocabulary.
-3. Prompt 3 — Application ports and persistence for projection records.
-4. Review A — Contract, persistence, boundary, and anti-drift review.
-5. Prompt 4 — Safe projection service for authored assets and safe fields.
-6. Prompt 5 — Safe projection service for overrides/customizations.
-7. Prompt 6 — Validation, diagnostics, and conflict-blocking behavior.
-8. Review B — Materialization semantics, immutability, and safety review.
-9. Prompt 7 — Effective-source/read-model integration for projected assets.
-10. Prompt 8 — API/IPC/preload exposure, split if needed.
-11. Prompt 9 — Minimal UI indicators/actions for projection readiness.
-12. Prompt 10 — Docs, context packs, ADR closeout, and Phase 10 handoff.
-13. Review C — Final Phase 9 closeout review.
+Phase 10 is **Asset Composition Planning** on top of safe projections: select compatible projections, order dependencies, build non-runtime plans, and surface missing/blocked/conflicted readiness gaps before plan build.
 
-## Non-goals
+## Related packs
 
-- Workflow/runtime execution.
-- Collaboration/permissions.
-- Pack import/export and marketplace behavior.
-- Live workspace-to-workspace sync.
-- Arbitrary JSON/prompt/workflow editing/materialization.
-
-## Phase 10 handoff
-
-Phase 10 (Asset Composition Planning) may consume Phase 9 projections for selection/order/dependency/compatibility planning and non-runtime preparation. Execution remains out of scope.
+- `docs/context/packs/asset-authoring.pack.md`
+- `docs/context/packs/user-library.pack.md`
+- `docs/context/packs/asset-kernel.pack.md`
+- `docs/architecture/system-overview.md`

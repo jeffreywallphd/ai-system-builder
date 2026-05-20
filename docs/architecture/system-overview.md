@@ -1,6 +1,6 @@
 # System Overview
 
-- Phase 9 baseline: `docs/architecture/effective-asset-projections.md` defines workspace-scoped safe materialized/effective asset projections (non-executing).
+- Phase 9 baseline: `docs/architecture/effective-asset-projections.md` defines workspace-scoped safe materialized/effective asset projections for planning-readiness (non-executing).
 ## Purpose of this repository
 
 `ai-system-builder` is a fresh rebuild intended to replace earlier architectural sprawl with a simpler and more disciplined structure.
