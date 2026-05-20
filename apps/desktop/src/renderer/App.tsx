@@ -9,7 +9,7 @@ import { desktopLazyPages, type DesktopLazyPageDiagnosticContext, type DesktopLa
 import { resolveDesktopWorkspaceRouteBoundary } from "./routes/workspaceRouteBoundary";
 import { recordRendererMemorySnapshot } from "./diagnostics/rendererMemoryDiagnostics";
 
-type DesktopWorkspacePageKey = Extract<DesktopPageKey, "artifacts" | "assets" | "asset-authoring" | "user-library" | "models" | "image-generation">;
+type DesktopWorkspacePageKey = Extract<DesktopPageKey, "artifacts" | "assets" | "asset-authoring" | "user-library" | "models" | "image-generation" | "effective-asset-projections">;
 
 export function App() {
   useEffect(() => {
@@ -89,6 +89,10 @@ export function WorkspaceAwareDesktopApp({ lazyPages = desktopLazyPages }: Works
       case "image-generation": {
         const ImageGenerationPage = lazyPages["image-generation"];
         return <ImageGenerationPage __lazyLoadContext={lazyLoadContext} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
+      }
+      case "effective-asset-projections": {
+        const EffectiveAssetProjectionsPage = lazyPages["effective-asset-projections"];
+        return <EffectiveAssetProjectionsPage __lazyLoadContext={lazyLoadContext} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
       }
     }
   };
