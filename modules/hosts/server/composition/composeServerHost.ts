@@ -793,6 +793,7 @@ export function composeServerHost(
           publishedModelRegistry: modelRegistry,
         }),
       });
+      void internalAssetRegistry.installSystemFoundationPack.install();
       const generateAssetInstanceId = () => `asset-instance.${randomUUID()}`;
       const assetMutationUseCases = {
         registerResourceBackedViewAsAsset: new RegisterResourceBackedViewAsAssetInstanceUseCase({
