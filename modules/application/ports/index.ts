@@ -26,3 +26,5 @@ export * from "./asset";
 export * from "./workspace";
 export * from "./user-library";
 export * from "./asset-authoring";
+
+export * from "./effective-asset-projections";
