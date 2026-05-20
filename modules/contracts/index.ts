@@ -26,3 +26,5 @@ export * as model from "./model";
 export * as runtimeInstaller from "./runtime-installer";
 
 export * as security from "./security";
+
+export * as effectiveAssetProjections from "./effective-asset-projections";
