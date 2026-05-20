@@ -492,6 +492,9 @@ export interface DesktopPreloadApi {
   listWorkspaceUserLibraryLinks: (input: { workspaceId: string; status?: string; propagationPolicy?: string; text?: string; limit?: number; cursor?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceUserLibraryLinkListResponse>;
   readWorkspaceUserLibraryLink: (input: { workspaceId: string; linkId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceUserLibraryLinkReadResponse>;
   readWorkspaceEffectiveAssetSources: (input: { workspaceId: string; limit?: number; cursor?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopWorkspaceEffectiveAssetSourceListResponse>;
+  listEffectiveAssetProjections: (input: { workspaceId: string; limit?: number; cursor?: string; status?: string; sourceKind?: string; policy?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  readEffectiveAssetProjection: (input: { workspaceId: string; projectionId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  refreshEffectiveAssetProjection: (input: { workspaceId: string; projectionId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
   createWorkspaceAuthoredAsset: (command: CreateWorkspaceAuthoredAssetCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringCreateWorkspaceAuthoredAssetResponse>;
   createAssetDraft: (command: CreateAssetDraftCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringCreateDraftResponse>;
   updateAssetDraft: (command: UpdateAssetDraftCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringUpdateDraftResponse>;
@@ -1169,6 +1172,34 @@ export function createDesktopPreloadApi(
     async readWorkspaceEffectiveAssetSources(input, context = {}) {
       const response = await dependencies.ipcRenderer.invoke(DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_REQUEST_CHANNEL.value, createDesktopWorkspaceEffectiveAssetSourceListRequest(input as never, context));
       return assertDesktopEnvelopeResponse<DesktopWorkspaceEffectiveAssetSourceListResponse>(response, { operation: DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_OPERATION, channel: DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_RESPONSE_CHANNEL.value, message: "Received invalid desktop effective asset source IPC response envelope." });
+    },
+    async listEffectiveAssetProjections(input, context = {}) {
+      if (!input.workspaceId?.trim()) throw new Error("workspaceId is required.");
+      return dependencies.ipcRenderer.invoke("effective-asset-projections:list", {
+        payload: {
+          targetWorkspaceId: input.workspaceId,
+          limit: input.limit,
+          cursor: input.cursor,
+          status: input.status,
+          sourceKind: input.sourceKind,
+          policy: input.policy,
+        },
+        context,
+      });
+    },
+    async readEffectiveAssetProjection(input, context = {}) {
+      if (!input.workspaceId?.trim()) throw new Error("workspaceId is required.");
+      if (!input.projectionId?.trim()) throw new Error("projectionId is required.");
+      return dependencies.ipcRenderer.invoke("effective-asset-projections:read", {
+        payload: {
+          targetWorkspaceId: input.workspaceId,
+          projectionId: input.projectionId,
+        },
+        context,
+      });
+    },
+    async refreshEffectiveAssetProjection(_input, _context = {}) {
+      return { ok: false, error: { code: "unsupported", message: "Refreshing is deferred for Phase 9 desktop UI." } };
     },
 
     async createWorkspaceAuthoredAsset(command, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_REQUEST_CHANNEL.value, { payload: command, operation: DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_OPERATION, channel: DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringCreateWorkspaceAuthoredAssetResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_OPERATION, channel: DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring create workspace-authored asset IPC response envelope." }); },
@@ -2057,4 +2088,3 @@ import type {
   LinkUserLibraryAssetToWorkspaceCommand,
   PromoteWorkspaceAssetToUserLibraryCommand,
 } from "../../../../modules/contracts/user-library";
-

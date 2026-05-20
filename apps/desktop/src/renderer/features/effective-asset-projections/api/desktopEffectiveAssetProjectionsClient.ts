@@ -17,8 +17,7 @@ export function createDesktopEffectiveAssetProjectionsClient() {
       return unwrap(await api.readEffectiveAssetProjection({ workspaceId, projectionId }));
     },
     refreshProjection: async (workspaceId: string, projectionId: string) => {
-      if (typeof api.refreshEffectiveAssetProjection !== 'function') return err('Refreshing is not available yet.', 'unavailable');
-      return unwrap(await api.refreshEffectiveAssetProjection({ workspaceId, projectionId }));
+      return err('Refreshing is deferred for Phase 9 desktop UI.', 'unsupported');
     },
   };
 }

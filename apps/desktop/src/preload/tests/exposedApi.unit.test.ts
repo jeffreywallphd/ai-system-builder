@@ -193,6 +193,28 @@ describe("desktop preload exposedApi bridge", () => {
     expect(JSON.stringify(invoke.mock.calls)).not.toContain("import-pack");
   });
 
+  it("maps effective projection list/read bridge calls to dedicated IPC channels", async () => {
+    const responses = [
+      { ok: true, value: { summaries: [] } },
+      { ok: true, value: { projectionId: "projection.a" } },
+    ];
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => responses.shift());
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    await api.listEffectiveAssetProjections({ workspaceId: "workspace.a", limit: 10, status: "ready" }, { requestId: "req-1" });
+    await api.readEffectiveAssetProjection({ workspaceId: "workspace.a", projectionId: "projection.a" }, { requestId: "req-2" });
+    const listCall = invoke.mock.calls.find((call) => call[0] === "effective-asset-projections:list");
+    const readCall = invoke.mock.calls.find((call) => call[0] === "effective-asset-projections:read");
+    expect(listCall?.[1]).toMatchObject({ payload: { targetWorkspaceId: "workspace.a", limit: 10, status: "ready" } });
+    expect(readCall?.[1]).toMatchObject({ payload: { targetWorkspaceId: "workspace.a", projectionId: "projection.a" } });
+  });
+  it("reports projection refresh as deferred without invoking generic IPC", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>();
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    const response = await api.refreshEffectiveAssetProjection({ workspaceId: "workspace.a", projectionId: "projection.a" });
+    expect(response).toMatchObject({ ok: false, error: { code: "unsupported" } });
+    expect(invoke.mock.calls.length).toBe(0);
+  });
+
   it("maps asset definition list reads to the read-only asset registry request channel", async () => {
     const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createDesktopAssetDefinitionsListSuccessResponse({ items: [] }),

@@ -17,6 +17,17 @@ test("refresh marks source missing", async ()=>{
   assert.equal(r.status,"success"); assert.equal((r as any).value.status,"source-missing");
 });
 
+test("refresh authored does not collapse non-published states to invalid", async ()=>{
+  const make = async (status: string) => {
+    const uc = new RefreshAuthoredAssetEffectiveProjectionUseCase({projectionRepository:{readEffectiveAssetProjectionRecord:async()=>({projectionId:"eap.main.1",targetWorkspaceId:ws,source:{sourceKind:"workspace-authored",targetWorkspaceId:ws,authoredAssetId:"authored.1"},target:{targetWorkspaceId:ws,effectiveAssetReference:{kind:"asset-instance",id:"a1"},intendedPolicy:"safe-fields-only"},sourceKind:"workspace-authored",effectiveAssetReference:{kind:"asset-instance",id:"a1"},status:"ready",policy:"safe-fields-only",projectedFields:{},diagnostics:[],blockers:[],provenance:{targetWorkspaceId:ws,sourceKind:"workspace-authored",operationAt:"2026-01-01T00:00:00.000Z"},createdAt:"2026-01-01T00:00:00.000Z",updatedAt:"2026-01-01T00:00:00.000Z"} as any),updateEffectiveAssetProjectionRecord:async(r:any)=>r} as any,authoredAssetRepository:{readAuthoredAssetRecordByWorkspace:async()=>({status,editableValues:{summary:"x"}})} as any,assetRevisionRepository:{} as any,now:()=>"2026-01-02T00:00:00.000Z"});
+    const r=await uc.execute({targetWorkspaceId:ws,projectionId:"eap.main.1"} as any); return (r as any).value.status;
+  };
+  assert.equal(await make("draft"),"draft-only");
+  assert.equal(await make("conflicted"),"conflicted");
+  assert.equal(await make("archived"),"disabled");
+  assert.equal(await make("unknown"),"unsupported");
+});
+
 test("preview draft returns draft-only", async ()=>{
 const uc=new PreviewDraftEffectiveAssetProjectionUseCase({assetDraftRepository:{readAssetDraftRecord:async()=>({draftId:"draft.1",targetWorkspaceId:ws,draftEditableValues:{summary:"S"}})} as any,generateEffectiveAssetProjectionId:()=>"eap.main.2",now:()=>"2026-01-01T00:00:00.000Z"});
 const r=await uc.execute({targetWorkspaceId:ws,source:{sourceKind:"workspace-authored-draft",targetWorkspaceId:ws,draftId:"draft.1",effectiveAssetReference:{kind:"asset-instance",id:"a1"}},policy:"draft-preview-only"} as any);

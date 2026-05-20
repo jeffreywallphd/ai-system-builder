@@ -49,6 +49,7 @@ test("lists workspace-only projection summaries with readiness/state mapping", a
   assert.equal(result.summaries.find((s) => s.projectionId === "p.stale")?.requiresRefresh, true);
   assert.equal(result.summaries.find((s) => s.projectionId === "p.unsupported")?.readinessLabel, "blocked-for-planning");
   assert.equal(result.summaries.find((s) => s.projectionId === "p.blocked")?.projectedFieldsApplied, false);
+  assert.deepEqual(result.summaries.find((s) => s.projectionId === "p.blocked")?.projectedFields ?? {}, {});
 });
 
 test("readByProjectionId is workspace-scoped and not global", async () => {
@@ -80,6 +81,21 @@ test("readByEffectiveAssetReference matches kind+id+version and enforces workspa
   assert.equal(kind?.projectionId, "p.kind");
   assert.equal(miss, undefined);
   assert.equal(noLeak?.targetWorkspaceId, workspaceA);
+});
+
+test("sanitizes diagnostics/blockers/provenance metadata from summary surface", async () => {
+  const repo = new FakeProjectionRepo();
+  repo.records = [record("p.safe", workspaceA, "ready", {
+    diagnostics: [{ code: "effective-projection-source-missing", message: "x", metadata: { unsafe: "secret" } } as any],
+    blockers: [{ code: "effective-projection-source-missing", message: "y", metadata: { unsafe: "secret" } } as any],
+    provenance: { kind: "projected-from-authored-asset-revision", targetWorkspaceId: workspaceA, operationAt: "2026-01-01T00:00:00.000Z", metadata: { unsafePath: "/tmp/raw" } } as any,
+  })];
+  const service = new WorkspaceEffectiveAssetProjectionReadModelService({ projectionRepository: repo as any });
+  const result = await service.listByWorkspace({ targetWorkspaceId: workspaceA } as any);
+  const summary = result.summaries[0]!;
+  assert.equal("metadata" in (summary.diagnostics[0] as any), false);
+  assert.equal("metadata" in (summary.blockers[0] as any), false);
+  assert.equal("metadata" in (summary.provenance as any), false);
 });
 
 function record(id: string, workspaceId: any, status: any, overrides: Partial<EffectiveAssetProjectionRecord> = {}): EffectiveAssetProjectionRecord {
