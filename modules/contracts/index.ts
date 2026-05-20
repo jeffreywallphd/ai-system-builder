@@ -28,3 +28,5 @@ export * as runtimeInstaller from "./runtime-installer";
 export * as security from "./security";
 
 export * as effectiveAssetProjections from "./effective-asset-projections";
+
+export * as assetComposition from "./asset-composition";
