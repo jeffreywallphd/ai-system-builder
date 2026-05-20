@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import type { DesktopPageDefinition, DesktopPageKey } from "../../routes/desktopPages";
+import appLogoSrc from "../../../../../../modules/ui/shared/assets/branding/logo.svg";
 
 export interface AppShellProps {
   activePage?: DesktopPageKey;
@@ -10,18 +11,54 @@ export interface AppShellProps {
 }
 
 export function AppShell({ activePage, onNavigate, pages, children }: AppShellProps) {
+  const menuRef = useRef<HTMLDetailsElement | null>(null);
   const primaryPages = pages.filter((page) => page.key !== "settings");
   const navigationPages: readonly (DesktopPageDefinition | { readonly key: "home"; readonly label: "Home" })[] = [
     { key: "home", label: "Home" },
     ...primaryPages,
   ];
 
+  useEffect(() => {
+    const closeMenuOnOutsideClick = (event: MouseEvent | TouchEvent) => {
+      const menu = menuRef.current;
+      const target = event.target;
+
+      if (!menu?.open || !target || !(target as Node).nodeType || menu.contains(target as Node)) {
+        return;
+      }
+
+      menu.open = false;
+    };
+
+    document.addEventListener("mousedown", closeMenuOnOutsideClick);
+    document.addEventListener("touchstart", closeMenuOnOutsideClick);
+
+    return () => {
+      document.removeEventListener("mousedown", closeMenuOnOutsideClick);
+      document.removeEventListener("touchstart", closeMenuOnOutsideClick);
+    };
+  }, []);
+
   return (
     <main className="ui-shell">
       <header className="ui-shell__header">
         <div className="ui-container ui-shell__header-inner">
+          <div className="ui-shell__brand">
+            <button
+              type="button"
+              className="ui-shell__logo-button"
+              aria-label="Go to Home"
+              title="Home"
+              onClick={() => onNavigate("home")}
+            >
+              <span className="ui-shell__logo-frame">
+                <img className="ui-shell__logo-image" src={appLogoSrc} alt="" aria-hidden="true" />
+              </span>
+            </button>
+            <h1 className="ui-shell__title">AI System Builder</h1>
+          </div>
           <nav className="ui-shell__nav" aria-label="Primary">
-            <details className="ui-shell__menu">
+            <details ref={menuRef} className="ui-shell__menu">
               <summary className="ui-button ui-button--icon ui-shell__menu-trigger" aria-label="Open navigation menu" title="Menu">
                 <svg aria-hidden="true" viewBox="0 0 24 24" className="ui-icon">
                   <path d="M4 6.5h16v2H4v-2Zm0 4.5h16v2H4v-2Zm0 4.5h16v2H4v-2Z" />
