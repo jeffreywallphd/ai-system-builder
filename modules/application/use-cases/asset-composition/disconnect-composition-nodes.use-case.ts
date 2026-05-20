@@ -12,13 +12,13 @@ export class DisconnectCompositionNodesUseCase {
     try {
       const plan = await this.d.repository.readAssetCompositionPlanRecord(c.targetWorkspaceId, c.planId);
       if (!plan) return assetCompositionPlanFailure("not-found", "asset-composition-plan-not-found");
-      if (plan.status === "archived") return assetCompositionPlanFailure("blocked", "asset-composition-plan-runtime-binding-deferred");
+      if (plan.status === "archived") return assetCompositionPlanFailure("blocked", "asset-composition-plan-archived");
       const relationship = plan.relationships.find((x) => x.relationshipId === c.relationshipId);
       if (!relationship) return assetCompositionPlanFailure("not-found", "asset-composition-relationship-node-missing");
-      if (relationship.targetWorkspaceId !== c.targetWorkspaceId) return assetCompositionPlanFailure("blocked", "asset-composition-workspace-invalid");
+      if (relationship.targetWorkspaceId !== c.targetWorkspaceId) return assetCompositionPlanFailure("blocked", "asset-composition-repository-unavailable");
       const relationships = plan.relationships.filter((x) => x.relationshipId !== c.relationshipId);
-      const next = normalizeAssetCompositionPlan({ ...plan, relationships, planningSummary: recomputeAssetCompositionPlanningSummary({ ...plan, relationships }), provenance: [...plan.provenance, { ...createPlanProvenanceEvent("plan-created", c.targetWorkspaceId, c.planId, now), kind: "relationship-removed", relationshipId: c.relationshipId }], updatedAt: now });
+      const next = normalizeAssetCompositionPlan({ ...plan, relationships, planningSummary: recomputeAssetCompositionPlanningSummary({ ...plan, relationships }), provenance: [...plan.provenance, { ...createPlanProvenanceEvent("relationship-added", c.targetWorkspaceId, c.planId, now), kind: "relationship-removed", relationshipId: c.relationshipId }], updatedAt: now });
       return { status: "success", value: await this.d.repository.updateAssetCompositionPlanRecord(next) };
-    } catch { return assetCompositionPlanFailure("unavailable", "asset-composition-workspace-invalid"); }
+    } catch { return assetCompositionPlanFailure("unavailable", "asset-composition-repository-unavailable"); }
   }
 }
