@@ -42,3 +42,5 @@ export * from "./user-library";
 export * from "./asset-authoring";
 
 export * from "./effective-asset-projections";
+
+export * from "./asset-composition";
