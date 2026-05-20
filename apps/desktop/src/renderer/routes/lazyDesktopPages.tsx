@@ -15,7 +15,7 @@ export interface ArtifactsLazyPageProps extends WorkspaceScopedPageProps {
 }
 
 export interface HomeLazyPageProps {
-  readonly onGoToArtifacts: () => void;
+  readonly onNavigate: (nextPage: DesktopPageKey) => void;
 }
 
 export type DesktopLazyPagePropsByKey = {

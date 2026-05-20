@@ -146,7 +146,7 @@ describe("desktop renderer lazy page loading", () => {
     mountedRoot = mounted.root;
     mountedContainer = mounted.container;
 
-    expect(mounted.container.textContent).toContain("AI System Builder");
+    expect(mounted.container.textContent).toContain("Home");
     expect(mounted.container.textContent).toContain("Data");
     expect(mounted.container.textContent).toContain("Assets");
     expect(mounted.container.textContent).toContain("Models");

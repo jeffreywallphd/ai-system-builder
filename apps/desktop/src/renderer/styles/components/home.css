@@ -1,0 +1,81 @@
+.home-page {
+  width: 100%;
+}
+
+.home-workspace-card {
+  border-color: var(--color-border-strong);
+}
+
+.home-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.home-card__eyebrow {
+  margin: 0 0 var(--space-2xs);
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.home-areas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.home-area-card {
+  min-height: 13rem;
+}
+
+.home-area-card--wide {
+  grid-column: 1 / -1;
+  min-height: auto;
+}
+
+.home-area-card__actions {
+  margin-top: auto;
+}
+
+.workspace-switcher {
+  width: 100%;
+}
+
+.workspace-switcher .ui-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-sm);
+}
+
+.workspace-switcher .ui-input {
+  min-width: min(20rem, 100%);
+}
+
+.workspace-create-form {
+  max-width: 32rem;
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.workspace-create-form input[name="workspaceName"] {
+  width: 100%;
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm);
+  color: var(--color-text-primary);
+}
+
+@media (max-width: 48rem) {
+  .home-card__header {
+    flex-direction: column;
+  }
+
+  .home-areas {
+    grid-template-columns: 1fr;
+  }
+}

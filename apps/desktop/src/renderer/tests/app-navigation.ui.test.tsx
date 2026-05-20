@@ -120,8 +120,10 @@ describe("desktop renderer page composition", () => {
       root.render(<App />);
     });
 
-    await waitForText(container, "Build visual AI workflows from your artifacts");
-    expect(container.textContent).toContain("Build visual AI workflows from your artifacts");
+    await waitForText(container, "Choose your working context");
+    expect(container.textContent).toContain("Choose your working context");
+    expect(container.textContent).toContain("Open System");
+    expect(container.querySelector("header")?.textContent).not.toContain("Create workspace");
 
     const artifactsButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Data",
