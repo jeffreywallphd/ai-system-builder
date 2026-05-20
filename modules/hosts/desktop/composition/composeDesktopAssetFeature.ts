@@ -32,6 +32,7 @@ export function composeDesktopAssetFeature(options: ComposeDesktopAssetFeatureOp
     }),
   });
   options.onInternalAssetRegistry?.(internalAssetRegistry);
+  void internalAssetRegistry.installSystemFoundationPack.install();
   const generateInstanceId = () => `asset-instance.${randomUUID()}`;
   const repositories = internalAssetRegistry.assetKernel.repositories;
   return {
