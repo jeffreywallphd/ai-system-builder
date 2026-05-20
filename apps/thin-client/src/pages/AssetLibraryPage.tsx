@@ -1,13 +1,33 @@
-import { AssetLibraryFeature } from "../features/asset-library";
+import { useState } from "react";
 
-export interface WorkspaceScopedPageProps { workspaceId: string; workspaceName: string; }
+import { AssetAuthoringFeature } from "../features/asset-authoring/components/AssetAuthoringFeature";
+import { AssetLibraryFeature } from "../features/asset-library";
+import { EffectiveAssetProjectionsFeature } from "../features/effective-asset-projections/components/EffectiveAssetProjectionsFeature";
+
+export interface WorkspaceScopedPageProps {
+  workspaceId: string;
+  workspaceName: string;
+}
+
+type AssetsTab = "browse" | "create" | "drafts" | "customizations";
+
 export function AssetLibraryPage({ workspaceId, workspaceName }: WorkspaceScopedPageProps) {
+  const [activeTab, setActiveTab] = useState<AssetsTab>("browse");
+
   return (
     <section className="ui-stack ui-stack--sm" data-workspace-name={workspaceName}>
-      <h1>Asset Library</h1>
-      <p>Showing records for: {workspaceName}</p>
-      <p>Browse reusable building blocks available in this workspace.</p>
-      <AssetLibraryFeature key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} />
+      <h1>Assets</h1>
+      <p>Manage assets for {workspaceName}.</p>
+      <div className="asset-library-tabs" role="tablist" aria-label="Assets sections">
+        <button type="button" role="tab" aria-selected={activeTab === "browse"} onClick={() => setActiveTab("browse")}>Browse</button>
+        <button type="button" role="tab" aria-selected={activeTab === "create"} onClick={() => setActiveTab("create")}>Create</button>
+        <button type="button" role="tab" aria-selected={activeTab === "drafts"} onClick={() => setActiveTab("drafts")}>Drafts</button>
+        <button type="button" role="tab" aria-selected={activeTab === "customizations"} onClick={() => setActiveTab("customizations")}>Customizations</button>
+      </div>
+      {activeTab === "browse" ? <><AssetLibraryFeature key={`assets-${workspaceId}`} workspaceId={workspaceId} workspaceName={workspaceName} /><EffectiveAssetProjectionsFeature workspaceId={workspaceId} /></> : null}
+      {activeTab === "create" ? <AssetAuthoringFeature workspaceId={workspaceId} initialSection="create" /> : null}
+      {activeTab === "drafts" ? <AssetAuthoringFeature workspaceId={workspaceId} initialSection="drafts" /> : null}
+      {activeTab === "customizations" ? <AssetAuthoringFeature workspaceId={workspaceId} initialSection="customizations" /> : null}
     </section>
   );
 }

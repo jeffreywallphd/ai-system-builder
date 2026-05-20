@@ -7,7 +7,6 @@ import { HomePage } from "./pages/HomePage";
 import { ImageGenerationPage } from "./pages/ImageGenerationPage";
 import { ModelsPage } from "./pages/ModelsPage";
 import { UserLibraryPage } from "./pages/UserLibraryPage";
-import { AssetAuthoringPage } from "./pages/AssetAuthoringPage";
 import { ActiveWorkspaceProvider, WorkspaceGate, WorkspaceRequiredSurface, useActiveWorkspace, type WorkspaceUiRecord } from "./features/workspace";
 import { SecurityPage } from "./pages/SecurityPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -19,10 +18,10 @@ import {
 } from "./routes/thinClientPages";
 import { resolveThinClientWorkspaceRouteBoundary } from "./routes/workspaceRouteBoundary";
 
-type ThinClientWorkspacePageKey = Extract<ThinClientPageKey, "artifacts" | "assets" | "asset-authoring" | "user-library" | "models" | "image-generation">;
+type ThinClientWorkspacePageKey = Extract<ThinClientPageKey, "artifacts" | "assets" | "user-library" | "models" | "image-generation">;
 
 function navigateToPage(page: ThinClientPageKey): void {
-  const path = page === "artifacts" ? "/artifacts" : page === "assets" ? "/assets" : page === "asset-authoring" ? "/asset-authoring" : page === "user-library" ? "/user-library" : page === "image-generation" ? "/image-generation" : page === "models" ? "/models" : page === "security" ? "/security" : page === "settings" ? "/settings" : "/";
+  const path = page === "artifacts" ? "/artifacts" : page === "assets" ? "/assets" : page === "user-library" ? "/user-library" : page === "image-generation" ? "/image-generation" : page === "models" ? "/models" : page === "security" ? "/security" : page === "settings" ? "/settings" : "/";
   window.history.pushState({}, "", path);
 }
 
@@ -61,8 +60,6 @@ function WorkspaceAwareThinClientApp() {
         );
       case "assets":
         return <AssetLibraryPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
-      case "asset-authoring":
-        return <AssetAuthoringPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
       case "user-library":
         return <UserLibraryPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
       case "models":
