@@ -102,3 +102,21 @@ Phase 9 must preserve Phase 8 truthfulness limits:
 Phase 10 (**Asset Composition Planning**) should build on Phase 9 projections for selection, ordering, dependency planning, compatibility checks, and non-runtime preparation.
 
 Phase 10 must not reinterpret Phase 9 as execution authorization, and must not assume runtime execution, collaboration, marketplace behavior, or arbitrary payload editing.
+
+
+## Prompt 10 closeout alignment
+
+The final Phase 9 implementation confirms these accepted decisions:
+
+1. Projection records are workspace-scoped and require explicit workspace context at creation/read/refresh surfaces.
+2. Safe projected fields remain metadata-oriented and explicitly exclude raw runtime/provider/payload content classes.
+3. Projection persistence remains a separate storage concern from Asset Kernel, User Library, and Asset Authoring record stores.
+4. Source mutation is forbidden; projection workflows are read/derive/materialize only.
+5. Projection `ready` is planning-consumability only, not runtime execution readiness.
+6. `blocked`, `conflicted`, `disabled`, and `stale` remain explicit states and are never silently treated as applied.
+7. Transport/UI exposure remains readiness/status oriented, not execution-capability exposure.
+8. Phase 10 handoff is constrained to **Asset Composition Planning** over safe projections.
+
+### Deferred consequences retained
+
+The implementation intentionally keeps runtime/workflow execution, visual composition-first flows, arbitrary payload projection/editing, background propagation, collaboration, pack import/export, marketplace behavior, and automatic conflict resolution out of Phase 9 scope.
