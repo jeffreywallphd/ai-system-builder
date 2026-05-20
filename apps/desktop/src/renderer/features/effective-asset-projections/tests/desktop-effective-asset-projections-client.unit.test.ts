@@ -12,4 +12,10 @@ describe('desktop effective asset projections client', () => {
     const result = await createDesktopEffectiveAssetProjectionsClient().readProjection('w', 'p');
     expect(result.ok).toBe(false);
   });
+  it('defers refresh in phase 9', async () => {
+    (window as any).desktopApi = {};
+    const result = await createDesktopEffectiveAssetProjectionsClient().refreshProjection('w', 'p');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('unsupported');
+  });
 });

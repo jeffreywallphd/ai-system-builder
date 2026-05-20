@@ -9,4 +9,10 @@ describe('thin client effective asset projections client', () => {
     await createThinClientEffectiveAssetProjectionsClient('/api').listProjections('workspace.1');
     expect((secureFetch as any).mock.calls[0][0]).toContain('/effective-asset-projections/workspaces/workspace.1/projections');
   });
+  it('does not call nonexistent generic refresh route', async () => {
+    const result = await createThinClientEffectiveAssetProjectionsClient('/api').refreshProjection('workspace.1', 'projection.1');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('unsupported');
+    expect((secureFetch as any).mock.calls.length).toBe(0);
+  });
 });

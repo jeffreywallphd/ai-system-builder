@@ -109,16 +109,16 @@ export class WorkspaceEffectiveAssetProjectionReadModelService {
       isDraftPreviewOnly,
       hasConflicts,
       isDisabled,
-      projectedFields: record.projectedFields,
+      projectedFields: safeProjectedFields,
       projectedFieldsApplied: isProjectionConsumable,
-      diagnostics: record.diagnostics,
-      blockers: record.blockers,
+      diagnostics: safeDiagnostics as never,
+      blockers: safeBlockers as never,
       provenance: {
         kind: record.provenance.kind,
         targetWorkspaceId: record.provenance.targetWorkspaceId,
         sourceWorkspaceId: record.provenance.sourceWorkspaceId,
-        sourceAssetReference: record.provenance.sourceAssetReference,
-        effectiveAssetReference: record.provenance.effectiveAssetReference,
+        sourceAssetReference: record.provenance.sourceAssetReference ? { ...record.provenance.sourceAssetReference } : undefined,
+        effectiveAssetReference: record.provenance.effectiveAssetReference ? { ...record.provenance.effectiveAssetReference } : undefined,
         authoredAssetId: record.provenance.authoredAssetId,
         draftId: record.provenance.draftId,
         revisionId: record.provenance.revisionId,
@@ -136,3 +136,6 @@ export class WorkspaceEffectiveAssetProjectionReadModelService {
     };
   }
 }
+    const safeProjectedFields = isProjectionConsumable ? record.projectedFields : {};
+    const safeDiagnostics = record.diagnostics.map((d) => ({ code: d.code, message: d.message }));
+    const safeBlockers = record.blockers.map((b) => ({ code: b.code, message: b.message }));

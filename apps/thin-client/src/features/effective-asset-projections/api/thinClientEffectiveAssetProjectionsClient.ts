@@ -10,6 +10,6 @@ export function createThinClientEffectiveAssetProjectionsClient(base = '/api') {
   return {
     listProjections: async (workspaceId: string) => { try { return unwrap(await getJson(`${b}/effective-asset-projections/workspaces/${encodeURIComponent(workspaceId)}/projections`)); } catch { return err('Effective Assets are not available yet.', 'unavailable'); } },
     readProjection: async (workspaceId: string, projectionId: string) => { try { return unwrap(await getJson(`${b}/effective-asset-projections/workspaces/${encodeURIComponent(workspaceId)}/projections/${encodeURIComponent(projectionId)}`)); } catch { return err('Projection details are not available yet.', 'unavailable'); } },
-    refreshProjection: async (workspaceId: string, projectionId: string) => { try { return unwrap(await postJson(`${b}/effective-asset-projections/workspaces/${encodeURIComponent(workspaceId)}/projections/${encodeURIComponent(projectionId)}/refresh`, { workspaceId, projectionId })); } catch { return err('Refreshing is not available yet.', 'unavailable'); } },
+    refreshProjection: async (_workspaceId: string, _projectionId: string) => err('Refreshing is deferred for Phase 9 thin-client UI.', 'unsupported'),
   };
 }
