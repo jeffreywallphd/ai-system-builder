@@ -14,13 +14,15 @@ import { CreateWorkspaceUseCase } from "../../../application/use-cases/workspace
 import { LinkUserLibraryAssetToWorkspaceUseCase } from "../../../application/use-cases/user-library";
 import { CreateAssetDraftUseCase, CreateAssetOverrideUseCase, CreateWorkspaceAuthoredAssetUseCase, DisableAssetOverrideUseCase, PublishAssetDraftUseCase, UpdateAssetDraftUseCase, UpdateAssetOverrideUseCase } from "../../../application/use-cases/asset-authoring";
 import { CreateAuthoredAssetEffectiveProjectionUseCase, CreateOverrideEffectiveProjectionUseCase, PreviewDraftEffectiveAssetProjectionUseCase, RefreshAuthoredAssetEffectiveProjectionUseCase, RefreshOverrideEffectiveProjectionUseCase } from "../../../application/use-cases/effective-asset-projections";
-import { WorkspaceEffectiveAssetProjectionReadModelService } from "../../../application/services/asset";
+import { AddProjectionToCompositionPlanUseCase, ArchiveAssetCompositionPlanUseCase, ConnectCompositionNodesUseCase, CreateAssetCompositionPlanUseCase, DisconnectCompositionNodesUseCase, ListAssetCompositionPlansUseCase, ReadAssetCompositionPlanUseCase, RemoveProjectionFromCompositionPlanUseCase, UpdateAssetCompositionPlanUseCase, ValidateAssetCompositionPlanUseCase } from "../../../application/use-cases/asset-composition";
+import { WorkspaceAssetCompositionReadModelService, WorkspaceEffectiveAssetProjectionReadModelService } from "../../../application/services/asset";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
 import { createLocalWorkspaceRepository, createLocalWorkspaceSelectionRepository, createLocalWorkspaceSystemPackActivationRepository } from "../../../adapters/persistence/workspace";
 import { createLocalUserLibraryAssetRepositoryAdapter, createLocalWorkspaceUserLibraryLinkRepositoryAdapter } from "../../../adapters/persistence/user-library";
 import { createLocalAssetDraftRepositoryAdapter, createLocalAssetOverrideRepositoryAdapter, createLocalAssetRevisionRepositoryAdapter, createLocalAuthoredAssetRepositoryAdapter } from "../../../adapters/persistence/asset-authoring";
 import { createLocalEffectiveAssetProjectionRepositoryAdapter } from "../../../adapters/persistence/effective-asset-projections";
+import { createLocalAssetCompositionPlanRepositoryAdapter } from "../../../adapters/persistence/asset-composition";
 import { registerElectronIpc } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
@@ -334,6 +336,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
       const assetRevisionRepository = createLocalAssetRevisionRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
       const assetOverrideRepository = createLocalAssetOverrideRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
       const effectiveAssetProjectionRepository = createLocalEffectiveAssetProjectionRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const assetCompositionPlanRepository = createLocalAssetCompositionPlanRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
       const unavailableCustomizationTargetReader: AssetCustomizationTargetReaderPort = {
         async readCustomizationTargetByReference() {
           return undefined;
@@ -350,6 +353,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
         disableAssetOverrideUseCase: new DisableAssetOverrideUseCase({ assetOverrideRepository, now: options.now }),
       };
       const effectiveAssetProjectionReadModel = new WorkspaceEffectiveAssetProjectionReadModelService({ projectionRepository: effectiveAssetProjectionRepository });
+      const assetCompositionReadModel = new WorkspaceAssetCompositionReadModelService({ compositionPlanRepository: assetCompositionPlanRepository });
       const workspaceUserLibraryLinkRepository = createLocalWorkspaceUserLibraryLinkRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
 
       const settingsUseCases = {
@@ -427,6 +431,20 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           previewDraft: new PreviewDraftEffectiveAssetProjectionUseCase({ assetDraftRepository, generateEffectiveAssetProjectionId: () => `projection.${randomUUID()}`, now: options.now }),
           createOverride: new CreateOverrideEffectiveProjectionUseCase({ projectionRepository: effectiveAssetProjectionRepository, assetOverrideRepository, targetReader: unavailableCustomizationTargetReader, generateEffectiveAssetProjectionId: () => `projection.${randomUUID()}`, now: options.now }),
           refreshOverride: new RefreshOverrideEffectiveProjectionUseCase({ projectionRepository: effectiveAssetProjectionRepository, assetOverrideRepository, targetReader: unavailableCustomizationTargetReader, now: options.now }),
+        },
+        assetComposition: {
+          ipcMain: registerOptions.ipcMain,
+          createPlan: new CreateAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository, generatePlanId: () => `plan.${randomUUID()}`, now: options.now }),
+          updatePlan: new UpdateAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository, now: options.now }),
+          readPlan: new ReadAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository }),
+          listPlans: new ListAssetCompositionPlansUseCase({ repository: assetCompositionPlanRepository }),
+          archivePlan: new ArchiveAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository, now: options.now }),
+          addProjection: new AddProjectionToCompositionPlanUseCase({ repository: assetCompositionPlanRepository, projectionRepository: effectiveAssetProjectionRepository, generateNodeId: () => `node.${randomUUID()}`, now: options.now }),
+          removeProjection: new RemoveProjectionFromCompositionPlanUseCase({ repository: assetCompositionPlanRepository, now: options.now }),
+          connectNodes: new ConnectCompositionNodesUseCase({ repository: assetCompositionPlanRepository, generateRelationshipId: () => `rel.${randomUUID()}`, now: options.now }),
+          disconnectNodes: new DisconnectCompositionNodesUseCase({ repository: assetCompositionPlanRepository, now: options.now }),
+          validatePlan: new ValidateAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository, now: options.now }),
+          readModel: assetCompositionReadModel,
         },
       });
       recordHostMemorySnapshot("desktop.host.ipc-registration.lazy-handlers.after");

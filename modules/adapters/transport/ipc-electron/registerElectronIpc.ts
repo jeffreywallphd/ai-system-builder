@@ -9,6 +9,7 @@ import { registerDesktopStartupIpc, type RegisterDesktopStartupIpcDependencies }
 import { registerAssetAuthoringIpc, type RegisterAssetAuthoringIpcDependencies } from "./asset-authoring/registerAssetAuthoringIpc";
 import { registerUserLibraryIpc, type RegisterUserLibraryIpcDependencies } from "./user-library/registerUserLibraryIpc";
 import { registerEffectiveAssetProjectionIpc, type RegisterEffectiveAssetProjectionIpcDependencies } from "./effective-asset-projections/registerEffectiveAssetProjectionIpc";
+import { registerAssetCompositionIpc, type RegisterAssetCompositionIpcDependencies } from "./asset-composition/registerAssetCompositionIpc";
 export type { AsyncFeatureProvider, LazyProvidedObjectOptions } from "./lazyFeatureProvider";
 
 export type DesktopIpcRegistrationMilestoneRecorder = (milestone: string) => void;
@@ -25,6 +26,7 @@ export interface RegisterElectronIpcDependencies {
   userLibrary?: RegisterUserLibraryIpcDependencies;
   assetAuthoring?: RegisterAssetAuthoringIpcDependencies;
   effectiveAssetProjections?: RegisterEffectiveAssetProjectionIpcDependencies;
+  assetComposition?: RegisterAssetCompositionIpcDependencies;
   recordMilestone?: DesktopIpcRegistrationMilestoneRecorder;
 }
 
@@ -52,6 +54,9 @@ export function registerElectronIpc(dependencies: RegisterElectronIpcDependencie
   if (dependencies.effectiveAssetProjections) {
     registerGroup(dependencies.recordMilestone, "effective-asset-projections-group", () => registerEffectiveAssetProjectionIpc(dependencies.effectiveAssetProjections!));
   }
+  if (dependencies.assetComposition) {
+    registerGroup(dependencies.recordMilestone, "asset-composition-group", () => registerAssetCompositionIpc(dependencies.assetComposition!));
+  }
 }
 
 export type {
@@ -66,4 +71,5 @@ export type {
   RegisterUserLibraryIpcDependencies,
   RegisterAssetAuthoringIpcDependencies,
   RegisterEffectiveAssetProjectionIpcDependencies,
+  RegisterAssetCompositionIpcDependencies,
 };

@@ -26,6 +26,8 @@ import {
   createLocalAssetRevisionRepositoryAdapter,
   createLocalAuthoredAssetRepositoryAdapter,
 } from "../../../adapters/persistence/asset-authoring";
+import { createLocalEffectiveAssetProjectionRepositoryAdapter } from "../../../adapters/persistence/effective-asset-projections";
+import { createLocalAssetCompositionPlanRepositoryAdapter } from "../../../adapters/persistence/asset-composition";
 import { LinkUserLibraryAssetToWorkspaceUseCase } from "../../../application/use-cases/user-library";
 import type { LoggingPort } from "../../../application/ports/logging";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
@@ -66,6 +68,16 @@ import {
   PublishAssetDraftUseCase,
   UpdateAssetDraftUseCase,
   UpdateAssetOverrideUseCase,
+  AddProjectionToCompositionPlanUseCase,
+  ArchiveAssetCompositionPlanUseCase,
+  ConnectCompositionNodesUseCase,
+  CreateAssetCompositionPlanUseCase,
+  DisconnectCompositionNodesUseCase,
+  ListAssetCompositionPlansUseCase,
+  ReadAssetCompositionPlanUseCase,
+  RemoveProjectionFromCompositionPlanUseCase,
+  UpdateAssetCompositionPlanUseCase,
+  ValidateAssetCompositionPlanUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import {
@@ -111,6 +123,7 @@ import {
 import { composeResourceBackedViewProviders } from "../../shared/composition/composeResourceBackedViewProviders";
 import type { AssetCustomizationTargetReaderPort } from "../../../application/ports/asset-authoring";
 import { WorkspaceAssetAuthoringReadModelService } from "../../../application/services/asset/workspace-asset-authoring-read-model.service";
+import { WorkspaceAssetCompositionReadModelService } from "../../../application/services/asset/workspace-asset-composition-read-model.service";
 
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
 const execFile = promisify(nodeExecFile);
@@ -1099,6 +1112,25 @@ export function composeServerHost(
               now: options.now,
             }),
             effectiveSummaryReader,
+          };
+        })(),
+        assetCompositionServices: (() => {
+          const compositionPlanRepository = createLocalAssetCompositionPlanRepositoryAdapter({
+            rootDir: registerOptions.storageRootDirectory,
+            now: options.now,
+          });
+          return {
+            createPlan: new CreateAssetCompositionPlanUseCase({ repository: compositionPlanRepository, generatePlanId: () => `plan.${randomUUID()}`, now: options.now }),
+            updatePlan: new UpdateAssetCompositionPlanUseCase({ repository: compositionPlanRepository, now: options.now }),
+            readPlan: new ReadAssetCompositionPlanUseCase({ repository: compositionPlanRepository }),
+            listPlans: new ListAssetCompositionPlansUseCase({ repository: compositionPlanRepository }),
+            archivePlan: new ArchiveAssetCompositionPlanUseCase({ repository: compositionPlanRepository, now: options.now }),
+            addProjection: new AddProjectionToCompositionPlanUseCase({ repository: compositionPlanRepository, projectionRepository: createLocalEffectiveAssetProjectionRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now }), generateNodeId: () => `node.${randomUUID()}`, now: options.now }),
+            removeProjection: new RemoveProjectionFromCompositionPlanUseCase({ repository: compositionPlanRepository, now: options.now }),
+            connectNodes: new ConnectCompositionNodesUseCase({ repository: compositionPlanRepository, generateRelationshipId: () => `rel.${randomUUID()}`, now: options.now }),
+            disconnectNodes: new DisconnectCompositionNodesUseCase({ repository: compositionPlanRepository, now: options.now }),
+            validatePlan: new ValidateAssetCompositionPlanUseCase({ repository: compositionPlanRepository, now: options.now }),
+            readModel: new WorkspaceAssetCompositionReadModelService({ compositionPlanRepository }),
           };
         })(),
       });
