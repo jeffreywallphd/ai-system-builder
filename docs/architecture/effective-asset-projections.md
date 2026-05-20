@@ -349,3 +349,10 @@ Phase 10 should start as a planning layer over Phase 9 safe projections by addin
 - surfacing missing/blocked/conflicted projections before plan construction.
 
 Phase 10 must not begin with runtime execution, workflow execution, visual canvas-first authoring, marketplace/collaboration features, pack import/export, background propagation, or arbitrary JSON/prompt/workflow editing.
+
+
+## UX surface guidance (Phase 9 correction)
+
+Effective asset projections are internal read-model infrastructure. In normal product UX, users navigate to **Assets** and see projection-derived readiness/status as secondary metadata on asset cards/details. A separate top-level 'Effective Assets' page is not part of the primary navigation model.
+
+Readiness language in user-facing surfaces must remain planning-oriented (for example, **Ready for planning**) and must not be presented as runtime or execution readiness.

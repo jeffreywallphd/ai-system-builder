@@ -8,7 +8,6 @@ import { ImageGenerationPage } from "./pages/ImageGenerationPage";
 import { ModelsPage } from "./pages/ModelsPage";
 import { UserLibraryPage } from "./pages/UserLibraryPage";
 import { AssetAuthoringPage } from "./pages/AssetAuthoringPage";
-import { EffectiveAssetProjectionsPage } from "./pages/EffectiveAssetProjectionsPage";
 import { ActiveWorkspaceProvider, WorkspaceGate, WorkspaceRequiredSurface, useActiveWorkspace, type WorkspaceUiRecord } from "./features/workspace";
 import { SecurityPage } from "./pages/SecurityPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -20,10 +19,10 @@ import {
 } from "./routes/thinClientPages";
 import { resolveThinClientWorkspaceRouteBoundary } from "./routes/workspaceRouteBoundary";
 
-type ThinClientWorkspacePageKey = Extract<ThinClientPageKey, "artifacts" | "assets" | "asset-authoring" | "user-library" | "models" | "image-generation" | "effective-asset-projections">;
+type ThinClientWorkspacePageKey = Extract<ThinClientPageKey, "artifacts" | "assets" | "asset-authoring" | "user-library" | "models" | "image-generation">;
 
 function navigateToPage(page: ThinClientPageKey): void {
-  const path = page === "artifacts" ? "/artifacts" : page === "assets" ? "/assets" : page === "asset-authoring" ? "/asset-authoring" : page === "user-library" ? "/user-library" : page === "image-generation" ? "/image-generation" : page === "models" ? "/models" : page === "effective-asset-projections" ? "/effective-asset-projections" : page === "security" ? "/security" : page === "settings" ? "/settings" : "/";
+  const path = page === "artifacts" ? "/artifacts" : page === "assets" ? "/assets" : page === "asset-authoring" ? "/asset-authoring" : page === "user-library" ? "/user-library" : page === "image-generation" ? "/image-generation" : page === "models" ? "/models" : page === "security" ? "/security" : page === "settings" ? "/settings" : "/";
   window.history.pushState({}, "", path);
 }
 
@@ -68,8 +67,6 @@ function WorkspaceAwareThinClientApp() {
         return <UserLibraryPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
       case "models":
         return <ModelsPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
-      case "effective-asset-projections":
-        return <EffectiveAssetProjectionsPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
     }
   };
 

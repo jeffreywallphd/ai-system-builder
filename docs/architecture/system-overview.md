@@ -300,3 +300,6 @@ Implemented workspace-owned records require explicit workspace context through c
 Phase 7 is **User Library and Cross-Workspace Asset Reuse**. It should define explicit promote/link/copy/import flows, provenance for promoted/linked/copied assets, resolver support for user-library linked/copied assets, and guarded direct workspace-to-workspace links only if needed. Phase 7 must not allow accidental propagation without an explicit link policy.
 
 Later roadmap: Phase 8 is **Asset Authoring, Customization, and Override Management**; Phase 9 is **Materialized / Effective Asset Projections**; Phase 10 is **Asset Composition Planning**; Phase 11 is **Pack Import/Export, Sharing, and Distribution**; and Phase 12 is **Collaboration, Permissions, and Multi-User Workspaces**.
+
+
+- UX alignment: effective asset projection infrastructure enriches the **Assets** experience; it is not a separate primary navigation destination in normal user flows.

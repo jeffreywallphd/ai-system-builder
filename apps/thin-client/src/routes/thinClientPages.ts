@@ -1,4 +1,4 @@
-export type ThinClientPageKey = "home" | "artifacts" | "assets" | "asset-authoring" | "user-library" | "image-generation" | "models" | "effective-asset-projections" | "security" | "settings";
+export type ThinClientPageKey = "home" | "artifacts" | "assets" | "asset-authoring" | "user-library" | "image-generation" | "models" | "security" | "settings";
 
 export interface ThinClientPageDefinition {
   key: ThinClientPageKey;
@@ -15,7 +15,6 @@ export const thinClientPageDefinitions: readonly ThinClientPageDefinition[] = [
   { key: "user-library", label: "Reusable Library", path: "/user-library", requiresWorkspace: true },
   { key: "image-generation", label: "Image Generation", path: "/image-generation", requiresWorkspace: true },
   { key: "models", label: "Models", path: "/models", requiresWorkspace: true },
-  { key: "effective-asset-projections", label: "Effective Assets", path: "/effective-asset-projections", requiresWorkspace: true },
   { key: "security", label: "Security", path: "/security" },
   { key: "settings", label: "Settings", path: "/settings" },
 ];
@@ -31,7 +30,6 @@ export function resolveThinClientPage(pathname: string): ThinClientPageKey {
   if (pathname === "/user-library") return "user-library";
   if (pathname === "/image-generation") return "image-generation";
   if (pathname === "/models") return "models";
-  if (pathname === "/effective-asset-projections") return "effective-asset-projections";
   if (pathname === "/security") return "security";
   if (pathname === "/settings") return "settings";
   return "home";
