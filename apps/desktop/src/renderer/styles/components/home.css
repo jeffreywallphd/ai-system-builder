@@ -13,6 +13,19 @@
   gap: var(--space-md);
 }
 
+.home-card-illustration {
+  width: 4.75rem;
+  height: 3.75rem;
+  flex: 0 0 auto;
+  color: var(--color-accent);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+  opacity: 0.78;
+}
+
 .home-card__eyebrow {
   margin: 0 0 var(--space-2xs);
   color: var(--color-accent);

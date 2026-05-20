@@ -122,8 +122,19 @@ describe("desktop renderer page composition", () => {
 
     await waitForText(container, "Choose your working context");
     expect(container.textContent).toContain("Choose your working context");
+    expect(container.querySelector("header")?.textContent).toContain("AI System Builder");
     expect(container.textContent).toContain("Open System");
     expect(container.querySelector("header")?.textContent).not.toContain("Create workspace");
+
+    const menu = container.querySelector(".ui-shell__menu") as HTMLDetailsElement | null;
+    expect(menu).toBeDefined();
+    if (menu) {
+      menu.open = true;
+      await act(async () => {
+        document.dispatchEvent(new Event("mousedown", { bubbles: true }));
+      });
+      expect(menu.open).toBe(false);
+    }
 
     const artifactsButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Data",
