@@ -15,3 +15,12 @@ export * from "./asset-composition-relationship-factory.service";
 export * from "./asset-composition-simple-relationship-guard.service";
 export * from "./connect-composition-nodes.use-case";
 export * from "./disconnect-composition-nodes.use-case";
+
+export * from "./asset-composition-diagnostics.service";
+export * from "./asset-composition-node-status.service";
+export * from "./asset-composition-readiness.service";
+export * from "./asset-composition-dependency.service";
+export * from "./asset-composition-relationship-status.service";
+export * from "./asset-composition-compatibility.service";
+export * from "./asset-composition-validation-result.service";
+export * from "./validate-asset-composition-plan.use-case";
