@@ -3,6 +3,7 @@ import { cpus, freemem, totalmem } from "node:os";
 import type { LoggingPort } from "../../../application/ports/logging";
 import type { ApplicationSecretsPort, ApplicationSettingsPort, ModelDefaultResolverPort } from "../../../application/ports/settings";
 import type { PowerSuspensionBlockerPort } from "../../../application/ports/desktop";
+import type { AssetCustomizationTargetReaderPort } from "../../../application/ports/asset-authoring";
 import { DefaultModelDefaultResolver } from "../../../application/services/settings";
 import { ClearSettingUseCase } from "../../../application/use-cases/settings/clear-setting.use-case";
 import { ListSettingsDefinitionsUseCase } from "../../../application/use-cases/settings/list-settings-definitions.use-case";
@@ -12,11 +13,14 @@ import { UpdateSettingUseCase } from "../../../application/use-cases/settings/up
 import { CreateWorkspaceUseCase } from "../../../application/use-cases/workspace";
 import { LinkUserLibraryAssetToWorkspaceUseCase } from "../../../application/use-cases/user-library";
 import { CreateAssetDraftUseCase, CreateAssetOverrideUseCase, CreateWorkspaceAuthoredAssetUseCase, DisableAssetOverrideUseCase, PublishAssetDraftUseCase, UpdateAssetDraftUseCase, UpdateAssetOverrideUseCase } from "../../../application/use-cases/asset-authoring";
+import { CreateAuthoredAssetEffectiveProjectionUseCase, CreateOverrideEffectiveProjectionUseCase, PreviewDraftEffectiveAssetProjectionUseCase, RefreshAuthoredAssetEffectiveProjectionUseCase, RefreshOverrideEffectiveProjectionUseCase } from "../../../application/use-cases/effective-asset-projections";
+import { WorkspaceEffectiveAssetProjectionReadModelService } from "../../../application/services/asset";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
 import { createLocalWorkspaceRepository, createLocalWorkspaceSelectionRepository, createLocalWorkspaceSystemPackActivationRepository } from "../../../adapters/persistence/workspace";
 import { createLocalUserLibraryAssetRepositoryAdapter, createLocalWorkspaceUserLibraryLinkRepositoryAdapter } from "../../../adapters/persistence/user-library";
 import { createLocalAssetDraftRepositoryAdapter, createLocalAssetOverrideRepositoryAdapter, createLocalAssetRevisionRepositoryAdapter, createLocalAuthoredAssetRepositoryAdapter } from "../../../adapters/persistence/asset-authoring";
+import { createLocalEffectiveAssetProjectionRepositoryAdapter } from "../../../adapters/persistence/effective-asset-projections";
 import { registerElectronIpc } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
@@ -329,6 +333,12 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
       const assetDraftRepository = createLocalAssetDraftRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
       const assetRevisionRepository = createLocalAssetRevisionRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
       const assetOverrideRepository = createLocalAssetOverrideRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const effectiveAssetProjectionRepository = createLocalEffectiveAssetProjectionRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const unavailableCustomizationTargetReader: AssetCustomizationTargetReaderPort = {
+        async readCustomizationTargetByReference() {
+          return undefined;
+        },
+      };
 
       const assetAuthoringUseCases = {
         createWorkspaceAuthoredAssetUseCase: new CreateWorkspaceAuthoredAssetUseCase({ authoredAssetRepository, assetRevisionRepository, generateAuthoredAssetId: () => `authored.${randomUUID()}`, generateAssetRevisionId: () => `revision.${randomUUID()}`, now: options.now }),
@@ -339,6 +349,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
         updateAssetOverrideUseCase: new UpdateAssetOverrideUseCase({ assetOverrideRepository, now: options.now }),
         disableAssetOverrideUseCase: new DisableAssetOverrideUseCase({ assetOverrideRepository, now: options.now }),
       };
+      const effectiveAssetProjectionReadModel = new WorkspaceEffectiveAssetProjectionReadModelService({ projectionRepository: effectiveAssetProjectionRepository });
       const workspaceUserLibraryLinkRepository = createLocalWorkspaceUserLibraryLinkRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
 
       const settingsUseCases = {
@@ -406,6 +417,16 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
             listDefinitionCards: async (query) => (await getAssetFeatures()).assetRegistryRead.listDefinitionCards(query),
             readDefinitionDetail: async (reference, options) => (await getAssetFeatures()).assetRegistryRead.readDefinitionDetail(reference, options),
           },
+        },
+        effectiveAssetProjections: {
+          ipcMain: registerOptions.ipcMain,
+          projectionRepository: effectiveAssetProjectionRepository,
+          readModel: effectiveAssetProjectionReadModel,
+          createAuthored: new CreateAuthoredAssetEffectiveProjectionUseCase({ projectionRepository: effectiveAssetProjectionRepository, authoredAssetRepository, assetRevisionRepository, generateEffectiveAssetProjectionId: () => `projection.${randomUUID()}`, now: options.now }),
+          refreshAuthored: new RefreshAuthoredAssetEffectiveProjectionUseCase({ projectionRepository: effectiveAssetProjectionRepository, authoredAssetRepository, assetRevisionRepository, now: options.now }),
+          previewDraft: new PreviewDraftEffectiveAssetProjectionUseCase({ assetDraftRepository, generateEffectiveAssetProjectionId: () => `projection.${randomUUID()}`, now: options.now }),
+          createOverride: new CreateOverrideEffectiveProjectionUseCase({ projectionRepository: effectiveAssetProjectionRepository, assetOverrideRepository, targetReader: unavailableCustomizationTargetReader, generateEffectiveAssetProjectionId: () => `projection.${randomUUID()}`, now: options.now }),
+          refreshOverride: new RefreshOverrideEffectiveProjectionUseCase({ projectionRepository: effectiveAssetProjectionRepository, assetOverrideRepository, targetReader: unavailableCustomizationTargetReader, now: options.now }),
         },
       });
       recordHostMemorySnapshot("desktop.host.ipc-registration.lazy-handlers.after");

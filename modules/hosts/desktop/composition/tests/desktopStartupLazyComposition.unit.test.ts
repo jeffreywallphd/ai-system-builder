@@ -140,17 +140,33 @@ describe("desktop startup lazy composition contract", () => {
 
     expect(result.getInternalAssetRegistry()).toBeUndefined();
     expect(harness.ipcMain.handle.mock.calls.length >= 65).toBe(true);
+    expect(harness.handlers.has("effective-asset-projections:list")).toBe(true);
+    expect(harness.handlers.has("effective-asset-projections:read")).toBe(true);
     expect(milestones).toContain("desktop.host.startup-workspace-shell.compose.before");
     expect(milestones).toContain("desktop.host.startup-workspace-shell.compose.after");
     expect(milestones).toContain("desktop.host.ipc-registration.lazy-handlers.before");
     expect(milestones).toContain("desktop.host.ipc-registration.lazy-handlers.after");
-    for (const group of ["startup", "artifact", "asset", "model", "image-generation", "runtime", "ingestion", "dataset-preparation"]) {
+    for (const group of ["startup", "artifact", "asset", "model", "image-generation", "runtime", "ingestion", "dataset-preparation", "asset-authoring", "user-library", "effective-asset-projections"]) {
       expect(milestones).toContain(`desktop.host.ipc.${group}-group.register.before`);
       expect(milestones).toContain(`desktop.host.ipc.${group}-group.register.after`);
     }
     for (const milestone of deferredMilestones) {
       expect(milestones).not.toContain(milestone);
     }
+  });
+
+  it("serves effective asset projection reads through the desktop host IPC surface", async () => {
+    const harness = await composeRegisteredHost();
+
+    const result = await harness.invoke("effective-asset-projections:list", {
+      payload: {
+        targetWorkspaceId: "workspace.projections",
+        status: "ready",
+      },
+    });
+
+    expect((result as { ok: boolean }).ok).toBe(true);
+    expect((result as { value: { summaries: unknown[] } }).value.summaries).toEqual([]);
   });
 
 

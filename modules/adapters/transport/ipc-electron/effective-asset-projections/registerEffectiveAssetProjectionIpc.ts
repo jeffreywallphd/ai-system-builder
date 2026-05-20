@@ -6,6 +6,9 @@ import {
   normalizeReadEffectiveAssetProjectionCommand,
   normalizeRefreshEffectiveAssetProjectionCommand,
   normalizeSafeEffectiveAssetProjectedFieldPatch,
+  normalizeEffectiveAssetProjectionPolicy,
+  normalizeEffectiveAssetProjectionSourceKind,
+  normalizeEffectiveAssetProjectionStatus,
   type CreateEffectiveAssetProjectionCommand,
   type CreateEffectiveAssetProjectionResult,
   type PreviewDraftEffectiveAssetProjectionCommand,
@@ -94,11 +97,18 @@ export function registerEffectiveAssetProjectionIpc(d: RegisterEffectiveAssetPro
   d.ipcMain.handle(C.list, async (_e, request: PayloadEnvelope) => {
     const workspace = S(request?.payload?.targetWorkspaceId);
     if (!txt(workspace) || !d.readModel) return fail(C.list, txt(workspace) ? "unavailable" : "validation", txt(workspace) ? "Read unavailable." : "targetWorkspaceId is required.");
-    return ok(C.list, await d.readModel.listByWorkspace({
-      targetWorkspaceId: createWorkspaceId(workspace),
-      limit: typeof request.payload?.limit === "number" ? request.payload.limit : undefined,
-      cursor: typeof request.payload?.cursor === "string" ? request.payload.cursor : undefined,
-    }));
+    try {
+      return ok(C.list, await d.readModel.listByWorkspace({
+        targetWorkspaceId: createWorkspaceId(workspace),
+        limit: typeof request.payload?.limit === "number" ? request.payload.limit : undefined,
+        cursor: typeof request.payload?.cursor === "string" ? request.payload.cursor : undefined,
+        status: txt(request.payload?.status) ? normalizeEffectiveAssetProjectionStatus(S(request.payload?.status)) : undefined,
+        sourceKind: txt(request.payload?.sourceKind) ? normalizeEffectiveAssetProjectionSourceKind(S(request.payload?.sourceKind)) : undefined,
+        policy: txt(request.payload?.policy) ? normalizeEffectiveAssetProjectionPolicy(S(request.payload?.policy)) : undefined,
+      }));
+    } catch {
+      return fail(C.list, "validation", "Invalid projection list request.");
+    }
   });
 
   d.ipcMain.handle(C.read, async (_e, request: PayloadEnvelope) => {
