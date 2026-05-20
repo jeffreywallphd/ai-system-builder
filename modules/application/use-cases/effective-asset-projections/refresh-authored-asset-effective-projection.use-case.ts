@@ -1,4 +1,10 @@
-import { normalizeRefreshEffectiveAssetProjectionCommand, type RefreshEffectiveAssetProjectionCommand, type RefreshEffectiveAssetProjectionResult } from "../../../contracts/effective-asset-projections";
+import {
+  normalizeRefreshEffectiveAssetProjectionCommand,
+  type EffectiveAssetProjectionPolicy,
+  type EffectiveAssetProjectionStatus,
+  type RefreshEffectiveAssetProjectionCommand,
+  type RefreshEffectiveAssetProjectionResult,
+} from "../../../contracts/effective-asset-projections";
 import type { AuthoredAssetRepositoryPort, AssetRevisionRepositoryPort } from "../../ports/asset-authoring";
 import type { EffectiveAssetProjectionRepositoryPort } from "../../ports/effective-asset-projections";
 import { mapEditableToProjectedFields } from "./effective-asset-projection-field-mapper.service";
@@ -18,7 +24,7 @@ const now=(this.d.now??(()=>new Date().toISOString()))();
 if(!src){const upd={...existing,status:"source-missing" as const,policy:"blocked" as const,updatedAt:now,materializedAt:now,diagnostics:[defaultEffectiveAssetProjectionDiagnosticsService.createDiagnostic("effective-projection-source-missing")],blockers:[defaultEffectiveAssetProjectionDiagnosticsService.createBlocker("effective-projection-source-missing")]}; await this.d.projectionRepository.updateEffectiveAssetProjectionRecord(upd); return {status:"success",value:upd};}
 const mapped=mapEditableToProjectedFields((src as any).editableValues);
 const sourceStatus = (src as { status?: string }).status;
-const status =
+const status: EffectiveAssetProjectionStatus =
   sourceStatus === "published"
     ? (mapped.blocked ? "blocked" : "ready")
     : sourceStatus === "draft"
@@ -28,6 +34,7 @@ const status =
         : sourceStatus === "disabled" || sourceStatus === "archived"
           ? "disabled"
           : "unsupported";
-const upd={...existing,status,policy:status==="ready"?"safe-fields-only":"blocked",projectedFields:mapped.projectedFields,diagnostics:mapped.diagnostics,blockers:mapped.blockers,provenance:createProjectionProvenance(c.targetWorkspaceId,existing.source,now),updatedAt:now,materializedAt:now};
+const policy: EffectiveAssetProjectionPolicy = status==="ready"?"safe-fields-only":"blocked";
+const upd={...existing,status,policy,projectedFields:mapped.projectedFields,diagnostics:mapped.diagnostics,blockers:mapped.blockers,provenance:createProjectionProvenance(c.targetWorkspaceId,existing.source,now),updatedAt:now,materializedAt:now};
 try{return {status:"success",value:await this.d.projectionRepository.updateEffectiveAssetProjectionRecord(upd)};}catch{return projectionFailure("unavailable","effective-projection-materialization-unavailable");}
 }}

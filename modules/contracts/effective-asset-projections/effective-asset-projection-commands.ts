@@ -4,8 +4,17 @@ import type { EffectiveAssetProjectionPolicy } from "./effective-asset-projectio
 import type { SafeEffectiveAssetProjectedFieldPatch } from "./effective-asset-projected-fields";
 import type { EffectiveAssetProjectionSource, EffectiveAssetProjectionTarget } from "./effective-asset-projection-source";
 
-export type EffectiveAssetProjectionRefreshReason = "source-updated"|"override-updated"|"override-disabled"|"draft-published"|"source-missing"|"conflict-detected"|"unsafe-field-detected"|"manual-refresh-requested";
+export const EFFECTIVE_ASSET_PROJECTION_REFRESH_REASONS = ["source-updated","override-updated","override-disabled","draft-published","source-missing","conflict-detected","unsafe-field-detected","manual-refresh-requested"] as const;
+export type EffectiveAssetProjectionRefreshReason = (typeof EFFECTIVE_ASSET_PROJECTION_REFRESH_REASONS)[number];
 export type EffectiveAssetProjectionInvalidationReason = EffectiveAssetProjectionRefreshReason;
+
+export function normalizeEffectiveAssetProjectionRefreshReason(value: string): EffectiveAssetProjectionRefreshReason {
+  const normalized = value.trim().toLowerCase() as EffectiveAssetProjectionRefreshReason;
+  if (!EFFECTIVE_ASSET_PROJECTION_REFRESH_REASONS.includes(normalized)) {
+    throw new Error("Effective asset projection refresh reason is invalid.");
+  }
+  return normalized;
+}
 
 export type CreateEffectiveAssetProjectionCommand = { targetWorkspaceId: WorkspaceId; source: EffectiveAssetProjectionSource; target: EffectiveAssetProjectionTarget; policy: EffectiveAssetProjectionPolicy; projectedFieldPatch?: SafeEffectiveAssetProjectedFieldPatch; };
 export type RefreshEffectiveAssetProjectionCommand = { targetWorkspaceId: WorkspaceId; projectionId: EffectiveAssetProjectionId; reason: EffectiveAssetProjectionRefreshReason; };
