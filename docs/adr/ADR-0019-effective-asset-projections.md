@@ -120,3 +120,8 @@ The final Phase 9 implementation confirms these accepted decisions:
 ### Deferred consequences retained
 
 The implementation intentionally keeps runtime/workflow execution, visual composition-first flows, arbitrary payload projection/editing, background propagation, collaboration, pack import/export, marketplace behavior, and automatic conflict resolution out of Phase 9 scope.
+
+
+## UX alignment note
+
+Phase 9 projection records and transports remain internal architecture. The primary user-facing destination is the **Assets** area, which may display projection-derived readiness/status badges. ADR-0019 does not require or endorse a separate top-level 'Effective Assets' page in normal navigation.

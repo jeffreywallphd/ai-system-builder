@@ -1,4 +1,4 @@
-export type DesktopPageKey = "home" | "artifacts" | "assets" | "asset-authoring" | "user-library" | "models" | "image-generation" | "effective-asset-projections" | "settings" | "system";
+export type DesktopPageKey = "home" | "artifacts" | "assets" | "asset-authoring" | "user-library" | "models" | "image-generation" | "settings" | "system";
 
 export interface DesktopPageDefinition {
   key: DesktopPageKey;
@@ -35,11 +35,6 @@ export const desktopPageDefinitions: readonly DesktopPageDefinition[] = [
   {
     key: "image-generation",
     label: "Image Generation",
-    requiresWorkspace: true,
-  },
-  {
-    key: "effective-asset-projections",
-    label: "Effective Assets",
     requiresWorkspace: true,
   },
   {

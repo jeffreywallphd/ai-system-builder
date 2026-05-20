@@ -62,3 +62,8 @@ Phase 10 is **Asset Composition Planning** on top of safe projections: select co
 - `docs/context/packs/user-library.pack.md`
 - `docs/context/packs/asset-kernel.pack.md`
 - `docs/architecture/system-overview.md`
+
+
+## UX correction guardrail
+
+Treat effective asset projections as internal architecture/read-model context. Normal user navigation should center on **Assets**, with projection status/readiness integrated into asset cards/details using planning-oriented wording. Do not route users to a separate primary 'Effective Assets' page.
