@@ -36,7 +36,7 @@ export function createLocalAssetCompositionPlanRepositoryAdapter(o:{rootDir:stri
       const paged = pageRecords(plans.sort(sort), query.limit, query.cursor);
       return { records: paged.records, nextCursor: paged.nextCursor };
     },
-    async listActiveDraftBlockedConflictedStaleOrArchivedAssetCompositionPlanRecords(targetWorkspaceId){ return (await this.listAssetCompositionPlanRecords({ targetWorkspaceId })).records.filter((x)=>x.status==="active"||x.status==="draft"||x.status==="blocked"||x.status==="conflicted"||x.status==="stale"||Boolean(x.archivedAt)); },
+    async listValidDraftBlockedConflictedStaleOrArchivedAssetCompositionPlanRecords(targetWorkspaceId){ return (await this.listAssetCompositionPlanRecords({ targetWorkspaceId })).records.filter((x)=>x.status==="valid"||x.status==="draft"||x.status==="blocked"||x.status==="conflicted"||x.status==="stale"||Boolean(x.archivedAt)); },
     async listAssetCompositionPlanRecordsBySelectedProjectionId(targetWorkspaceId, selectedProjectionId){ return (await this.listAssetCompositionPlanRecords({ targetWorkspaceId, selectedProjectionId })).records; },
     async listAssetCompositionPlanRecordsByEffectiveAssetReference(targetWorkspaceId, effectiveAssetReference){ return (await this.listAssetCompositionPlanRecords({ targetWorkspaceId, effectiveAssetReference })).records; },
     async archiveAssetCompositionPlanRecord(targetWorkspaceId, planId, archivedAt){ const plan = await this.readAssetCompositionPlanRecord(targetWorkspaceId, planId); if (!plan) return undefined; return this.saveAssetCompositionPlanRecord({ ...plan, status: "archived", archivedAt, updatedAt: archivedAt }); }

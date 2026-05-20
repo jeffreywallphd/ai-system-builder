@@ -34,7 +34,7 @@ export interface AssetCompositionPlanRepositoryPort {
   updateAssetCompositionPlanRecord(record: AssetCompositionPlan): Promise<AssetCompositionPlan>;
   readAssetCompositionPlanRecord(targetWorkspaceId: WorkspaceId, planId: AssetCompositionPlanId): Promise<AssetCompositionPlan | undefined>;
   listAssetCompositionPlanRecords(query: AssetCompositionPlanListQuery): Promise<AssetCompositionPlanListResult>;
-  listActiveDraftBlockedConflictedStaleOrArchivedAssetCompositionPlanRecords(targetWorkspaceId: WorkspaceId): Promise<readonly AssetCompositionPlan[]>;
+  listValidDraftBlockedConflictedStaleOrArchivedAssetCompositionPlanRecords(targetWorkspaceId: WorkspaceId): Promise<readonly AssetCompositionPlan[]>;
   listAssetCompositionPlanRecordsBySelectedProjectionId(targetWorkspaceId: WorkspaceId, selectedProjectionId: EffectiveAssetProjectionId): Promise<readonly AssetCompositionPlan[]>;
   listAssetCompositionPlanRecordsByEffectiveAssetReference(targetWorkspaceId: WorkspaceId, effectiveAssetReference: AssetReference): Promise<readonly AssetCompositionPlan[]>;
   archiveAssetCompositionPlanRecord(targetWorkspaceId: WorkspaceId, planId: AssetCompositionPlanId, archivedAt: string): Promise<AssetCompositionPlan | undefined>;

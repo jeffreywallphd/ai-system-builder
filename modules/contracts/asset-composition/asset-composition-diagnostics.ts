@@ -5,7 +5,16 @@ export type AssetCompositionDiagnosticCode=(typeof ASSET_COMPOSITION_DIAGNOSTIC_
 export type AssetCompositionDiagnosticSeverity="info"|"warning"|"error";
 export interface AssetCompositionDiagnostic{readonly diagnosticId?:AssetCompositionDiagnosticId;readonly code:AssetCompositionDiagnosticCode;readonly severity:AssetCompositionDiagnosticSeverity;readonly message:string;readonly safeDetails?:AssetMetadata;}
 export interface AssetCompositionBlocker{readonly blockerId?:AssetCompositionBlockerId;readonly code:AssetCompositionDiagnosticCode;readonly message:string;readonly safeDetails?:AssetMetadata;}
-const UNSAFE=/(?:\bhttps?:\/\/|\b[a-zA-Z]:\\|\.\.|\/[\w.-]+|token|secret|api[_-]?key|command|env)/i;
+export type AssetCompositionNormalizationResult<T>={status:"success";value:T}|{status:"failure";diagnostics:readonly AssetCompositionDiagnostic[]};
+
+const UNSAFE=/(?:\bhttps?:\/\/|token|secret|api[_-]?key|command|env|provider|payload|path|storage-root|signed-url|base64|workflow|prompt)/i;
 const sanitize=(v:string)=>{const m=v.trim().replace(/[\u0000-\u001f\u007f]/g,""); return UNSAFE.test(m)?"Sanitized diagnostic detail.":m.slice(0,240)||"Sanitized diagnostic detail.";};
-export const normalizeAssetCompositionDiagnostic=(d:AssetCompositionDiagnostic):AssetCompositionDiagnostic=>({...d, ...(d.diagnosticId?{diagnosticId:normalizeAssetCompositionDiagnosticId(d.diagnosticId)}:{}), message:sanitize(d.message)});
-export const normalizeAssetCompositionBlocker=(b:AssetCompositionBlocker):AssetCompositionBlocker=>({...b, ...(b.blockerId?{blockerId:normalizeAssetCompositionBlockerId(b.blockerId)}:{}), message:sanitize(b.message)});
+const safeMeta=(v?:AssetMetadata)=>{if(!v) return undefined; const out:Record<string,unknown>={}; for(const [k,x] of Object.entries(v)){ if(UNSAFE.test(k)) throw new Error("Safe details are invalid."); if(typeof x==="string"&&UNSAFE.test(x)) throw new Error("Safe details are invalid."); out[k]=x&&typeof x==="object"?safeMeta(x as AssetMetadata):x; } return out as AssetMetadata;};
+const normalizeCode=(code:string):AssetCompositionDiagnosticCode=>{const c=code.trim() as AssetCompositionDiagnosticCode; if(!ASSET_COMPOSITION_DIAGNOSTIC_CODES.includes(c)) throw new Error("Asset composition diagnostic code is invalid."); return c;};
+const normalizeSeverity=(severity:string):AssetCompositionDiagnosticSeverity=>{const s=severity.trim().toLowerCase() as AssetCompositionDiagnosticSeverity; if(!["info","warning","error"].includes(s)) throw new Error("Asset composition diagnostic severity is invalid."); return s;};
+
+export const normalizeAssetCompositionDiagnostic=(d:AssetCompositionDiagnostic):AssetCompositionDiagnostic=>({...d, ...(d.diagnosticId?{diagnosticId:normalizeAssetCompositionDiagnosticId(d.diagnosticId)}:{}), code:normalizeCode(d.code), severity:normalizeSeverity(d.severity), message:sanitize(d.message), ...(d.safeDetails?{safeDetails:safeMeta(d.safeDetails)}:{})});
+export const normalizeAssetCompositionBlocker=(b:AssetCompositionBlocker):AssetCompositionBlocker=>({...b, ...(b.blockerId?{blockerId:normalizeAssetCompositionBlockerId(b.blockerId)}:{}), code:normalizeCode(b.code), message:sanitize(b.message), ...(b.safeDetails?{safeDetails:safeMeta(b.safeDetails)}:{})});
+const tryN=<T>(fn:()=>T):AssetCompositionNormalizationResult<T>=>{try{return{status:"success",value:fn()};}catch{return{status:"failure",diagnostics:[{code:"asset-composition-workspace-invalid",severity:"error",message:"Sanitized normalization failure."}]};}};
+export const tryNormalizeAssetCompositionDiagnostic=(d:AssetCompositionDiagnostic)=>tryN(()=>normalizeAssetCompositionDiagnostic(d));
+export const tryNormalizeAssetCompositionBlocker=(b:AssetCompositionBlocker)=>tryN(()=>normalizeAssetCompositionBlocker(b));
