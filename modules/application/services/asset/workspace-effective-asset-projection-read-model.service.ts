@@ -1,5 +1,11 @@
 import type { AssetReference } from "../../../contracts/asset";
-import type { EffectiveAssetProjectionRecord, EffectiveAssetProjectionStatus, SafeEffectiveAssetProjectedFieldPatch } from "../../../contracts/effective-asset-projections";
+import type {
+  EffectiveAssetProjectionBlocker,
+  EffectiveAssetProjectionDiagnostic,
+  EffectiveAssetProjectionRecord,
+  EffectiveAssetProjectionStatus,
+  SafeEffectiveAssetProjectedFieldPatch,
+} from "../../../contracts/effective-asset-projections";
 import type { WorkspaceId } from "../../../contracts/workspace";
 import type { EffectiveAssetProjectionListQuery, EffectiveAssetProjectionRepositoryPort } from "../../ports/effective-asset-projections";
 import { EffectiveAssetProjectionReadinessService, defaultEffectiveAssetProjectionReadinessService } from "../../use-cases/effective-asset-projections/effective-asset-projection-readiness.service";
@@ -26,8 +32,8 @@ export interface WorkspaceEffectiveAssetProjectionSummary {
   readonly isDisabled: boolean;
   readonly projectedFields: SafeEffectiveAssetProjectedFieldPatch;
   readonly projectedFieldsApplied: boolean;
-  readonly diagnostics: readonly EffectiveAssetProjectionRecord["diagnostics"];
-  readonly blockers: readonly EffectiveAssetProjectionRecord["blockers"];
+  readonly diagnostics: readonly EffectiveAssetProjectionDiagnostic[];
+  readonly blockers: readonly EffectiveAssetProjectionBlocker[];
   readonly provenance: {
     readonly kind: string;
     readonly targetWorkspaceId: WorkspaceId;
@@ -81,6 +87,9 @@ export class WorkspaceEffectiveAssetProjectionReadModelService {
     const hasConflicts = record.status === "conflicted";
     const isDisabled = record.status === "disabled";
     const isBlockedForPlanning = this.readiness.isBlockedForDownstreamPlanning(record.status);
+    const safeProjectedFields = isProjectionConsumable ? record.projectedFields : {};
+    const safeDiagnostics = record.diagnostics.map((d) => ({ code: d.code, message: d.message }));
+    const safeBlockers = record.blockers.map((b) => ({ code: b.code, message: b.message }));
 
     const readinessLabel = isDisabled
       ? "disabled"
@@ -111,8 +120,8 @@ export class WorkspaceEffectiveAssetProjectionReadModelService {
       isDisabled,
       projectedFields: safeProjectedFields,
       projectedFieldsApplied: isProjectionConsumable,
-      diagnostics: safeDiagnostics as never,
-      blockers: safeBlockers as never,
+      diagnostics: safeDiagnostics,
+      blockers: safeBlockers,
       provenance: {
         kind: record.provenance.kind,
         targetWorkspaceId: record.provenance.targetWorkspaceId,
@@ -136,6 +145,3 @@ export class WorkspaceEffectiveAssetProjectionReadModelService {
     };
   }
 }
-    const safeProjectedFields = isProjectionConsumable ? record.projectedFields : {};
-    const safeDiagnostics = record.diagnostics.map((d) => ({ code: d.code, message: d.message }));
-    const safeBlockers = record.blockers.map((b) => ({ code: b.code, message: b.message }));
