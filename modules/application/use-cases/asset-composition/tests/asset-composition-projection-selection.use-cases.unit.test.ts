@@ -9,7 +9,7 @@ import { AddProjectionToCompositionPlanUseCase, RemoveProjectionFromCompositionP
 const ws = "workspace.alpha" as never;
 const now = "2026-05-20T00:00:00.000Z";
 const plan = (): AssetCompositionPlan => ({ planId: "plan.alpha" as never, targetWorkspaceId: ws, name: "P", status: "draft", selectedProjections: [], nodes: [], relationships: [], compatibilityDiagnostics: [], blockers: [], planningSummary: { totalNodes: 0, compatibleNodeCount: 0, blockedNodeCount: 0, conflictedNodeCount: 0, missingDependencyCount: 0, staleProjectionCount: 0, unsupportedCount: 0, totalRelationships: 0, compatibleRelationshipCount: 0, blockedRelationshipCount: 0, planningReadiness: "draft-not-yet-validated" }, provenance: [], createdAt: now, updatedAt: now });
-const projection = (status: EffectiveAssetProjectionRecord["status"] = "ready"): EffectiveAssetProjectionRecord => ({ projectionId: "projection.a" as never, targetWorkspaceId: ws, source: { sourceWorkspaceId: ws, assetId: "a" as never }, target: { targetWorkspaceId: ws, effectiveAssetId: "e" as never, displayLabel: "Label" }, effectiveAssetReference: { kind: "artifact" as never, id: "e" as never }, sourceKind: "workspace-authored" as never, status, policy: { allowPreviewDraftSelection: false }, projectedFields: {}, diagnostics: [], blockers: [], provenance: { recomputeVersion: 1 }, createdAt: now, updatedAt: now });
+const projection = (status: EffectiveAssetProjectionRecord["status"] = "ready-for-planning"): EffectiveAssetProjectionRecord => ({ projectionId: "projection.a" as never, targetWorkspaceId: ws, source: { sourceWorkspaceId: ws, assetId: "a" as never }, target: { targetWorkspaceId: ws, effectiveAssetId: "e" as never, displayLabel: "Label" }, effectiveAssetReference: { kind: "artifact" as never, id: "e" as never }, sourceKind: "workspace-authored" as never, status, policy: { allowPreviewDraftSelection: false }, projectedFields: {}, diagnostics: [], blockers: [], provenance: { recomputeVersion: 1 }, createdAt: now, updatedAt: now });
 
 const repos = () => {
   const plans: AssetCompositionPlan[] = [plan()];
@@ -41,7 +41,7 @@ describe("composition plan projection add/remove", () => {
   });
 
   it("rejects blocked statuses and archived/duplicate safely", async () => {
-    for (const status of ["draft-only", "blocked", "conflicted", "disabled", "source-missing", "stale", "unsupported", "invalid"] as const) {
+    for (const status of ["draft-only", "blocked", "conflicted", "disabled", "missing-projection", "stale", "unsupported", "invalid"] as const) {
       const r = repos(); r.projections[0] = projection(status);
       const add = new AddProjectionToCompositionPlanUseCase({ repository: r.planRepo, projectionRepository: r.projRepo, generateNodeId: () => "node.a", now: () => now });
       const out = await add.execute({ targetWorkspaceId: ws, planId: "plan.alpha" as never, projectionId: "projection.a" as never });

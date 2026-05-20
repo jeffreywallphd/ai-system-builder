@@ -7,7 +7,7 @@ import type { AssetCompositionRelationshipKind } from "./asset-composition-relat
 export type CreateAssetCompositionPlanCommand={targetWorkspaceId:WorkspaceId;name:string;description?:string;};
 export type UpdateAssetCompositionPlanCommand={targetWorkspaceId:WorkspaceId;planId:AssetCompositionPlanId;name?:string;description?:string;status?:AssetCompositionPlan["status"]};
 export type ReadAssetCompositionPlanCommand={targetWorkspaceId:WorkspaceId;planId:AssetCompositionPlanId};
-export type ListAssetCompositionPlansCommand={targetWorkspaceId:WorkspaceId;status?:AssetCompositionPlan["status"];limit?:number;cursor?:string};
+export type ListAssetCompositionPlansCommand={targetWorkspaceId:WorkspaceId;status?:AssetCompositionPlan["status"];selectedProjectionId?:EffectiveAssetProjectionId;effectiveAssetReference?:import("../asset").AssetReference;nodeRole?:AssetCompositionNodeRole;relationshipKind?:AssetCompositionRelationshipKind;compatibilityStatus?:import("./asset-composition-status").AssetCompositionCompatibilityStatus;blockedOnly?:boolean;conflictedOnly?:boolean;staleOnly?:boolean;archived?:boolean;text?:string;limit?:number;cursor?:string};
 export type ArchiveAssetCompositionPlanCommand={targetWorkspaceId:WorkspaceId;planId:AssetCompositionPlanId;archivedAt?:string};
 export type AddProjectionToCompositionPlanCommand={targetWorkspaceId:WorkspaceId;planId:AssetCompositionPlanId;projectionId:EffectiveAssetProjectionId;label?:string;role?:AssetCompositionNodeRole};
 export type RemoveProjectionFromCompositionPlanCommand={targetWorkspaceId:WorkspaceId;planId:AssetCompositionPlanId;projectionId:EffectiveAssetProjectionId};

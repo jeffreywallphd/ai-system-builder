@@ -1,4 +1,5 @@
-import type { AddProjectionToCompositionPlanCommand, AssetCompositionNode, AssetCompositionNodeRole, SelectedAssetProjectionReference } from "../../../contracts/asset-composition";
+import { normalizeAssetCompositionNodeId, normalizeAssetCompositionNodeRole } from "../../../contracts/asset-composition";
+import type { AddProjectionToCompositionPlanCommand, AssetCompositionNode, SelectedAssetProjectionReference } from "../../../contracts/asset-composition";
 import type { EffectiveAssetProjectionRecord } from "../../../contracts/effective-asset-projections";
 
 export const createSelectedProjectionReference = (
@@ -21,18 +22,18 @@ export const createCompositionNodeFromProjection = (d: {
   nodeId: string;
   now: string;
 }): AssetCompositionNode => ({
-  nodeId: d.nodeId as never,
+  nodeId: normalizeAssetCompositionNodeId(d.nodeId),
   targetWorkspaceId: d.projection.targetWorkspaceId,
   selectedProjection: d.selectedProjection,
   effectiveAssetReference: d.projection.effectiveAssetReference,
-  role: ((d.command as AddProjectionToCompositionPlanCommand & { role?: AssetCompositionNodeRole }).role ?? "supporting-asset") as AssetCompositionNodeRole,
+  role: normalizeAssetCompositionNodeRole(d.command.role ?? "supporting-asset"),
   status: "ready-for-planning",
   requiredCapabilities: [],
   providedCapabilities: [],
   diagnostics: [],
   blockers: [],
-  label: d.command.label ?? d.projection.target.displayLabel,
-  summary: d.projection.target.effectiveSummary,
+  label: d.command.label?.trim() || d.projection.target.displayLabel?.trim() || "Selected projection",
+  summary: d.projection.target.effectiveSummary?.trim() || undefined,
   createdAt: d.now,
   updatedAt: d.now,
 });
