@@ -1,5 +1,6 @@
 # Asset Authoring, Customization, and Override Management (Phase 8 Baseline)
 
+- Phase 9 follow-on baseline: `docs/architecture/effective-asset-projections.md` and ADR-0019 define how authored/customized records become workspace-scoped effective projections with explicit status/blockers.
 ## Purpose
 
 Phase 8 defines the architecture baseline for **asset authoring**, **safe customization**, and **explicit override management** without weakening Phase 6 workspace isolation or Phase 7 user-library reuse boundaries.

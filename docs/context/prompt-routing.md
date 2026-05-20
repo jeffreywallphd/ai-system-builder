@@ -16,6 +16,7 @@ Use this guide to select **minimum-sufficient** context packs for prompts.
 | assets, asset packs/catalogs/manifests, asset definitions/instances/bindings/compositions, systems/subsystems/features as composable assets, UI components/pages as assets, workflows/tools as assets, resource-backed assets, generated outputs as assets, Hugging Face objects as asset/resource backings, AI-readable asset context, asset validation, asset configuration, asset ports/composition rules, Asset Registry read-facade transport wrappers, or Asset Library UI | `docs/context/packs/asset-kernel.pack.md` |
 | user library scope, user-library assets, promote/link/copy/import reuse workflows, cross-workspace asset reuse, provenance, propagation policy, effective asset source, effective resolution summaries, accidental propagation prevention | `docs/context/packs/user-library.pack.md` |
 | asset authoring, customized assets, override records, editable drafts, authored revisions, customization conflicts, linked/customized user-library assets, customized detached copies/imported workspace copies, workspace-local asset creation, or promotion-readiness of authored/customized assets | `docs/context/packs/asset-authoring.pack.md` |
+| materialization, effective asset projections, projected asset records, projection readiness/diagnostics/blockers, safe projected fields, authored/customized asset materialization, or preparing assets for composition/runtime-readiness | `docs/context/packs/effective-asset-projections.pack.md` |
 
 When prompts involve promotion, linking, copying, workspace import, reusable library assets, effective-source summaries, provenance, propagation policy, cross-workspace reuse, or user-library transport/UI, include the `user-library` pack and then read canonical Phase 7 architecture + ADR docs for truthful status checks.
 
@@ -23,6 +24,17 @@ For tasks combining Phase 7 reuse and Phase 8 customization, include both:
 
 - `docs/context/packs/user-library.pack.md`
 - `docs/context/packs/asset-authoring.pack.md`
+
+For tasks combining Phase 8 customization and Phase 9 projection, include both:
+
+- `docs/context/packs/asset-authoring.pack.md`
+- `docs/context/packs/effective-asset-projections.pack.md`
+
+For tasks that materially involve effective projections built from user-library sources, include all three:
+
+- `docs/context/packs/user-library.pack.md`
+- `docs/context/packs/asset-authoring.pack.md`
+- `docs/context/packs/effective-asset-projections.pack.md`
 | authn/authz, credential handling, transport encryption, storage security, audit, runtime/process security policy | `docs/context/packs/security.pack.md` |
 | runtime adapters, runtime contract shape, runtime execution flow | `docs/context/packs/runtime.pack.md` |
 | runtime task registry lifecycle for long-running runtime tasks (start/read/cancel, shared lifecycle/progress/retention semantics) | `docs/context/packs/runtime-task-registry.pack.md` |

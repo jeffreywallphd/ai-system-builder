@@ -1,5 +1,6 @@
 # User Library and Cross-Workspace Asset Reuse
 
+- Phase 9 follow-on baseline: `docs/architecture/effective-asset-projections.md` defines how linked/copied/imported/user-library sources contribute to workspace-scoped effective projections without live cross-workspace links.
 ## Purpose and phase placement
 
 Phase 7 is **User Library and Cross-Workspace Asset Reuse**. It defines the ownership vocabulary and architecture boundaries for moving reusable assets out of a single workspace into a user-owned library, then making those reusable assets available to workspaces through explicit link, copy, or import workflows.
@@ -11,8 +12,8 @@ Correct roadmap placement:
 - Phase 6: Workspace Foundations.
 - Phase 7: User Library and Cross-Workspace Asset Reuse.
 - Phase 8: Asset Authoring, Customization, and Override Management.
-- Phase 9: Composition Planning and Authoring.
-- Phase 10: Execution Binding and Runtime-Orchestrated Systems.
+- Phase 9: Materialized / Effective Asset Projections.
+- Phase 10: Asset Composition Planning.
 - Phase 11: Pack Import/Export, Sharing, and Distribution.
 - Phase 12: Collaboration, Permissions, and Multi-User Workspaces.
 
