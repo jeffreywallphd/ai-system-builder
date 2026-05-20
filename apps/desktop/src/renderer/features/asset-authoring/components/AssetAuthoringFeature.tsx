@@ -59,10 +59,10 @@ const mapSummary = (record: AssetAuthoringEffectiveSourceSummary, index: number)
   id: `${record.effectiveAssetReference?.id ?? record.assetReference.id ?? 'summary'}-${index}`,
   label: sourceLabel(record.effectiveSourceKind),
   statusLabel:
-    record.conflictStatus === 'open' ? 'Conflict' : record.overrideStatus === 'disabled' ? 'Disabled' : 'Active',
+    record.conflictStatus === 'open' ? 'Needs attention' : record.overrideStatus === 'disabled' ? 'Disabled' : 'Active',
 });
 
-export function AssetAuthoringFeature({ workspaceId }: { workspaceId: string }) {
+export function AssetAuthoringFeature({ workspaceId, initialSection = "create" }: { workspaceId: string; initialSection?: "create" | "drafts" | "customizations" }) {
   const client = useMemo(() => createDesktopAssetAuthoringClient(), []);
   const [authored, setAuthored] = useState<RowVm[]>([]);
   const [drafts, setDrafts] = useState<RowVm[]>([]);
@@ -72,6 +72,11 @@ export function AssetAuthoringFeature({ workspaceId }: { workspaceId: string }) 
   const [message, setMessage] = useState('');
   const [name, setName] = useState('');
   const [summary, setSummary] = useState('');
+  const sectionMatches = {
+    create: initialSection === "create",
+    drafts: initialSection === "drafts",
+    customizations: initialSection === "customizations",
+  };
 
   const refresh = async () => {
     const [authoredResult, draftsResult, overridesResult, summariesResult] = await Promise.all([
@@ -102,8 +107,8 @@ export function AssetAuthoringFeature({ workspaceId }: { workspaceId: string }) 
 
   return (
     <section>
-      <h2>Asset Authoring</h2>
-      <h3>Custom Assets</h3>
+      <h2>Create and manage workspace assets</h2>
+      {sectionMatches.create ? <h3>Created assets</h3> : null}
       <ul>
         {authored.length ? (
           authored.map((asset) => (
@@ -115,7 +120,7 @@ export function AssetAuthoringFeature({ workspaceId }: { workspaceId: string }) 
           <li>No custom assets yet.</li>
         )}
       </ul>
-      <h3>Drafts</h3>
+      {sectionMatches.drafts ? <h3>Drafts</h3> : null}
       <ul>
         {drafts.length ? (
           drafts.map((draft) => (
@@ -124,11 +129,11 @@ export function AssetAuthoringFeature({ workspaceId }: { workspaceId: string }) 
               <button
                 onClick={async () => {
                   const result = await client.publishDraft(workspaceId, draft.id);
-                  setMessage(result.ok === true ? 'Publish requested.' : result.error.message);
+                  setMessage(result.ok === true ? 'Draft published.' : result.error.message);
                   if (result.ok === true) await refresh();
                 }}
               >
-                Publish draft
+                Publish
               </button>{' '}
               <button
                 onClick={async () => {
@@ -137,11 +142,11 @@ export function AssetAuthoringFeature({ workspaceId }: { workspaceId: string }) 
                     draftId: draft.id,
                     summary: 'Updated in workspace',
                   });
-                  setMessage(result.ok === true ? 'Draft updated.' : result.error.message);
+                  setMessage(result.ok === true ? 'Draft changes saved.' : result.error.message);
                   if (result.ok === true) await refresh();
                 }}
               >
-                Save safe edit
+                Save changes
               </button>
             </li>
           ))
@@ -149,30 +154,30 @@ export function AssetAuthoringFeature({ workspaceId }: { workspaceId: string }) 
           <li>No drafts yet.</li>
         )}
       </ul>
-      <h3>Create draft</h3>
+      <h3>Create asset draft</h3>
       <form
         onSubmit={async (event) => {
           event.preventDefault();
           if (!name.trim()) {
-            setMessage('Display name is required.');
+            setMessage('Name is required.');
             return;
           }
           const result = await client.createDraft({ workspaceId, displayName: name, summary });
           if (result.ok === true) {
             setName('');
             setSummary('');
-            setMessage('Draft created.');
+            setMessage('Saved as draft.');
             await refresh();
           } else {
             setMessage(result.error.message);
           }
         }}
       >
-        <input aria-label="Display name" value={name} onChange={(event) => setName(event.target.value)} />
-        <input aria-label="Summary" value={summary} onChange={(event) => setSummary(event.target.value)} />
-        <button type="submit">Create draft</button>
+        <input aria-label="Name" value={name} onChange={(event) => setName(event.target.value)} />
+        <input aria-label="Short summary" value={summary} onChange={(event) => setSummary(event.target.value)} />
+        <button type="submit">Create asset draft</button>
       </form>
-      <h3>Workspace customizations</h3>
+      {sectionMatches.customizations ? <h3>Customizations</h3> : null}
       <p>
         <small>Creating new customizations is not available yet.</small>
       </p>
@@ -185,7 +190,7 @@ export function AssetAuthoringFeature({ workspaceId }: { workspaceId: string }) 
                 <button
                   onClick={async () => {
                     const result = await client.disableOverride(workspaceId, override.id);
-                    setMessage(result.ok === true ? 'Customization disabled.' : result.error.message);
+                    setMessage(result.ok === true ? 'Customization turned off.' : result.error.message);
                     if (result.ok === true) await refresh();
                   }}
                 >
@@ -195,7 +200,7 @@ export function AssetAuthoringFeature({ workspaceId }: { workspaceId: string }) 
             </li>
           ))
         ) : (
-          <li>No workspace customizations yet.</li>
+          <li>No customizations yet.</li>
         )}
       </ul>
       <h3>What this workspace is using</h3>
