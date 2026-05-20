@@ -23,3 +23,5 @@ export * from "./workspace-asset-registry-read-facade.service";
 export * from "./workspace-effective-asset-source-resolver.service";
 
 export * from "./workspace-effective-asset-projection-read-model.service";
+
+export * from "./workspace-asset-composition-read-model.service";
