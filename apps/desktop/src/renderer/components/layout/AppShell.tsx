@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
 
 import type { DesktopPageDefinition, DesktopPageKey } from "../../routes/desktopPages";
-import appLogoSrc from "../../../../../../modules/ui/shared/assets/branding/logo.svg";
-import { WorkspaceSwitcher } from "../../features/workspace";
 
 export interface AppShellProps {
   activePage?: DesktopPageKey;
@@ -13,35 +11,41 @@ export interface AppShellProps {
 
 export function AppShell({ activePage, onNavigate, pages, children }: AppShellProps) {
   const primaryPages = pages.filter((page) => page.key !== "settings");
+  const navigationPages: readonly (DesktopPageDefinition | { readonly key: "home"; readonly label: "Home" })[] = [
+    { key: "home", label: "Home" },
+    ...primaryPages,
+  ];
+
   return (
     <main className="ui-shell">
       <header className="ui-shell__header">
         <div className="ui-container ui-shell__header-inner">
-          <div className="ui-shell__brand">            
-              <span className="ui-shell__logo-frame">
-                <button
-                  type="button"
-                  className="ui-shell__logo-button"
-                  onClick={() => onNavigate("home")} // <-- use your actual home key
-                >
-                  <img className="ui-shell__logo-image" src={appLogoSrc} alt="AI System Builder logo" />
-                </button>
-              </span>
-            <h1 className="ui-shell__title">AI System Builder</h1>
-          </div>
-          <WorkspaceSwitcher />
           <nav className="ui-shell__nav" aria-label="Primary">
-            {primaryPages.map((page) => (
-              <button
-                key={page.key}
-                className="ui-button"
-                type="button"
-                aria-current={activePage === page.key ? "page" : undefined}
-                onClick={() => onNavigate(page.key)}
-              >
-                {page.label}
-              </button>
-            ))}
+            <details className="ui-shell__menu">
+              <summary className="ui-button ui-button--icon ui-shell__menu-trigger" aria-label="Open navigation menu" title="Menu">
+                <svg aria-hidden="true" viewBox="0 0 24 24" className="ui-icon">
+                  <path d="M4 6.5h16v2H4v-2Zm0 4.5h16v2H4v-2Zm0 4.5h16v2H4v-2Z" />
+                </svg>
+                <span className="ui-visually-hidden">Menu</span>
+              </summary>
+              <div className="ui-shell__menu-panel" role="menu">
+                {navigationPages.map((page) => (
+                  <button
+                    key={page.key}
+                    className="ui-shell__menu-item"
+                    type="button"
+                    role="menuitem"
+                    aria-current={activePage === page.key ? "page" : undefined}
+                    onClick={(event) => {
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                      onNavigate(page.key);
+                    }}
+                  >
+                    {page.label}
+                  </button>
+                ))}
+              </div>
+            </details>
             <button
               className="ui-button ui-button--icon"
               type="button"

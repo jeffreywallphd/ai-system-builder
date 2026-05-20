@@ -97,7 +97,7 @@ export function WorkspaceAwareDesktopApp({ lazyPages = desktopLazyPages }: Works
     switch (page) {
       case "home": {
         const HomePage = lazyPages.home;
-        return <HomePage __lazyLoadContext={lazyLoadContext} onGoToArtifacts={() => setActivePage("artifacts")} />;
+        return <HomePage __lazyLoadContext={lazyLoadContext} onNavigate={setActivePage} />;
       }
       case "settings": {
         const SettingsPage = lazyPages.settings;

@@ -5,7 +5,7 @@
 
 .ui-input {
   background: var(--color-bg-panel);
-  border: 1px solid (--color-border-inverse);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: var(--space-sm);
   color: var(--color-text-primary);
