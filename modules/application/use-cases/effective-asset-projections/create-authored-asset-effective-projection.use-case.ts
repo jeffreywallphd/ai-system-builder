@@ -4,6 +4,9 @@ import type { EffectiveAssetProjectionRepositoryPort } from "../../ports/effecti
 import { mapEditableToProjectedFields } from "./effective-asset-projection-field-mapper.service";
 import { createProjectionProvenance } from "./effective-asset-projection-provenance.service";
 import { projectionFailure } from "./effective-asset-projection-result-helpers";
+import { defaultEffectiveAssetProjectionValidationService } from "./effective-asset-projection-validation.service";
+import { defaultEffectiveAssetProjectionDiagnosticsService } from "./effective-asset-projection-diagnostics.service";
+import { defaultEffectiveAssetProjectionConflictBlockingService } from "./effective-asset-projection-conflict-blocking.service";
 
 export class CreateAuthoredAssetEffectiveProjectionUseCase {
   constructor(private readonly d:{projectionRepository:EffectiveAssetProjectionRepositoryPort;authoredAssetRepository:AuthoredAssetRepositoryPort;assetRevisionRepository:AssetRevisionRepositoryPort;generateEffectiveAssetProjectionId:()=>string;now?:()=>string;}){}

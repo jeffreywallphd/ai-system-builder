@@ -4,6 +4,9 @@ import type { EffectiveAssetProjectionRepositoryPort } from "../../ports/effecti
 import { mapEditableToProjectedFields } from "./effective-asset-projection-field-mapper.service";
 import { createProjectionProvenance } from "./effective-asset-projection-provenance.service";
 import { projectionFailure } from "./effective-asset-projection-result-helpers";
+import { defaultEffectiveAssetProjectionValidationService } from "./effective-asset-projection-validation.service";
+import { defaultEffectiveAssetProjectionDiagnosticsService } from "./effective-asset-projection-diagnostics.service";
+import { defaultEffectiveAssetProjectionConflictBlockingService } from "./effective-asset-projection-conflict-blocking.service";
 import { deriveOverrideProjectionStatus } from "./effective-asset-override-projection-status.service";
 
 const SUPPORTED = new Set(["workspace-customized","linked-with-workspace-override","copied-with-workspace-override","imported-with-workspace-override","system-derived-override"]);
@@ -26,7 +29,7 @@ export class CreateOverrideEffectiveProjectionUseCase {
     let projectionId; try{projectionId=normalizeEffectiveAssetProjectionId(this.d.generateEffectiveAssetProjectionId());}catch{return projectionFailure("internal","effective-projection-materialization-unavailable");}
     const blocked = mapped.blocked || statusModel.status !== "ready";
     const status = mapped.blocked ? "blocked" : statusModel.status;
-    const record = normalizeEffectiveAssetProjectionRecord({projectionId,targetWorkspaceId:c.targetWorkspaceId,source:c.source,target:c.target,sourceKind:c.source.sourceKind,effectiveAssetReference:c.target.effectiveAssetReference,sourceAssetReference:c.source.sourceAssetReference,status,policy:blocked?"blocked":statusModel.policy,projectedFields: mapped.blocked?{}:mapped.projectedFields,diagnostics:statusModel.diagnosticCode?[{code:statusModel.diagnosticCode,message:"Sanitized projection diagnostic."}]:mapped.diagnostics,blockers:statusModel.diagnosticCode?[{code:statusModel.diagnosticCode,message:"Sanitized projection blocker."}]:mapped.blockers,provenance:createProjectionProvenance(c.targetWorkspaceId,c.source,now),createdAt:now,updatedAt:now,materializedAt:now});
+    const record = normalizeEffectiveAssetProjectionRecord({projectionId,targetWorkspaceId:c.targetWorkspaceId,source:c.source,target:c.target,sourceKind:c.source.sourceKind,effectiveAssetReference:c.target.effectiveAssetReference,sourceAssetReference:c.source.sourceAssetReference,status,policy:blocked?"blocked":statusModel.policy,projectedFields: mapped.blocked?{}:mapped.projectedFields,diagnostics:statusModel.diagnosticCode?[defaultEffectiveAssetProjectionDiagnosticsService.createDiagnostic(statusModel.diagnosticCode)]:mapped.diagnostics,blockers:statusModel.diagnosticCode?[defaultEffectiveAssetProjectionDiagnosticsService.createBlocker(statusModel.diagnosticCode)]:mapped.blockers,provenance:createProjectionProvenance(c.targetWorkspaceId,c.source,now),createdAt:now,updatedAt:now,materializedAt:now});
     try{return {status:"success",value:await this.d.projectionRepository.saveEffectiveAssetProjectionRecord(record)};}catch{return projectionFailure("unavailable","effective-projection-materialization-unavailable");}
   }
 }
