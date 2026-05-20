@@ -1,0 +1,12 @@
+export const SAFE_EFFECTIVE_ASSET_PROJECTED_FIELDS = ["display-name","summary","description","tags","classification","source-label","revision-label","status-label","readiness-state","safe-metadata"] as const;
+export type SafeEffectiveAssetProjectedField = (typeof SAFE_EFFECTIVE_ASSET_PROJECTED_FIELDS)[number];
+export type SafeEffectiveAssetMetadata = string | number | boolean | null | SafeEffectiveAssetMetadata[] | { [key: string]: SafeEffectiveAssetMetadata };
+export type SafeEffectiveAssetProjectedFieldValue = string | string[] | SafeEffectiveAssetMetadata;
+export type SafeEffectiveAssetProjectedFieldPatch = Partial<Record<SafeEffectiveAssetProjectedField, SafeEffectiveAssetProjectedFieldValue>>;
+
+const KEY_PATTERN=/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+function safeMeta(v: unknown): v is SafeEffectiveAssetMetadata { if (v===null) return true; if (["string","number","boolean"].includes(typeof v)) return true; if(Array.isArray(v)) return v.every(safeMeta); if(typeof v==="object"){return Object.entries(v as Record<string,unknown>).every(([k,val])=>KEY_PATTERN.test(k)&&!k.includes("/")&&!k.includes("\\")&&!k.includes("..")&&!/token|secret|password|key/i.test(k)&&safeMeta(val));} return false; }
+export const isSafeEffectiveAssetProjectedField=(v:unknown):v is SafeEffectiveAssetProjectedField=>typeof v==="string"&&SAFE_EFFECTIVE_ASSET_PROJECTED_FIELDS.includes(v.trim().toLowerCase() as SafeEffectiveAssetProjectedField);
+export function assertSafeEffectiveAssetProjectedField(v:string): asserts v is SafeEffectiveAssetProjectedField { if(!isSafeEffectiveAssetProjectedField(v)) throw new Error("Effective projected field is unsafe or unsupported."); }
+export const normalizeSafeEffectiveAssetProjectedField=(v:string):SafeEffectiveAssetProjectedField=>{const n=v.trim().toLowerCase(); assertSafeEffectiveAssetProjectedField(n); return n;};
+export function normalizeSafeEffectiveAssetProjectedFieldPatch(v: SafeEffectiveAssetProjectedFieldPatch): SafeEffectiveAssetProjectedFieldPatch { const out: SafeEffectiveAssetProjectedFieldPatch = {}; for (const [k,val] of Object.entries(v)) { const key = normalizeSafeEffectiveAssetProjectedField(k); if (key==="safe-metadata") { if(!safeMeta(val)) throw new Error("Effective projected safe-metadata is unsafe."); out[key]=val; continue; } if(typeof val!=="string" && !(Array.isArray(val)&&val.every((x)=>typeof x==="string"))) throw new Error("Effective projected field value is invalid."); out[key]=val; } return out; }
