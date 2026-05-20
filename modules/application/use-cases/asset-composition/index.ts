@@ -10,3 +10,8 @@ export * from "./asset-composition-node-factory.service";
 export * from "./asset-composition-projection-selection.service";
 export * from "./add-projection-to-composition-plan.use-case";
 export * from "./remove-projection-from-composition-plan.use-case";
+export * from "./asset-composition-plan-summary.service";
+export * from "./asset-composition-relationship-factory.service";
+export * from "./asset-composition-simple-relationship-guard.service";
+export * from "./connect-composition-nodes.use-case";
+export * from "./disconnect-composition-nodes.use-case";
