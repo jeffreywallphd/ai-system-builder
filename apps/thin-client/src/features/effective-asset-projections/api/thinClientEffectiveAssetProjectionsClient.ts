@@ -8,8 +8,8 @@ const postJson = async (url: string, body: unknown) => parseApiEnvelope(await (a
 export function createThinClientEffectiveAssetProjectionsClient(base = '/api') {
   const b = base.replace(/\/+$/, '');
   return {
-    listProjections: async (workspaceId: string) => { try { return unwrap(await getJson(`${b}/workspaces/${encodeURIComponent(workspaceId)}/effective-asset-projections`)); } catch { return err('Effective Assets are not available yet.', 'unavailable'); } },
-    readProjection: async (workspaceId: string, projectionId: string) => { try { return unwrap(await getJson(`${b}/workspaces/${encodeURIComponent(workspaceId)}/effective-asset-projections/${encodeURIComponent(projectionId)}`)); } catch { return err('Projection details are not available yet.', 'unavailable'); } },
-    refreshProjection: async (workspaceId: string, projectionId: string) => { try { return unwrap(await postJson(`${b}/workspaces/${encodeURIComponent(workspaceId)}/effective-asset-projections/${encodeURIComponent(projectionId)}/refresh`, { workspaceId, projectionId })); } catch { return err('Refreshing is not available yet.', 'unavailable'); } },
+    listProjections: async (workspaceId: string) => { try { return unwrap(await getJson(`${b}/effective-asset-projections/workspaces/${encodeURIComponent(workspaceId)}/projections`)); } catch { return err('Effective Assets are not available yet.', 'unavailable'); } },
+    readProjection: async (workspaceId: string, projectionId: string) => { try { return unwrap(await getJson(`${b}/effective-asset-projections/workspaces/${encodeURIComponent(workspaceId)}/projections/${encodeURIComponent(projectionId)}`)); } catch { return err('Projection details are not available yet.', 'unavailable'); } },
+    refreshProjection: async (workspaceId: string, projectionId: string) => { try { return unwrap(await postJson(`${b}/effective-asset-projections/workspaces/${encodeURIComponent(workspaceId)}/projections/${encodeURIComponent(projectionId)}/refresh`, { workspaceId, projectionId })); } catch { return err('Refreshing is not available yet.', 'unavailable'); } },
   };
 }

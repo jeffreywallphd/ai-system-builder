@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createDesktopEffectiveAssetProjectionsClient } from '../api/desktopEffectiveAssetProjectionsClient';
 describe('desktop effective asset projections client', () => {
   it('calls list with explicit workspace id', async () => {
-    const listEffectiveAssetProjections = vi.fn().mockResolvedValue({ ok: true, value: { items: [] } });
+    const listEffectiveAssetProjections = vi.fn().mockResolvedValue({ ok: true, value: { summaries: [] } });
     (window as any).desktopApi = { listEffectiveAssetProjections };
     await createDesktopEffectiveAssetProjectionsClient().listProjections('workspace.a');
     expect(listEffectiveAssetProjections).toHaveBeenCalledWith({ workspaceId: 'workspace.a' });
