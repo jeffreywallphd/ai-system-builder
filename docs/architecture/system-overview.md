@@ -1,5 +1,6 @@
 # System Overview
 
+- Phase 9 baseline: `docs/architecture/effective-asset-projections.md` defines workspace-scoped safe materialized/effective asset projections (non-executing).
 ## Purpose of this repository
 
 `ai-system-builder` is a fresh rebuild intended to replace earlier architectural sprawl with a simpler and more disciplined structure.
@@ -298,4 +299,4 @@ Implemented workspace-owned records require explicit workspace context through c
 
 Phase 7 is **User Library and Cross-Workspace Asset Reuse**. It should define explicit promote/link/copy/import flows, provenance for promoted/linked/copied assets, resolver support for user-library linked/copied assets, and guarded direct workspace-to-workspace links only if needed. Phase 7 must not allow accidental propagation without an explicit link policy.
 
-Later roadmap: Phase 8 is **Asset Authoring, Customization, and Override Management**; Phase 9 is **Composition Planning and Authoring**; Phase 10 is **Execution Binding and Runtime-Orchestrated Systems**; Phase 11 is **Pack Import/Export, Sharing, and Distribution**; and Phase 12 is **Collaboration, Permissions, and Multi-User Workspaces**.
+Later roadmap: Phase 8 is **Asset Authoring, Customization, and Override Management**; Phase 9 is **Materialized / Effective Asset Projections**; Phase 10 is **Asset Composition Planning**; Phase 11 is **Pack Import/Export, Sharing, and Distribution**; and Phase 12 is **Collaboration, Permissions, and Multi-User Workspaces**.
