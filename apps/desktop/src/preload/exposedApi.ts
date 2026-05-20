@@ -495,6 +495,10 @@ export interface DesktopPreloadApi {
   listEffectiveAssetProjections: (input: { workspaceId: string; limit?: number; cursor?: string; status?: string; sourceKind?: string; policy?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
   readEffectiveAssetProjection: (input: { workspaceId: string; projectionId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
   refreshEffectiveAssetProjection: (input: { workspaceId: string; projectionId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  createAssetCompositionPlan: (input: { targetWorkspaceId: string; name: string; description?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  updateAssetCompositionPlan: (input: { targetWorkspaceId: string; planId: string; name?: string; description?: string; status?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  readAssetCompositionPlan: (input: { targetWorkspaceId: string; planId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  listAssetCompositionPlans: (input: { targetWorkspaceId: string; status?: string; text?: string; limit?: number; cursor?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
   createWorkspaceAuthoredAsset: (command: CreateWorkspaceAuthoredAssetCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringCreateWorkspaceAuthoredAssetResponse>;
   createAssetDraft: (command: CreateAssetDraftCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringCreateDraftResponse>;
   updateAssetDraft: (command: UpdateAssetDraftCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringUpdateDraftResponse>;
@@ -1200,6 +1204,24 @@ export function createDesktopPreloadApi(
     },
     async refreshEffectiveAssetProjection(_input, _context = {}) {
       return { ok: false, error: { code: "unsupported", message: "Refreshing is deferred for Phase 9 desktop UI." } };
+    },
+    async createAssetCompositionPlan(input, context = {}) {
+      if (!input.targetWorkspaceId?.trim()) throw new Error("targetWorkspaceId is required.");
+      return dependencies.ipcRenderer.invoke("asset-composition:create-plan", { payload: input, context });
+    },
+    async updateAssetCompositionPlan(input, context = {}) {
+      if (!input.targetWorkspaceId?.trim()) throw new Error("targetWorkspaceId is required.");
+      if (!input.planId?.trim()) throw new Error("planId is required.");
+      return dependencies.ipcRenderer.invoke("asset-composition:update-plan", { payload: input, context });
+    },
+    async readAssetCompositionPlan(input, context = {}) {
+      if (!input.targetWorkspaceId?.trim()) throw new Error("targetWorkspaceId is required.");
+      if (!input.planId?.trim()) throw new Error("planId is required.");
+      return dependencies.ipcRenderer.invoke("asset-composition:read-plan", { payload: input, context });
+    },
+    async listAssetCompositionPlans(input, context = {}) {
+      if (!input.targetWorkspaceId?.trim()) throw new Error("targetWorkspaceId is required.");
+      return dependencies.ipcRenderer.invoke("asset-composition:list-plans", { payload: input, context });
     },
 
     async createWorkspaceAuthoredAsset(command, context = {}) { const response = await dependencies.ipcRenderer.invoke(DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_REQUEST_CHANNEL.value, { payload: command, operation: DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_OPERATION, channel: DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_REQUEST_CHANNEL.value, requestId: context.requestId, correlationId: context.correlationId }); return assertDesktopEnvelopeResponse<DesktopAssetAuthoringCreateWorkspaceAuthoredAssetResponse>(response, { operation: DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_OPERATION, channel: DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_RESPONSE_CHANNEL.value, message: "Received invalid desktop asset authoring create workspace-authored asset IPC response envelope." }); },
