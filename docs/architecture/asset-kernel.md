@@ -593,3 +593,8 @@ Phase 8 should add Asset Authoring, Customization, and Override Management. Phas
 ## Phase 8 cross-reference
 
 Phase 8 authoring/customization/override architecture builds on Asset Kernel vocabulary and is defined in `docs/architecture/asset-authoring-customization-and-overrides.md` (ADR-0018).
+
+
+## Relationship to Phase 10 composition planning
+
+Phase 10 composition plans are planning records that reference effective asset projections and safe fields; they are not new Asset Kernel definitions and do not generate executable runtime payloads.

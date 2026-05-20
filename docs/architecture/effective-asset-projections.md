@@ -356,3 +356,8 @@ Phase 10 must not begin with runtime execution, workflow execution, visual canva
 Effective asset projections are internal read-model infrastructure. In normal product UX, users navigate to **Assets** and see projection-derived readiness/status as secondary metadata on asset cards/details. A separate top-level 'Effective Assets' page is not part of the primary navigation model.
 
 Readiness language in user-facing surfaces must remain planning-oriented (for example, **Ready for planning**) and must not be presented as runtime or execution readiness.
+
+
+## Phase 10 handoff
+
+Phase 9 projections are readiness-for-planning inputs for Phase 10 composition planning (`docs/architecture/asset-composition-planning.md`, ADR-0020). Projection `ready` is not runtime-ready and does not imply execution capability.

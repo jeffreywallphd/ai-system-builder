@@ -17,6 +17,7 @@ Use this guide to select **minimum-sufficient** context packs for prompts.
 | user library scope, user-library assets, promote/link/copy/import reuse workflows, cross-workspace asset reuse, provenance, propagation policy, effective asset source, effective resolution summaries, accidental propagation prevention | `docs/context/packs/user-library.pack.md` |
 | asset authoring, customized assets, override records, editable drafts, authored revisions, customization conflicts, linked/customized user-library assets, customized detached copies/imported workspace copies, workspace-local asset creation, or promotion-readiness of authored/customized assets | `docs/context/packs/asset-authoring.pack.md` |
 | materialization, effective asset projections, projected asset records, projection readiness/diagnostics/blockers, safe projected fields, authored/customized asset materialization, or preparing assets for composition/runtime-readiness | `docs/context/packs/effective-asset-projections.pack.md` |
+| asset composition plans, composition nodes/relationships, projection selection for planning, compatibility checking, planning blockers/diagnostics, missing dependencies, required/provided capabilities, or runtime-readiness handoff preparation | `docs/context/packs/asset-composition-planning.pack.md` |
 
 When prompts involve promotion, linking, copying, workspace import, reusable library assets, effective-source summaries, provenance, propagation policy, cross-workspace reuse, or user-library transport/UI, include the `user-library` pack and then read canonical Phase 7 architecture + ADR docs for truthful status checks.
 
@@ -29,6 +30,19 @@ For tasks combining Phase 8 customization and Phase 9 projection, include both:
 
 - `docs/context/packs/asset-authoring.pack.md`
 - `docs/context/packs/effective-asset-projections.pack.md`
+
+For tasks involving composition over projections, include both:
+
+- `docs/context/packs/effective-asset-projections.pack.md`
+- `docs/context/packs/asset-composition-planning.pack.md`
+
+For tasks involving authored/customized assets and composition, also include:
+
+- `docs/context/packs/asset-authoring.pack.md`
+
+For tasks involving library-linked/copied/imported sources and composition, also include:
+
+- `docs/context/packs/user-library.pack.md`
 
 For tasks that materially involve effective projections built from user-library sources, include all three:
 

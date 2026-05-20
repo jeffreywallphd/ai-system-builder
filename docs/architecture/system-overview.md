@@ -303,3 +303,8 @@ Later roadmap: Phase 8 is **Asset Authoring, Customization, and Override Managem
 
 
 - UX alignment: effective asset projection infrastructure enriches the **Assets** experience; it is not a separate primary navigation destination in normal user flows.
+
+
+## Phase 10 note
+
+Asset Composition Planning is defined in `docs/architecture/asset-composition-planning.md` and ADR-0020. It consumes Phase 9 effective projection summaries as planning inputs and does not execute workflows/runtime behavior.
