@@ -297,3 +297,8 @@ Prompt 1 defines vocabulary only; contract implementation is deferred.
 17. Conflict rebase/resolution workflow: not implemented.
 18. Source mutation: not implemented.
 19. `system.foundation` mutation: not implemented.
+
+
+## Relationship to Phase 10 composition planning
+
+Authoring/customization records remain source-of-truth for edits. Phase 10 composition planning consumes effective projection summaries and must route users back to authoring/customization surfaces when source edits are needed.

@@ -227,3 +227,8 @@ Phase 8 must not assume hidden propagation, live workspace-to-workspace links, s
 - Deferred/unavailable in minimal UI: promote and import action flows, advanced editing, propagation execution, live workspace-to-workspace links, collaboration, pack import/export, marketplace, hidden/default workspaces, startup seeding, and legacy/global auto-migration.
 - Transport and preload exposure may include promote/import operations, but minimal UI intentionally does not present them as available actions in this phase cleanup.
 - Documentation and tests must stay aligned with implemented behavior; do not claim unsupported actions as complete.
+
+
+## Relationship to Phase 10 composition planning
+
+Phase 10 may compose projections derived from linked/copied/imported user-library sources, but must not create live workspace-to-workspace links, silently propagate changes, or mutate user-library records.
