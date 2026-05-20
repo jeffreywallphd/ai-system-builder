@@ -22,7 +22,7 @@ test('conflict classifier handles missing source', ()=>{
   assert.equal(r.status,'source-missing');
 });
 
-test('readiness only ready status is execution-ready', ()=>{
-  assert.equal(defaultEffectiveAssetProjectionReadinessService.isExecutionReady('ready'), true);
-  assert.equal(defaultEffectiveAssetProjectionReadinessService.isExecutionReady('blocked'), false);
+test('readiness only ready status is consumable for downstream planning', ()=>{
+  assert.equal(defaultEffectiveAssetProjectionReadinessService.isProjectionConsumable('ready'), true);
+  assert.equal(defaultEffectiveAssetProjectionReadinessService.isProjectionConsumable('blocked'), false);
 });
