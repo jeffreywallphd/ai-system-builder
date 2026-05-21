@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Define and protect the non-executing execution-plan-preparation layer that turns runtime-readiness-backed composition context into safe execution plan candidates/previews.
+Define and protect the non-executing execution-plan-preparation layer that turns runtime-readiness-backed composition context into safe execution plan candidates/previews shown inside Assets / Plans / Setup.
 
 ## Use When
 

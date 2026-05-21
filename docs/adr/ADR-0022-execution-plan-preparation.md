@@ -16,7 +16,7 @@ Phase 12 introduces workspace-scoped execution plan preparation that converts re
 ## Accepted Phase 12 boundaries
 
 - Phase 12 owns non-executing planning metadata only.
-- Phase 12 outputs execution plan candidates/previews for user/system inspection.
+- Phase 12 outputs execution plan candidates/previews for user/system inspection in Assets / Plans / Setup (no separate top-level Execution Plans page).
 - Phase 12 preserves conservative blocker-first semantics when readiness or planning completeness is insufficient.
 
 ## Execution plan ownership and workspace scope
@@ -72,3 +72,8 @@ Phase 12 is downstream from Phase 11 readiness bindings. If readiness is stale, 
 ## Phase 13 handoff implications
 
 Phase 13 (Execution Orchestration and Controlled Runtime Invocation) may consume prepared execution plans to perform invocation, lifecycle management, progress, cancellation, recovery, and audit behaviors. Phase 12 supplies planning metadata and gate outcomes only.
+
+
+## Phase 12 to Phase 13 handoff payload boundary
+
+Phase 12 hands off only safe planning metadata (workspace/plan/source ids, status, planned steps/inputs/outputs/dependencies, safe adapter references, safety gates, resource estimates, blockers, diagnostics, provenance summary). It must not hand off credentials, secrets, raw env values, command lines, local paths, storage roots, raw workflow JSON, provider invocation payloads, runnable graphs, executable payloads, bytes/blobs/base64, or signed URLs.
