@@ -136,6 +136,13 @@ import {
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_OPERATION,
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_RESPONSE_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_REFRESH_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_LIST_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_LATEST_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_SUMMARIZE_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_CREATE_BINDING_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL,
 
   DESKTOP_WORKSPACE_LIST_OPERATION,
   DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL,
@@ -471,6 +478,13 @@ export interface DesktopPreloadApi {
     input: { capabilityId: RuntimeCapabilityId },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopRuntimeCapabilityStatusReadResponse>;
+  refreshRuntimeReadinessInventory: (input: { targetWorkspaceId: string; sourceKind?: string; sourceId?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  listRuntimeReadinessInventory: (input: { targetWorkspaceId: string; limit?: number; cursor?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  readRuntimeReadinessInventory: (input: { targetWorkspaceId: string; inventorySourceId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  readLatestRuntimeReadinessInventory: (input: { targetWorkspaceId: string; sourceKind?: string; sourceId?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  summarizeRuntimeReadinessInventory: (input: { targetWorkspaceId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  createRuntimeReadinessBinding: (input: { targetWorkspaceId: string; compositionPlanId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  validateRuntimeReadinessBinding: (input: { targetWorkspaceId: string; readinessBindingId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
   readFeatureLifecycleState: (
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopFeatureLifecycleStateReadResponse>;
@@ -1074,6 +1088,28 @@ export function createDesktopPreloadApi(
       });
     },
 
+
+    async refreshRuntimeReadinessInventory(input, context = {}) {
+      return dependencies.ipcRenderer.invoke(DESKTOP_RUNTIME_READINESS_REFRESH_INVENTORY_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input });
+    },
+    async listRuntimeReadinessInventory(input, context = {}) {
+      return dependencies.ipcRenderer.invoke(DESKTOP_RUNTIME_READINESS_LIST_INVENTORY_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input });
+    },
+    async readRuntimeReadinessInventory(input, context = {}) {
+      return dependencies.ipcRenderer.invoke(DESKTOP_RUNTIME_READINESS_READ_INVENTORY_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input });
+    },
+    async readLatestRuntimeReadinessInventory(input, context = {}) {
+      return dependencies.ipcRenderer.invoke(DESKTOP_RUNTIME_READINESS_READ_LATEST_INVENTORY_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input });
+    },
+    async summarizeRuntimeReadinessInventory(input, context = {}) {
+      return dependencies.ipcRenderer.invoke(DESKTOP_RUNTIME_READINESS_SUMMARIZE_INVENTORY_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input });
+    },
+    async createRuntimeReadinessBinding(input, context = {}) {
+      return dependencies.ipcRenderer.invoke(DESKTOP_RUNTIME_READINESS_CREATE_BINDING_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input });
+    },
+    async validateRuntimeReadinessBinding(input, context = {}) {
+      return dependencies.ipcRenderer.invoke(DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input });
+    },
 
     async readFeatureLifecycleState(context = {}) {
       const request = createDesktopFeatureLifecycleStateReadRequest(

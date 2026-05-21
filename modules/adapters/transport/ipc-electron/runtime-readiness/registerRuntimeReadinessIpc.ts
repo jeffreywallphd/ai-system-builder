@@ -1,4 +1,6 @@
 import type { RuntimeReadinessPort } from "../../../../application/ports/runtime";
+import type { CreateRuntimeReadinessBindingUseCase, ValidateRuntimeReadinessBindingUseCase } from "../../../../application/use-cases/runtime-readiness";
+import type { RuntimeCapabilityInventoryService, RuntimeCapabilityInventorySummaryService } from "../../../../application/services/runtime-readiness";
 import { normalizeRuntimeCapabilityId } from "../../../../contracts/runtime";
 import {
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
@@ -13,16 +15,34 @@ import {
   type DesktopRuntimeCapabilityStatusReadResponse,
   type DesktopRuntimeReadinessReadRequest,
   type DesktopRuntimeReadinessReadResponse,
+  DESKTOP_RUNTIME_READINESS_REFRESH_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_LIST_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_LATEST_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_SUMMARIZE_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_CREATE_BINDING_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
 export interface RegisterRuntimeReadinessIpcDependencies {
   ipcMain: IpcMainHandlePort;
   runtimeReadiness: RuntimeReadinessPort;
+  runtimeReadinessV2?: {
+    inventory: RuntimeCapabilityInventoryService;
+    inventorySummary: RuntimeCapabilityInventorySummaryService;
+    createBinding: CreateRuntimeReadinessBindingUseCase;
+    validateBinding: ValidateRuntimeReadinessBindingUseCase;
+  };
 }
 
 const RUNTIME_READINESS_INTERNAL_ERROR_MESSAGE = "Unable to read runtime readiness.";
 const RUNTIME_CAPABILITY_STATUS_INTERNAL_ERROR_MESSAGE = "Unable to read runtime capability status.";
+
+
+type RuntimeReadinessV2Request = { requestId?: string; correlationId?: string; payload?: Record<string, unknown> };
+const ok = <T>(request: RuntimeReadinessV2Request, value: T) => ({ ok: true as const, requestId: request.requestId, correlationId: request.correlationId, value });
+const fail = (request: RuntimeReadinessV2Request, code: string, message: string) => ({ ok: false as const, requestId: request.requestId, correlationId: request.correlationId, error: { code, message } });
 
 export function createDesktopRuntimeReadinessReadIpcHandler(
   dependencies: Pick<RegisterRuntimeReadinessIpcDependencies, "runtimeReadiness">,
@@ -100,4 +120,38 @@ export function registerRuntimeReadinessIpc(
     DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL.value,
     createDesktopRuntimeCapabilityStatusReadIpcHandler({ runtimeReadiness: dependencies.runtimeReadiness }),
   );
+
+  if (dependencies.runtimeReadinessV2) {
+    const v2 = dependencies.runtimeReadinessV2;
+    dependencies.ipcMain.handle(DESKTOP_RUNTIME_READINESS_REFRESH_INVENTORY_REQUEST_CHANNEL.value, async (_e: unknown, request: RuntimeReadinessV2Request) => {
+      const workspaceId = request?.payload?.targetWorkspaceId;
+      if (!workspaceId) return fail(request, "validation", "Workspace id is required.");
+      return ok(request, await v2.inventory.refreshInventoryFromSources(request.payload));
+    });
+    dependencies.ipcMain.handle(DESKTOP_RUNTIME_READINESS_LIST_INVENTORY_REQUEST_CHANNEL.value, async (_e: unknown, request: RuntimeReadinessV2Request) => {
+      const workspaceId = request?.payload?.targetWorkspaceId; if (!workspaceId) return fail(request, "validation", "Workspace id is required.");
+      return ok(request, await v2.inventory.listRuntimeInventory(request.payload));
+    });
+    dependencies.ipcMain.handle(DESKTOP_RUNTIME_READINESS_READ_INVENTORY_REQUEST_CHANNEL.value, async (_e: unknown, request: RuntimeReadinessV2Request) => {
+      if (!request?.payload?.targetWorkspaceId || !request?.payload?.inventorySourceId) return fail(request, "validation", "Workspace id and inventory source id are required.");
+      return ok(request, await v2.inventory.readRuntimeInventory(request.payload));
+    });
+    dependencies.ipcMain.handle(DESKTOP_RUNTIME_READINESS_READ_LATEST_INVENTORY_REQUEST_CHANNEL.value, async (_e: unknown, request: RuntimeReadinessV2Request) => {
+      if (!request?.payload?.targetWorkspaceId) return fail(request, "validation", "Workspace id is required.");
+      return ok(request, await v2.inventory.readLatestRuntimeInventory(request.payload));
+    });
+    dependencies.ipcMain.handle(DESKTOP_RUNTIME_READINESS_SUMMARIZE_INVENTORY_REQUEST_CHANNEL.value, async (_e: unknown, request: RuntimeReadinessV2Request) => {
+      if (!request?.payload?.targetWorkspaceId) return fail(request, "validation", "Workspace id is required.");
+      return ok(request, await v2.inventorySummary.summarizeRuntimeCapabilities(request.payload));
+    });
+    dependencies.ipcMain.handle(DESKTOP_RUNTIME_READINESS_CREATE_BINDING_REQUEST_CHANNEL.value, async (_e: unknown, request: RuntimeReadinessV2Request) => {
+      const p=request?.payload; if (!p?.targetWorkspaceId || !p?.compositionPlanId) return fail(request, "validation", "Workspace id and composition plan id are required.");
+      return ok(request, await v2.createBinding.execute(p));
+    });
+    dependencies.ipcMain.handle(DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL.value, async (_e: unknown, request: RuntimeReadinessV2Request) => {
+      const p=request?.payload; if (!p?.targetWorkspaceId || !p?.readinessBindingId) return fail(request, "validation", "Workspace id and readiness binding id are required.");
+      return ok(request, await v2.validateBinding.execute(p));
+    });
+  }
+
 }

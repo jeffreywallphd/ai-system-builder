@@ -50,6 +50,14 @@
 - Prompt 1: architecture baseline + ADR + docs/context pack.
 - Prompt 2+: contracts/ports/persistence/readiness services/read models/transports/UI (as separately scoped prompts).
 
+## Prompt 8 transport status
+
+- API, IPC, preload, and client transport exposure is intended to remain thin and workspace-explicit.
+- Operation families should be semantically aligned across API/IPC/preload/desktop-client/thin-client surfaces.
+- Deferred or unavailable operations must be represented consistently and safely.
+- Visible runtime-readiness UI remains deferred (Prompt 9 scope).
+- Runtime/provider/workflow/model execution remains out of scope for Prompt 8.
+
 ## Non-goals
 
 - Workflow/runtime/model/ComfyUI execution.

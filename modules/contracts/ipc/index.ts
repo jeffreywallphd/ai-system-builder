@@ -39,3 +39,5 @@ export * from "./desktop-workspace-contract";
 export * from "./desktop-user-library-contract";
 
 export * from "./desktop-asset-authoring-contract";
+
+export * from "./desktop-runtime-readiness-v2-contract";
