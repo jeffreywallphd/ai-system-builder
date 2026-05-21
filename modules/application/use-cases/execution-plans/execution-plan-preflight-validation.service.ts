@@ -44,5 +44,5 @@ export class ExecutionPlanPreflightValidationService {
     if (hasUnsafeDetails) diagnostics.push({ code: 'execution-plan-unsafe-details-redacted', severity: 'warning', message: 'Unsafe details were detected and deferred.' });
     return { blockers, diagnostics, hasMissingInputs: blockers.some((b) => b.code.includes('input')), hasMissingOutputs: blockers.some((b) => b.code.includes('output')), hasMissingAdapters: blockers.some((b) => b.code.includes('adapter') || b.code.includes('provider-setup')), hasUnsafeDetails };
   }
-  private b(code: string, message: string, targetReferenceId?: string): ExecutionBlocker { return { code, message, ...(targetReferenceId ? { targetReferenceKind: 'execution-step', targetReferenceId: targetReferenceId as never } : {}) }; }
+  private b(code: string, message: string, targetReferenceId?: string): ExecutionBlocker { return { code, message, ...(targetReferenceId ? { targetReferenceKind: 'execution-step', targetReferenceId: targetReferenceId } : {}) }; }
 }

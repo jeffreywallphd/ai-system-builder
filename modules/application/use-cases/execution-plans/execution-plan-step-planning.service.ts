@@ -21,7 +21,7 @@ export class ExecutionPlanStepPlanningService {
         blockers.push({ code: "execution-plan-unsupported-node", message: "Unsupported composition node requires manual review.", targetReferenceId: node.nodeId, targetReferenceKind: "composition-node" });
         diagnostics.push({ code: "execution-plan-step-manual-review", message: "Step mapped to manual review.", severity: "warning", targetReferenceId: node.nodeId, targetReferenceKind: "composition-node" });
       }
-      return { id: args.nextExecutionStepId(), planId: args.planId as any, sourceCompositionPlanId: args.sourceCompositionPlanId, sourceNodeId: node.nodeId, kind, status: kind === "manual-review" ? "needs-review" : "planned", label: node.label ?? `Planned ${kind}`, summary: node.summary ?? "Planning-only execution step.", requiredAdapterReferenceIds: [], inputIds: [], outputIds: [], dependencyIds: [], safetyGateIds: [], blockers: [], diagnostics: [] };
+      return { id: args.nextExecutionStepId(), planId: args.planId, sourceCompositionPlanId: args.sourceCompositionPlanId, sourceNodeId: node.nodeId, kind, status: kind === "manual-review" ? "needs-review" : "planned", label: node.label ?? `Planned ${kind}`, summary: node.summary ?? "Planning-only execution step.", requiredAdapterReferenceIds: [], inputIds: [], outputIds: [], dependencyIds: [], safetyGateIds: [], blockers: [], diagnostics: [] };
     });
     return { steps, blockers, diagnostics };
   }

@@ -15,19 +15,19 @@ export class ValidateExecutionPlanUseCase {
     let c; try { c = normalizeValidateExecutionPlanCommand(command); } catch { return executionPlanFailure('validation','execution-plan-command-invalid'); }
     const now = (this.d.now ?? (() => new Date().toISOString()))();
     try {
-      const record = await this.d.executionPlanRepository.getExecutionPlanById(c.workspaceId as any, c.executionPlanId as any);
+      const record = await this.d.executionPlanRepository.getExecutionPlanById(c.workspaceId, c.executionPlanId);
       if (!record) return executionPlanFailure('not-found','execution-plan-not-found');
       if (record.status === 'archived') return executionPlanFailure('archived','execution-plan-archived');
       let hasStaleSource = false;
       let readinessStatus = record.sourceReadinessStatus;
       if (this.d.runtimeReadinessBindingRepository) {
-        const readiness = await this.d.runtimeReadinessBindingRepository.readRuntimeReadinessBindingRecord(record.workspaceId as any, record.sourceRuntimeReadinessBindingId as any);
+        const readiness = await this.d.runtimeReadinessBindingRepository.readRuntimeReadinessBindingRecord(record.workspaceId, record.sourceRuntimeReadinessBindingId);
         if (!readiness) return executionPlanFailure('source-readiness-not-ready','execution-plan-source-readiness-not-found');
         readinessStatus = readiness.status;
         if (new Date(readiness.updatedAt).getTime() > new Date(record.updatedAt).getTime()) hasStaleSource = true;
       }
       if (this.d.compositionPlanRepository) {
-        const comp = await this.d.compositionPlanRepository.readAssetCompositionPlanRecord(record.workspaceId as any, record.sourceCompositionPlanId as any);
+        const comp = await this.d.compositionPlanRepository.readAssetCompositionPlanRecord(record.workspaceId, record.sourceCompositionPlanId);
         if (!comp) return executionPlanFailure('blocked','execution-plan-source-composition-not-found');
         if (new Date(comp.updatedAt).getTime() > new Date(record.updatedAt).getTime()) hasStaleSource = true;
       }
