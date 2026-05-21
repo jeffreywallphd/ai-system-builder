@@ -169,6 +169,7 @@ describe("desktop artifact-browser ipc contract", () => {
       locator: {
         storageKey: " staged/images/artifact-32 ",
       },
+      workspaceId: "workspace-a",
       boundary: {
         host: "desktop",
         source: " desktop.renderer.artifact-read ",
@@ -178,6 +179,7 @@ describe("desktop artifact-browser ipc contract", () => {
       locator: {
         storageKey: " staged/images/artifact-32 ",
       },
+      workspaceId: "workspace-a",
       boundary: {
         host: "desktop",
         source: " desktop.renderer.artifact-content-read ",
@@ -185,6 +187,7 @@ describe("desktop artifact-browser ipc contract", () => {
     });
     const browseRequest = createDesktopArtifactBrowseRequest({
       artifactFamily: "image",
+      workspaceId: "workspace-a",
       boundary: {
         host: "desktop",
         source: " desktop.renderer.artifact-browse ",
@@ -193,6 +196,7 @@ describe("desktop artifact-browser ipc contract", () => {
 
     const mediaViewRequest = createDesktopArtifactMediaViewRequest({
       storageKey: " staged/images/artifact-32 ",
+      workspaceId: "workspace-a",
       boundary: {
         host: "desktop",
         source: " desktop.renderer.artifact-media-view ",
@@ -210,6 +214,7 @@ describe("desktop artifact-browser ipc contract", () => {
   it("accepts generic artifactFamily filters without narrowing to image/data", () => {
     const browseRequest = createDesktopArtifactBrowseRequest({
       artifactFamily: "application",
+      workspaceId: "workspace-a",
       boundary: {
         host: "desktop",
         source: "desktop.renderer.artifact-browse",

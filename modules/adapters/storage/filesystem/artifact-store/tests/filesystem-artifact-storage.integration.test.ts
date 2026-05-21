@@ -101,7 +101,6 @@ describe("desktop filesystem artifact-object storage adapter integration", () =>
       outcome: "success",
       data: {
         key: "uploads/session-1/kitten.png",
-        absolutePath: path.join(rootDirectory, "uploads", "session-1", "kitten.png"),
         sizeBytes: bytes.byteLength,
         checksumAlgorithm: "sha256",
         checksumValue: sha256Hex(bytes),
@@ -170,7 +169,6 @@ describe("desktop filesystem artifact-object storage adapter integration", () =>
     expect(result.error.details).toMatchObject({
       operation: "storeArtifact",
       key: "uploads/verifies/missing-after-write.png",
-      absolutePath: path.join(rootDirectory, "uploads", "verifies", "missing-after-write.png"),
       filesystemCode: "ENOENT",
     });
 
@@ -212,7 +210,7 @@ describe("desktop filesystem artifact-object storage adapter integration", () =>
       throw new Error("Expected post-write size verification failure.");
     }
     expect(result.error.code).toBe("unavailable");
-    expect(result.error.message).toContain("expected 3 bytes but found 999");
+    expect(result.error.message).toContain("Failed to store artifact bytes");
     expect(result.error.details).toMatchObject({
       operation: "storeArtifact",
       key: "uploads/verifies/size-mismatch.png",
@@ -501,4 +499,34 @@ describe("desktop filesystem artifact-object storage adapter integration", () =>
     expect(retrieveMissing.requestId).toBe("req-retrieve-missing");
     expect(retrieveMissing.correlationId).toBe("corr-retrieve-missing");
   });
+
+  it("sanitizes filesystem error messages for retrieve, delete, and store failures", async () => {
+    const rootDirectory = await createTempRoot();
+    const adapter = createFilesystemArtifactObjectStorageAdapter({
+      rootDirectory,
+      statPath: testDouble.fn(async (target: string) => {
+        const error = new Error(`EACCES: permission denied, stat '${target}'`) as NodeJS.ErrnoException;
+        error.code = "EACCES";
+        throw error;
+      }) as typeof import("node:fs/promises").stat,
+    });
+    await import("node:fs/promises").then(({ mkdir }) => mkdir(path.join(rootDirectory, "uploads", "as-directory.png"), { recursive: true }));
+
+    const retrieve = await adapter.retrieveArtifact(createRetrieveArtifactRequest("uploads/as-directory.png"));
+    const deleted = await adapter.deleteArtifact(createDeleteArtifactRequest("uploads/as-directory.png"));
+    const stored = await adapter.storeArtifact(createStoreArtifactRequest(new Uint8Array([1]), { descriptor: { key: "uploads/store.png", mediaType: "image/png" } }));
+
+    for (const result of [retrieve, deleted, stored]) {
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error("Expected storage operation to fail.");
+      const serialized = JSON.stringify(result.error);
+      expect(serialized).not.toContain(rootDirectory);
+      expect(serialized).not.toContain("permission denied");
+      expect(serialized).not.toContain("EACCES: permission denied");
+    }
+    if (!retrieve.ok) expect(retrieve.error.message).toBe("Failed to retrieve artifact bytes.");
+    if (!deleted.ok) expect(deleted.error.message).toBe("Failed to delete artifact.");
+    if (!stored.ok) expect(stored.error.message).toBe("Failed to store artifact bytes.");
+  });
+
 });

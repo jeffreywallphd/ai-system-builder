@@ -23,7 +23,7 @@ export function registerImageGenerationIpc(dependencies: RegisterImageGeneration
   });
   dependencies.ipcMain.handle(DESKTOP_IMAGE_GENERATION_FINALIZE_REQUEST_CHANNEL.value, async (_e, request: DesktopImageGenerationFinalizeRequest) => {
     if (!dependencies.imageGenerationFinalizationOrchestrator) return createDesktopImageGenerationFinalizeSuccessResponse({ finalized: false, reason: "image generation finalization is unavailable" }, { requestId: request.requestId, correlationId: request.correlationId });
-    try { const value = await dependencies.imageGenerationFinalizationOrchestrator.finalizeIfCompleted(request.payload.requestId); return createDesktopImageGenerationFinalizeSuccessResponse(value, { requestId: request.requestId, correlationId: request.correlationId }); }
+    try { const value = await dependencies.imageGenerationFinalizationOrchestrator.finalizeIfCompleted(request.payload.requestId, request.payload.workspaceId); return createDesktopImageGenerationFinalizeSuccessResponse(value, { requestId: request.requestId, correlationId: request.correlationId }); }
     catch { return createIpcFailureResponse(createIpcError(DESKTOP_IMAGE_GENERATION_FINALIZE_RESPONSE_CHANNEL, "internal", INTERNAL_IMAGE_GENERATION_IPC_FAILURE_MESSAGE, { requestId: request.requestId, correlationId: request.correlationId })); }
   });
 }

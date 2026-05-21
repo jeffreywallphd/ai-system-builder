@@ -40,6 +40,7 @@ export interface AssetRegistryDefinitionListInput {
   readonly limit?: number;
   readonly cursor?: string;
   readonly includeMetadata?: boolean;
+  readonly workspaceId?: string;
 }
 
 export interface AssetRegistryDefinitionReadInput {
@@ -47,6 +48,7 @@ export interface AssetRegistryDefinitionReadInput {
   readonly version?: string;
   readonly expand?: readonly AssetRegistryDefinitionExpansion[];
   readonly includeValidation?: boolean;
+  readonly workspaceId?: string;
 }
 
 export interface AssetRegistryResourceBackedViewListInput {
@@ -58,12 +60,14 @@ export interface AssetRegistryResourceBackedViewListInput {
   readonly limit?: number;
   readonly cursor?: string;
   readonly includeMetadata?: boolean;
+  readonly workspaceId?: string;
 }
 
 export interface AssetRegistryResourceBackedViewReadInput {
   readonly viewId: string;
   readonly expand?: readonly AssetRegistryResourceBackedViewExpansion[];
   readonly includeValidation?: boolean;
+  readonly workspaceId?: string;
 }
 
 const MAX_PUBLIC_LIMIT = 100;
@@ -90,6 +94,7 @@ export function parseAssetRegistryDefinitionListInput(
   const assetTypesValue = shape === "api-query" ? record.assetType : record.assetTypes;
   const assetFamiliesValue = shape === "api-query" ? record.assetFamily : record.assetFamilies;
   const lifecycleStatusesValue = shape === "api-query" ? record.lifecycleStatus : record.lifecycleStatuses;
+  const workspaceIdValue = record.workspaceId;
 
   return {
     ...(searchTextValue !== undefined ? { searchText: optionalString(searchTextValue, "searchText", shape) } : {}),
@@ -106,6 +111,7 @@ export function parseAssetRegistryDefinitionListInput(
     ...(record.limit !== undefined ? { limit: parseLimit(record.limit, shape) } : {}),
     ...(record.cursor !== undefined ? { cursor: parseCursor(record.cursor, shape) } : {}),
     ...(record.includeMetadata !== undefined ? { includeMetadata: parseBoolean(record.includeMetadata, "includeMetadata", shape) } : {}),
+    ...(workspaceIdValue !== undefined ? { workspaceId: requiredString(workspaceIdValue, "workspaceId", shape) } : {}),
   };
 }
 
@@ -122,6 +128,7 @@ export function toAssetRegistryFacadeListQuery(
     includeMetadata: input.includeMetadata,
     limit: input.limit,
     cursor: input.cursor,
+    workspaceId: input.workspaceId,
   };
 }
 
@@ -135,6 +142,7 @@ export function parseAssetRegistryResourceBackedViewListInput(
   const assetFamiliesValue = shape === "api-query" ? record.assetFamily : record.assetFamilies;
   const lifecycleStatusesValue = shape === "api-query" ? record.lifecycleStatus : record.lifecycleStatuses;
   const viewKindsValue = shape === "api-query" ? record.viewKind : record.viewKinds;
+  const workspaceIdValue = record.workspaceId;
 
   return {
     ...(searchTextValue !== undefined ? { searchText: optionalString(searchTextValue, "searchText", shape) } : {}),
@@ -153,6 +161,7 @@ export function parseAssetRegistryResourceBackedViewListInput(
     ...(record.limit !== undefined ? { limit: parseLimit(record.limit, shape) } : {}),
     ...(record.cursor !== undefined ? { cursor: parseCursor(record.cursor, shape) } : {}),
     ...(record.includeMetadata !== undefined ? { includeMetadata: parseBoolean(record.includeMetadata, "includeMetadata", shape) } : {}),
+    ...(workspaceIdValue !== undefined ? { workspaceId: requiredString(workspaceIdValue, "workspaceId", shape) } : {}),
   };
 }
 
@@ -168,6 +177,7 @@ export function toAssetRegistryResourceBackedViewListQuery(
     includeMetadata: input.includeMetadata,
     limit: input.limit,
     cursor: input.cursor,
+    workspaceId: input.workspaceId,
   };
 }
 
@@ -199,6 +209,7 @@ export function parseAssetRegistryDefinitionReadInput(
     ...(version ? { version } : {}),
     ...(expand ? { expand } : {}),
     ...(record.includeValidation !== undefined ? { includeValidation: parseBoolean(record.includeValidation, "includeValidation", shape) } : {}),
+    ...(record.workspaceId !== undefined ? { workspaceId: requiredString(record.workspaceId, "workspaceId", shape) } : {}),
   };
 }
 
@@ -213,7 +224,7 @@ export function toAssetRegistryDefinitionReference(
 }
 
 export function toAssetRegistryReadOptions(
-  input: Pick<AssetRegistryDefinitionReadInput, "expand" | "includeValidation">,
+  input: Pick<AssetRegistryDefinitionReadInput, "expand" | "includeValidation" | "workspaceId">,
 ): AssetRegistryReadOptions {
   const expand = new Set(input.expand ?? []);
   return {
@@ -223,6 +234,7 @@ export function toAssetRegistryReadOptions(
     includePorts: expand.has("ports"),
     includeRequirements: expand.has("requirements"),
     includeMetadata: expand.has("metadata"),
+    workspaceId: input.workspaceId,
   };
 }
 
@@ -245,17 +257,19 @@ export function parseAssetRegistryResourceBackedViewReadInput(
     viewId,
     ...(expand ? { expand } : {}),
     ...(record.includeValidation !== undefined ? { includeValidation: parseBoolean(record.includeValidation, "includeValidation", shape) } : {}),
+    ...(record.workspaceId !== undefined ? { workspaceId: requiredString(record.workspaceId, "workspaceId", shape) } : {}),
   };
 }
 
 export function toAssetRegistryResourceBackedViewReadOptions(
-  input: Pick<AssetRegistryResourceBackedViewReadInput, "expand" | "includeValidation">,
+  input: Pick<AssetRegistryResourceBackedViewReadInput, "expand" | "includeValidation" | "workspaceId">,
 ): AssetRegistryReadOptions {
   const expand = new Set(input.expand ?? []);
   return {
     includeValidation: input.includeValidation || expand.has("validation"),
     includeMetadata: expand.has("metadata"),
     includeResourceBackings: expand.has("resourceBackings"),
+    workspaceId: input.workspaceId,
   };
 }
 

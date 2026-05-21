@@ -1,5 +1,6 @@
 # System Overview
 
+- Phase 9 baseline: `docs/architecture/effective-asset-projections.md` defines workspace-scoped safe materialized/effective asset projections for planning-readiness (non-executing).
 ## Purpose of this repository
 
 `ai-system-builder` is a fresh rebuild intended to replace earlier architectural sprawl with a simpler and more disciplined structure.
@@ -64,6 +65,8 @@ This keeps desktop workflow stable while making thin-client/server dependency in
 The Asset Kernel is a central platform concept for user-composable systems. It defines assets as versioned, configurable, AI-readable, machine-composable building blocks that can represent structure, behavior, interface, data, instructions, resources, compositions, or logic containers, and can be assembled into features, systems, subsystems, and systems composed of subsystems. Canonical terminology and Phase 2A sequencing live in `docs/architecture/asset-kernel.md`; ADR-0016 refines the directional asset concept from ADR-0005.
 
 The Asset Kernel does not rename or replace existing artifact, resource, runtime, host, or storage concepts. Resource-backed assets reference artifact/resource storage, asset runtime requirements reference shared runtime capability IDs, and transport/UI-specific asset models are not allowed. Prompt 3 adds the initial `modules/contracts/asset` family for core identity, lifecycle, provenance, definitions, instances, references, minimal binding/composition shells, and validation issue contracts only; detailed configuration, AI context, port/rule validation, registry ports, persistence, and resource-backed mapping remain later Phase 2A prompts.
+
+Current Phase 5 Asset Kernel work adds pack-compatible system defaults without changing those boundaries. Phase 8 authoring/customization/override baseline is documented in `docs/architecture/asset-authoring-customization-and-overrides.md` and ADR-0018. `system.foundation` is the canonical versioned, system-trusted default pack; its entries are full semantic `AssetDefinition` records, not renderer components or loose hardcoded built-ins, and foundation records are read as system defaults/built-ins only when trusted source metadata or installer-managed markers prove that ownership. A source label alone does not make user/custom/imported assets system defaults. System pack install/seeding is explicit/internal/idempotent and not host-startup behavior; user/custom same-ID/version conflicts fail install without overwrite. The basic resolver is pure and non-destructive; its full result is internal and must not be exposed directly through public API/IPC/preload/UI without read-model sanitization. Manifest serialization/fingerprinting is pure in-memory readiness for future import/export, but fingerprinting is not validation or import approval. Asset Library pack/source/category display remains read-only, and `workspace-pack` is distinct from workspace override unless override metadata exists. Public pack import/export/install/activation, override editing, marketplace/package registry, asset editor, visual composition/canvas authoring, workflow execution, runtime execution, and provider/network/storage side effects remain deferred.
 
 ### Core logic
 
@@ -262,6 +265,65 @@ Desktop renderer artifact-browser publish/re-check UX should call the preload-ba
 
 Security is cross-cutting and layered rather than a monolithic module. The first implementation target is **HTTPS + LAN pairing bearer token** (`lan-https-token`). Transport security remains adapter-based and swappable, while authorization policy is shared but enforced at both transport and application/resource boundaries. Storage and runtime security concerns remain separate from transport security and are enforced in their own adapter/application seams. ADR-0015 is the canonical security architecture reference.
 
+## Phase 6 workspace contract vocabulary
+
+Phase 6 has introduced a passive `modules/contracts/workspace` contract family for workspace identity, lifecycle status, future actor/member role metadata, storage-root descriptors, system-pack activation references, workspace records, creation commands, active-selection read models, and explicit workspace request context. Phase 6 Prompt 3 adds application repository ports and local file-backed persistence adapters for workspace records/indexes, active workspace selection preferences, and workspace system-pack activation records. Phase 6 Prompt 4 adds `modules/application/use-cases/workspace`, including workspace creation with display-name validation, safe generated workspace IDs, workspace-record persistence, optional explicit active-selection persistence, and optional reference-only activation of `system.foundation@1.0.0`. These foundations prepare later workspace-scoped assets and resource-backed views, but they do not implement page gating, Asset Library effective views, resource scoping, active workspace global application-service state, collaboration permissions beyond passive placeholders, invites, sharing, sync, remote auth, API/IPC/preload/UI exposure, host wiring, or multi-user runtime behavior. Workspace ID validation errors are safe public diagnostics and do not echo rejected raw values. Workspace and activation persistence distinguish save as create-or-replace from update as existing-record-only. Workspace system-pack activation records reference system packs such as `system.foundation@1.0.0` by pack id/version only and do not use the Phase 5 installer or install, copy, embed, or mutate system pack definitions. If activation-reference persistence fails after the workspace record is saved, the current simple transaction policy leaves the workspace record in place, returns a failed result with partial-failure diagnostics, and persists no active workspace selection.
+
+### Workspace-gated product surfaces (Phase 6 Prompt 5)
+
+Workspace-scoped UI surfaces are unavailable without an active workspace. Asset, artifact/data, model, image-generation, generated-output, and other resource-backed pages must show a workspace-required call to action rather than empty global records when no workspace is active. Global-safe pages such as home, settings, security diagnostics, and system/about-style views may remain available when they do not expose workspace-owned resources.
+
+Workspace creation may offer `system.foundation@1.0.0` activation by reference via the user-facing “Include System Foundation assets” choice. This does not expose the system pack installer, copy system pack definitions, add pack import/export/install UI, or bypass workspace effective-view/resource scoping.
+
+## Phase 6 workspace activation availability checkpoint
+
+Workspace foundations include internal application use cases for listing, reading, and narrowly toggling workspace system-pack activation references. System packs remain system-owned; workspace records only determine availability by reference. The known activation registry is limited to `system.foundation@1.0.0`, diagnostics are sanitized, and no host/API/IPC/preload/UI pack-management surface, installer call, pack copy, collaboration, marketplace, workflow, runtime, provider, or network behavior is introduced.
+
+## Phase 6 artifact workspace isolation
+
+Workspace foundations now include artifact and upload isolation: workspace pages and transports must send an explicit workspace id for artifact browse, read, and upload operations. Workspace A artifacts must not appear in Workspace B, and missing workspace context must fail safely instead of returning global artifacts.
+
+### Workspace-aware desktop and thin-client surfaces (Phase 6 Prompt 10)
+
+Desktop and thin-client users can see the active workspace in the shell and on workspace-scoped pages. Assets, Artifacts/Data, Models, Images, generated-output/data/model surfaces remain gated without an active workspace; Settings, safe diagnostics, and system/status pages remain globally accessible when they do not display workspace-owned records.
+
+The UI uses real workspace clients/transports for create/select/switch, never derives workspace ids from display names, and never creates a hidden default workspace. Creating a workspace may include System Foundation assets via a `system.foundation@1.0.0` activation reference. Workspace-scoped feature clients must include the active workspace id and must not fall back to global records. User-library/cross-workspace reuse, collaboration, invites, sync, and marketplace/pack-management behavior remain out of scope.
+
+## Phase 6 final stabilization and Phase 7 handoff
+
+Phase 6 end-state: workspace is the normal boundary for user/project resources. A user can create, select, and switch workspaces through host-provided workspace repositories/use cases/transports; no workspace-scoped page should render feature content or call workspace-owned clients without an active workspace. Relevant workspace-scoped pages display the active workspace by display name, and global-safe pages may remain available only when they do not expose workspace-owned records.
+
+System packs remain system-owned. Workspace creation can request `system.foundation@1.0.0` only as a workspace activation reference; system pack definitions/manifests are not copied into workspace records, no Phase 5 installer is called during workspace creation, and hosts must not create hidden/default workspaces or seed/activate packs at startup.
+
+Implemented workspace-owned records require explicit workspace context through contracts, clients, transports, use cases, ports, providers, and persistence; UI gating alone is not sufficient, and reads/mutations must not fall back to legacy global records. Artifacts/uploads use workspace-scoped storage keyspace; image assets, generated-output descriptors/finalization, dataset preparation outputs, model inventory records, and runtime task outputs are workspace-scoped where implemented. Global runtime readiness, installed-runtime/model diagnostics, and provider configuration diagnostics may remain global, but they must not masquerade as workspace-owned records. Resource-backed Asset Library views either require workspace context or remain safely deferred. Legacy global records are not auto-migrated or silently assigned.
+
+Phase 7 is **User Library and Cross-Workspace Asset Reuse**. It should define explicit promote/link/copy/import flows, provenance for promoted/linked/copied assets, resolver support for user-library linked/copied assets, and guarded direct workspace-to-workspace links only if needed. Phase 7 must not allow accidental propagation without an explicit link policy.
+
+Later roadmap: Phase 8 is **Asset Authoring, Customization, and Override Management**; Phase 9 is **Materialized / Effective Asset Projections**; Phase 10 is **Asset Composition Planning**; Phase 11 is **Pack Import/Export, Sharing, and Distribution**; and Phase 12 is **Collaboration, Permissions, and Multi-User Workspaces**.
+
+
+- UX alignment: effective asset projection infrastructure enriches the **Assets** experience; it is not a separate primary navigation destination in normal user flows.
+
+
+## Phase 10 note
+
+Asset Composition Planning is defined in `docs/architecture/asset-composition-planning.md` and ADR-0020. It consumes Phase 9 effective projection summaries as planning inputs and does not execute workflows/runtime behavior.
+
+
+## Phase 10 UI closeout
+
+- Composition planning is exposed inside the **Assets** area as a `Plans` tab, not as a separate top-level page.
+- The Phase 10 UI is structured form/list planning (plans, assets in plan, connections, check plan), not visual canvas authoring.
+- `valid` means **Ready for planning** only; it does not mean runtime-ready or execution-ready.
+- Runtime-readiness binding and workflow/runtime/model execution remain deferred to Phase 11+.
+- API/IPC/preload/client exposure from Prompt 9 is the boundary used by UI operations; unsupported operations must render as unavailable in UI.
+
+- Asset composition planning in Phase 10 is surfaced in the Assets page (Plans tab) and remains non-runtime; runtime-readiness binding is a Phase 11 responsibility.
+
+
+## Phase 11 follow-on architecture
+
+After Phase 10 composition planning, Phase 11 introduces runtime readiness binding as a non-executing capability-matching layer before execution-oriented phases. See `docs/architecture/runtime-readiness-binding.md` and ADR-0021.
 
 ## Execution Plan Preparation (Phase 12)
 

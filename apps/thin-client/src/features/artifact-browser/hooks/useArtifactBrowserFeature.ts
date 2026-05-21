@@ -96,6 +96,7 @@ export interface UseArtifactBrowserFeatureResult {
 
 export function useArtifactBrowserFeature(
   client?: ArtifactBrowserApiClient,
+  workspaceId?: string,
 ): UseArtifactBrowserFeatureResult {
   type DatasetFilesPanelState = {
     files: ThinClientHuggingFaceDatasetParquetFile[];
@@ -154,7 +155,7 @@ export function useArtifactBrowserFeature(
         return undefined;
       }
 
-      const artifactDetail = await artifactClient.readArtifactDetail({ storageKey: selectedStorageKey });
+      const artifactDetail = await artifactClient.readArtifactDetail({ storageKey: selectedStorageKey }, { workspaceId });
       setDetail(artifactDetail);
       return artifactDetail;
     },
@@ -163,8 +164,18 @@ export function useArtifactBrowserFeature(
   async function refreshArtifacts(): Promise<void> {
     setViewState({ status: "loading", message: "Loading data artifacts..." });
     try {
-      const browseItems = await artifactClient.browseArtifacts();
+      if (!workspaceId) {
+        setItems([]);
+        setSelectedStorageKey(undefined);
+        setDetail(undefined);
+        setContent(undefined);
+        setImageViewUrl(undefined);
+        setViewState({ status: "success", message: "No data artifacts found yet." });
+        return;
+      }
+      const browseItems = await artifactClient.browseArtifacts({ workspaceId });
       setItems(browseItems);
+      setSelectedStorageKey((current) => browseItems.some((item) => item.storageKey === current) ? current : undefined);
       setViewState({
         status: "success",
         message: browseItems.length > 0 ? "Loaded data artifacts." : "No data artifacts found yet.",
@@ -179,7 +190,7 @@ export function useArtifactBrowserFeature(
 
   useEffect(() => {
     void refreshArtifacts();
-  }, [artifactClient]);
+  }, [artifactClient, workspaceId]);
 
   async function selectArtifact(storageKey: string): Promise<void> {
     setSelectedStorageKey(storageKey);
@@ -187,12 +198,12 @@ export function useArtifactBrowserFeature(
 
     try {
       const locator = { storageKey };
-      const artifactDetail = await artifactClient.readArtifactDetail(locator);
+      const artifactDetail = await artifactClient.readArtifactDetail(locator, { workspaceId });
       setDetail(artifactDetail);
       publishLogic.setPublishedBackingFromDetail(artifactDetail);
 
       try {
-        const contentDescriptor = await artifactClient.readArtifactContent(locator);
+        const contentDescriptor = await artifactClient.readArtifactContent(locator, { workspaceId });
         setContent(contentDescriptor);
         if (contentDescriptor.mediaType?.startsWith("image/")) {
           setImageViewUrl(artifactClient.createArtifactMediaViewUrl(locator));

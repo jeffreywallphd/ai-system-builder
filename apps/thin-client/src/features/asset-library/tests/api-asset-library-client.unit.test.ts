@@ -186,7 +186,57 @@ describe("api asset library client", () => {
     expect(JSON.stringify(internal).includes("C:\\Users\\name\\secret")).toBe(false);
   });
 
-  it("does not expose mutation or execution methods", () => {
+  it("posts controlled mutation commands and sanitizes mutation results", async () => {
+    const fetchMock = queuedFetch([
+      response(200, {
+        ok: true,
+        value: {
+          ok: false,
+          operation: "asset.import-external-repository-object",
+          failure: {
+            code: "internal",
+            message: "stack at C:\\Users\\name\\secret",
+            operation: "asset.import-external-repository-object",
+            diagnostics: [{ severity: "error", code: "raw", message: "Bearer secret" }],
+          },
+        },
+      }),
+    ]);
+    installBrowserStubs(fetchMock);
+
+    const client = createApiAssetLibraryClient({ apiBaseUrl: "/api" });
+    const command = {
+      operation: "asset.import-external-repository-object" as const,
+      viewId: "asset-view.external-repository-object.internal.1",
+      importMode: "remote-reference" as const,
+      approval: {
+        userConfirmed: true,
+        confirmationKind: "import-external-object" as const,
+        allowNetworkAccess: true,
+        allowCredentialUse: true,
+        allowFilesystemWrite: true,
+        allowPartialCompletion: true,
+      },
+      actor: { initiatedBy: "human" as const, automationSafe: false, thinClientSafe: true },
+    };
+    const result = await client.importExternalRepositoryObjectAsAsset(command);
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/assets/import-external-repository-object");
+    expect((fetchMock.mock.calls[0][1] as RequestInit).method).toBe("POST");
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string)).toEqual(command);
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        ok: false,
+        operation: "asset.import-external-repository-object",
+        failure: { code: "internal", message: "Something went wrong while completing this action." },
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("C:\\Users\\name\\secret");
+    expect(JSON.stringify(result)).not.toContain("Bearer secret");
+  });
+
+  it("exposes only controlled mutations and no arbitrary mutation or execution methods", () => {
     const fetchMock = testDouble.fn().mockResolvedValue(response(200, { ok: true, value: { items: [] } }));
     installBrowserStubs(fetchMock);
     const client = createApiAssetLibraryClient() as unknown as Record<string, unknown>;
@@ -194,6 +244,10 @@ describe("api asset library client", () => {
     for (const method of ["createAssetDefinition", "updateAssetDefinition", "deleteAssetDefinition", "seedBuiltInAssetDefinitions", "importAsset", "finalizeAsset", "scanResources", "executeAsset"]) {
       expect(client[method]).toBeUndefined();
     }
+    expect(typeof client.registerResourceBackedViewAsAsset).toBe("function");
+    expect(typeof client.finalizeGeneratedOutputAsAsset).toBe("function");
+    expect(typeof client.importExternalRepositoryObjectAsAsset).toBe("function");
+    expect(typeof client.localizeExternalRepositoryObjectAsAsset).toBe("function");
   });
 
   it("does not import server handlers, application services, host composition, or persistence adapters", () => {

@@ -204,7 +204,7 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
     const second = new TestProvider("second-provider", [view("view.3", "Three")]);
     const aggregate = new AssetResourceBackedViewAggregateProvider({ providers: [first, second] });
 
-    const result = await aggregate.listResourceBackedViews();
+    const result = await aggregate.listResourceBackedViews({ workspaceId: "workspace-a" });
 
     assert.deepEqual(result.items.map((item) => item.viewId), ["view.1", "view.2", "view.3"]);
     assert.equal(first.listCalls, 1);
@@ -213,7 +213,7 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
 
   it("returns an empty list when no providers are supplied", async () => {
     const aggregate = new AssetResourceBackedViewAggregateProvider();
-    assert.deepEqual(await aggregate.listResourceBackedViews(), { items: [] });
+    assert.deepEqual(await aggregate.listResourceBackedViews({ workspaceId: "workspace-a" }), { items: [] });
   });
 
   it("preserves safe diagnostics and sanitizes unsafe provider diagnostics/data", async () => {
@@ -230,7 +230,7 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
       },
     };
 
-    const result = await new AssetResourceBackedViewAggregateProvider({ providers: [provider] }).listResourceBackedViews({ limit: 10 });
+    const result = await new AssetResourceBackedViewAggregateProvider({ providers: [provider] }).listResourceBackedViews({ workspaceId: "workspace-a", limit: 10 });
 
     assert.equal(result.items[0]?.metadata?.safe, "yes");
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "resource-backed-view-provider-unsafe-data"), true);
@@ -293,7 +293,7 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
     const result = await new AssetResourceBackedViewAggregateProvider({
       providers: [unsupported, artifactProvider],
       maxListLimit: 10,
-    }).listResourceBackedViews({ limit: 10 });
+    }).listResourceBackedViews({ workspaceId: "workspace-a", limit: 10 });
 
     assert.deepEqual(result.items.map((item) => item.viewKind), ["document", "artifact"]);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "resource-backed-view-provider-unsupported"), true);
@@ -324,7 +324,7 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
     const result = await new AssetResourceBackedViewAggregateProvider({
       providers: [unsupported, artifactProvider, datasetModelProvider, imageProvider, externalProvider],
       maxListLimit: 10,
-    }).listResourceBackedViews({ limit: 10 });
+    }).listResourceBackedViews({ workspaceId: "workspace-a", limit: 10 });
 
     assert.deepEqual(result.items.map((item) => item.viewKind), ["document", "dataset", "model", "generated-output", "external-repository-object"]);
     assert.equal(result.items[1]?.assetDefinitionRef?.id, "builtin.dataset");
@@ -357,7 +357,7 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
     const result = await new AssetResourceBackedViewAggregateProvider({
       providers: [artifactProvider, datasetModelProvider, imageProvider],
       maxListLimit: 3,
-    }).listResourceBackedViews({ limit: 99 });
+    }).listResourceBackedViews({ workspaceId: "workspace-a", limit: 99 });
 
     assert.deepEqual(result.items.map((item) => item.viewKind), ["document", "dataset", "model"]);
     assert.equal(result.diagnostics?.some((diagnostic) => diagnostic.code === "resource-backed-view-provider-limit-clamped"), true);
@@ -396,7 +396,7 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
       generatedImageOutputDescriptorSource: new FakeGeneratedOutputDescriptorSource("shared"),
     });
 
-    const result = await new AssetResourceBackedViewAggregateProvider({ providers: [imageProvider], maxListLimit: 10 }).listResourceBackedViews({ limit: 10 });
+    const result = await new AssetResourceBackedViewAggregateProvider({ providers: [imageProvider], maxListLimit: 10 }).listResourceBackedViews({ workspaceId: "workspace-a", limit: 10 });
 
     assert.deepEqual(result.items.map((item) => item.viewKind), ["image-asset", "generated-output"]);
     assert.notEqual(result.items[0]?.viewId, result.items[1]?.viewId);
@@ -418,7 +418,7 @@ describe("AssetResourceBackedViewAggregateProvider", () => {
     const second = new TestProvider("second-provider", [view("view.2", "Two")]);
     const aggregate = new AssetResourceBackedViewAggregateProvider({ providers: [first, second] });
 
-    await aggregate.listResourceBackedViews();
+    await aggregate.listResourceBackedViews({ workspaceId: "workspace-a" });
     assert.equal((await aggregate.readResourceBackedView("view.2"))?.displayName, "Two");
     assert.equal(first.readCalls, 0);
     assert.equal(second.readCalls, 1);

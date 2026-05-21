@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { ImageGenerationRequest } from "../../../contracts/image-generation";
+import { isWorkspaceId } from "../../../contracts/workspace";
 import { TaskType, type RuntimeTaskListRequest, type RuntimeTaskListResult, type RuntimeTaskRecord, type RuntimeTaskStatus, type StartRuntimeTaskRequest, type StartRuntimeTaskResult } from "../../../contracts/runtime";
 import type { RuntimeTaskRegistryPort } from "../../../application/ports/runtime/runtime-task-registry.port";
 import type { ComfyUiHttpClient } from "./createComfyUiHttpClient";
@@ -100,7 +101,7 @@ function resolveComfyUiFailure(historyRecord: Record<string, unknown>, runtimeOu
 }
 
 export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeTaskRegistryPort {
-  const byRequest = new Map<string, { promptId: string; request: ImageGenerationRequest; submittedAt: string }>();
+  const byRequest = new Map<string, { promptId: string; request: ImageGenerationRequest; submittedAt: string; workspaceId: string }>();
   const finalResults = new Map<string, RuntimeTaskRecord>();
   const now = deps.now ?? (() => new Date().toISOString());
 
@@ -120,14 +121,17 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
   });
 
   const matchesListRequest = (record: RuntimeTaskRecord, request: RuntimeTaskListRequest): boolean => {
+    if (!isWorkspaceId(request.workspaceId)) return false;
+    if (record.workspaceId !== request.workspaceId) return false;
     if (request.taskTypes && request.taskTypes.length > 0 && !request.taskTypes.includes(record.taskType)) return false;
     if (request.statuses && request.statuses.length > 0 && !request.statuses.includes(record.status)) return false;
     if (!request.includeCompleted && (record.status === "succeeded" || record.status === "failed" || record.status === "cancelled")) return false;
     return true;
   };
 
-  const taskRecordFromTracked = (requestId: string, tracked: { promptId: string; request: ImageGenerationRequest; submittedAt: string }): RuntimeTaskRecord => ({
+  const taskRecordFromTracked = (requestId: string, tracked: { promptId: string; request: ImageGenerationRequest; submittedAt: string; workspaceId: string }): RuntimeTaskRecord => ({
     requestId,
+    workspaceId: tracked.workspaceId as never,
     taskType: TaskType.IMAGE_GENERATION,
     status: "queued",
     concurrencyClass: "gpu-exclusive",
@@ -135,6 +139,7 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
     startedAt: tracked.submittedAt,
     updatedAt: tracked.submittedAt,
     metadata: {
+      workspaceId: tracked.workspaceId,
       engine: "comfyui",
       comfyUiPromptId: tracked.promptId,
       request: {
@@ -152,6 +157,9 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
     async startTask(request: StartRuntimeTaskRequest) {
       if (request.taskType !== TaskType.IMAGE_GENERATION) {
         throw new Error(`ComfyUI runtime adapter only supports ${TaskType.IMAGE_GENERATION} tasks.`);
+      }
+      if (!isWorkspaceId(request.workspaceId)) {
+        throw new Error("Workspace id is required for image generation runtime tasks.");
       }
       const imageRequest = request.payload as ImageGenerationRequest;
       const requestedRuntimeDeviceMode = resolveRequestedRuntimeDeviceMode(imageRequest);
@@ -193,11 +201,12 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
       const submitted = await deps.client.submitPrompt(payload);
       const requestId = request.requestId ?? randomUUID();
       const submittedAt = now();
-      byRequest.set(requestId, { promptId: submitted.prompt_id, request: imageRequest, submittedAt });
+      byRequest.set(requestId, { promptId: submitted.prompt_id, request: imageRequest, submittedAt, workspaceId: request.workspaceId });
       return {
         requestId,
         status: submitted.number === undefined ? "running" : "queued",
         metadata: {
+          workspaceId: request.workspaceId,
           engine: "comfyui",
           comfyUiPromptId: submitted.prompt_id,
           submittedAt,
@@ -221,11 +230,12 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
         const status: RuntimeTaskStatus = outputs.length > 0 ? "succeeded" : "failed";
         const failure = status === "failed" ? resolveComfyUiFailure(historyRecord, deps.supervisor.getRecentRuntimeOutput?.() ?? []) : undefined;
         const record: RuntimeTaskRecord = {
-          requestId, taskType: TaskType.IMAGE_GENERATION, status, concurrencyClass: "gpu-exclusive",
-          data: status === "succeeded" ? { outputs } : undefined,
+          requestId, workspaceId: tracked.workspaceId as never, taskType: TaskType.IMAGE_GENERATION, status, concurrencyClass: "gpu-exclusive",
+          data: status === "succeeded" ? { outputs: outputs.map((output) => ({ ...output, workspaceId: tracked.workspaceId })) } : undefined,
           error: status === "failed" ? { code: "comfyui_failed", message: failure?.message ?? GENERIC_NO_OUTPUT_MESSAGE, details: failure?.details } : undefined,
           completedAt: now(), updatedAt: now(),
           metadata: {
+            workspaceId: tracked.workspaceId,
             engine: "comfyui",
             comfyUiPromptId: tracked.promptId,
             runtimeDeviceMode: deps.supervisor.getRuntimeDeviceMode?.(),
@@ -247,9 +257,9 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
       const pending = queue.queue_pending.some((entry) => Array.isArray(entry) && String(entry[1] ?? "") === tracked.promptId);
       const running = queue.queue_running.some((entry) => Array.isArray(entry) && String(entry[1] ?? "") === tracked.promptId);
       if (pending || running) {
-        return { requestId, taskType: TaskType.IMAGE_GENERATION, status: pending ? "queued" : "running", concurrencyClass: "gpu-exclusive", progress: { message: pending ? "Queued in ComfyUI." : "Running in ComfyUI.", details: { promptId: tracked.promptId, queue } }, startedAt: tracked.submittedAt, updatedAt: now(), metadata: { engine: "comfyui", comfyUiPromptId: tracked.promptId } };
+        return { requestId, workspaceId: tracked.workspaceId as never, taskType: TaskType.IMAGE_GENERATION, status: pending ? "queued" : "running", concurrencyClass: "gpu-exclusive", progress: { message: pending ? "Queued in ComfyUI." : "Running in ComfyUI.", details: { promptId: tracked.promptId, queue } }, startedAt: tracked.submittedAt, updatedAt: now(), metadata: { workspaceId: tracked.workspaceId, engine: "comfyui", comfyUiPromptId: tracked.promptId } };
       }
-      return { requestId, taskType: TaskType.IMAGE_GENERATION, status: "unknown", concurrencyClass: "gpu-exclusive", error: { code: "comfyui_task_missing", message: "ComfyUI prompt was not found in queue or history." }, startedAt: tracked.submittedAt, updatedAt: now(), metadata: { engine: "comfyui", comfyUiPromptId: tracked.promptId } };
+      return { requestId, workspaceId: tracked.workspaceId as never, taskType: TaskType.IMAGE_GENERATION, status: "unknown", concurrencyClass: "gpu-exclusive", error: { code: "comfyui_task_missing", message: "ComfyUI prompt was not found in queue or history." }, startedAt: tracked.submittedAt, updatedAt: now(), metadata: { workspaceId: tracked.workspaceId, engine: "comfyui", comfyUiPromptId: tracked.promptId } };
     },
 
     async cancelTask(requestId) {

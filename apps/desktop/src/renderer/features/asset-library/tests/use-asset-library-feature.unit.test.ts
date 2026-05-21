@@ -36,6 +36,7 @@ const resourceViewCard: AssetLibraryResourceBackedViewCard = {
   assetFamily: "resource-backed",
   assetFamilyLabel: "Resource Backed",
   lifecycleStatusLabel: "Not registered",
+  sourceKind: "external-repository",
   registrationStatusLabel: "Not imported or registered",
 };
 
@@ -46,12 +47,16 @@ function createClient(overrides: Partial<AssetLibraryClient> = {}): AssetLibrary
     readAssetDefinitionVersion: testDouble.fn().mockResolvedValue({ ok: true, value: { ...card, overview: { description: "Reusable document descriptor" } } }),
     listAssetResourceBackedViews: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [resourceViewCard] } }),
     readAssetResourceBackedView: testDouble.fn().mockResolvedValue({ ok: true, value: { ...resourceViewCard } }),
+    registerResourceBackedViewAsAsset: testDouble.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.register-resource-backed-view", status: "created" } }),
+    finalizeGeneratedOutputAsAsset: testDouble.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.finalize-generated-output", status: "created" } }),
+    importExternalRepositoryObjectAsAsset: testDouble.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.import-external-repository-object", status: "created" } }),
+    localizeExternalRepositoryObjectAsAsset: testDouble.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.localize-external-repository-object", status: "created" } }),
     ...overrides,
   };
 }
 
-function HookHarness({ client, onState }: { readonly client: AssetLibraryClient; readonly onState: (state: AssetLibraryFeatureState) => void }) {
-  const state = useAssetLibraryFeature(client);
+function HookHarness({ client, onState, workspaceId }: { readonly client: AssetLibraryClient; readonly onState: (state: AssetLibraryFeatureState) => void; readonly workspaceId?: string }) {
+  const state = useAssetLibraryFeature(client, workspaceId);
   useEffect(() => {
     onState(state);
   }, [onState, state]);
@@ -88,7 +93,7 @@ describe("useAssetLibraryFeature", () => {
     mountedContainer = undefined;
   });
 
-  async function render(client: AssetLibraryClient) {
+  async function render(client: AssetLibraryClient, workspaceId: string | null = "workspace.alpha") {
     const states: AssetLibraryFeatureState[] = [];
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -97,11 +102,32 @@ describe("useAssetLibraryFeature", () => {
     mountedContainer = container;
 
     await act(async () => {
-      root.render(createElement(HookHarness, { client, onState: (state) => states.push(state) }));
+      root.render(createElement(HookHarness, { client, workspaceId: workspaceId ?? undefined, onState: (state) => states.push(state) }));
     });
     await flush();
     return { container, states };
   }
+
+  it("does not call the Asset Library client without an active workspace", async () => {
+    const client = createClient();
+    await render(client, null);
+
+    expect(client.listAssetDefinitions).not.toHaveBeenCalled();
+    expect(client.listAssetResourceBackedViews).not.toHaveBeenCalled();
+  });
+
+  it("does not call resource-backed detail clients without an active workspace", async () => {
+    const client = createClient();
+    const { states } = await render(client, null);
+
+    await act(async () => {
+      await states[states.length - 1]?.selectResourceBackedView(resourceViewCard);
+    });
+    await flush();
+
+    expect(client.readAssetResourceBackedView).not.toHaveBeenCalled();
+    expect(states[states.length - 1]?.detailError).toBe("Select a workspace before loading resource-backed views.");
+  });
 
   it("loads definitions once on initial render without background repeat calls", async () => {
     const client = createClient();
@@ -109,8 +135,8 @@ describe("useAssetLibraryFeature", () => {
 
     expect(client.listAssetDefinitions).toHaveBeenCalledTimes(1);
     expect(client.listAssetResourceBackedViews).toHaveBeenCalledTimes(1);
-    expect(client.listAssetDefinitions).toHaveBeenCalledWith({ limit: 50 });
-    expect(client.listAssetResourceBackedViews).toHaveBeenCalledWith({ limit: 50 });
+    expect(client.listAssetDefinitions).toHaveBeenCalledWith({ limit: 50, workspaceId: "workspace.alpha" });
+    expect(client.listAssetResourceBackedViews).toHaveBeenCalledWith({ limit: 50, workspaceId: "workspace.alpha" });
   });
 
   it("sends supported query fields when filters change and refreshes the current query", async () => {
@@ -136,6 +162,7 @@ describe("useAssetLibraryFeature", () => {
       assetFamilies: ["resource-backed"],
       lifecycleStatuses: ["published"],
       builtIn: "built-in",
+      workspaceId: "workspace.alpha",
     });
 
     const callsBeforeRefresh = (client.listAssetDefinitions as ReturnType<typeof testDouble.fn>).mock.calls.length;
@@ -150,6 +177,7 @@ describe("useAssetLibraryFeature", () => {
       assetFamilies: ["resource-backed"],
       lifecycleStatuses: ["published"],
       builtIn: "built-in",
+      workspaceId: "workspace.alpha",
     });
   });
 
@@ -165,6 +193,7 @@ describe("useAssetLibraryFeature", () => {
       { definitionId: "builtin.document", version: "1.0.0" },
       {
         expand: ["aiContext", "configurationSchema", "ports", "requirements", "provenance", "metadata"],
+        workspaceId: "workspace.alpha",
       },
     );
     expect((client.readAssetDefinitionVersion as ReturnType<typeof testDouble.fn>).mock.calls
@@ -188,6 +217,7 @@ describe("useAssetLibraryFeature", () => {
       {
         expand: ["aiContext", "configurationSchema", "ports", "requirements", "provenance", "metadata"],
         includeValidation: true,
+        workspaceId: "workspace.alpha",
       },
     ]);
     expect(states[states.length - 1]?.validationError).toBeUndefined();
@@ -203,7 +233,7 @@ describe("useAssetLibraryFeature", () => {
 
     expect(client.readAssetResourceBackedView).toHaveBeenCalledWith(
       { viewId: "asset-view.external-repository-object.internal.1" },
-      { expand: ["metadata", "resourceBackings"] },
+      { expand: ["metadata", "resourceBackings"], workspaceId: "workspace.alpha" },
     );
     expect(states[states.length - 1]?.selectedResourceBackedViewDetail?.registrationStatusLabel).toBe("Not imported or registered");
   });

@@ -127,9 +127,9 @@ export interface ArtifactBrowserApiClient {
   clearHuggingFaceToken: () => Promise<{ configured: boolean; maskedToken?: string }>;
   browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<ThinClientHuggingFaceNamespaceDataset[]>;
   browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<ThinClientHuggingFaceDatasetParquetFile[]>;
-  browseArtifacts: (input?: { artifactFamily?: ThinClientArtifactFamily }) => Promise<ThinClientArtifactBrowseItem[]>;
-  readArtifactDetail: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactDetail>;
-  readArtifactContent: (locator: ArtifactBrowserLocator) => Promise<ThinClientArtifactContentDescriptor>;
+  browseArtifacts: (input?: { artifactFamily?: ThinClientArtifactFamily; workspaceId?: string }) => Promise<ThinClientArtifactBrowseItem[]>;
+  readArtifactDetail: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<ThinClientArtifactDetail>;
+  readArtifactContent: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<ThinClientArtifactContentDescriptor>;
   deleteRegisteredArtifact: (locator: ArtifactBrowserLocator) => Promise<{ storageKey: string }>;
   createArtifactMediaViewUrl: (locator: ArtifactBrowserLocator) => string;
   publishArtifactToHuggingFace: (input: {
@@ -253,7 +253,7 @@ export function createApiArtifactBrowserClient(
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ artifactFamily: input.artifactFamily, source }),
+        body: JSON.stringify({ artifactFamily: input.artifactFamily, workspaceId: input.workspaceId, source }),
       });
 
       const envelope = ensureEnvelope((await response.json()) as unknown);
@@ -263,13 +263,13 @@ export function createApiArtifactBrowserClient(
       });
     },
 
-    async readArtifactDetail(locator: ArtifactBrowserLocator): Promise<ThinClientArtifactDetail> {
+    async readArtifactDetail(locator: ArtifactBrowserLocator, input = {}): Promise<ThinClientArtifactDetail> {
       const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/read"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ locator, source }),
+        body: JSON.stringify({ locator, workspaceId: input.workspaceId, source }),
       });
 
       const envelope = ensureEnvelope((await response.json()) as unknown);
@@ -285,13 +285,14 @@ export function createApiArtifactBrowserClient(
 
     async readArtifactContent(
       locator: ArtifactBrowserLocator,
+      input = {},
     ): Promise<ThinClientArtifactContentDescriptor> {
       const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/content/read"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ locator, source }),
+        body: JSON.stringify({ locator, workspaceId: input.workspaceId, source }),
       });
 
       const envelope = ensureEnvelope((await response.json()) as unknown);

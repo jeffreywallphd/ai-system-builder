@@ -21,7 +21,7 @@ export const DESKTOP_IMAGE_GENERATION_FINALIZE_RESPONSE_CHANNEL = createIpcChann
 
 export interface DesktopImageGenerationReadRequestPayload { requestId: string; }
 export interface DesktopImageGenerationCancelRequestPayload { requestId: string; }
-export interface DesktopImageGenerationFinalizeRequestPayload { requestId: string; }
+export interface DesktopImageGenerationFinalizeRequestPayload { requestId: string; workspaceId?: string; }
 export interface DesktopImageGenerationFinalizeResult { finalized: boolean; assets?: Array<{ assetId: string; artifactId: string; storageKey?: string; mediaType?: string }>; reason?: string; }
 
 export type DesktopImageGenerationStartRequest = IpcRequest<ImageGenerationRequest, typeof DESKTOP_IMAGE_GENERATION_START_OPERATION, Record<string, never>, typeof DESKTOP_IMAGE_GENERATION_START_REQUEST_CHANNEL.value>;
@@ -34,6 +34,7 @@ export type DesktopImageGenerationFinalizeRequest = IpcRequest<DesktopImageGener
 export type DesktopImageGenerationFinalizeResponse = IpcResponse<DesktopImageGenerationFinalizeResult, Record<string, unknown>, typeof DESKTOP_IMAGE_GENERATION_FINALIZE_OPERATION, Record<string, never>, typeof DESKTOP_IMAGE_GENERATION_FINALIZE_RESPONSE_CHANNEL.value>;
 
 const n = (v: string) => v.trim();
+const optionalN = (v: string | undefined) => typeof v === "string" ? n(v) : undefined;
 
 export const createDesktopImageGenerationStartRequest = (payload: ImageGenerationRequest, options?: { requestId?: string; correlationId?: string }): DesktopImageGenerationStartRequest => createIpcRequest(DESKTOP_IMAGE_GENERATION_START_REQUEST_CHANNEL, payload, options);
 export const createDesktopImageGenerationStartSuccessResponse = (value: StartRuntimeTaskResult, options?: { requestId?: string; correlationId?: string }): DesktopImageGenerationStartResponse => createIpcSuccessResponse(DESKTOP_IMAGE_GENERATION_START_RESPONSE_CHANNEL, value, options);
@@ -41,5 +42,5 @@ export const createDesktopImageGenerationReadRequest = (payload: DesktopImageGen
 export const createDesktopImageGenerationReadSuccessResponse = (value: RuntimeTaskStatusRecord, options?: { requestId?: string; correlationId?: string }): DesktopImageGenerationReadResponse => createIpcSuccessResponse(DESKTOP_IMAGE_GENERATION_READ_RESPONSE_CHANNEL, value, options);
 export const createDesktopImageGenerationCancelRequest = (payload: DesktopImageGenerationCancelRequestPayload, options?: { requestId?: string; correlationId?: string }): DesktopImageGenerationCancelRequest => createIpcRequest(DESKTOP_IMAGE_GENERATION_CANCEL_REQUEST_CHANNEL, { requestId: n(payload.requestId) }, options);
 export const createDesktopImageGenerationCancelSuccessResponse = (value: CancelRuntimeTaskResult, options?: { requestId?: string; correlationId?: string }): DesktopImageGenerationCancelResponse => createIpcSuccessResponse(DESKTOP_IMAGE_GENERATION_CANCEL_RESPONSE_CHANNEL, value, options);
-export const createDesktopImageGenerationFinalizeRequest = (payload: DesktopImageGenerationFinalizeRequestPayload, options?: { requestId?: string; correlationId?: string }): DesktopImageGenerationFinalizeRequest => createIpcRequest(DESKTOP_IMAGE_GENERATION_FINALIZE_REQUEST_CHANNEL, { requestId: n(payload.requestId) }, options);
+export const createDesktopImageGenerationFinalizeRequest = (payload: DesktopImageGenerationFinalizeRequestPayload, options?: { requestId?: string; correlationId?: string }): DesktopImageGenerationFinalizeRequest => createIpcRequest(DESKTOP_IMAGE_GENERATION_FINALIZE_REQUEST_CHANNEL, { requestId: n(payload.requestId), workspaceId: optionalN(payload.workspaceId) }, options);
 export const createDesktopImageGenerationFinalizeSuccessResponse = (value: DesktopImageGenerationFinalizeResult, options?: { requestId?: string; correlationId?: string }): DesktopImageGenerationFinalizeResponse => createIpcSuccessResponse(DESKTOP_IMAGE_GENERATION_FINALIZE_RESPONSE_CHANNEL, value, options);

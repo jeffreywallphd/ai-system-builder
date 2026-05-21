@@ -15,6 +15,7 @@
 @import "./components/python-runtime-footer.css";
 @import "./components/settings.css";
 @import "./components/asset-library.css";
+@import "./components/home.css";
 
 #root {
   min-height: 100vh;
@@ -29,3 +30,15 @@
   white-space: nowrap;
 }
 
+
+.workspace-gate,
+.workspace-banner {
+  border: 1px solid var(--ui-color-border, #d8dee9);
+}
+
+.workspace-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}

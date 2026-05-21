@@ -442,20 +442,224 @@ describe("AssetRegistryReadFacade definition reads", () => {
     assert.equal(await facade.readDefinitionDetail({ kind: "asset-definition", id: normalizeAssetId("missing") }), undefined);
   });
 
+  it("includes only safe pack, source, category, and override read fields on definition cards", async () => {
+    const facade = createFacade({
+      definitionRepository: new FakeDefinitionRepository([
+        validDefinition({
+          definitionId: "definition.system",
+          metadata: {
+            sourcePackId: "system.foundation",
+            sourcePackVersion: "1.0.0",
+            categoryId: "ui-structure",
+            assetPackInstall: {
+              packId: "system.foundation",
+              packVersion: "1.0.0",
+              entryId: "builtin.definition.system",
+              fingerprint: "fnv1a:definition-system",
+              sourceKind: "system",
+              sourceLayer: "system-default",
+              trustStatus: "system-trusted",
+              managedBy: "asset-kernel",
+              installedAt: "2026-05-09T12:00:00.000Z",
+            },
+            overridesDefinitionRef: { kind: "asset-definition-version", id: "definition.base", version: "1.0.0" },
+            overriddenByDefinitionRefs: [
+              { kind: "asset-definition-version", id: "definition.child", version: "1.0.0" },
+              { kind: "asset-definition-version", id: "C:\\Users\\name\\secret", version: "Bearer token" },
+            ],
+            effectiveResolutionStatus: "available",
+            resolutionSummary: "Safe informational summary.",
+            unsafeSourcePackDisplayName: "Bearer token C:\\Users\\name\\secret",
+          },
+        }),
+      ]),
+    });
+
+    const card = (await facade.listDefinitionCards()).items[0]!;
+
+    assert.equal(card.sourcePackId, "system.foundation");
+    assert.equal(card.sourcePackVersion, "1.0.0");
+    assert.equal(card.sourcePackDisplayName, "System Foundation");
+    assert.equal(card.sourceKind, "system");
+    assert.equal(card.sourceLayer, "system-default");
+    assert.equal(card.trustStatus, "system-trusted");
+    assert.equal(card.packCategoryId, "ui-structure");
+    assert.equal(card.packCategoryDisplayName, "UI Structure");
+    assert.equal(card.systemDefault, true);
+    assert.deepEqual(card.overridesDefinitionRef, { kind: "asset-definition-version", id: "definition.base", version: "1.0.0" });
+    assert.deepEqual(card.overriddenByDefinitionRefs, [{ kind: "asset-definition-version", id: "definition.child", version: "1.0.0" }]);
+    assert.equal(card.effectiveResolutionStatus, "available");
+    assert.equal(card.resolutionSummary, "Safe informational summary.");
+    assert.equal(JSON.stringify(card).includes("Bearer"), false);
+    assert.equal(JSON.stringify(card).includes("C:\\Users"), false);
+    assertSafe(card);
+  });
+
   it("filters definitions by search text, type, family, lifecycle, and built-in/custom flags", async () => {
     const builtInSeed = BUILT_IN_ASSET_DEFINITION_CATALOG[0]!;
     const builtIn = { ...builtInSeed.definition, metadata: { builtInSeed: { seedId: builtInSeed.seedId, seedVersion: builtInSeed.seedVersion, fingerprint: "abc", managedBy: "asset-kernel", lastSeededAt: "2026-01-01T00:00:00.000Z" } } };
+    const systemFoundation = validDefinition({
+      definitionId: "builtin.system.foundation.fixture",
+      displayName: "System Foundation Fixture",
+      metadata: {
+        sourcePackId: "system.foundation",
+        sourceLayer: "system-default",
+        sourceKind: "system",
+        trustStatus: "system-trusted",
+        assetPackInstall: {
+          packId: "system.foundation",
+          packVersion: "1.0.0",
+          entryId: "builtin.system.foundation.fixture",
+          fingerprint: "fnv1a:system-foundation-fixture",
+          sourceKind: "system",
+          sourceLayer: "system-default",
+          trustStatus: "system-trusted",
+          managedBy: "asset-kernel",
+          installedAt: "2026-05-09T12:00:00.000Z",
+        },
+      },
+    });
     const repo = new FakeDefinitionRepository([
       validDefinition(),
       validDefinition({ definitionId: "definition.beta", assetType: "dataset", assetFamily: "resource-backed", displayName: "Beta Dataset", lifecycleStatus: "published" }),
       builtIn,
+      systemFoundation,
     ]);
     const facade = createFacade({ definitionRepository: repo });
 
     assert.deepEqual((await facade.listDefinitionCards({ searchText: "beta" })).items.map((item) => item.definitionId), ["definition.beta"]);
     assert.deepEqual((await facade.listDefinitionCards({ assetTypes: ["dataset"], assetFamilies: ["resource-backed"], lifecycleStatuses: ["published"] })).items.map((item) => item.definitionId), ["definition.beta"]);
-    assert.equal((await facade.listDefinitionCards({ includeBuiltIns: true, includeCustom: false })).items[0]?.builtIn, true);
-    assert.equal((await facade.listDefinitionCards({ includeBuiltIns: false })).items.some((item) => item.builtIn), false);
+    assert.deepEqual(
+      (await facade.listDefinitionCards({ includeBuiltIns: true, includeCustom: false })).items.map((item) => item.definitionId).sort(),
+      [String(builtIn.definitionId), "builtin.system.foundation.fixture"].sort(),
+    );
+    assert.equal((await facade.listDefinitionCards({ includeBuiltIns: false })).items.some((item) => item.definitionId === "builtin.system.foundation.fixture"), false);
+    assert.equal((await facade.listDefinitionCards({ includeCustom: true, includeBuiltIns: false })).items.some((item) => item.definitionId === "builtin.system.foundation.fixture"), false);
+    assert.equal((await facade.readDefinitionDetail({ kind: "asset-definition-version", id: normalizeAssetId("builtin.system.foundation.fixture"), version: "1.0.0" }))?.builtIn, true);
+    assert.equal((await facade.listDefinitionCards({ includeBuiltIns: false })).items.some((item) => item.definitionId === "definition.alpha"), true);
+  });
+
+  it("classifies system foundation defaults only from trusted metadata or installer markers", async () => {
+    const seed = BUILT_IN_ASSET_DEFINITION_CATALOG[0]!;
+    const exactBuiltIn = { ...seed.definition };
+    const legacyBuiltInSeed = validDefinition({
+      definitionId: "definition.legacy-seed",
+      metadata: { builtInSeed: { managedBy: "asset-kernel", seedId: "seed.legacy", seedVersion: "1.0.0", fingerprint: "abc123" } },
+    });
+    const installedSystemDefault = validDefinition({
+      definitionId: "definition.installed-system-default",
+      metadata: {
+        sourcePackId: "system.foundation",
+        sourcePackVersion: "1.0.0",
+        assetPackInstall: {
+          packId: "system.foundation",
+          packVersion: "1.0.0",
+          entryId: "definition.installed-system-default",
+          fingerprint: "fnv1a:installed-system-default",
+          sourceKind: "system",
+          sourceLayer: "system-default",
+          trustStatus: "system-trusted",
+          managedBy: "asset-kernel",
+          installedAt: "2026-05-09T12:00:00.000Z",
+        },
+      },
+    });
+    const trustedSourceMetadata = validDefinition({
+      definitionId: "definition.trusted-source",
+      metadata: {
+        sourcePackId: "system.foundation",
+        sourceKind: "system",
+        sourceLayer: "system-default",
+        trustStatus: "system-trusted",
+      },
+    });
+    const bareSystemFoundation = validDefinition({
+      definitionId: "definition.bare-system-foundation",
+      metadata: { sourcePackId: "system.foundation" },
+    });
+    const wrongSourceKind = validDefinition({
+      definitionId: "definition.wrong-kind",
+      metadata: {
+        sourcePackId: "system.foundation",
+        sourceKind: "user",
+        sourceLayer: "system-default",
+        trustStatus: "system-trusted",
+      },
+    });
+    const wrongSourceLayer = validDefinition({
+      definitionId: "definition.wrong-layer",
+      metadata: {
+        sourcePackId: "system.foundation",
+        sourceKind: "system",
+        sourceLayer: "workspace-pack",
+        trustStatus: "system-trusted",
+      },
+    });
+    const wrongTrustStatus = validDefinition({
+      definitionId: "definition.wrong-trust",
+      metadata: {
+        sourcePackId: "system.foundation",
+        sourceKind: "system",
+        sourceLayer: "system-default",
+        trustStatus: "unverified",
+      },
+    });
+    const customDefinition = validDefinition({
+      definitionId: "definition.custom",
+      metadata: { sourceKind: "user", sourceLayer: "workspace-pack", trustStatus: "unverified" },
+    });
+    const facade = createFacade({
+      definitionRepository: new FakeDefinitionRepository([
+        exactBuiltIn,
+        legacyBuiltInSeed,
+        installedSystemDefault,
+        trustedSourceMetadata,
+        bareSystemFoundation,
+        wrongSourceKind,
+        wrongSourceLayer,
+        wrongTrustStatus,
+        customDefinition,
+      ]),
+    });
+
+    const cards = await facade.listDefinitionCards();
+    const byId = new Map(cards.items.map((item) => [item.definitionId, item]));
+
+    assert.equal(byId.get(String(seed.definition.definitionId))?.builtIn, true);
+    assert.equal(byId.get("definition.legacy-seed")?.builtIn, true);
+    assert.equal(byId.get("definition.installed-system-default")?.builtIn, true);
+    assert.equal(byId.get("definition.installed-system-default")?.systemDefault, true);
+    assert.equal(byId.get("definition.trusted-source")?.builtIn, true);
+    assert.equal(byId.get("definition.trusted-source")?.systemDefault, true);
+    for (const definitionId of [
+      "definition.bare-system-foundation",
+      "definition.wrong-kind",
+      "definition.wrong-layer",
+      "definition.wrong-trust",
+      "definition.custom",
+    ]) {
+      assert.equal(byId.get(definitionId)?.builtIn, undefined, definitionId);
+      assert.equal(byId.get(definitionId)?.systemDefault, undefined, definitionId);
+    }
+    assert.deepEqual(
+      (await facade.listDefinitionCards({ includeBuiltIns: true, includeCustom: false })).items.map((item) => item.definitionId).sort(),
+      [
+        String(seed.definition.definitionId),
+        "definition.installed-system-default",
+        "definition.legacy-seed",
+        "definition.trusted-source",
+      ].sort(),
+    );
+    assert.deepEqual(
+      (await facade.listDefinitionCards({ includeBuiltIns: false })).items.map((item) => item.definitionId).sort(),
+      [
+        "definition.bare-system-foundation",
+        "definition.custom",
+        "definition.wrong-kind",
+        "definition.wrong-layer",
+        "definition.wrong-trust",
+      ].sort(),
+    );
   });
 
   it("marks persisted built-ins without seeding or overwriting definitions", async () => {
@@ -566,6 +770,31 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     assert.equal(detail?.view.assetDefinitionRef, undefined);
   });
 
+  it("passes workspace context to resource-backed providers for isolated list/detail reads", async () => {
+    const views: readonly AssetResourceBackedView[] = [
+      { viewId: "view.workspace-a", viewKind: "generated-output", displayName: "Workspace A", assetType: "image", assetFamily: "resource-backed", metadata: { workspaceId: "workspace-a" }, generatedOutput: { outputId: "out-a", producedAssetType: "image", producedAt: "2026-01-01T00:00:00.000Z", metadata: { workspaceId: "workspace-a" } } },
+      { viewId: "view.workspace-b", viewKind: "generated-output", displayName: "Workspace B", assetType: "image", assetFamily: "resource-backed", metadata: { workspaceId: "workspace-b" }, generatedOutput: { outputId: "out-b", producedAssetType: "image", producedAt: "2026-01-01T00:00:00.000Z", metadata: { workspaceId: "workspace-b" } } },
+    ];
+    const provider: AssetResourceBackedViewProvider = {
+      async listResourceBackedViews(query = {}) {
+        if (!query.workspaceId) return { items: [], diagnostics: [{ severity: "error", code: "workspace-required", message: "Workspace id is required." }] };
+        return { items: views.filter((view) => (view.metadata as Record<string, unknown>).workspaceId === query.workspaceId) };
+      },
+      async readResourceBackedView(viewId, query = {}) {
+        return views.find((view) => view.viewId === viewId && (view.metadata as Record<string, unknown>).workspaceId === query.workspaceId);
+      },
+    };
+    const facade = createFacade({ resourceBackedViewProvider: provider });
+
+    assert.deepEqual((await facade.listResourceBackedViewCards({ workspaceId: "workspace-a", limit: 10 })).items.map((item) => item.viewId), ["view.workspace-a"]);
+    assert.deepEqual((await facade.listResourceBackedViewCards({ workspaceId: "workspace-b", limit: 10 })).items.map((item) => item.viewId), ["view.workspace-b"]);
+    assert.equal((await facade.readResourceBackedViewDetail("view.workspace-a", { workspaceId: "workspace-a" }))?.view.viewId, "view.workspace-a");
+    assert.equal(await facade.readResourceBackedViewDetail("view.workspace-a", { workspaceId: "workspace-b" }), undefined);
+    const missingWorkspace = await facade.listResourceBackedViewCards({ limit: 10 });
+    assert.equal(missingWorkspace.items.length, 0);
+    assert.equal(missingWorkspace.diagnostics?.[0]?.code, "workspace-required");
+  });
+
   it("returns empty/undefined without a provider and sanitizes provider errors", async () => {
     const noProviderFacade = createFacade();
     assert.deepEqual(await noProviderFacade.listResourceBackedViewCards(), { items: [] });
@@ -598,19 +827,19 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     const provider = new ArtifactResourceBackedViewProvider({ artifactBrowserMetadataRead: browser });
     const facade = createFacade({ resourceBackedViewProvider: provider });
 
-    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10 });
+    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10, workspaceId: "workspace-a" });
     assert.deepEqual(list.items.map((item) => item.viewKind), ["document", "artifact"]);
     assert.equal(list.items[0]?.assetDefinitionRef?.id, "builtin.document");
     assert.equal(list.items[1]?.displayName?.startsWith("artifact."), true);
     assertSafe(list);
 
-    const detail = await facade.readResourceBackedViewDetail(list.items[0]!.viewId, { includeMetadata: true, includeResourceBackings: true });
+    const detail = await facade.readResourceBackedViewDetail(list.items[0]!.viewId, { includeMetadata: true, includeResourceBackings: true, workspaceId: "workspace-a" });
     assert.equal(detail?.view.viewKind, "document");
     assert.equal(detail?.validationSummary, undefined);
     assert.equal(detail?.view.validationSummary, undefined);
     assertSafe(detail);
 
-    assert.equal(await facade.readResourceBackedViewDetail("missing-artifact-view"), undefined);
+    assert.equal(await facade.readResourceBackedViewDetail("missing-artifact-view", { workspaceId: "workspace-a" }), undefined);
     assert.equal(browser.readContentCalls, 0);
   });
 
@@ -623,7 +852,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     });
     const facade = createFacade({ resourceBackedViewProvider: provider });
 
-    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10 });
+    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10, workspaceId: "workspace-a" });
     assert.deepEqual(list.items.map((item) => item.viewKind), ["image-asset", "generated-output"]);
     assert.equal(list.items[0]?.assetDefinitionRef?.id, "builtin.resource-backed-image");
     assert.equal(list.items[1]?.assetDefinitionRef, undefined);
@@ -633,6 +862,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     const imageDetail = await facade.readResourceBackedViewDetail(list.items[0]!.viewId, {
       includeMetadata: true,
       includeResourceBackings: true,
+      workspaceId: "workspace-a",
     });
     assert.equal(imageDetail?.view.viewKind, "image-asset");
     assert.equal(imageDetail?.validationSummary, undefined);
@@ -642,6 +872,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     const generatedDetail = await facade.readResourceBackedViewDetail(list.items[1]!.viewId, {
       includeMetadata: true,
       includeResourceBackings: true,
+      workspaceId: "workspace-a",
     });
     assert.equal(generatedDetail?.view.viewKind, "generated-output");
     assert.equal(generatedDetail?.view.assetDefinitionRef, undefined);
@@ -649,7 +880,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     assert.equal(generatedDetail?.view.summary?.includes("not finalized or registered"), true);
     assertSafe(generatedDetail);
 
-    assert.equal(await facade.readResourceBackedViewDetail("missing-image-view"), undefined);
+    assert.equal(await facade.readResourceBackedViewDetail("missing-image-view", { workspaceId: "workspace-a" }), undefined);
     assert.equal(imageSource.byteReadCalls + outputSource.byteReadCalls, 0);
     assert.equal(outputSource.statusReadCalls + outputSource.generationCalls, 0);
     assert.equal(imageSource.storageScanCalls + imageSource.createAssetInstanceCalls + imageSource.persistMappingCalls, 0);
@@ -664,7 +895,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     });
     const facade = createFacade({ resourceBackedViewProvider: provider });
 
-    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10 });
+    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10, workspaceId: "workspace-a" });
     assert.deepEqual(list.items.map((item) => item.viewKind), ["dataset", "model"]);
     assert.equal(list.items[0]?.assetDefinitionRef?.id, "builtin.dataset");
     assert.equal(list.items[1]?.assetDefinitionRef?.id, "builtin.model");
@@ -673,6 +904,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     const datasetDetail = await facade.readResourceBackedViewDetail(list.items[0]!.viewId, {
       includeMetadata: true,
       includeResourceBackings: true,
+      workspaceId: "workspace-a",
     });
     assert.equal(datasetDetail?.view.viewKind, "dataset");
     assert.equal(datasetDetail?.validationSummary, undefined);
@@ -682,12 +914,13 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
       includeMetadata: true,
       includeResourceBackings: true,
       includeValidation: true,
+      workspaceId: "workspace-a",
     });
     assert.equal(modelDetail?.view.viewKind, "model");
     assert.equal(modelDetail?.validationSummary?.status, "valid");
     assertSafe(modelDetail);
 
-    assert.equal(await facade.readResourceBackedViewDetail("missing-dataset-model-view"), undefined);
+    assert.equal(await facade.readResourceBackedViewDetail("missing-dataset-model-view", { workspaceId: "workspace-a" }), undefined);
     assert.equal(modelRegistry.discoveryCalls, 0);
     assert.equal(modelRegistry.validationCalls, 0);
     assert.equal(modelRegistry.trainingCalls, 0);
@@ -703,7 +936,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     });
     const facade = createFacade({ resourceBackedViewProvider: provider });
 
-    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10 });
+    const list = await facade.listResourceBackedViewCards({ includeMetadata: true, limit: 10, workspaceId: "workspace-a" });
     assert.equal(list.items.length, 1);
     assert.equal(list.items[0]?.viewKind, "external-repository-object");
     assert.equal(list.items[0]?.assetDefinitionRef, undefined);
@@ -713,6 +946,7 @@ describe("AssetRegistryReadFacade resource-backed view reads", () => {
     const detail = await facade.readResourceBackedViewDetail(list.items[0]!.viewId, {
       includeMetadata: true,
       includeResourceBackings: true,
+      workspaceId: "workspace-a",
     });
     assert.equal(detail?.view.viewKind, "external-repository-object");
     assert.equal(detail?.view.assetDefinitionRef, undefined);

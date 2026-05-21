@@ -16,6 +16,12 @@ import { registerApplicationSettingsApiRoutes, type RegisterApplicationSettingsA
 import { registerServerControlApiRoutes, type RegisterServerControlApiRoutesDependencies } from "./server-control/registerServerControlApiRoutes";
 import { registerRuntimeReadinessApiRoutes, type RegisterRuntimeReadinessApiRoutesDependencies } from "./runtime-readiness/registerRuntimeReadinessApiRoutes";
 import { registerAssetRegistryApiRoutes, type RegisterAssetRegistryApiRoutesDependencies } from "./asset-registry/registerAssetRegistryApiRoutes";
+import { registerAssetMutationApiRoutes, type RegisterAssetMutationApiRoutesDependencies } from "./asset-registry/registerAssetMutationApiRoutes";
+import { registerWorkspaceApiRoutes, type RegisterWorkspaceApiRoutesDependencies } from "./workspace/registerWorkspaceApiRoutes";
+import { registerUserLibraryApiRoutes, type RegisterUserLibraryApiRoutesDependencies } from "./user-library/registerUserLibraryApiRoutes";
+import { registerAssetAuthoringApiRoutes, type RegisterAssetAuthoringApiRoutesDependencies } from "./asset-authoring/registerAssetAuthoringApiRoutes";
+import { registerEffectiveAssetProjectionApiRoutes, type RegisterEffectiveAssetProjectionApiRoutesDependencies } from "./effective-asset-projections/registerEffectiveAssetProjectionApiRoutes";
+import { registerAssetCompositionApiRoutes, type RegisterAssetCompositionApiRoutesDependencies } from "./asset-composition/registerAssetCompositionApiRoutes";
 
 export interface RegisterExpressApiDependencies {
   app: RegisterArtifactUploadApiRouteDependencies["app"]
@@ -26,7 +32,13 @@ export interface RegisterExpressApiDependencies {
     & RegisterApplicationSettingsApiRoutesDependencies["app"]
     & RegisterServerControlApiRoutesDependencies["app"]
     & RegisterRuntimeReadinessApiRoutesDependencies["app"]
-    & RegisterAssetRegistryApiRoutesDependencies["app"];
+    & RegisterAssetRegistryApiRoutesDependencies["app"]
+    & RegisterAssetMutationApiRoutesDependencies["app"]
+    & RegisterWorkspaceApiRoutesDependencies["app"]
+    & RegisterUserLibraryApiRoutesDependencies["app"]
+    & RegisterAssetAuthoringApiRoutesDependencies["app"]
+    & RegisterEffectiveAssetProjectionApiRoutesDependencies["app"]
+    & RegisterAssetCompositionApiRoutesDependencies["app"];
   getHuggingFaceTokenStatus: RegisterArtifactRepoApiRoutesDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];
@@ -65,6 +77,12 @@ export interface RegisterExpressApiDependencies {
   restartServer?: RegisterServerControlApiRoutesDependencies["restartServer"];
   runtimeReadiness?: RegisterRuntimeReadinessApiRoutesDependencies["runtimeReadiness"];
   assetRegistryRead?: RegisterAssetRegistryApiRoutesDependencies["assetRegistryRead"];
+  assetMutationUseCases?: Omit<RegisterAssetMutationApiRoutesDependencies, "app">;
+  workspaceServices?: Omit<RegisterWorkspaceApiRoutesDependencies, "app">;
+  userLibraryServices?: Omit<RegisterUserLibraryApiRoutesDependencies, "app">;
+  assetAuthoringServices?: Omit<RegisterAssetAuthoringApiRoutesDependencies, "app">;
+  effectiveAssetProjectionServices?: Omit<RegisterEffectiveAssetProjectionApiRoutesDependencies, "app">;
+  assetCompositionServices?: Omit<RegisterAssetCompositionApiRoutesDependencies, "app">;
 }
 
 export function registerExpressApi(
@@ -136,10 +154,36 @@ export function registerExpressApi(
     });
   }
 
+  if (dependencies.workspaceServices) {
+    registerWorkspaceApiRoutes({ app: dependencies.app, ...dependencies.workspaceServices });
+  }
+
+  if (dependencies.userLibraryServices) {
+    registerUserLibraryApiRoutes({ app: dependencies.app, ...dependencies.userLibraryServices });
+  }
+
+  if (dependencies.assetAuthoringServices) {
+    registerAssetAuthoringApiRoutes({ app: dependencies.app, ...dependencies.assetAuthoringServices });
+  }
+
+  if (dependencies.effectiveAssetProjectionServices) {
+    registerEffectiveAssetProjectionApiRoutes({ app: dependencies.app, ...dependencies.effectiveAssetProjectionServices });
+  }
+  if (dependencies.assetCompositionServices) {
+    registerAssetCompositionApiRoutes({ app: dependencies.app, ...dependencies.assetCompositionServices });
+  }
+
   if (dependencies.assetRegistryRead) {
     registerAssetRegistryApiRoutes({
       app: dependencies.app,
       assetRegistryRead: dependencies.assetRegistryRead,
+    });
+  }
+
+  if (dependencies.assetMutationUseCases) {
+    registerAssetMutationApiRoutes({
+      app: dependencies.app,
+      ...dependencies.assetMutationUseCases,
     });
   }
 

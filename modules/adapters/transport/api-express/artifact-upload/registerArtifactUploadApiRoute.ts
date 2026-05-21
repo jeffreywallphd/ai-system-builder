@@ -31,6 +31,7 @@ export interface StoreArtifactUploadUseCasePort {
 
 interface ApiArtifactUploadMultipartRequestBody {
   source?: string;
+  workspaceId?: string;
 }
 
 export interface ApiArtifactUploadJsonRequestBody {
@@ -38,6 +39,7 @@ export interface ApiArtifactUploadJsonRequestBody {
   mediaType: string;
   bytes: number[];
   source: string;
+  workspaceId: string;
 }
 
 export interface ExpressRequestLike {
@@ -102,6 +104,7 @@ export function mapApiArtifactUploadRequestBody(
     },
     commandContext: {
       source: requestBody.source,
+      ...(requestBody.workspaceId ? { workspaceId: requestBody.workspaceId } : {}),
     },
   };
 }
@@ -120,6 +123,7 @@ function mapMultipartArtifactUploadRequest(
     },
     commandContext: {
       source: normalizeSource(multipartUpload.source),
+      ...(multipartUpload.workspaceId ? { workspaceId: multipartUpload.workspaceId } : {}),
     },
   };
 }
@@ -228,10 +232,7 @@ export function registerArtifactUploadApiRoute(
     const result = await dependencies.storeArtifactUploadUseCase.execute(
       mapping.command,
       mapping.commandContext,
-      {
-        requestId,
-        correlationId,
-      },
+      { requestId, correlationId, workspaceId: mapping.commandContext.workspaceId } as { requestId?: string; correlationId?: string; workspaceId?: string },
     );
 
     const apiResponse = mapStoreArtifactUploadResultToApiResponse(result, {

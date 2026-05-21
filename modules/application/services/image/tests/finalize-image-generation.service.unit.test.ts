@@ -3,7 +3,7 @@ import { TaskType, type RuntimeTaskRecord } from "../../../../contracts/runtime"
 import type { GeneratedImagePersistencePort, ImageAssetRegistryPort } from "../../../ports/image";
 import { FinalizeImageGenerationService } from "../finalize-image-generation.service";
 
-function createTask(overrides: Partial<RuntimeTaskRecord> = {}): RuntimeTaskRecord { return { requestId: "req-1", taskType: TaskType.IMAGE_GENERATION, status: "succeeded", concurrencyClass: "unknown", data: { outputs: [{ type: "image", engine: "comfyui", fileName: "out.png", width: 512, height: 768, promptId: "p1", subfolder: "" }] }, metadata: { request: { prompt: "cat", model: "sdxl" } }, ...overrides }; }
+function createTask(overrides: Partial<RuntimeTaskRecord> = {}): RuntimeTaskRecord { return { requestId: "req-1", workspaceId: "workspace-a" as never, taskType: TaskType.IMAGE_GENERATION, status: "succeeded", concurrencyClass: "unknown", data: { outputs: [{ type: "image", engine: "comfyui", fileName: "out.png", width: 512, height: 768, promptId: "p1", subfolder: "" }] }, metadata: { request: { prompt: "cat", model: "sdxl" } }, ...overrides }; }
 
 describe("FinalizeImageGenerationService", () => {
   it("returns asset-backed results and registers generated image assets", async () => {

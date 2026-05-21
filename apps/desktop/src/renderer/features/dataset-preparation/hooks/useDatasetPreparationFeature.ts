@@ -140,6 +140,7 @@ export interface UseDatasetPreparationFeatureOptions {
   settingsClient?: DesktopApplicationSettingsClient;
   runtimeStatusClient?: Pick<DesktopPythonRuntimeClient, "readStatus" | "controlRuntime">;
   onPrepared?: () => void;
+  workspaceId?: string;
 }
 
 const defaultDatasetPreparationPageState: DatasetPreparationPageState = {
@@ -221,6 +222,7 @@ export function useDatasetPreparationFeature(
 ): UseDatasetPreparationFeatureResult {
   const pollingRecoveryGraceWindowMs = 30_000;
   const onPrepared = options.onPrepared;
+  const workspaceId = options.workspaceId;
   const datasetClient = useDatasetPreparationClient(options.client);
   const settingsClient = useMemo(() => {
     if (options.settingsClient) {
@@ -398,13 +400,13 @@ export function useDatasetPreparationFeature(
   }, []);
 
   const refreshArtifacts = useCallback(async () => {
-    const sourceArtifacts = await datasetClient.browseSourceArtifacts();
+    const sourceArtifacts = await datasetClient.browseSourceArtifacts(workspaceId);
     setArtifacts(sourceArtifacts);
     setSelectedArtifactIds((current) => {
       const validArtifactIds = new Set(sourceArtifacts.map((artifact) => artifact.artifactId));
       return current.filter((artifactId) => validArtifactIds.has(artifactId));
     });
-  }, [datasetClient]);
+  }, [datasetClient, workspaceId]);
 
   const refreshRuntimeModelStatus = useCallback(async () => {
     if (!runtimeStatusClient) {
@@ -642,7 +644,12 @@ export function useDatasetPreparationFeature(
     window.dispatchEvent(new CustomEvent("dataset-preparation-training-started"));
     setStatus({ kind: "loading", message: `Checking model ${generationModelId} before dataset preparation...` });
 
-    const started = await datasetClient.startPrepareTrainingDataset(request, { requestId });
+    if (!workspaceId) {
+      setStatus({ kind: "error", message: "Select a workspace before preparing datasets." });
+      return;
+    }
+
+    const started = await datasetClient.startPrepareTrainingDataset({ ...request, workspaceId } as never, { requestId });
     if ("error" in started) {
       setStatus({ kind: "error", message: appendErrorDetailsMessage(started.error.message, started.error.details) });
       return;
@@ -681,6 +688,7 @@ export function useDatasetPreparationFeature(
     huggingFaceRevision,
     huggingFacePathPrefix,
     datasetClient,
+    workspaceId,
     settingsClient,
     pollDatasetPreparationTask,
     setActiveDatasetPreparationTask,

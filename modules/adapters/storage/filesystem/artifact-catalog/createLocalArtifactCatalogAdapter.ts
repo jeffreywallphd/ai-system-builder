@@ -13,11 +13,12 @@ import {
   createSuccessResult,
 } from "../../../../contracts/shared";
 import { normalizeStorageArtifactKey } from "../../../../contracts/storage";
+import { createWorkspaceId, isWorkspaceId } from "../../../../contracts/workspace";
 import { normalizeArtifactFamily } from "../../../../domain/artifact";
 
 const DEFAULT_CATALOG_FILE = ".catalog/artifact-catalog.ndjson";
 
-type ArtifactCatalogRecordLine = ArtifactCatalogRecord | { storageKey: string; deletedAt: string };
+type ArtifactCatalogRecordLine = ArtifactCatalogRecord | { workspaceId: string; storageKey: string; deletedAt: string };
 
 export interface CreateLocalArtifactCatalogPersistenceAdapterOptions {
   rootDirectory: string;
@@ -30,9 +31,27 @@ export interface LocalArtifactCatalogPersistenceAdapter
 function normalizeRecord(record: ArtifactCatalogRecord): ArtifactCatalogRecord {
   return {
     ...record,
+    ...(record.workspaceId ? { workspaceId: createWorkspaceId(record.workspaceId) } : {}),
     storageKey: normalizeStorageArtifactKey(record.storageKey),
     artifactFamily: normalizeArtifactFamily(record.artifactFamily),
   };
+}
+
+function isFsError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error;
+}
+
+function toFilesystemCode(error: unknown): string | undefined {
+  return isFsError(error) ? error.code : undefined;
+}
+
+function createCatalogUnavailableError(operation: string, error: unknown) {
+  return createContractError("unavailable", "Artifact catalog is unavailable.", {
+    details: {
+      operation,
+      filesystemCode: toFilesystemCode(error),
+    },
+  });
 }
 
 function parseRecordLine(line: string): ArtifactCatalogRecordLine | undefined {
@@ -43,14 +62,22 @@ function parseRecordLine(line: string): ArtifactCatalogRecordLine | undefined {
     }
 
     if (typeof parsed.deletedAt === "string" && parsed.deletedAt.trim().length > 0) {
-      return { storageKey: normalizeStorageArtifactKey(parsed.storageKey), deletedAt: parsed.deletedAt };
+      if (!isWorkspaceId(parsed.workspaceId)) {
+        return undefined;
+      }
+      return { workspaceId: parsed.workspaceId, storageKey: normalizeStorageArtifactKey(parsed.storageKey), deletedAt: parsed.deletedAt };
     }
 
     if (typeof parsed.artifactFamily !== "string" || parsed.artifactFamily.trim().length === 0) {
       return undefined;
     }
 
+    if (parsed.workspaceId !== undefined && !isWorkspaceId(parsed.workspaceId)) {
+      return undefined;
+    }
+
     return normalizeRecord({
+      ...(parsed.workspaceId ? { workspaceId: parsed.workspaceId } : {}),
       storageKey: parsed.storageKey,
       artifactFamily: normalizeArtifactFamily(parsed.artifactFamily),
       mediaType: typeof parsed.mediaType === "string" ? parsed.mediaType : undefined,
@@ -82,7 +109,16 @@ export function createLocalArtifactCatalogPersistenceAdapter(
   const catalogPath = path.join(rootDirectory, catalogFile);
 
   async function readCatalogRecords(): Promise<ArtifactCatalogRecord[]> {
-    const content = await readFile(catalogPath, "utf8").catch(() => "");
+    let content: string;
+    try {
+      content = await readFile(catalogPath, "utf8");
+    } catch (error) {
+      if (isFsError(error) && error.code === "ENOENT") {
+        return [];
+      }
+      throw error;
+    }
+
     if (!content.trim()) {
       return [];
     }
@@ -100,11 +136,11 @@ export function createLocalArtifactCatalogPersistenceAdapter(
       }
 
       if ("deletedAt" in record) {
-        latestByStorageKey.delete(record.storageKey);
+        latestByStorageKey.delete(`${record.workspaceId}:${record.storageKey}`);
         continue;
       }
 
-      latestByStorageKey.set(record.storageKey, record);
+      latestByStorageKey.set(`${record.workspaceId ?? "legacy"}:${record.storageKey}`, record);
     }
 
     return Array.from(latestByStorageKey.values());
@@ -121,7 +157,8 @@ export function createLocalArtifactCatalogPersistenceAdapter(
         return createFailureResult(
           createContractError("unavailable", "Failed to append artifact catalog record.", {
             details: {
-              reason: error instanceof Error ? error.message : String(error),
+              operation: "appendArtifactCatalogRecord",
+              filesystemCode: toFilesystemCode(error),
             },
           }),
           context,
@@ -130,17 +167,43 @@ export function createLocalArtifactCatalogPersistenceAdapter(
     },
 
     async browseArtifactCatalogRecords(request, context = {}) {
-      const records = await readCatalogRecords();
-      return createSuccessResult({
-        records: request.artifactFamily
-          ? records.filter((record) => record.artifactFamily === request.artifactFamily)
-          : records,
-      }, context);
+      if (!isWorkspaceId(request.workspaceId)) {
+        return createFailureResult(
+          createContractError("validation", "Workspace id is required for artifact catalog browse.", {
+            details: { code: "workspace-required" },
+          }),
+          context,
+        );
+      }
+
+      try {
+        const records = (await readCatalogRecords()).filter((record) => record.workspaceId === request.workspaceId);
+        return createSuccessResult({
+          records: request.artifactFamily
+            ? records.filter((record) => record.artifactFamily === request.artifactFamily)
+            : records,
+        }, context);
+      } catch (error) {
+        return createFailureResult(createCatalogUnavailableError("browseArtifactCatalogRecords", error), context);
+      }
     },
 
     async readArtifactCatalogRecord(request, context = {}) {
+      if (!isWorkspaceId(request.workspaceId)) {
+        return createFailureResult(
+          createContractError("validation", "Workspace id is required for artifact catalog read.", {
+            details: { code: "workspace-required" },
+          }),
+          context,
+        );
+      }
       const storageKey = normalizeStorageArtifactKey(request.storageKey);
-      const record = (await readCatalogRecords()).find((entry) => entry.storageKey === storageKey);
+      let record: ArtifactCatalogRecord | undefined;
+      try {
+        record = (await readCatalogRecords()).find((entry) => entry.workspaceId === request.workspaceId && entry.storageKey === storageKey);
+      } catch (error) {
+        return createFailureResult(createCatalogUnavailableError("readArtifactCatalogRecord", error), context);
+      }
       if (!record) {
         return createFailureResult(
           createContractError("not-found", `Artifact not found for storage key \"${storageKey}\".`),
@@ -152,16 +215,28 @@ export function createLocalArtifactCatalogPersistenceAdapter(
     },
 
     async deleteArtifactCatalogRecord(request, context = {}) {
-      const storageKey = normalizeStorageArtifactKey(request.storageKey);
-      const records = await readCatalogRecords();
-      const exists = records.some((entry) => entry.storageKey === storageKey);
-      if (!exists) {
-        return createSuccessResult({ deleted: false }, context);
+      if (!isWorkspaceId(request.workspaceId)) {
+        return createFailureResult(
+          createContractError("validation", "Workspace id is required for artifact catalog delete.", {
+            details: { code: "workspace-required" },
+          }),
+          context,
+        );
       }
+      const storageKey = normalizeStorageArtifactKey(request.storageKey);
+      try {
+        const records = await readCatalogRecords();
+        const exists = records.some((entry) => entry.workspaceId === request.workspaceId && entry.storageKey === storageKey);
+        if (!exists) {
+          return createSuccessResult({ deleted: false }, context);
+        }
 
-      await mkdir(path.dirname(catalogPath), { recursive: true });
-      await appendFile(catalogPath, `${JSON.stringify({ storageKey, deletedAt: new Date().toISOString() })}\n`, "utf8");
-      return createSuccessResult({ deleted: true }, context);
+        await mkdir(path.dirname(catalogPath), { recursive: true });
+        await appendFile(catalogPath, `${JSON.stringify({ workspaceId: request.workspaceId, storageKey, deletedAt: new Date().toISOString() })}\n`, "utf8");
+        return createSuccessResult({ deleted: true }, context);
+      } catch (error) {
+        return createFailureResult(createCatalogUnavailableError("deleteArtifactCatalogRecord", error), context);
+      }
     },
   };
 }

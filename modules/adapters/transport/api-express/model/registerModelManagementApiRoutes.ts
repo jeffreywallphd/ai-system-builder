@@ -7,15 +7,19 @@ import {
   normalizeDownloadModelRequest,
   normalizeGetModelDetailsRequest,
   normalizeListModelsRequest,
+  normalizePublishModelRequest,
   normalizeSaveModelReferenceRequest,
   normalizeUpdateModelRecordRequest,
+  normalizeValidateModelRequest,
   type BrowseModelsRequest,
   type DeleteModelRecordRequest,
   type DownloadModelRequest,
   type GetModelDetailsRequest,
   type ListModelsRequest,
+  type PublishModelRequest,
   type SaveModelReferenceRequest,
   type UpdateModelRecordRequest,
+  type ValidateModelRequest,
 } from "../../../../contracts/model";
 
 interface ExpressRequestLike { body?: unknown; headers?: Record<string, string | string[] | undefined>; }
@@ -50,6 +54,8 @@ const mapSaveModelReferenceApiRequestToCommand = (body: unknown): SaveModelRefer
 const mapDownloadModelApiRequestToCommand = (body: unknown): DownloadModelRequest => mapWithContractNormalizer(body, normalizeDownloadModelRequest);
 const mapUpdateModelRecordApiRequestToCommand = (body: unknown): UpdateModelRecordRequest => mapWithContractNormalizer(body, normalizeUpdateModelRecordRequest);
 const mapDeleteModelRecordApiRequestToCommand = (body: unknown): DeleteModelRecordRequest => mapWithContractNormalizer(body, normalizeDeleteModelRecordRequest);
+const mapValidateModelApiRequestToCommand = (body: unknown): ValidateModelRequest => mapWithContractNormalizer(body, normalizeValidateModelRequest);
+const mapPublishModelApiRequestToCommand = (body: unknown): PublishModelRequest => mapWithContractNormalizer(body, normalizePublishModelRequest);
 
 const mapFailureCode = (error: unknown): "internal" | "validation" | "not-found" | "unavailable" => {
   if (isRuntimeCapabilityUnavailableError(error)) return "unavailable";
@@ -135,4 +141,12 @@ export function registerModelManagementApiRoutes(dependencies: RegisterModelMana
   registerRoute(dependencies.app, dependencies.logger, "/api/model/download", "model.download", async (body) => dependencies.downloadModelUseCase.execute(mapDownloadModelApiRequestToCommand(body)));
   registerRoute(dependencies.app, dependencies.logger, "/api/model/record/update", "model.record.update", async (body) => dependencies.updateModelRecordUseCase.execute(mapUpdateModelRecordApiRequestToCommand(body)));
   registerRoute(dependencies.app, dependencies.logger, "/api/model/record/delete", "model.record.delete", async (body) => dependencies.deleteModelRecordUseCase.execute(mapDeleteModelRecordApiRequestToCommand(body)));
+  const validateModelUseCase = dependencies.validateModelUseCase;
+  if (validateModelUseCase) {
+    registerRoute(dependencies.app, dependencies.logger, "/api/model/validate", "model.validate", async (body) => validateModelUseCase.execute(mapValidateModelApiRequestToCommand(body)));
+  }
+  const publishModelUseCase = dependencies.publishModelUseCase;
+  if (publishModelUseCase) {
+    registerRoute(dependencies.app, dependencies.logger, "/api/model/publish", "model.publish", async (body) => publishModelUseCase.execute(mapPublishModelApiRequestToCommand(body)));
+  }
 }

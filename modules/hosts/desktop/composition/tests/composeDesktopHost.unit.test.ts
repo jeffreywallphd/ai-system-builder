@@ -7,6 +7,7 @@ import { describe, expect, expectTypeOf, it, testDouble } from "../../../../test
 
 import type { LoggingPort } from "../../../../application/ports/logging";
 import type { StructuredLogEvent } from "../../../../contracts/logging";
+import { TaskType } from "../../../../contracts/runtime";
 import type { HuggingFaceFetchImplementation } from "../../../../adapters/storage/huggingface";
 
 import {
@@ -30,6 +31,8 @@ import {
   DESKTOP_DATASET_PREPARE_TRAINING_START_REQUEST_CHANNEL,
   DESKTOP_DATASET_PREPARE_TRAINING_TASK_READ_REQUEST_CHANNEL,
   DESKTOP_DATASET_PREPARE_TRAINING_TASK_CANCEL_REQUEST_CHANNEL,
+  DESKTOP_FEATURE_LIFECYCLE_STATE_READ_REQUEST_CHANNEL,
+  DESKTOP_FEATURE_LIFECYCLE_IDLE_DISPOSE_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL,
@@ -37,9 +40,20 @@ import {
   DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_CREATE_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_READ_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_SAVE_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_CLEAR_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL,
+  DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL,
+  DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL,
+  DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_LIST_DEFINITIONS_REQUEST_CHANNEL,
@@ -62,18 +76,22 @@ import {
 import type { IpcMainHandlePort } from "../../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 
 import {
-  classifyPythonRuntimeStdioLogLevel,
   composeDesktopHost,
   createDesktopRuntimeReadinessService,
+  type ComposeDesktopHostOptions,
+  type RegisterDesktopArtifactUploadIpcOptions,
+} from "../composeDesktopHost";
+import {
   resolveComfyUiLaunchPythonExecutable,
   resolveComfyUiPythonEnvironmentMode,
   resolveComfyUiRuntimeDeviceMode,
   resolveComfyUiInstallRoot,
+} from "../composeDesktopComfyUiHelpers";
+import {
+  classifyPythonRuntimeStdioLogLevel,
   resolveDefaultManagedPythonRuntimePort,
   resolvePythonRuntimeBaseUrl,
-  type ComposeDesktopHostOptions,
-  type RegisterDesktopArtifactUploadIpcOptions,
-} from "../composeDesktopHost";
+} from "../desktopPythonRuntimeHelpers";
 
 describe("composeDesktopHost", () => {
   it("resolves ComfyUI install root with COMFYUI_INSTALL_ROOT override", () => {
@@ -195,7 +213,7 @@ describe("composeDesktopHost", () => {
       logSink: sink,
     });
 
-    expectTypeOf(host.loggingPort).toExtend<LoggingPort>();
+    expectTypeOf<typeof host.loggingPort>().toExtend<LoggingPort>();
     expect(host.loggingConfig).toEqual({
       verbosity: "verbose",
       level: "debug",
@@ -253,16 +271,26 @@ describe("composeDesktopHost", () => {
       runtimeRootDirectory,
     });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(54);
     const channels = ipcMain.handle.mock.calls.map((call) => call[0]);
-    expect(channels).toEqual([
+    const expectedChannels = [
       DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL.value,
       DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
       DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_CREATE_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_SELECTION_READ_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_SELECTION_SAVE_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_SELECTION_CLEAR_REQUEST_CHANNEL.value,
       DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL.value,
       DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL.value,
       DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
       DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value,
       DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL.value,
       DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL.value,
@@ -310,38 +338,50 @@ describe("composeDesktopHost", () => {
       "ipc.comfyui-runtime.repair-install.request",
       DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL.value,
       DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL.value,
-    ]);
+      "ipc.user-library.promote-workspace-asset.request",
+      "ipc.user-library.link-asset-to-workspace.request",
+      "ipc.user-library.copy-asset-to-workspace.request",
+      "ipc.user-library.import-workspace-asset.request",
+      "ipc.user-library.list-assets.request",
+      "ipc.user-library.read-asset.request",
+      "ipc.user-library.list-workspace-links.request",
+      "ipc.user-library.read-workspace-link.request",
+      "ipc.user-library.list-workspace-effective-sources.request",
+      DESKTOP_FEATURE_LIFECYCLE_STATE_READ_REQUEST_CHANNEL.value,
+      DESKTOP_FEATURE_LIFECYCLE_IDLE_DISPOSE_REQUEST_CHANNEL.value,
+    ];
+    expect(ipcMain.handle).toHaveBeenCalledTimes(expectedChannels.length);
+    expect(new Set(channels)).toEqual(new Set(expectedChannels));
     expect(channels.filter((channel) => String(channel).startsWith("ipc.asset."))).toEqual([
       DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL.value,
       DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL.value,
       DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
     ]);
-    expect(/asset\.(?:create|update|delete|register|seed|import|finalize|scan|execute)/i.test(channels.join(" "))).toBe(false);
-    expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(true);
+    expect(/asset\.(?:create|update|delete|patch|edit|seed|publish|scan|execute|run)/i.test(channels.join(" "))).toBe(false);
+    expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
-    const internalRegistry = host.getInternalAssetRegistry();
-    expect(internalRegistry).toBeDefined();
-    expect(internalRegistry?.resourceBackedViewProvider).toBeDefined();
-    expect(internalRegistry?.diagnostics.resourceBackedViewsEnabled).toBe(true);
-    const resourceBacked = await internalRegistry?.readFacade.listResourceBackedViewCards({ limit: 10 });
-    expect(resourceBacked?.items).toEqual([]);
-    expect(resourceBacked?.diagnostics?.some((diagnostic) => diagnostic.code.includes("source-unavailable") || diagnostic.code.includes("unsupported"))).toBe(true);
-    const missingResourceBackedDetail = await internalRegistry!.readFacade.readResourceBackedViewDetail("asset-view.image.internal.missing");
-    expect(missingResourceBackedDetail).toBeUndefined();
+    expect(host.getInternalAssetRegistry()).toBeUndefined();
     expect(artifactRepoFetch).not.toHaveBeenCalled();
-    expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
-    expect(
-      await internalRegistry?.readFacade.listDefinitionCards({ includeBuiltIns: true, includeCustom: true }),
-    ).toEqual({ items: [] });
     const preloadSource = [
       readFileSync(resolve("apps/desktop/src/preload/index.ts"), "utf8"),
       readFileSync(resolve("apps/desktop/src/preload/exposedApi.ts"), "utf8"),
     ].join("\n");
     expect(preloadSource).toContain("listAssetDefinitions");
     expect(preloadSource).toContain("readAssetDefinition");
-    expect(/createAsset|updateAsset|deleteAsset|registerAsset|seedAsset|importAsset|finalizeAsset|listAssetInstances|readAssetInstance/i.test(preloadSource)).toBe(false);
+    expect(preloadSource).toContain("registerResourceBackedViewAsAsset");
+    expect(preloadSource).toContain("finalizeGeneratedOutputAsAsset");
+    expect(preloadSource).toContain("importExternalRepositoryObjectAsAsset");
+    expect(preloadSource).toContain("localizeExternalRepositoryObjectAsAsset");
+    expect(/createAsset|updateAsset|deleteAsset|patchAsset|editAsset|seedAsset|publishAsset|listAssetInstances|readAssetInstance/i.test(preloadSource)).toBe(false);
     const hostSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopHost.ts"), "utf8");
-    expect(hostSource).toContain("assetRegistryRead: internalAssetRegistry.readFacade");
+    expect(hostSource).toContain("await import(\"./composeDesktopAssetFeature\")");
+    expect(hostSource).not.toContain("import { composeInternalAssetRegistry");
     expect(hostSource).not.toContain("assetRegistryRead: internalAssetRegistry,");
     const listener = ipcMain.handle.mock.calls[0]?.[1];
     expect(listener).toBeTypeOf("function");
@@ -430,159 +470,117 @@ describe("composeDesktopHost", () => {
     expect(sink).toHaveBeenCalledTimes(2);
   });
 
-  it("reuses the shared PublishArtifactToRepoUseCase in desktop host composition", () => {
-    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
-    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
-    const sourcePath = existsSync(canonicalSourcePath)
-      ? canonicalSourcePath
-      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
-    const source = readFileSync(sourcePath, "utf8");
+  it("keeps composeDesktopHost free of deferred feature implementation static imports", () => {
+    const source = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopHost.ts"), "utf8");
 
-    expect(source).toContain("PublishArtifactToRepoUseCase");
-    expect(source).not.toContain("class DesktopPublish");
+    const forbiddenRuntimeImports = [
+      "createPythonRuntimeAdapterFoundation",
+      "createPythonRuntimeTaskRegistryAdapter",
+      "createComfyUiRuntimeInstaller",
+      "createComfyUiRuntimeSupervisor",
+      "createFilesystemArtifactObjectStorageAdapter",
+      "createHuggingFaceArtifactRepoStorageAdapter",
+      "createLocalModelRegistryAdapter",
+      "GenerateImageUseCase",
+      "PrepareTrainingDatasetFromArtifactsUseCase",
+      "composeInternalAssetRegistry",
+      "TaskPowerLifecycleService",
+      "createElectronPowerSuspensionBlocker",
+    ];
+
+    for (const forbidden of forbiddenRuntimeImports) {
+      expect(source).not.toContain(`import { ${forbidden}`);
+      expect(source).not.toContain(`import {\n  ${forbidden}`);
+    }
+    expect(source).toContain("await import(\"./composeDesktopModelFeature\")");
+    expect(source).toContain("await import(\"./composeDesktopArtifactFeature\")");
+    expect(source).toContain("await import(\"./composeDesktopComfyUiInstallFeature\")");
+    expect(source).toContain("await import(\"./composeDesktopComfyUiImageRuntimeFeature\")");
+  });
+
+
+  it("keeps runtime task power blocker construction lazy until a task lifecycle action", async () => {
+    const { composeDesktopRuntimeTaskFeature } = await import("../composeDesktopRuntimeTaskFeature");
+    const milestones: string[] = [];
+
+    const feature = await composeDesktopRuntimeTaskFeature({
+      pythonRuntimeFoundation: {
+        supervisor: { start: testDouble.fn(async () => undefined) },
+        runtimePort: {},
+      },
+      imageRuntimeTaskRegistry: {
+        startTask: testDouble.fn(),
+        readTask: testDouble.fn(),
+        cancelTask: testDouble.fn(),
+        listTasks: testDouble.fn(),
+      },
+      runtimeReadiness: {
+        readCapabilityStatus: testDouble.fn(async () => ({ capabilityId: "runtime.test", status: "ready", checkedAt: "2026-05-15T00:00:00.000Z" })),
+        readAllCapabilityStatuses: testDouble.fn(async () => []),
+      },
+      recordMilestone: (milestone) => milestones.push(milestone),
+    });
+
+    expect(milestones).not.toContain("desktop.host.power-blocker.compose.before");
+    await feature.taskPowerLifecycle.startTask("task.lazy-power", TaskType.DATASET_PREPARATION);
+    expect(milestones).toContain("desktop.host.power-blocker.compose.before");
+    expect(milestones).toContain("desktop.host.power-blocker.compose.after");
   });
 
   it("keeps desktop composition source free of DOM-global fetch typing to stay webpack main emit-safe", () => {
-    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
-    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
-    const sourcePath = existsSync(canonicalSourcePath)
-      ? canonicalSourcePath
-      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
-    const source = readFileSync(sourcePath, "utf8");
+    const source = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopHost.ts"), "utf8");
 
     expect(source).not.toContain("typeof fetch");
   });
 
-  it("wires Hugging Face browse use-cases to the dedicated Hugging Face adapter seam", () => {
-    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
-    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
-    const sourcePath = existsSync(canonicalSourcePath)
-      ? canonicalSourcePath
-      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
-    const source = readFileSync(sourcePath, "utf8");
+  it("moves deferred feature implementations into explicit dynamically imported composers", () => {
+    const artifactRemoteSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopArtifactRemoteFeature.ts"), "utf8");
+    const pythonSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopPythonRuntimeFeature.ts"), "utf8");
+    const comfySource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopComfyUiImageRuntimeFeature.ts"), "utf8");
+    const comfyInstallSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopComfyUiInstallFeature.ts"), "utf8");
+    const imageSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopImageGenerationFeature.ts"), "utf8");
 
-    expect(source).toContain("const huggingFaceArtifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter");
-    expect(source).toContain("adapter: huggingFaceArtifactRepoStorage");
-    expect(source).toContain("repoBrowser: huggingFaceArtifactRepoStorage");
-    expect(source).not.toContain("repoBrowser: artifactRepoStorage");
+    expect(artifactRemoteSource).toContain("PublishArtifactToRepoUseCase");
+    expect(artifactRemoteSource).toContain("const huggingFaceArtifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter");
+    expect(artifactRemoteSource).toContain("repoBrowser: huggingFaceArtifactRepoStorage");
+    expect(pythonSource).toContain("createPythonRuntimeAdapterFoundation");
+    expect(pythonSource).toContain("ensurePythonRuntimeWorkerDependencies");
+    expect(comfyInstallSource).toContain("createComfyUiRuntimeInstaller");
+    expect(comfySource).toContain("createComfyUiRuntimeInstaller");
+    expect(comfySource).toContain("detectNvidiaGpu()");
+    expect(pythonSource).not.toContain("./composeDesktopHost");
+    expect(imageSource).toContain("ImageGenerationFinalizationOrchestratorService");
+    expect(imageSource).toContain("createFilesystemGeneratedImagePersistenceAdapter");
   });
 
-  it("wires Python runtime foundation and dataset preparation use case into desktop composition", () => {
-    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
-    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
-    const sourcePath = existsSync(canonicalSourcePath)
-      ? canonicalSourcePath
-      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
-    const source = readFileSync(sourcePath, "utf8");
 
-    expect(source).toContain("createPythonRuntimeAdapterFoundation");
-    expect(source).toContain("createPythonRuntimeTaskRegistryAdapter");
-    expect(source).not.toContain("createPythonDatasetPreparationPort");
-    expect(source).toContain("ensureRuntimeReady: () => pythonRuntimeFoundation.supervisor.start()");
-    expect(source).toContain("requiredCapabilities: PYTHON_RUNTIME_DATASET_PREPARATION_REQUIRED_CAPABILITIES");
-    expect(source).toContain("HF_HUB_DISABLE_XET");
-    expect(source).not.toContain("HF_HUB_DISABLE_XET: process.env.HF_HUB_DISABLE_XET ?? \"1\"");
-    expect(source).toContain("PrepareTrainingDatasetFromArtifactsUseCase");
-    expect(source).toContain("prepareTrainingDatasetFromArtifactsUseCase");
-  });
+  it("enforces cleanup import boundaries for ComfyUI, Python, runtime IPC, and typed providers", () => {
+    const hostSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopHost.ts"), "utf8");
+    const pythonFeatureSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopPythonRuntimeFeature.ts"), "utf8");
+    const comfyRuntimeIpcSource = readFileSync(resolve("modules/adapters/transport/ipc-electron/comfyui-runtime/registerComfyUiRuntimeIpc.ts"), "utf8");
+    const runtimeIpcSource = readFileSync(resolve("modules/adapters/transport/ipc-electron/registerDesktopRuntimeIpc.ts"), "utf8");
+    const lazyProviderSource = readFileSync(resolve("modules/adapters/transport/ipc-electron/lazyFeatureProvider.ts"), "utf8");
 
-  it("preserves the full Python runtime port when adding desktop composition logging wrappers", () => {
-    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
-    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
-    const sourcePath = existsSync(canonicalSourcePath)
-      ? canonicalSourcePath
-      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
-    const source = readFileSync(sourcePath, "utf8");
-    const runtimePortSpreadCount = source.match(/\.\.\.pythonRuntimeFoundation\.runtimePort/g)?.length ?? 0;
+    expect(comfyRuntimeIpcSource).not.toContain("../../../runtime/installer/comfyui");
+    expect(comfyRuntimeIpcSource).not.toContain("buildComfyUiInstallRequest");
+    expect(runtimeIpcSource).not.toContain("RuntimeInstallerPort");
+    expect(pythonFeatureSource).not.toContain("./composeDesktopHost");
+    expect(hostSource).not.toContain("from \"./composeDesktopPythonRuntimeFeature\"");
+    expect(hostSource).not.toContain("export {\n  detectNvidiaGpu");
+    expect(lazyProviderSource).not.toContain("AsyncFeatureProvider<any>");
 
-    expect(runtimePortSpreadCount >= 1).toBe(true);
-    expect(source).not.toContain("getHealthStatus: () => pythonRuntimeFoundation.runtimePort.getHealthStatus()");
-    expect(source).not.toContain("getCapabilities: () => pythonRuntimeFoundation.runtimePort.getCapabilities()");
-    expect(source).not.toContain("unloadModels: () => pythonRuntimeFoundation.runtimePort.unloadModels()");
-  });
-
-  it("passes ComfyUI installer dependencies through the top-level desktop IPC composition", () => {
-    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
-    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
-    const sourcePath = existsSync(canonicalSourcePath)
-      ? canonicalSourcePath
-      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
-    const source = readFileSync(sourcePath, "utf8");
-
-    expect(source).toContain("const comfyUiInstallRoot = resolveComfyUiInstallRoot");
-    expect(source).toContain("const comfyUiInstaller = createComfyUiRuntimeInstaller");
-    expect(source).toContain("const configuredComfyUiInstallCommandTimeoutMs = Number(process.env.COMFYUI_INSTALL_COMMAND_TIMEOUT_MS)");
-    expect(source).toContain("execFile: (file, args = []) => execFile(file, [...args], { timeout: comfyUiInstallCommandTimeoutMs, windowsHide: true })");
-    expect(source).toContain("const resolvedRuntimeDeviceMode = resolveComfyUiRuntimeDeviceMode");
-    expect(source).toContain("const comfyUiPythonEnvironmentMode = resolveComfyUiPythonEnvironmentMode");
-    expect(source).toContain("pythonEnvironmentMode: comfyUiPythonEnvironmentMode");
-    expect(source).toContain("runtimeDeviceMode: resolvedRuntimeDeviceMode");
-    expect(source).toContain("IMAGE_GENERATION_GPU_TYPE_SETTING_KEY");
-    expect(source).toContain("processReuse: modeChanged ? \"restarted_mode_changed\" : \"reused_or_started\"");
-    expect(source).toContain("comfyUiInstaller,");
-    expect(source).toContain("comfyUiInstallRoot,");
-    expect(source).toContain("createRuntimePreparedModelCheckpointResolver");
-    expect(source).toContain("runtime: comfyUiSupervisorPort");
-    expect(source).toContain("modelCheckpointResolver: localModelCheckpointResolver");
-  });
-
-  it("wires generated image finalization into desktop image generation IPC", () => {
-    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
-    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
-    const sourcePath = existsSync(canonicalSourcePath)
-      ? canonicalSourcePath
-      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
-    const source = readFileSync(sourcePath, "utf8");
-
-    expect(source).toContain("const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService");
-    expect(source).toContain("createFilesystemGeneratedImagePersistenceAdapter");
-    expect(source).toContain("artifactCatalogAppend: artifactCatalog");
-    expect(source).toContain("imageGenerationFinalizationOrchestrator,");
-  });
-
-  it("derives the Python runtime client URL from host and port when no base URL is configured", () => {
-    expect(resolvePythonRuntimeBaseUrl({ PYTHON_RUNTIME_PORT: "45123" })).toBe("http://127.0.0.1:45123");
-    expect(resolvePythonRuntimeBaseUrl({
-      PYTHON_RUNTIME_HOST: "localhost",
-      PYTHON_RUNTIME_PORT: "45124",
-    })).toBe("http://localhost:45124");
-    expect(resolvePythonRuntimeBaseUrl({
-      PYTHON_RUNTIME_BASE_URL: "http://192.0.2.10:46000",
-      PYTHON_RUNTIME_HOST: "localhost",
-      PYTHON_RUNTIME_PORT: "45124",
-    })).toBe("http://192.0.2.10:46000");
-  });
-
-  it("uses a process-scoped managed Python runtime port when no runtime endpoint is configured", () => {
-    expect(resolveDefaultManagedPythonRuntimePort(0)).toBe("43111");
-    expect(resolveDefaultManagedPythonRuntimePort(1)).toBe("43112");
-    expect(resolveDefaultManagedPythonRuntimePort(10_123)).toBe("43234");
-  });
-
-  it("passes the resolved managed Python runtime endpoint to spawned workers", () => {
-    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
-    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
-    const sourcePath = existsSync(canonicalSourcePath)
-      ? canonicalSourcePath
-      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
-    const source = readFileSync(sourcePath, "utf8");
-
-    expect(source).toContain("const pythonRuntimeEndpoint = resolvePythonRuntimeHostAndPort()");
-    expect(source).toContain("PYTHON_RUNTIME_HOST: pythonRuntimeEndpoint.host");
-    expect(source).toContain("PYTHON_RUNTIME_PORT: pythonRuntimeEndpoint.port");
-  });
-
-  it("configures Python runtime startup timeout for slower cold starts", () => {
-    const canonicalSourcePath = resolve("modules/hosts/desktop/composition/composeDesktopHost.ts");
-    const typeScriptPath = fileURLToPath(new URL("../composeDesktopHost.ts", import.meta.url));
-    const sourcePath = existsSync(canonicalSourcePath)
-      ? canonicalSourcePath
-      : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
-    const source = readFileSync(sourcePath, "utf8");
-
-    expect(source).toContain("PYTHON_RUNTIME_STARTUP_TIMEOUT_MS_DEFAULT = 60_000");
-    expect(source).toContain("Number(process.env.PYTHON_RUNTIME_STARTUP_TIMEOUT_MS)");
-    expect(source).toContain("startupTimeoutMs: pythonRuntimeStartupTimeoutMs");
+    for (const filePath of [
+      "modules/adapters/transport/ipc-electron/registerDesktopArtifactIpc.ts",
+      "modules/adapters/transport/ipc-electron/registerDesktopAssetIpc.ts",
+      "modules/adapters/transport/ipc-electron/registerDesktopModelIpc.ts",
+      "modules/adapters/transport/ipc-electron/registerDesktopImageGenerationIpc.ts",
+      "modules/adapters/transport/ipc-electron/registerDesktopRuntimeIpc.ts",
+      "modules/adapters/transport/ipc-electron/registerDesktopIngestionIpc.ts",
+      "modules/adapters/transport/ipc-electron/registerDesktopDatasetPreparationIpc.ts",
+    ]) {
+      const source = readFileSync(resolve(filePath), "utf8");
+      expect(source).not.toContain("AsyncFeatureProvider<any>");
+    }
   });
 
   it("stores and exposes desktop Hugging Face token status", () => {
@@ -673,7 +671,7 @@ describe("desktop host composition decomposition", () => {
     const hostSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopHost.ts"), "utf8");
     const helperSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopRuntimeTaskRegistry.ts"), "utf8");
 
-    expect(hostSource).toContain("./composeDesktopRuntimeTaskRegistry");
+    expect(hostSource).toContain("./composeDesktopRuntimeTaskFeature");
     expect(helperSource).toContain("createRuntimeTaskRegistryRouter");
     expect(helperSource).not.toContain("ipc-electron");
     expect(helperSource).not.toContain("registerElectronIpc");

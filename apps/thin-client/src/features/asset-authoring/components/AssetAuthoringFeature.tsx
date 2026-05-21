@@ -1,0 +1,41 @@
+import { useEffect, useMemo, useState } from 'react';
+import type { AssetAuthoringEffectiveSourceSummary, AssetOverrideRecord, AuthoredAssetDraftRecord, AuthoredAssetRecord } from '../../../../../modules/contracts/asset-authoring';
+import { createThinClientAssetAuthoringClient } from '../api/thinClientAssetAuthoringClient';
+
+type RowVm = { id: string; label: string; statusLabel: string };
+const safe = (value: unknown, fallback: string) => typeof value === 'string' && value.trim() ? value.trim() : fallback;
+const authoredVm = (x: AuthoredAssetRecord): RowVm => ({ id: x.authoredAssetId, label: safe(x.editableFields?.displayName, 'Authored asset'), statusLabel: safe(x.status, 'Active') });
+const draftVm = (x: AuthoredAssetDraftRecord): RowVm => ({ id: x.draftId, label: safe(x.editableFields?.displayName, 'Draft'), statusLabel: safe(x.status, 'Draft') });
+const overrideVm = (x: AssetOverrideRecord): RowVm => ({ id: x.overrideId, label: safe(x.displayLabel, 'Customization'), statusLabel: safe(x.status, 'Active') });
+const summaryVm = (x: AssetAuthoringEffectiveSourceSummary, i: number): RowVm => ({ id: `${x.assetId ?? 'summary'}-${i}`, label: safe(x.effectiveSourceKind, 'Workspace usage'), statusLabel: x.hasConflict ? 'Needs attention' : x.disabled ? 'Disabled' : 'Active' });
+
+export function AssetAuthoringFeature({ workspaceId }: { workspaceId: string; initialSection?: 'create' | 'drafts' | 'customizations' }) {
+  const c = useMemo(() => createThinClientAssetAuthoringClient('/api'), []);
+  const [authored, setAuthored] = useState<RowVm[]>([]);
+  const [drafts, setDrafts] = useState<RowVm[]>([]);
+  const [overrides, setOverrides] = useState<RowVm[]>([]);
+  const [summaries, setSummaries] = useState<RowVm[]>([]);
+  const [summariesUnavailable, setSummariesUnavailable] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [name, setName] = useState('');
+
+  const refresh = async () => {
+    const [a, d, o, s] = await Promise.all([c.listAuthoredAssets(workspaceId), c.listDrafts(workspaceId), c.listOverrides(workspaceId), c.listEffectiveSummaries(workspaceId)]);
+    if (a.ok) setAuthored(a.value.items.map(authoredVm));
+    if (d.ok) setDrafts(d.value.items.map(draftVm));
+    if (o.ok) setOverrides(o.value.items.map(overrideVm));
+    if (s.ok) {
+      setSummaries(s.value.items.map(summaryVm));
+      setSummariesUnavailable(false);
+    } else if (s.error.code === 'unavailable') {
+      setSummaries([]);
+      setSummariesUnavailable(true);
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+  }, [workspaceId]);
+
+  return <section><h2>Create and manage workspace assets</h2><h3>Created assets</h3><ul>{authored.length ? authored.map((a) => <li key={a.id}>{a.label} — {a.statusLabel}</li>) : <li>No created assets yet.</li>}</ul><h3>Drafts</h3><ul>{drafts.length ? drafts.map((d) => <li key={d.id}>{d.label} — {d.statusLabel} <button onClick={async () => { const r = await c.publishDraft(workspaceId, d.id); setMsg(r.ok ? 'Draft published.' : r.error.message); if (r.ok) await refresh(); }}>Publish</button> <button onClick={async () => { const r = await c.updateDraft({ workspaceId, draftId: d.id, summary: 'Updated in workspace' }); setMsg(r.ok ? 'Draft changes saved.' : r.error.message); if (r.ok) await refresh(); }}>Save changes</button></li>) : <li>No drafts yet.</li>}</ul><form onSubmit={async (e) => { e.preventDefault(); if (!name.trim()) { setMsg('Name is required.'); return; } const r = await c.createDraft({ workspaceId, displayName: name }); if (r.ok) { setMsg('Saved as draft.'); setName(''); await refresh(); } else setMsg(r.error.message); }}><input aria-label='Name' value={name} onChange={(e) => setName(e.target.value)} /><button>Create asset draft</button></form><h3>Customizations</h3><p><small>Creating new customizations is not available yet.</small></p><ul>{overrides.length ? overrides.map((o) => <li key={o.id}>{o.label} — {o.statusLabel} <button onClick={async () => { const r = await c.disableOverride(workspaceId, o.id); setMsg(r.ok ? 'Customization turned off.' : r.error.message); if (r.ok) await refresh(); }}>Disable customization</button></li>) : <li>No customizations yet.</li>}</ul><h3>Readiness and status</h3>{summariesUnavailable ? <p>Workspace usage summaries are not available yet.</p> : <ul>{summaries.length ? summaries.map((s) => <li key={s.id}>{s.label} — {s.statusLabel}</li>) : <li>No workspace usage summaries yet.</li>}</ul>}{msg ? <p>{msg}</p> : null}</section>;
+}

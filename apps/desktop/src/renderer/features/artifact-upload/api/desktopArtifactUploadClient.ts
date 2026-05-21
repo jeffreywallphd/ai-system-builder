@@ -173,6 +173,10 @@ export function createDesktopArtifactUploadClient(): ArtifactUploadClient {
 
   return {
     async uploadArtifact(input: DesktopArtifactUploadInput): Promise<DesktopArtifactUploadResult> {
+      if (!input.workspaceId?.trim()) {
+        return { ok: false, error: { code: "validation", message: "Workspace id is required for artifact upload." } };
+      }
+
       const response = await desktopApi.uploadArtifact(input);
       return toRendererResult(response);
     },

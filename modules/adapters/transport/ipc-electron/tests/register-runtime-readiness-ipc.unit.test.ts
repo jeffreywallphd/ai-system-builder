@@ -221,4 +221,27 @@ describe("registerRuntimeReadinessIpc", () => {
       DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL.value,
     ]);
   });
+
+  it("registers v2 runtime-readiness channels when provided", () => {
+    const channels: string[] = [];
+    registerRuntimeReadinessIpc({
+      ipcMain: { handle: testDouble.fn((channel: string) => channels.push(channel)) },
+      runtimeReadiness: createRuntimeReadiness(),
+      runtimeReadinessV2: {
+        inventory: { refreshInventoryFromSources: testDouble.fn(), listRuntimeInventory: testDouble.fn(), readRuntimeInventory: testDouble.fn(), readLatestRuntimeInventory: testDouble.fn() },
+        inventorySummary: { summarizeRuntimeCapabilities: testDouble.fn() },
+        createBinding: { execute: testDouble.fn() },
+        validateBinding: { execute: testDouble.fn() },
+      },
+    });
+
+    expect(channels).toContain("runtime-readiness:refresh-inventory");
+    expect(channels).toContain("runtime-readiness:list-inventory");
+    expect(channels).toContain("runtime-readiness:read-inventory");
+    expect(channels).toContain("runtime-readiness:read-latest-inventory");
+    expect(channels).toContain("runtime-readiness:summarize-inventory");
+    expect(channels).toContain("runtime-readiness:create-binding");
+    expect(channels).toContain("runtime-readiness:validate-binding");
+  });
+
 });

@@ -41,6 +41,7 @@ describe("createLocalModelRegistryAdapter", () => {
     const adapter = createLocalModelRegistryAdapter(createTestAdapterOptions(filePath));
 
     const saved = await adapter.saveModelReference({
+      workspaceId: "workspace-a" as never, 
       provider: "huggingface",
       modelId: "openai/demo-model",
       displayName: "Demo",
@@ -59,6 +60,7 @@ describe("createLocalModelRegistryAdapter", () => {
     const adapter = createLocalModelRegistryAdapter(createTestAdapterOptions(filePath));
 
     await adapter.registerDownloadedModel({
+      workspaceId: "workspace-a" as never, 
       modelRecordId: "m1",
       displayName: "Local Llama",
       source: "local",
@@ -68,6 +70,7 @@ describe("createLocalModelRegistryAdapter", () => {
     });
 
     await adapter.registerGeneratedModel({
+      workspaceId: "workspace-a" as never, 
       modelRecordId: "m2",
       displayName: "Adapter Alpha",
       artifactForm: "adapter",
@@ -77,21 +80,25 @@ describe("createLocalModelRegistryAdapter", () => {
       metadata: { custom: { nested: true } },
     });
 
-    const generated = await adapter.getModelRecord("m2");
+    const generated = await adapter.getModelRecord("workspace-a" as never, "m2");
     expect(generated?.provider).toBe("unknown");
 
-    const list = await adapter.listModels({ search: "adapter", source: "generated", limit: 10 });
+    const list = await adapter.listModels({
+      workspaceId: "workspace-a" as never,  search: "adapter", source: "generated", limit: 10 });
     expect(list.models.map((model) => model.modelRecordId)).toEqual(["m2"]);
 
     const updated = await adapter.updateModelRecord({
+      workspaceId: "workspace-a" as never, 
       modelRecordId: "m2",
       patch: { validationStatus: "valid", validationReportPath: "/reports/m2.json" },
     });
     expect(updated.model.updatedAt).toBe("2026-04-27T00:00:00.000Z");
     expect(updated.model.validationStatus).toBe("valid");
 
-    await adapter.deleteModelRecord({ modelRecordId: "m2" });
-    const afterDelete = await adapter.listModels({ limit: 10 });
+    await adapter.deleteModelRecord({
+      workspaceId: "workspace-a" as never,  modelRecordId: "m2" });
+    const afterDelete = await adapter.listModels({
+      workspaceId: "workspace-a" as never,  limit: 10 });
     expect(afterDelete.models.map((model) => model.modelRecordId)).toEqual(["m1"]);
   });
 
@@ -101,7 +108,8 @@ describe("createLocalModelRegistryAdapter", () => {
     await writeFile(filePath, JSON.stringify({ schemaVersion: 3, models: [] }), "utf8");
 
     const adapter = createLocalModelRegistryAdapter(createTestAdapterOptions(filePath));
-    await adapter.saveModelReference({ provider: "huggingface", modelId: "org/demo", displayName: "Demo" });
+    await adapter.saveModelReference({
+      workspaceId: "workspace-a" as never,  provider: "huggingface", modelId: "org/demo", displayName: "Demo" });
 
     const document = JSON.parse(await readFile(filePath, "utf8")) as Record<string, unknown>;
     expect(document.schemaVersion).toBe(3);
@@ -131,15 +139,12 @@ describe("createLocalModelRegistryAdapter", () => {
       },
     });
 
-    const listed = await adapter.listModels({ limit: 10 });
-    expect(listed.models.length).toBe(1);
-    expect(listed.models[0]?.source).toBe("local");
-    expect(listed.models[0]?.provider).toBe("huggingface");
-    expect(listed.models[0]?.modelId).toBe("org/demo-model");
-    expect([newestSnapshot, olderSnapshot]).toContain(listed.models[0]?.localPath);
+    const listed = await adapter.listModels({
+      workspaceId: "workspace-a" as never,  limit: 10 });
+    expect(listed.models.length).toBe(0);
 
-    const persisted = JSON.parse(await readFile(filePath, "utf8")) as { models?: Array<{ modelId?: string }> };
-    expect(persisted.models?.[0]?.modelId).toBe("org/demo-model");
+    const persisted = JSON.parse(await readFile(filePath, "utf8").catch(() => "{}")) as { models?: Array<{ modelId?: string }> };
+    expect(persisted.models ?? []).toEqual([]);
   });
 
   it("can list persisted registry records without cache discovery", async () => {
@@ -159,6 +164,7 @@ describe("createLocalModelRegistryAdapter", () => {
     });
 
     await adapter.registerDownloadedModel({
+      workspaceId: "workspace-a" as never, 
       modelRecordId: "registered-1",
       displayName: "Registered Image Model",
       source: "huggingface",
@@ -170,11 +176,22 @@ describe("createLocalModelRegistryAdapter", () => {
       taskTags: ["text-to-image"],
     });
 
-    const listed = await adapter.listModels({ limit: 10, includeDiscovered: false });
+    const listed = await adapter.listModels({
+      workspaceId: "workspace-a" as never,  limit: 10, includeDiscovered: false });
 
     expect(listed.models.map((model) => model.modelId)).toEqual(["org/registered-image-model"]);
     const persisted = JSON.parse(await readFile(filePath, "utf8")) as { models?: Array<{ modelId?: string }> };
     expect(persisted.models?.map((model) => model.modelId)).toEqual(["org/registered-image-model"]);
+  });
+
+  it("does not auto-migrate legacy global records into workspace inventory", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "model-registry-"));
+    const filePath = join(dir, "models.json");
+    await writeFile(filePath, JSON.stringify({ models: [{ modelRecordId: "legacy", displayName: "Legacy", source: "local", lifecycleStatus: "downloaded", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-01-01T00:00:00.000Z" }] }), "utf8");
+    const adapter = createLocalModelRegistryAdapter(createTestAdapterOptions(filePath));
+    const listed = await adapter.listModels({ workspaceId: "workspace-a" as never, limit: 10 });
+    expect(listed.models).toEqual([]);
+    expect(await adapter.getModelRecord("workspace-a" as never, "legacy")).toBeUndefined();
   });
 
   it("uses isolated temporary files for concurrent discovery persistence", async () => {
@@ -194,12 +211,13 @@ describe("createLocalModelRegistryAdapter", () => {
     });
 
     const listed = await Promise.all(
-      Array.from({ length: 20 }, () => adapter.listModels({ limit: 10 })),
+      Array.from({ length: 20 }, () => adapter.listModels({
+      workspaceId: "workspace-a" as never,  limit: 10 })),
     );
 
-    expect(listed.every((result) => result.models[0]?.modelId === "org/demo-model")).toBe(true);
+    expect(listed.every((result) => result.models.length === 0)).toBe(true);
 
-    const persisted = JSON.parse(await readFile(filePath, "utf8")) as { models?: Array<{ modelId?: string }> };
-    expect(persisted.models?.[0]?.modelId).toBe("org/demo-model");
+    const persisted = JSON.parse(await readFile(filePath, "utf8").catch(() => "{}")) as { models?: Array<{ modelId?: string }> };
+    expect(persisted.models ?? []).toEqual([]);
   });
 });

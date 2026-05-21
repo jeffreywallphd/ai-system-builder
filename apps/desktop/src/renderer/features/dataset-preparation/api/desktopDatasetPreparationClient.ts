@@ -30,7 +30,7 @@ export interface DesktopDatasetPreparationRequestContext {
 }
 
 export interface DesktopDatasetPreparationClient {
-  browseSourceArtifacts: () => Promise<Array<{ artifactId: string; label: string; storageKey: string }>>;
+  browseSourceArtifacts: (workspaceId?: string) => Promise<Array<{ artifactId: string; label: string; storageKey: string }>>;
   startPrepareTrainingDataset: (
     input: DesktopPrepareTrainingDatasetInput,
     context?: DesktopDatasetPreparationRequestContext,
@@ -89,9 +89,10 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
   const desktopApi = getDesktopApi();
 
   return {
-    async browseSourceArtifacts() {
+    async browseSourceArtifacts(workspaceId) {
+      if (!workspaceId) return [];
       const payload = ensureSuccessEnvelope(
-        await desktopApi.browseArtifacts(),
+        await desktopApi.browseArtifacts({ workspaceId }),
         "Failed to browse source artifacts.",
       );
 

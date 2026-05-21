@@ -205,7 +205,7 @@ export class AssetExternalRepositoryResourceBackedViewProvider implements AssetR
     }) as AssetResourceBackedViewListResult;
   }
 
-  public async readResourceBackedView(viewId: string): Promise<AssetResourceBackedView | undefined> {
+  public async readResourceBackedView(viewId: string, query: { readonly workspaceId?: string } = {}): Promise<AssetResourceBackedView | undefined> {
     const descriptorId = parseDirectViewId(viewId);
     if (descriptorId && this.externalRepositoryObjectDescriptorSource?.readExternalRepositoryObjectDescriptor) {
       try {
@@ -233,7 +233,7 @@ export class AssetExternalRepositoryResourceBackedViewProvider implements AssetR
     }
     if (descriptorId && this.publishedModelRegistry?.getModelRecord) {
       try {
-        const record = await this.publishedModelRegistry.getModelRecord(descriptorId);
+        const record = await this.publishedModelRegistry.getModelRecord(query.workspaceId as never, descriptorId);
         if (record) {
           const diagnostics: AssetResourceBackedViewProviderDiagnostic[] = [];
           const view = this.viewFromPublishedModelRecord(record, diagnostics);
@@ -362,6 +362,7 @@ export class AssetExternalRepositoryResourceBackedViewProvider implements AssetR
     let nextCursor: string | undefined;
     try {
       const result = await this.publishedModelRegistry.listModels({
+        workspaceId: query.workspaceId as never,
         search: query.searchText,
         limit,
         cursor,

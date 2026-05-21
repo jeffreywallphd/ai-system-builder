@@ -4,6 +4,8 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "../../../../modules/testing/node-test";
 
+import { createWorkspaceId } from "../../../../modules/contracts/workspace";
+import { createLocalWorkspaceRepository } from "../../../../modules/adapters/persistence/workspace";
 import { createServer } from "../createServer";
 
 const tempRoots: string[] = [];
@@ -19,9 +21,20 @@ async function createTempRoot(): Promise<string> {
   return root;
 }
 
+async function seedActiveWorkspace(rootDirectory: string, workspaceId = "workspace-a"): Promise<void> {
+  await createLocalWorkspaceRepository({ rootDirectory }).saveWorkspace({
+    workspaceId: createWorkspaceId(workspaceId),
+    displayName: "Workspace A",
+    status: "active",
+    createdAt: "2026-05-15T00:00:00.000Z",
+    updatedAt: "2026-05-15T00:00:00.000Z",
+  });
+}
+
 describe("server app artifact upload route", () => {
   it("mounts the upload route and stores image bytes through the server host use case", async () => {
     const storageRootDirectory = await createTempRoot();
+    await seedActiveWorkspace(storageRootDirectory);
     const { app } = await createServer({
       env: {
         ...process.env,
@@ -46,6 +59,7 @@ describe("server app artifact upload route", () => {
         new File([new Uint8Array([137, 80, 78, 71])], "cat.png", { type: "image/png" }),
       );
       uploadFormData.append("source", "server.integration.test");
+      uploadFormData.append("workspaceId", "workspace-a");
 
       const response = await fetch(`http://127.0.0.1:${address.port}/api/artifact/upload`, {
         method: "POST",
@@ -66,7 +80,7 @@ describe("server app artifact upload route", () => {
         value: {
           descriptor: {
             storage: {
-              key: expect.stringMatching(/^uploads\/.+\.png$/),
+              key: expect.stringMatching(/^workspaces\/workspace-a\/artifacts\/files\/.+\.png$/),
               mediaType: "image/png",
               sizeBytes: 4,
             },
@@ -92,6 +106,7 @@ describe("server app artifact upload route", () => {
 
   it("returns a client failure envelope when request payload fails use-case validation", async () => {
     const storageRootDirectory = await createTempRoot();
+    await seedActiveWorkspace(storageRootDirectory);
     const { app } = await createServer({
       env: {
         ...process.env,
@@ -116,6 +131,7 @@ describe("server app artifact upload route", () => {
         new File([new Uint8Array([80, 75, 3, 4])], "cat.zip", { type: "application/zip" }),
       );
       uploadFormData.append("source", "server.integration.test.invalid-media-type");
+      uploadFormData.append("workspaceId", "workspace-a");
 
       const response = await fetch(`http://127.0.0.1:${address.port}/api/artifact/upload`, {
         method: "POST",

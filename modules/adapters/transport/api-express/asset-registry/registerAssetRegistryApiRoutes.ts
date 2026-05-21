@@ -45,7 +45,7 @@ export interface RegisterAssetRegistryApiRoutesDependencies {
 }
 
 const getHeader = (headers: ExpressRequestLike["headers"], key: string) => {
-  const value = headers?.[key];
+  const value = headers?.[key] ?? headers?.[key.toLowerCase()];
   return Array.isArray(value) ? value[0] : value;
 };
 
@@ -59,17 +59,22 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
     const context = contextFrom(request);
     let query: Parameters<AssetRegistryDefinitionReadPort["listDefinitionCards"]>[0];
     try {
-      query = toAssetRegistryFacadeListQuery(parseAssetRegistryDefinitionListInput(request.query ?? {}, "api-query"));
+      query = toAssetRegistryFacadeListQuery(parseAssetRegistryDefinitionListInput(withWorkspaceId(request, request.query ?? {}), "api-query"));
     } catch {
       response.status(400).json(createApiAssetDefinitionsListFailureResponse("validation", "Invalid asset definitions query.", context));
+      return;
+    }
+
+    if (!hasWorkspaceId(query)) {
+      response.status(400).json(createApiAssetDefinitionsListFailureResponse("validation", "Workspace id is required for Asset Library reads.", context));
       return;
     }
 
     try {
       const result = await dependencies.assetRegistryRead.listDefinitionCards(query);
       response.status(200).json(createApiAssetDefinitionsListSuccessResponse(sanitizeAssetViewValue(result), context));
-    } catch {
-      response.status(500).json(createApiAssetDefinitionsListFailureResponse("internal", "Unable to read asset definitions.", context));
+    } catch (error) {
+      writeApiReadError(response, createApiAssetDefinitionsListFailureResponse, error, context, "Unable to read asset definitions.");
     }
   });
 
@@ -77,9 +82,14 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
     const context = contextFrom(request);
     let query: Parameters<NonNullable<AssetRegistryDefinitionReadPort["listResourceBackedViewCards"]>>[0];
     try {
-      query = toAssetRegistryResourceBackedViewListQuery(parseAssetRegistryResourceBackedViewListInput(request.query ?? {}, "api-query"));
+      query = toAssetRegistryResourceBackedViewListQuery(parseAssetRegistryResourceBackedViewListInput(withWorkspaceId(request, request.query ?? {}), "api-query"));
     } catch {
       response.status(400).json(createApiAssetResourceBackedViewsListFailureResponse("validation", "Invalid asset resource-backed views query.", context));
+      return;
+    }
+
+    if (!hasWorkspaceId(query)) {
+      response.status(400).json(createApiAssetResourceBackedViewsListFailureResponse("validation", "Workspace id is required for Asset Library reads.", context));
       return;
     }
 
@@ -91,8 +101,8 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
     try {
       const result = await dependencies.assetRegistryRead.listResourceBackedViewCards(query);
       response.status(200).json(createApiAssetResourceBackedViewsListSuccessResponse(sanitizeAssetViewValue(result), context));
-    } catch {
-      response.status(500).json(createApiAssetResourceBackedViewsListFailureResponse("internal", "Unable to read asset resource-backed views.", context));
+    } catch (error) {
+      writeApiReadError(response, createApiAssetResourceBackedViewsListFailureResponse, error, context, "Unable to read asset resource-backed views.");
     }
   });
 
@@ -103,6 +113,7 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
       payload = parseAssetRegistryResourceBackedViewReadInput(
         {
           viewId: request.params?.viewId,
+          workspaceId: workspaceIdFrom(request),
           ...(request.query?.expand !== undefined ? { expand: request.query.expand } : {}),
           ...(request.query?.includeValidation !== undefined ? { includeValidation: request.query.includeValidation } : {}),
         },
@@ -110,6 +121,11 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
       );
     } catch {
       response.status(400).json(createApiAssetResourceBackedViewReadFailureResponse("validation", "Invalid asset resource-backed view read request.", context));
+      return;
+    }
+
+    if (!hasWorkspaceId(payload)) {
+      response.status(400).json(createApiAssetResourceBackedViewReadFailureResponse("validation", "Workspace id is required for Asset Library reads.", context));
       return;
     }
 
@@ -128,8 +144,8 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
         return;
       }
       response.status(200).json(createApiAssetResourceBackedViewReadSuccessResponse(sanitizeAssetViewValue(detail), context));
-    } catch {
-      response.status(500).json(createApiAssetResourceBackedViewReadFailureResponse("internal", "Unable to read asset resource-backed view.", context));
+    } catch (error) {
+      writeApiReadError(response, createApiAssetResourceBackedViewReadFailureResponse, error, context, "Unable to read asset resource-backed view.");
     }
   });
 
@@ -143,6 +159,11 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
       return;
     }
 
+    if (!hasWorkspaceId(payload)) {
+      response.status(400).json(createApiAssetDefinitionReadFailureResponse("validation", "Workspace id is required for Asset Library reads.", context));
+      return;
+    }
+
     try {
       const detail = await dependencies.assetRegistryRead.readDefinitionDetail(
         toAssetRegistryDefinitionReference(payload),
@@ -153,8 +174,8 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
         return;
       }
       response.status(200).json(createApiAssetDefinitionReadSuccessResponse(sanitizeAssetViewValue(detail), context));
-    } catch {
-      response.status(500).json(createApiAssetDefinitionReadFailureResponse("internal", "Unable to read asset definition.", context));
+    } catch (error) {
+      writeApiReadError(response, createApiAssetDefinitionReadFailureResponse, error, context, "Unable to read asset definition.");
     }
   });
 
@@ -168,6 +189,11 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
       return;
     }
 
+    if (!hasWorkspaceId(payload)) {
+      response.status(400).json(createApiAssetDefinitionVersionReadFailureResponse("validation", "Workspace id is required for Asset Library reads.", context));
+      return;
+    }
+
     try {
       const detail = await dependencies.assetRegistryRead.readDefinitionDetail(
         toAssetRegistryDefinitionReference(payload),
@@ -178,16 +204,61 @@ export function registerAssetRegistryApiRoutes(dependencies: RegisterAssetRegist
         return;
       }
       response.status(200).json(createApiAssetDefinitionVersionReadSuccessResponse(sanitizeAssetViewValue(detail), context));
-    } catch {
-      response.status(500).json(createApiAssetDefinitionVersionReadFailureResponse("internal", "Unable to read asset definition version.", context));
+    } catch (error) {
+      writeApiReadError(response, createApiAssetDefinitionVersionReadFailureResponse, error, context, "Unable to read asset definition version.");
     }
   });
+}
+
+function hasWorkspaceId(value: { readonly workspaceId?: unknown } | undefined): value is { readonly workspaceId: string } {
+  return typeof value?.workspaceId === "string" && value.workspaceId.trim().length > 0;
+}
+
+function workspaceIdFrom(request: ExpressRequestLike): string | undefined {
+  const queryValue = request.query?.workspaceId;
+  if (typeof queryValue === "string") return queryValue;
+  const headerValue = getHeader(request.headers, "x-workspace-id");
+  return typeof headerValue === "string" ? headerValue : undefined;
+}
+
+function withWorkspaceId(request: ExpressRequestLike, input: Record<string, unknown>): Record<string, unknown> {
+  const workspaceId = workspaceIdFrom(request);
+  return workspaceId !== undefined ? { ...input, workspaceId } : input;
+}
+
+function workspaceReadErrorCode(error: unknown): "validation" | "not-found" | "unavailable" | "internal" {
+  const code = typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code) : "";
+  if (code === "workspace-required" || code === "workspace-invalid") return "validation";
+  if (code === "workspace-not-found" || code === "workspace-asset-not-in-effective-view") return "not-found";
+  if (code === "workspace-unavailable" || code === "workspace-resource-backed-view-deferred" || code === "workspace-system-pack-activation-unavailable") return "unavailable";
+  return "internal";
+}
+
+function workspaceReadErrorStatus(code: "validation" | "not-found" | "unavailable" | "internal"): number {
+  return code === "validation" ? 400 : code === "not-found" ? 404 : code === "unavailable" ? 503 : 500;
+}
+
+function workspaceReadErrorMessage(error: unknown, fallback: string): string {
+  const code = typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code) : "";
+  return code.startsWith("workspace-") && error instanceof Error && error.message ? error.message : fallback;
+}
+
+function writeApiReadError(
+  response: ExpressResponseLike,
+  factory: (code: "validation" | "not-found" | "unavailable" | "internal", message: string, context: { requestId?: string; correlationId?: string }) => unknown,
+  error: unknown,
+  context: { requestId?: string; correlationId?: string },
+  fallback: string,
+): void {
+  const code = workspaceReadErrorCode(error);
+  response.status(workspaceReadErrorStatus(code)).json(factory(code, workspaceReadErrorMessage(error, fallback), context));
 }
 
 function parseDefinitionReadRequest(request: ExpressRequestLike, versionValue: unknown, requireVersion: boolean) {
   return parseAssetRegistryDefinitionReadInput(
     {
       definitionId: request.params?.definitionId,
+      workspaceId: workspaceIdFrom(request),
       ...(versionValue !== undefined ? { version: versionValue } : {}),
       ...(request.query?.expand !== undefined ? { expand: request.query.expand } : {}),
       ...(request.query?.includeValidation !== undefined ? { includeValidation: request.query.includeValidation } : {}),

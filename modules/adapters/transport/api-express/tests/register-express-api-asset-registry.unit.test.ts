@@ -41,6 +41,29 @@ describe("registerExpressApi asset registry", () => {
     expect(mutationPaths).toEqual([]);
   });
 
+  it("registers approved mutation routes only when narrow mutation use cases are supplied", () => {
+    const app: any = { post: testDouble.fn(), get: testDouble.fn(), put: testDouble.fn(), patch: testDouble.fn(), delete: testDouble.fn() };
+    const execute = testDouble.fn();
+    registerExpressApi({
+      ...baseDependencies(app),
+      assetMutationUseCases: {
+        registerResourceBackedViewAsAsset: { execute },
+        finalizeGeneratedOutputAsAsset: { execute },
+        importExternalRepositoryObjectAsAsset: { execute },
+        localizeExternalRepositoryObjectAsAsset: { execute },
+      },
+    } as any);
+
+    const mutationPaths = app.post.mock.calls.map((call: any) => call[0]).filter((path: string) => path.startsWith("/api/assets"));
+    expect(mutationPaths).toEqual([
+      "/api/assets/register-resource-backed-view",
+      "/api/assets/finalize-generated-output",
+      "/api/assets/import-external-repository-object",
+      "/api/assets/localize-external-repository-object",
+    ]);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it("continues to register existing route families", () => {
     const app: any = { post: testDouble.fn(), get: testDouble.fn(), put: testDouble.fn(), patch: testDouble.fn(), delete: testDouble.fn() };
     registerExpressApi({

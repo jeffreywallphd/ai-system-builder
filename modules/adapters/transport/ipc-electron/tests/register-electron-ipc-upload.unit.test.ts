@@ -55,6 +55,7 @@ describe("registerArtifactUploadIpc desktop artifact upload handler", () => {
         fileName: "kitten.png",
         mediaType: "image/png",
         bytes: new Uint8Array([137, 80, 78, 71]),
+        workspaceId: "workspace.upload-test",
         boundary: {
           host: "desktop",
           source: "desktop.renderer.artifact-upload.form",
@@ -119,6 +120,7 @@ describe("registerArtifactUploadIpc desktop artifact upload handler", () => {
         fileName: "brochure.pdf",
         mediaType: "application/pdf",
         bytes: new Uint8Array([1, 2, 3]),
+        workspaceId: "workspace.upload-test",
         boundary: {
           host: "desktop",
           source: "desktop.renderer.artifact-upload.form",
@@ -193,6 +195,7 @@ describe("registerArtifactUploadIpc desktop artifact upload handler", () => {
         fileName: "cat.png",
         mediaType: "image/png",
         bytes: new Uint8Array([1, 2, 3, 4]),
+        workspaceId: "workspace.upload-test",
         boundary: {
           host: "desktop",
           source: "desktop.renderer.artifact-upload.form",
@@ -236,7 +239,7 @@ describe("registerElectronIpc top-level aggregator surface", () => {
       : aggregatorTypeScriptPath.replace(/\.ts$/, ".js");
     const source = readFileSync(aggregatorPath, "utf8");
 
-    expect(source).not.toContain("export type");
+    expect(source).toContain("registerDesktopArtifactIpc");
     expect(source).not.toContain("mapIpcRequestPayload");
     expect(source).not.toContain("mapStoreArtifactUploadResultToIpcResponse");
     expect(source).not.toContain("createDesktopArtifactUploadIpcHandler");

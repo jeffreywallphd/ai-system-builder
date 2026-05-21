@@ -9,9 +9,8 @@ import { BrowseModelsTab } from "./BrowseModelsTab";
 import { ManageModelsTab } from "./ManageModelsTab";
 import { TrainModelTab } from "./TrainModelTab";
 
-export function ModelsFeature(props: { client?: DesktopModelsClient }) {
-  const state = useModelsFeature(props.client);
-  const trainingState = useModelTrainingFeature(props.client);
+export function ModelsFeature(props: { client?: DesktopModelsClient; workspaceId?: string; workspaceName?: string }) {
+  const state = useModelsFeature(props.client, props.workspaceId);
   const [activeTabId, setActiveTabId] = useState("browse-models");
   return (
     <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
@@ -33,11 +32,16 @@ export function ModelsFeature(props: { client?: DesktopModelsClient }) {
           {
             id: "train-model",
             label: "Train Model",
-            content: <TrainModelTab state={trainingState} />,
+            content: <DeferredTrainModelTab client={props.client} />,
           },
         ]}
       />
       <PythonRuntimeFooter enabled={activeTabId === "train-model"} />
     </section>
   );
+}
+
+function DeferredTrainModelTab({ client }: { client?: DesktopModelsClient }) {
+  const trainingState = useModelTrainingFeature(client);
+  return <TrainModelTab state={trainingState} />;
 }

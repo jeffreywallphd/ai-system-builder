@@ -1,9 +1,13 @@
 import type {
+  AssetMutationResult,
   AssetFamily,
   AssetLifecycleStatus,
   AssetMetadata,
+  AssetPackSourceKind,
+  AssetPackTrustStatus,
   AssetReference,
   AssetResourceBackedViewKind,
+  AssetSourceLayer,
   AssetType,
 } from "../../../contracts/asset";
 import type {
@@ -14,6 +18,12 @@ import type {
   AssetLibraryResourceBackedViewExpansion,
   AssetLibraryResourceBackedViewQuery,
 } from "./assetLibraryQueries";
+import type {
+  FinalizeGeneratedOutputCommand,
+  ImportExternalRepositoryObjectCommand,
+  LocalizeExternalRepositoryObjectCommand,
+  RegisterResourceBackedViewCommand,
+} from "../../../contracts/asset";
 
 export interface AssetLibraryDefinitionCard {
   readonly id: string;
@@ -29,6 +39,25 @@ export interface AssetLibraryDefinitionCard {
   readonly lifecycleStatus?: AssetLifecycleStatus;
   readonly lifecycleStatusLabel?: string;
   readonly builtIn: boolean;
+  readonly sourcePackId?: string;
+  readonly sourcePackVersion?: string;
+  readonly sourcePackDisplayName?: string;
+  readonly sourceKind?: AssetPackSourceKind;
+  readonly sourceLayer?: AssetSourceLayer;
+  readonly trustStatus?: AssetPackTrustStatus;
+  readonly packCategoryId?: string;
+  readonly packCategoryDisplayName?: string;
+  readonly packTags?: readonly string[];
+  readonly systemDefault?: boolean;
+  readonly installedPack?: boolean;
+  readonly importedPack?: boolean;
+  readonly workspacePack?: boolean;
+  readonly workspaceOverride?: boolean;
+  readonly organizationOverride?: boolean;
+  readonly userOverride?: boolean;
+  readonly sourceBadgeLabel?: string;
+  readonly packLabel?: string;
+  readonly categoryLabel?: string;
   readonly updatedAt?: string;
   readonly badges?: readonly string[];
 }
@@ -97,6 +126,10 @@ export interface AssetLibraryDefinitionDetail extends AssetLibraryDefinitionCard
   readonly provenanceSummary?: AssetLibraryProvenanceSummary;
   readonly validationSummary?: AssetLibraryValidationSummary;
   readonly metadata?: AssetMetadata;
+  readonly overridesDefinitionRef?: AssetReference;
+  readonly overriddenByDefinitionRefs?: readonly AssetReference[];
+  readonly effectiveResolutionStatus?: string;
+  readonly resolutionSummary?: string;
 }
 
 export interface AssetLibraryResourceBackedViewCard {
@@ -176,6 +209,18 @@ export interface AssetLibraryClient {
     input: { readonly viewId: string },
     options?: AssetLibraryResourceBackedViewDetailOptions,
   ) => Promise<AssetLibraryClientResult<AssetLibraryResourceBackedViewDetail>>;
+  readonly registerResourceBackedViewAsAsset: (
+    command: RegisterResourceBackedViewCommand,
+  ) => Promise<AssetLibraryClientResult<AssetMutationResult>>;
+  readonly finalizeGeneratedOutputAsAsset: (
+    command: FinalizeGeneratedOutputCommand,
+  ) => Promise<AssetLibraryClientResult<AssetMutationResult>>;
+  readonly importExternalRepositoryObjectAsAsset: (
+    command: ImportExternalRepositoryObjectCommand,
+  ) => Promise<AssetLibraryClientResult<AssetMutationResult>>;
+  readonly localizeExternalRepositoryObjectAsAsset: (
+    command: LocalizeExternalRepositoryObjectCommand,
+  ) => Promise<AssetLibraryClientResult<AssetMutationResult>>;
 }
 
 export type {

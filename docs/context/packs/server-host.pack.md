@@ -74,7 +74,7 @@
 
 
 
-- Server `registerApi` composes the internal Asset Registry through `composeInternalAssetRegistry` using `storageRootDirectory`, which initializes `<storageRootDirectory>/asset-kernel/` and exposes only a host-internal getter for private composition/tests. It also passes the Phase 3 safe resource-backed provider aggregate built from already-composed artifact metadata, finalized image descriptor, and persisted model read seams. It must not use `runtimeRootDirectory` for Asset Kernel records or provider reads and must not add asset API routes, thin-client clients, automatic built-in seeding, resource scans, provider/network calls, resource-byte reads, or runtime start/probe/install behavior for the Asset Kernel.
+- Server `registerApi` composes the internal Asset Registry through `composeInternalAssetRegistry` using `storageRootDirectory`, which initializes `<storageRootDirectory>/asset-kernel/` and exposes only a host-internal getter for private composition/tests. It also passes the Phase 3 safe resource-backed provider aggregate built from already-composed artifact metadata, finalized image descriptor, and persisted model read seams. The internal registry may expose an explicit application-side `system.foundation` installer seam, but server startup must not invoke it. It must not use `runtimeRootDirectory` for Asset Kernel records or provider reads and must not add asset API routes, thin-client clients, automatic built-in or system-pack seeding, resource scans, provider/network calls, resource-byte reads, or runtime start/probe/install behavior for the Asset Kernel.
 
 ## Current implementation checkpoint (server host)
 
@@ -131,3 +131,42 @@ Phase 2C Prompt 7 thin-client Asset Library detail panels reuse shared read-only
 Phase 2C Prompt 8 finalizes the server/thin-client Asset Library definition baseline as read-only; the final Phase 3 cleanup adds GET-only resource-backed view list/detail routes and thin-client visibility. Thin-client code uses the server API client and shared UI helpers, validation is explicit through `includeValidation`, built-in seeding stays internal, and no server/thin-client Asset Library code may scan resources, read bytes, call providers/runtimes, or expose mutation/import/finalization/execution controls.
 
 Phase 3 Prompt 8 keeps server resource-backed provider wiring internal to host composition and the Asset Registry read facade. The public server/thin-client surface may list/read resource-backed views only through that facade; do not add automatic seeding, registration/import/finalization/localization/publishing flows, storage scans, provider/network calls, runtime/task-registry calls, or byte/content reads for resource-backed views.
+
+Phase 4 Prompt 7 adds only four approved asset mutation POST wrappers under `/api/assets`: register resource-backed view, finalize generated output, import external repository object, and localize external repository object. Server transport registration must receive only narrow application use cases, map typed mutation results/failures through existing API envelopes, sanitize thrown errors, and avoid host composition objects, repositories, providers, storage/runtime adapters, token stores, startup mutation execution, seeding routes, provider browse/download routes, and runtime execution routes.
+
+Phase 4 Prompt 8 allows thin-client Asset Library UI actions only through those public server API wrappers, with explicit confirmation and sanitized result display. Thin-client code must not import route handlers, application services, host composition, IPC/preload, resource-byte readers, provider clients, or runtime behavior.
+
+Phase 5 Prompt 9 allows the thin-client Asset Library to display sanitized pack/source/category metadata and local read-only filters from shared UI read models. `system.foundation` definitions should appear as `System default` assets from `System Foundation`; `workspace-pack` should display as `Workspace pack` unless explicit override metadata exists. Server API remains limited to existing read/mutation surfaces and must not add pack install/import/export/activate/disable routes, override editing routes, resolver execution, marketplace behavior, scans, provider/network/runtime calls, or byte/content reads.
+
+Phase 5 Prompt 10 adds only a pure application-side asset resolver. Server API and thin-client surfaces must not expose resolver routes or raw resolver result payloads, override editing, pack activation/priority controls, active-pack persistence, install/import/export behavior, scans, provider/network/runtime/filesystem calls, composition authoring, or execution behavior for that resolver.
+
+Phase 5 Prompt 11 adds only pure in-memory application serialization/fingerprint helpers and fixtures. Server API and thin-client surfaces must not expose pack import/export routes, upload/download routes, file/archive/signature handling, marketplace/registry clients, user pack install/activation, override editing, host startup import/export behavior, filesystem scans, provider/network/runtime calls, or byte/content reads.
+
+## Phase 6 Prompt 5 active workspace gating
+
+Thin-client/server-host surfaces should treat active workspace selection as request/UI context and not as authorization. Workspace-scoped pages must not render global resource records without an active workspace. API-level resource filtering and persistence scoping remain deferred; future endpoints must require explicit workspace context rather than reading application-service global state.
+
+## Phase 6 Prompt 6 workspace activation server boundary
+
+Workspace system pack activation availability is internal application-layer behavior only. Server host prompts should not expose new API routes, call system-pack installers, copy system definitions, add Asset Library effective-view filtering, scope artifact/data/model/image persistence, or add public pack management/collaboration behavior for this checkpoint unless a later prompt explicitly asks for host wiring.
+
+## Workspace-aware Asset Registry API reads
+
+Server Asset Registry API read routes accept workspace context (query/header) and delegate to the workspace effective-view read facade. Missing workspace context must not fall back to global definitions; `system.foundation@1.0.0` is visible only through active workspace system-pack activation records. Artifact/data/model/image persistence scoping and user-library reuse remain later work.
+
+
+## Phase 6 Prompt 8 artifact workspace scoping
+
+Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.
+
+## Phase 6 Prompt 10 thin-client workspace UX integration
+
+Thin-client/server-host surfaces expose real workspace API-backed create/select/switch behavior. Workspace-required thin-client pages are gated without active workspace context, display the active workspace name once selected, and pass the active workspace id on workspace-scoped API requests. Switching workspaces refetches current route data and must not fall back to global records.
+
+The server remains the authoritative workspace creator/selector transport; thin-client UI must not derive ids from display names or create local authoritative workspace records. System Foundation inclusion during creation is the existing `system.foundation@1.0.0` activation reference, not pack install/copy UI. No automatic startup seeding/default workspace, user-library, cross-workspace reuse, collaboration, invites, sync, or marketplace behavior is added.
+
+## Phase 6 final stabilization / Phase 7 handoff
+
+Phase 6 final state: workspace is the normal boundary for user/project resources. No active workspace means workspace-scoped pages are gated and must not render underlying feature components or call workspace-scoped clients. Active workspace display uses the workspace display name. System Foundation remains system-owned and is made available only through a `system.foundation@1.0.0` workspace activation reference; workspace creation must not call the Phase 5 installer, copy pack definitions, create a hidden/default workspace, or perform startup seeding. Workspace-owned artifacts/uploads, image assets, generated outputs/finalization, dataset outputs, model records, and runtime task outputs require explicit workspace context where implemented, must not leak across Workspace A/B, and must not fall back to legacy global records. Global runtime readiness and system/provider diagnostics may remain global but must not masquerade as workspace-owned records. Collaboration fields are passive placeholders only.
+
+Phase 7 is User Library and Cross-Workspace Asset Reuse. It should define explicit promote/link/copy/import flows and provenance/resolver behavior without accidental propagation. Do not implement user-library, cross-workspace reuse, collaboration permissions, invites/sync/remote auth, asset authoring, override editing, pack import/export/install, marketplace, visual composition, workflow execution expansion, provider/network expansion, or automatic legacy migration as part of Phase 6 stabilization.

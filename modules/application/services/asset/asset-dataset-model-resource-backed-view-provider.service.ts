@@ -3,6 +3,7 @@ import type {
   DatasetMaterializationDescriptor,
   DatasetSchemaSummary,
 } from "../../../contracts/dataset";
+import { isWorkspaceId } from "../../../contracts/workspace";
 import type { ModelInventoryRecord } from "../../../contracts/model";
 import type {
   AssetFamily,
@@ -34,8 +35,8 @@ export interface SafeDatasetDescriptorListResult {
 // Provider-local descriptor-only input seam. It remains narrow by design and is
 // not a public Asset Kernel port unless a later host-wiring prompt proves reuse.
 export interface SafeDatasetDescriptorSource {
-  listDatasetDescriptors(query?: { readonly searchText?: string; readonly limit?: number; readonly cursor?: string }): Promise<SafeDatasetDescriptorListResult>;
-  readDatasetDescriptor?(datasetId: string): Promise<DatasetDescriptor | null | undefined>;
+  listDatasetDescriptors(query: { readonly workspaceId: string; readonly searchText?: string; readonly limit?: number; readonly cursor?: string }): Promise<SafeDatasetDescriptorListResult>;
+  readDatasetDescriptor?(workspaceId: string, datasetId: string): Promise<DatasetDescriptor | null | undefined>;
 }
 
 export interface AssetDatasetModelResourceBackedViewProviderDependencies {
@@ -70,6 +71,9 @@ export class AssetDatasetModelResourceBackedViewProvider implements AssetResourc
   }
 
   public async listResourceBackedViews(query: AssetResourceBackedViewListQuery = {}): Promise<AssetResourceBackedViewListResult> {
+    if (!isWorkspaceId(query.workspaceId)) {
+      return { items: [], diagnostics: [this.diagnostic("error", "dataset-model-resource-backed-view-workspace-required", "Workspace id is required for dataset/model resource-backed views.")] };
+    }
     const diagnostics: AssetResourceBackedViewProviderDiagnostic[] = [];
     const limit = this.safeLimit(query.limit);
     const datasetActive = allowsViewKind(query, "dataset") && allowsAssetType(query, "dataset") && allowsAssetFamily(query);
@@ -113,11 +117,12 @@ export class AssetDatasetModelResourceBackedViewProvider implements AssetResourc
     }) as AssetResourceBackedViewListResult;
   }
 
-  public async readResourceBackedView(viewId: string): Promise<AssetResourceBackedView | undefined> {
+  public async readResourceBackedView(viewId: string, query: { readonly workspaceId?: string } = {}): Promise<AssetResourceBackedView | undefined> {
+    if (!isWorkspaceId(query.workspaceId)) return undefined;
     const datasetId = parseDirectViewId(viewId, DATASET_VIEW_ID_PREFIX);
     if (datasetId && this.datasetDescriptorSource?.readDatasetDescriptor) {
       try {
-        const descriptor = await this.datasetDescriptorSource.readDatasetDescriptor(datasetId);
+        const descriptor = await this.datasetDescriptorSource.readDatasetDescriptor(query.workspaceId, datasetId);
         if (descriptor) {
           const diagnostics: AssetResourceBackedViewProviderDiagnostic[] = [];
           const view = this.viewFromDatasetDescriptor(descriptor, diagnostics);
@@ -131,7 +136,7 @@ export class AssetDatasetModelResourceBackedViewProvider implements AssetResourc
     const modelRecordId = parseDirectViewId(viewId, MODEL_VIEW_ID_PREFIX);
     if (modelRecordId && this.modelRegistry?.getModelRecord) {
       try {
-        const record = await this.modelRegistry.getModelRecord(modelRecordId);
+        const record = await this.modelRegistry.getModelRecord(query.workspaceId, modelRecordId);
         if (record) {
           const diagnostics: AssetResourceBackedViewProviderDiagnostic[] = [];
           const view = this.viewFromModelInventoryRecord(record, diagnostics);
@@ -142,7 +147,7 @@ export class AssetDatasetModelResourceBackedViewProvider implements AssetResourc
       }
     }
 
-    const result = await this.listResourceBackedViews({ limit: this.maxListLimit });
+    const result = await this.listResourceBackedViews({ limit: this.maxListLimit, workspaceId: query.workspaceId });
     const view = result.items.find((item) => item.viewId === viewId);
     return view ? withDetailFallbackDiagnostic(view, this.diagnostic("info", "dataset-model-resource-backed-view-detail-list-fallback-limited", "Detail read used the bounded descriptor list fallback because a direct safe read seam or reversible safe view id was not available.")) : undefined;
   }
@@ -163,6 +168,7 @@ export class AssetDatasetModelResourceBackedViewProvider implements AssetResourc
     let nextCursor: string | undefined;
     try {
       const result = await this.datasetDescriptorSource.listDatasetDescriptors({
+        workspaceId: query.workspaceId as string,
         searchText: query.searchText,
         limit,
         cursor,
@@ -203,6 +209,7 @@ export class AssetDatasetModelResourceBackedViewProvider implements AssetResourc
     let nextCursor: string | undefined;
     try {
       const result = await this.modelRegistry.listModels({
+        workspaceId: query.workspaceId as never,
         search: query.searchText,
         limit,
         cursor,
@@ -251,6 +258,7 @@ export class AssetDatasetModelResourceBackedViewProvider implements AssetResourc
       displayName,
       createdAt: safeTimestamp(descriptor.createdAt),
       metadata: metadataOf({
+        workspaceId: descriptor.workspaceId,
         datasetId: datasetIdentity.publicId,
         sourceArtifactCount: descriptor.sourceArtifacts?.length,
         transformCount: descriptor.transforms?.length,
@@ -279,6 +287,7 @@ export class AssetDatasetModelResourceBackedViewProvider implements AssetResourc
       displayName,
       summary: "Dataset descriptor resource-backed view; not a registered Asset Kernel instance.",
       metadata: metadataOf({
+        workspaceId: descriptor.workspaceId,
         datasetId: datasetIdentity.publicId,
         sourceArtifactCount: descriptor.sourceArtifacts?.length,
         transformCount: descriptor.transforms?.length,
@@ -319,6 +328,7 @@ export class AssetDatasetModelResourceBackedViewProvider implements AssetResourc
       createdAt: safeTimestamp(record.createdAt),
       updatedAt: safeTimestamp(record.updatedAt),
       metadata: metadataOf({
+        workspaceId: record.workspaceId,
         modelRecordId: modelIdentity.publicId,
         modelId: safeModelId(record.modelId),
         source: safeLabelValue(record.source),
@@ -361,6 +371,7 @@ export class AssetDatasetModelResourceBackedViewProvider implements AssetResourc
       lifecycleStatus: lifecycleFromModelStatus(record.lifecycleStatus),
       validationSummary: validationSummaryFromModel(record),
       metadata: metadataOf({
+        workspaceId: record.workspaceId,
         modelRecordId: modelIdentity.publicId,
         modelId: safeModelId(record.modelId),
         source: safeLabelValue(record.source),

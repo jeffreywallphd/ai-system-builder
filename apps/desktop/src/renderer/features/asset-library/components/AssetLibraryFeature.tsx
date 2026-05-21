@@ -1,11 +1,21 @@
+import { useState } from "react";
+
 import type { AssetLibraryClient } from "../../../../../../../modules/ui/shared/asset-library";
 import {
+  buildAssetLibraryMutationCommand,
+  describeAssetMutationResult,
+  getAssetLibraryMutationActions,
   getAssetLibraryFamilyLabel,
   getAssetLibraryLifecycleStatusLabel,
   getAssetLibraryTypeLabel,
+  sanitizeAssetLibraryDiagnosticMessages,
+  type AssetLibraryMutationAction,
+  type AssetLibraryMutationCommand,
+  type AssetLibraryMutationDisplay,
   type AssetLibraryResourceBackedViewCard,
   type AssetLibraryResourceBackedViewDetail,
 } from "../../../../../../../modules/ui/shared/asset-library";
+import { AssetMutationConfirmationDialog } from "../../../../../../../modules/ui/shared/asset-library/AssetMutationConfirmationDialog";
 import { AssetDefinitionDetailPanel } from "./AssetDefinitionDetailPanel";
 import { AssetDefinitionList } from "./AssetDefinitionList";
 import { AssetLibraryFilters } from "./AssetLibraryFilters";
@@ -13,13 +23,46 @@ import { useAssetLibraryFeature } from "../hooks/useAssetLibraryFeature";
 
 interface AssetLibraryFeatureProps {
   readonly client?: AssetLibraryClient;
+  readonly workspaceId?: string;
+  readonly workspaceName?: string;
 }
 
-export function AssetLibraryFeature({ client }: AssetLibraryFeatureProps) {
-  const state = useAssetLibraryFeature(client);
+export function AssetLibraryFeature({ client, workspaceId, workspaceName }: AssetLibraryFeatureProps) {
+  const state = useAssetLibraryFeature(client, workspaceId);
+  const [pendingAction, setPendingAction] = useState<AssetLibraryMutationAction | undefined>();
+  const [isMutating, setIsMutating] = useState(false);
+  const [mutationDisplay, setMutationDisplay] = useState<AssetLibraryMutationDisplay | undefined>();
+  const topLevelDiagnostics = safeDiagnosticMessages(state.diagnostics);
+
+  async function confirmMutation() {
+    if (!pendingAction || !state.selectedResourceBackedViewDetail) return;
+    setIsMutating(true);
+    setMutationDisplay(undefined);
+    const command = buildAssetLibraryMutationCommand({
+      action: pendingAction,
+      view: state.selectedResourceBackedViewDetail,
+      userConfirmed: true,
+      workspaceId: workspaceId as never,
+    });
+    const result = await callMutationClient(state, command);
+    if (result.ok === true) {
+      const display = describeAssetMutationResult(result.value);
+      setMutationDisplay(display);
+      setPendingAction(undefined);
+      if (result.value.ok === true) {
+        await state.refresh();
+        await state.selectResourceBackedView(state.selectedResourceBackedViewDetail);
+      }
+    } else {
+      setMutationDisplay({ tone: "error", message: result.error.message || "Unable to complete this asset action." });
+    }
+    setIsMutating(false);
+  }
 
   return (
     <section className="asset-library-feature ui-stack ui-stack--lg">
+      {workspaceName ? <div className="ui-status" role="status">Workspace: {workspaceName}</div> : null}
+
       <AssetLibraryFilters
         filters={state.filters}
         onSearchTextChange={state.setSearchText}
@@ -27,6 +70,9 @@ export function AssetLibraryFeature({ client }: AssetLibraryFeatureProps) {
         onAssetFamilyChange={state.setAssetFamily}
         onLifecycleStatusChange={state.setLifecycleStatus}
         onBuiltInChange={state.setBuiltIn}
+        onPackIdChange={state.setPackId}
+        onSourceLayerChange={state.setSourceLayer}
+        onCategoryIdChange={state.setCategoryId}
         onRefresh={() => {
           void state.refresh();
         }}
@@ -35,9 +81,9 @@ export function AssetLibraryFeature({ client }: AssetLibraryFeatureProps) {
 
       {state.isLoadingList ? <div className="ui-status" role="status">Loading asset definitions...</div> : null}
       {state.listError ? <div className="ui-status" role="alert">{state.listError}</div> : null}
-      {state.diagnostics.length > 0 ? (
+      {topLevelDiagnostics.length > 0 ? (
         <div className="ui-status" role="status">
-          {state.diagnostics.join(" ")}
+          {topLevelDiagnostics.join(" ")}
         </div>
       ) : null}
 
@@ -83,13 +129,31 @@ export function AssetLibraryFeature({ client }: AssetLibraryFeatureProps) {
               }}
             />
             <ResourceBackedViewDetailPanel
+              workspaceScoped={Boolean(workspaceId)}
               detail={state.selectedResourceBackedViewDetail}
               isLoading={state.isLoadingDetail}
               error={state.detailError}
+              mutationDisplay={mutationDisplay}
+              isMutating={isMutating}
+              onChooseAction={(action) => {
+                setMutationDisplay(undefined);
+                setPendingAction(action);
+              }}
             />
           </>
         )}
       </div>
+      {pendingAction && state.selectedResourceBackedViewDetail ? (
+        <AssetMutationConfirmationDialog
+          action={pendingAction}
+          view={state.selectedResourceBackedViewDetail}
+          isPending={isMutating}
+          onCancel={() => setPendingAction(undefined)}
+          onConfirm={() => {
+            void confirmMutation();
+          }}
+        />
+      ) : null}
     </section>
   );
 }
@@ -136,7 +200,7 @@ function ResourceBackedViewList({
               <span>{getAssetLibraryLifecycleStatusLabel(view)}</span>
               <span>{view.registrationStatusLabel}</span>
             </span>
-            {view.diagnostics?.length ? <span className="asset-definition-card__updated">{view.diagnostics.join(" ")}</span> : null}
+            {safeDiagnosticMessages(view.diagnostics).length ? <span className="asset-definition-card__updated">{safeDiagnosticMessages(view.diagnostics).join(" ")}</span> : null}
           </button>
         );
       })}
@@ -148,14 +212,23 @@ function ResourceBackedViewDetailPanel({
   detail,
   isLoading,
   error,
+  mutationDisplay,
+  isMutating,
+  onChooseAction,
+  workspaceScoped,
 }: {
   readonly detail?: AssetLibraryResourceBackedViewDetail;
   readonly isLoading: boolean;
   readonly error?: string;
+  readonly mutationDisplay?: AssetLibraryMutationDisplay;
+  readonly isMutating: boolean;
+  readonly onChooseAction: (action: AssetLibraryMutationAction) => void;
+  readonly workspaceScoped: boolean;
 }) {
   if (isLoading) return <section className="ui-panel" role="status">Loading resource view...</section>;
   if (error) return <section className="ui-panel" role="alert">{error}</section>;
   if (!detail) return <section className="ui-panel asset-library-empty"><h2>Select a resource view.</h2></section>;
+  const actions = workspaceScoped ? [] : getAssetLibraryMutationActions(detail);
   return (
     <section className="ui-panel asset-library-detail" aria-label="Resource view detail">
       <h2>{detail.displayName}</h2>
@@ -168,7 +241,54 @@ function ResourceBackedViewDetailPanel({
         {detail.sourceKind ? <><dt>Source</dt><dd>{detail.sourceKind}</dd></> : null}
         {detail.resourceBackingSummary?.resourceKind ? <><dt>Backing</dt><dd>{detail.resourceBackingSummary.resourceKind}</dd></> : null}
       </dl>
-      {detail.diagnostics?.length ? <div className="ui-status" role="status">{detail.diagnostics.join(" ")}</div> : null}
+      {actions.length > 0 ? (
+        <div className="asset-library-actions" aria-label="Resource view actions">
+          {actions.map((action) => (
+            <button key={action.id} type="button" className="ui-button ui-button--primary" onClick={() => onChooseAction(action)} disabled={isMutating || Boolean(action.disabledReason)}>
+              {action.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {mutationDisplay ? (
+        <div className="ui-status" role={mutationDisplay.tone === "error" ? "alert" : "status"}>
+          {mutationDisplay.message}
+          {mutationDisplay.details?.length ? (
+            <details>
+              <summary>Review details</summary>
+              <ul>{mutationDisplay.details.map((detailMessage) => <li key={detailMessage}>{detailMessage}</li>)}</ul>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
+      {workspaceScoped ? <div className="ui-status" role="status">Resource-backed asset actions are deferred until workspace resource scoping is implemented.</div> : null}
+      {safeDiagnosticMessages(detail.diagnostics).length ? <div className="ui-status" role="status">{safeDiagnosticMessages(detail.diagnostics).join(" ")}</div> : null}
     </section>
   );
+}
+
+async function callMutationClient(
+  state: ReturnType<typeof useAssetLibraryFeature>,
+  command: AssetLibraryMutationCommand,
+) {
+  switch (command.operation) {
+    case "asset.register-resource-backed-view":
+      return state.client.registerResourceBackedViewAsAsset(command);
+    case "asset.finalize-generated-output":
+      return state.client.finalizeGeneratedOutputAsAsset(command);
+    case "asset.import-external-repository-object":
+      return state.client.importExternalRepositoryObjectAsAsset(command);
+    case "asset.localize-external-repository-object":
+      return state.client.localizeExternalRepositoryObjectAsAsset(command);
+    default:
+      return assertNever(command);
+  }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unsupported asset mutation command: ${JSON.stringify(value)}`);
+}
+
+function safeDiagnosticMessages(value: readonly string[] | undefined): readonly string[] {
+  return sanitizeAssetLibraryDiagnosticMessages(value);
 }

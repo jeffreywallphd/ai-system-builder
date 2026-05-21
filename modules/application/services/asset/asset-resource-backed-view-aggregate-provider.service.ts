@@ -97,7 +97,7 @@ export class AssetResourceBackedViewAggregateProvider implements AssetResourceBa
     }) as AssetResourceBackedViewListResult;
   }
 
-  public async readResourceBackedView(viewId: string): Promise<AssetResourceBackedView | undefined> {
+  public async readResourceBackedView(viewId: string, query: { readonly workspaceId?: string } = {}): Promise<AssetResourceBackedView | undefined> {
     const scopedProvider = this.providerForScopedViewId(viewId);
     const cachedProvider = !scopedProvider ? this.providerByPublicViewId.get(viewId) : undefined;
     const providers = scopedProvider ? [scopedProvider.provider] : cachedProvider ? [cachedProvider] : this.providers;
@@ -105,7 +105,7 @@ export class AssetResourceBackedViewAggregateProvider implements AssetResourceBa
 
     for (const provider of providers) {
       try {
-        const view = await provider.readResourceBackedView(scopedViewId);
+        const view = await provider.readResourceBackedView(scopedViewId, query);
         if (view) return sanitizeAssetViewValue(view) as AssetResourceBackedView;
       } catch {
         continue;

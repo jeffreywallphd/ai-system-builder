@@ -54,7 +54,7 @@ let persistedFileUploadState: PersistedFileUploadState = {
   viewState: { status: "idle" },
 };
 
-export function useArtifactUploadFeature(client?: ApiArtifactUploadClient, onUploadComplete?: () => void): UseArtifactUploadFeatureResult {
+export function useArtifactUploadFeature(client?: ApiArtifactUploadClient, onUploadComplete?: () => void, workspaceId?: string): UseArtifactUploadFeatureResult {
   const uploadClient = useArtifactUploadClient(client);
   const shouldPersistFileUploadState = client === undefined;
   const [selectedFile, setSelectedFile] = useState<File | null>(shouldPersistFileUploadState ? persistedFileUploadState.selectedFile : null);
@@ -82,11 +82,17 @@ export function useArtifactUploadFeature(client?: ApiArtifactUploadClient, onUpl
       return;
     }
 
+    if (!workspaceId) {
+      setViewState({ status: "error", message: "Select an active workspace before uploading." });
+      return;
+    }
+
     uploadInProgressRef.current = true;
     setViewState({ status: "uploading", message: `Uploading ${file.name}...` });
 
     try {
       const response = await uploadClient.uploadArtifact({
+        workspaceId,
         fileName: file.name,
         mediaType: file.type,
         bytes: new Uint8Array(await file.arrayBuffer()),

@@ -43,6 +43,7 @@ describe("artifact browser read use cases", () => {
         value: {
           items: [
             {
+              artifactId: " staged/images/cat-1 ",
               storageKey: " staged/images/cat-1 ",
               artifactFamily: "image",
               mediaType: " image/png ",
@@ -62,6 +63,7 @@ describe("artifact browser read use cases", () => {
       {
         requestId: "req-browse-1",
         correlationId: "corr-browse-1",
+        workspaceId: "workspace-a",
       },
     );
 
@@ -87,6 +89,7 @@ describe("artifact browser read use cases", () => {
       {
         requestId: "req-browse-1",
         correlationId: "corr-browse-1",
+        workspaceId: "workspace-a",
       },
     );
   });
@@ -100,10 +103,10 @@ describe("artifact browser read use cases", () => {
 
     const result = await useCase.execute({
       artifactFamily: "document",
-    });
+    }, { workspaceId: "workspace-a" });
 
     expect(result.ok).toBe(true);
-    expect(browseArtifacts).toHaveBeenCalledWith({ artifactFamily: "document" }, {});
+    expect(browseArtifacts).toHaveBeenCalledWith({ artifactFamily: "document" }, { workspaceId: "workspace-a" });
   });
 
   it("detail returns one artifact metadata/read-model result by locator", async () => {
@@ -129,7 +132,7 @@ describe("artifact browser read use cases", () => {
 
     const result = await useCase.execute<{ width: number }>({
       locator: createArtifactBrowserLocator(" staged/images/cat-2 "),
-    });
+    }, { workspaceId: "workspace-a" });
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -159,7 +162,7 @@ describe("artifact browser read use cases", () => {
 
     const notFoundResult = await useCase.execute({
       locator: createArtifactBrowserLocator("staged/images/missing-1"),
-    });
+    }, { workspaceId: "workspace-a" });
 
     expect(notFoundResult.ok).toBe(false);
     if (notFoundResult.ok) {
@@ -169,7 +172,7 @@ describe("artifact browser read use cases", () => {
 
     const validationResult = await useCase.execute({
       locator: { storageKey: "   " },
-    });
+    }, { workspaceId: "workspace-a" });
 
     expect(validationResult.ok).toBe(false);
     if (validationResult.ok) {
@@ -200,7 +203,7 @@ describe("artifact browser read use cases", () => {
 
     const result = await useCase.execute({
       locator: createArtifactBrowserLocator(" staged/images/cat-3 "),
-    });
+    }, { workspaceId: "workspace-a" });
 
     expect(result.ok).toBe(true);
     if (!result.ok) {
@@ -231,7 +234,7 @@ describe("artifact browser read use cases", () => {
 
     const notFoundResult = await useCase.execute({
       locator: createArtifactBrowserLocator("staged/images/missing-content-1"),
-    });
+    }, { workspaceId: "workspace-a" });
 
     expect(notFoundResult.ok).toBe(false);
     if (notFoundResult.ok) {
@@ -241,7 +244,7 @@ describe("artifact browser read use cases", () => {
 
     const validationResult = await useCase.execute({
       locator: { storageKey: "" },
-    });
+    }, { workspaceId: "workspace-a" });
 
     expect(validationResult.ok).toBe(false);
     if (validationResult.ok) {

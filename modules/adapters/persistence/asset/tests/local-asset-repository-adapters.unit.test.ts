@@ -276,6 +276,20 @@ describe("local asset instance repository adapter", () => {
     assert.deepEqual((await repositories.instances.listInstances({ text: "updated alpha" })).instances.map((record) => record.instanceId), ["instance.one"]);
     assert.deepEqual((await repositories.instances.listInstances({ text: "definition.two" })).instances.map((record) => record.instanceId), ["instance.two"]);
     assert.deepEqual((await repositories.instances.listInstances({ text: "unrelated" })).instances.map((record) => record.instanceId), []);
+
+    await repositories.instances.saveInstance(validInstance({
+      instanceId: "instance.workspace-a",
+      metadata: { assetFinalization: { workspaceId: "workspace-a", sourceIdentity: { deduplicationKey: "safe-key" } } },
+      provenance: { sourceKind: "human-authored", updatedAt: "2026-05-07T01:00:00.000Z" },
+    }));
+    await repositories.instances.saveInstance(validInstance({
+      instanceId: "instance.workspace-b",
+      metadata: { assetFinalization: { workspaceId: "workspace-b", finalizedImage: { workspaceId: "workspace-b" }, sourceIdentity: { deduplicationKey: "safe-key" } } },
+      provenance: { sourceKind: "human-authored", updatedAt: "2026-05-07T01:30:00.000Z" },
+    }));
+    assert.deepEqual((await repositories.instances.listInstances({ workspaceId: "workspace-a" as never })).instances.map((record) => record.instanceId), ["instance.workspace-a"]);
+    assert.deepEqual((await repositories.instances.listInstances({ workspaceId: "workspace-b" as never })).instances.map((record) => record.instanceId), ["instance.workspace-b"]);
+
     const first = await repositories.instances.listInstances({ limit: 1 });
     const second = await repositories.instances.listInstances({ limit: 1, cursor: first.nextCursor });
     assert.deepEqual(first.instances.map((record) => record.instanceId), ["instance.one"]);

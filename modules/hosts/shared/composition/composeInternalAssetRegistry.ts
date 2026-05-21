@@ -1,5 +1,9 @@
 import { AssetRegistryReadFacade } from "../../../application/services/asset/asset-registry-read-facade.service";
+import { WorkspaceAssetRegistryReadFacade } from "../../../application/services/asset/workspace-asset-registry-read-facade.service";
 import { createAssetResourceBackedViewAggregateProvider } from "../../../application/services/asset/asset-resource-backed-view-aggregate-provider.service";
+import { InstallSystemAssetPackService, InstallSystemFoundationPackService } from "../../../application/services/asset-packs";
+import { CreateWorkspaceUseCase, ListWorkspaceSystemPackActivationsUseCase } from "../../../application/use-cases/workspace";
+import { createLocalWorkspaceRepository, createLocalWorkspaceSelectionRepository, createLocalWorkspaceSystemPackActivationRepository } from "../../../adapters/persistence/workspace";
 import type { AssetResourceBackedViewProvider } from "../../../application/ports/asset";
 import { composeLocalAssetKernel, type LocalAssetKernelComposition } from "./composeLocalAssetKernel";
 
@@ -13,6 +17,18 @@ export interface ComposeInternalAssetRegistryOptions {
 export interface InternalAssetRegistryComposition {
   readonly assetKernel: LocalAssetKernelComposition;
   readonly readFacade: AssetRegistryReadFacade;
+  readonly workspaceReadFacade: WorkspaceAssetRegistryReadFacade;
+  readonly assetPackInstaller: InstallSystemAssetPackService;
+  readonly installSystemFoundationPack: InstallSystemFoundationPackService;
+  readonly workspaceRepositories: {
+    readonly workspaceRepository: ReturnType<typeof createLocalWorkspaceRepository>;
+    readonly workspaceSelectionRepository: ReturnType<typeof createLocalWorkspaceSelectionRepository>;
+    readonly systemPackActivationRepository: ReturnType<typeof createLocalWorkspaceSystemPackActivationRepository>;
+  };
+  readonly workspaceUseCases: {
+    readonly createWorkspace: CreateWorkspaceUseCase;
+    readonly listWorkspaceSystemPackActivations: ListWorkspaceSystemPackActivationsUseCase;
+  };
   readonly resourceBackedViewProvider?: AssetResourceBackedViewProvider;
   readonly diagnostics: {
     readonly storeKind: LocalAssetKernelComposition["diagnostics"]["storeKind"];
@@ -25,6 +41,15 @@ export interface InternalAssetRegistryComposition {
 export function composeInternalAssetRegistry(options: ComposeInternalAssetRegistryOptions): InternalAssetRegistryComposition {
   const assetKernel = composeLocalAssetKernel({ rootDirectory: options.rootDirectory, now: options.now });
   const resourceBackedViewProvider = composeResourceBackedViewProvider(options);
+  const workspaceRepository = createLocalWorkspaceRepository({ rootDirectory: options.rootDirectory });
+  const workspaceSelectionRepository = createLocalWorkspaceSelectionRepository({ rootDirectory: options.rootDirectory });
+  const systemPackActivationRepository = createLocalWorkspaceSystemPackActivationRepository({ rootDirectory: options.rootDirectory });
+  const installerDependencies = {
+    definitionRepository: assetKernel.repositories.definitionRepository,
+    registerAssetDefinition: assetKernel.useCases.registerAssetDefinition,
+  };
+  const createWorkspace = new CreateWorkspaceUseCase({ workspaceRepository, workspaceSelectionRepository, systemPackActivationRepository });
+  const listWorkspaceSystemPackActivations = new ListWorkspaceSystemPackActivationsUseCase({ systemPackActivationRepository });
   const readFacade = new AssetRegistryReadFacade({
     definitionRepository: assetKernel.repositories.definitionRepository,
     instanceRepository: assetKernel.repositories.instanceRepository,
@@ -33,9 +58,20 @@ export function composeInternalAssetRegistry(options: ComposeInternalAssetRegist
     resourceBackedViewProvider,
   });
 
+  const workspaceReadFacade = new WorkspaceAssetRegistryReadFacade({
+    assetRegistryRead: readFacade,
+    listWorkspaceSystemPackActivations,
+    workspaceRepository,
+  });
+
   return {
     assetKernel,
     readFacade,
+    workspaceReadFacade,
+    assetPackInstaller: new InstallSystemAssetPackService(installerDependencies),
+    installSystemFoundationPack: new InstallSystemFoundationPackService(installerDependencies),
+    workspaceRepositories: { workspaceRepository, workspaceSelectionRepository, systemPackActivationRepository },
+    workspaceUseCases: { createWorkspace, listWorkspaceSystemPackActivations },
     ...(resourceBackedViewProvider ? { resourceBackedViewProvider } : {}),
     diagnostics: {
       storeKind: assetKernel.diagnostics.storeKind,
