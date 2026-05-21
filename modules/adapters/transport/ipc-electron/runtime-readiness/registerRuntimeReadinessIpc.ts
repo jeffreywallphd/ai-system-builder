@@ -22,6 +22,12 @@ import {
   DESKTOP_RUNTIME_READINESS_SUMMARIZE_INVENTORY_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_READINESS_CREATE_BINDING_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_LIST_SUMMARIES_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_DETAIL_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_LIST_FOR_COMPOSITION_PLAN_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_LATEST_FOR_COMPOSITION_PLAN_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_LIST_NEEDING_ATTENTION_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_SUMMARIZE_WORKSPACE_REQUEST_CHANNEL,
 } from "../../../../contracts/ipc";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
 
@@ -33,6 +39,7 @@ export interface RegisterRuntimeReadinessIpcDependencies {
     inventorySummary: RuntimeCapabilityInventorySummaryService;
     createBinding: CreateRuntimeReadinessBindingUseCase;
     validateBinding: ValidateRuntimeReadinessBindingUseCase;
+    readModel: import("../../../../application/services/runtime-readiness/runtime-readiness-read-model.service").WorkspaceRuntimeReadinessReadModelService;
   };
 }
 
@@ -151,6 +158,31 @@ export function registerRuntimeReadinessIpc(
     dependencies.ipcMain.handle(DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL.value, async (_e: unknown, request: RuntimeReadinessV2Request) => {
       const p=request?.payload; if (!p?.targetWorkspaceId || !p?.readinessBindingId) return fail(request, "validation", "Workspace id and readiness binding id are required.");
       return ok(request, await v2.validateBinding.execute(p));
+    });
+
+    dependencies.ipcMain.handle(DESKTOP_RUNTIME_READINESS_LIST_SUMMARIES_REQUEST_CHANNEL.value, async (_e: unknown, request: RuntimeReadinessV2Request) => {
+      const p=request?.payload; if (!p?.targetWorkspaceId) return fail(request, "validation", "Workspace id is required.");
+      try { return ok(request, await v2.readModel.listRuntimeReadinessSummaries(p as any)); } catch { return fail(request, "internal", "Unable to complete request."); }
+    });
+    dependencies.ipcMain.handle(DESKTOP_RUNTIME_READINESS_READ_DETAIL_REQUEST_CHANNEL.value, async (_e: unknown, request: RuntimeReadinessV2Request) => {
+      const p=request?.payload; if (!p?.targetWorkspaceId || !p?.readinessBindingId) return fail(request, "validation", "Workspace id and readiness binding id are required.");
+      try { return ok(request, await v2.readModel.readRuntimeReadinessDetail(p as any)); } catch { return fail(request, "internal", "Unable to complete request."); }
+    });
+    dependencies.ipcMain.handle(DESKTOP_RUNTIME_READINESS_LIST_FOR_COMPOSITION_PLAN_REQUEST_CHANNEL.value, async (_e: unknown, request: RuntimeReadinessV2Request) => {
+      const p=request?.payload; if (!p?.targetWorkspaceId || !p?.compositionPlanId) return fail(request, "validation", "Workspace id and composition plan id are required.");
+      try { return ok(request, await v2.readModel.listRuntimeReadinessForCompositionPlan(p as any)); } catch { return fail(request, "internal", "Unable to complete request."); }
+    });
+    dependencies.ipcMain.handle(DESKTOP_RUNTIME_READINESS_READ_LATEST_FOR_COMPOSITION_PLAN_REQUEST_CHANNEL.value, async (_e: unknown, request: RuntimeReadinessV2Request) => {
+      const p=request?.payload; if (!p?.targetWorkspaceId || !p?.compositionPlanId) return fail(request, "validation", "Workspace id and composition plan id are required.");
+      try { return ok(request, await v2.readModel.readLatestRuntimeReadinessForCompositionPlan(p as any)); } catch { return fail(request, "internal", "Unable to complete request."); }
+    });
+    dependencies.ipcMain.handle(DESKTOP_RUNTIME_READINESS_LIST_NEEDING_ATTENTION_REQUEST_CHANNEL.value, async (_e: unknown, request: RuntimeReadinessV2Request) => {
+      const p=request?.payload; if (!p?.targetWorkspaceId) return fail(request, "validation", "Workspace id is required.");
+      try { return ok(request, await v2.readModel.listRuntimeReadinessNeedingAttention(p as any)); } catch { return fail(request, "internal", "Unable to complete request."); }
+    });
+    dependencies.ipcMain.handle(DESKTOP_RUNTIME_READINESS_SUMMARIZE_WORKSPACE_REQUEST_CHANNEL.value, async (_e: unknown, request: RuntimeReadinessV2Request) => {
+      const p=request?.payload; if (!p?.targetWorkspaceId) return fail(request, "validation", "Workspace id is required.");
+      try { return ok(request, await v2.readModel.summarizeWorkspaceRuntimeReadiness(p as any)); } catch { return fail(request, "internal", "Unable to complete request."); }
     });
   }
 

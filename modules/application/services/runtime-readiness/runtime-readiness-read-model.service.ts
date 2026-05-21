@@ -16,14 +16,18 @@ export interface WorkspaceRuntimeReadinessSummary {
 
 export class WorkspaceRuntimeReadinessReadModelService {
   public constructor(private readonly d: WorkspaceRuntimeReadinessReadModelDependencies) {}
+  private normalizeId(value: string | undefined, field: string): string { const v = value?.trim(); if (!v) throw new Error(`validation:${field}`); return v; }
 
   public async listRuntimeReadinessSummaries(request: { targetWorkspaceId: string; limit?: number; cursor?: string; archived?: boolean }) {
-    const { records, nextCursor } = await this.d.bindingRepository.listRuntimeReadinessBindingRecords({ targetWorkspaceId: request.targetWorkspaceId as never, limit: request.limit, cursor: request.cursor, archived: request.archived });
+    const targetWorkspaceId = this.normalizeId(request.targetWorkspaceId, 'targetWorkspaceId');
+    const { records, nextCursor } = await this.d.bindingRepository.listRuntimeReadinessBindingRecords({ targetWorkspaceId, limit: request.limit, cursor: request.cursor, archived: request.archived });
     return { summaries: records.map((r) => this.toSummary(r)), nextCursor };
   }
 
   public async readRuntimeReadinessDetail(request: { targetWorkspaceId: string; readinessBindingId: string }) {
-    const record = await this.d.bindingRepository.readRuntimeReadinessBindingRecord(request.targetWorkspaceId as never, request.readinessBindingId as never);
+    const targetWorkspaceId = this.normalizeId(request.targetWorkspaceId, 'targetWorkspaceId');
+    const readinessBindingId = this.normalizeId(request.readinessBindingId, 'readinessBindingId');
+    const record = await this.d.bindingRepository.readRuntimeReadinessBindingRecord(targetWorkspaceId, readinessBindingId);
     if (!record) return undefined;
     return { summary: this.toSummary(record), requirements: record.requirements.map((x) => ({ requirementId: x.requirementId, sourceCompositionPlanId: x.compositionPlanId, sourceNodeId: x.sourceNodeId, sourceRelationshipId: x.sourceRelationshipId, capabilityKind: x.capabilityKind, capabilityKey: sanitizeRuntimeReadinessMessage(x.capabilityKey), isRequired: x.isRequired, label: sanitizeRuntimeReadinessMessage(x.label), summary: sanitizeRuntimeReadinessMessage(x.summary), candidateCount: record.bindingCandidates.filter((c) => c.requirementId === x.requirementId).length, selectedBindingCount: record.bindings.filter((b) => b.requirementId === x.requirementId).length, blockerCount: x.blockers.length, diagnosticCount: x.diagnostics.length, statusLabel: this.requirementStatusLabel(record, x.requirementId, x.isRequired) })),
       providerCandidates: record.providerCandidates.map((p) => ({ providerCandidateId: p.providerCandidateId, providerKind: p.providerKind, inventorySourceId: p.inventorySourceId, availabilityStatus: p.availabilityStatus, configurationStatus: p.configurationStatus, displayLabel: sanitizeRuntimeReadinessMessage(p.displayLabel), capabilityCount: p.capabilities.length, blockerCount: p.blockers.length, diagnosticCount: p.diagnostics.length, statusLabel: this.providerStatusLabel(p.availabilityStatus, p.configurationStatus) })),
@@ -35,12 +39,13 @@ export class WorkspaceRuntimeReadinessReadModelService {
     };
   }
 
-  public async listRuntimeReadinessForCompositionPlan(request: { targetWorkspaceId: string; compositionPlanId: string }) { const records = await this.d.bindingRepository.listRuntimeReadinessBindingRecordsByCompositionPlanId(request.targetWorkspaceId as never, request.compositionPlanId as never); return records.map((r) => this.toSummary(r)); }
+  public async listRuntimeReadinessForCompositionPlan(request: { targetWorkspaceId: string; compositionPlanId: string }) { const targetWorkspaceId=this.normalizeId(request.targetWorkspaceId,'targetWorkspaceId'); const compositionPlanId=this.normalizeId(request.compositionPlanId,'compositionPlanId'); const records = await this.d.bindingRepository.listRuntimeReadinessBindingRecordsByCompositionPlanId(targetWorkspaceId, compositionPlanId); return records.map((r) => this.toSummary(r)); }
   public async readLatestRuntimeReadinessForCompositionPlan(request: { targetWorkspaceId: string; compositionPlanId: string }) { const items = await this.listRuntimeReadinessForCompositionPlan(request); return items.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.readinessBindingId.localeCompare(a.readinessBindingId))[0]; }
   public async listRuntimeReadinessNeedingAttention(request: { targetWorkspaceId: string }) { const { summaries } = await this.listRuntimeReadinessSummaries({ targetWorkspaceId: request.targetWorkspaceId }); return summaries.filter((x) => x.needsAttention); }
   public async summarizeWorkspaceRuntimeReadiness(request: { targetWorkspaceId: string }) { const { summaries } = await this.listRuntimeReadinessSummaries(request); return { total: summaries.length, needingAttention: summaries.filter((s) => s.needsAttention).length, byStatus: summaries.reduce<Record<string, number>>((a, s) => ((a[s.readinessStatus] = (a[s.readinessStatus] ?? 0) + 1), a), {}) }; }
   public async summarizeWorkspaceRuntimeInventory(request: { targetWorkspaceId: string }) {
-    const { records } = await this.d.inventoryRepository.listRuntimeInventoryRecords({ targetWorkspaceId: request.targetWorkspaceId as never });
+    const targetWorkspaceId=this.normalizeId(request.targetWorkspaceId,'targetWorkspaceId');
+    const { records } = await this.d.inventoryRepository.listRuntimeInventoryRecords({ targetWorkspaceId });
     return summarizeInventory(records);
   }
 
