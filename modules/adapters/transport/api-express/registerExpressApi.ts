@@ -22,6 +22,7 @@ import { registerUserLibraryApiRoutes, type RegisterUserLibraryApiRoutesDependen
 import { registerAssetAuthoringApiRoutes, type RegisterAssetAuthoringApiRoutesDependencies } from "./asset-authoring/registerAssetAuthoringApiRoutes";
 import { registerEffectiveAssetProjectionApiRoutes, type RegisterEffectiveAssetProjectionApiRoutesDependencies } from "./effective-asset-projections/registerEffectiveAssetProjectionApiRoutes";
 import { registerAssetCompositionApiRoutes, type RegisterAssetCompositionApiRoutesDependencies } from "./asset-composition/registerAssetCompositionApiRoutes";
+import { registerExecutionPlanApiRoutes, type RegisterExecutionPlanApiRoutesDependencies } from "./execution-plans/registerExecutionPlanApiRoutes";
 
 export interface RegisterExpressApiDependencies {
   app: RegisterArtifactUploadApiRouteDependencies["app"]
@@ -38,7 +39,8 @@ export interface RegisterExpressApiDependencies {
     & RegisterUserLibraryApiRoutesDependencies["app"]
     & RegisterAssetAuthoringApiRoutesDependencies["app"]
     & RegisterEffectiveAssetProjectionApiRoutesDependencies["app"]
-    & RegisterAssetCompositionApiRoutesDependencies["app"];
+    & RegisterAssetCompositionApiRoutesDependencies["app"]
+    & RegisterExecutionPlanApiRoutesDependencies["app"];
   getHuggingFaceTokenStatus: RegisterArtifactRepoApiRoutesDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];
@@ -83,6 +85,7 @@ export interface RegisterExpressApiDependencies {
   assetAuthoringServices?: Omit<RegisterAssetAuthoringApiRoutesDependencies, "app">;
   effectiveAssetProjectionServices?: Omit<RegisterEffectiveAssetProjectionApiRoutesDependencies, "app">;
   assetCompositionServices?: Omit<RegisterAssetCompositionApiRoutesDependencies, "app">;
+  executionPlanServices?: Omit<RegisterExecutionPlanApiRoutesDependencies, "app">;
 }
 
 export function registerExpressApi(
@@ -171,6 +174,9 @@ export function registerExpressApi(
   }
   if (dependencies.assetCompositionServices) {
     registerAssetCompositionApiRoutes({ app: dependencies.app, ...dependencies.assetCompositionServices });
+  }
+  if (dependencies.executionPlanServices) {
+    registerExecutionPlanApiRoutes({ app: dependencies.app, ...dependencies.executionPlanServices });
   }
 
   if (dependencies.assetRegistryRead) {
