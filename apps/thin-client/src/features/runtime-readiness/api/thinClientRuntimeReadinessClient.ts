@@ -37,6 +37,15 @@ export function createThinClientRuntimeReadinessClient(base = '/api/runtime-read
       const q = new URLSearchParams(); if (input.sourceKind) q.set('sourceKind', input.sourceKind); if (input.sourceId) q.set('sourceId', input.sourceId);
       try { return unwrap(await get(`${b}/workspaces/${encodeURIComponent(input.workspaceId)}/inventory/latest${q.toString()?`?${q.toString()}`:''}`)); } catch { return fail('Runtime readiness inventory is unavailable.', 'unavailable'); }
     },
+
+    async readLatestRuntimeReadinessForCompositionPlan(input: { workspaceId: string; compositionPlanId: string }) {
+      if (!input.workspaceId || !input.compositionPlanId) return fail('Workspace id and composition plan id are required.', 'validation');
+      try { return unwrap(await get(`${b}/workspaces/${encodeURIComponent(input.workspaceId)}/readiness/latest-for-plan/${encodeURIComponent(input.compositionPlanId)}`)); } catch { return fail('Setup status is unavailable.', 'unavailable'); }
+    },
+    async readRuntimeReadinessDetail(input: { workspaceId: string; readinessBindingId: string }) {
+      if (!input.workspaceId || !input.readinessBindingId) return fail('Workspace id and setup id are required.', 'validation');
+      try { return unwrap(await get(`${b}/workspaces/${encodeURIComponent(input.workspaceId)}/readiness/${encodeURIComponent(input.readinessBindingId)}`)); } catch { return fail('Setup detail is unavailable.', 'unavailable'); }
+    },
     async createBinding(input: { workspaceId: string; compositionPlanId: string }) {
       if (!input.workspaceId || !input.compositionPlanId) return fail('Workspace id and composition plan id are required.', 'validation');
       try { return unwrap(await post(`${b}/workspaces/${encodeURIComponent(input.workspaceId)}/bindings`, { targetWorkspaceId: input.workspaceId, compositionPlanId: input.compositionPlanId })); } catch { return fail('Runtime readiness binding creation is unavailable.', 'unavailable'); }

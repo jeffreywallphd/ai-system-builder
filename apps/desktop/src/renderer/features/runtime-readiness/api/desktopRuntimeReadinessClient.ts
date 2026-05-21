@@ -7,6 +7,12 @@ const asResult = <T,>(v: unknown): Result<T> => {
 };
 
 type Api = {
+  listRuntimeReadinessSummaries?: (i: { targetWorkspaceId: string; limit?: number; cursor?: string; archived?: boolean }) => Promise<unknown>;
+  readRuntimeReadinessDetail?: (i: { targetWorkspaceId: string; readinessBindingId: string }) => Promise<unknown>;
+  listRuntimeReadinessForCompositionPlan?: (i: { targetWorkspaceId: string; compositionPlanId: string }) => Promise<unknown>;
+  readLatestRuntimeReadinessForCompositionPlan?: (i: { targetWorkspaceId: string; compositionPlanId: string }) => Promise<unknown>;
+  listRuntimeReadinessNeedingAttention?: (i: { targetWorkspaceId: string }) => Promise<unknown>;
+  summarizeWorkspaceRuntimeReadiness?: (i: { targetWorkspaceId: string }) => Promise<unknown>;
   refreshRuntimeReadinessInventory?: (i: { targetWorkspaceId: string; sourceKind?: string; sourceId?: string }) => Promise<unknown>;
   listRuntimeReadinessInventory?: (i: { targetWorkspaceId: string; limit?: number; cursor?: string }) => Promise<unknown>;
   readRuntimeReadinessInventory?: (i: { targetWorkspaceId: string; inventorySourceId: string }) => Promise<unknown>;
@@ -45,6 +51,17 @@ export function createDesktopRuntimeReadinessClient() {
       if (!input.workspaceId) return fail('Workspace id is required.', 'validation');
       if (typeof api().readLatestRuntimeReadinessInventory !== 'function') return fail('Runtime readiness inventory read is not available yet.', 'unavailable');
       return asResult(await api().readLatestRuntimeReadinessInventory!({ targetWorkspaceId: input.workspaceId, sourceKind: input.sourceKind, sourceId: input.sourceId }));
+    },
+
+    async readLatestRuntimeReadinessForCompositionPlan(input: { workspaceId: string; compositionPlanId: string }) {
+      if (!input.workspaceId || !input.compositionPlanId) return fail('Workspace id and composition plan id are required.', 'validation');
+      if (typeof api().readLatestRuntimeReadinessForCompositionPlan !== 'function') return fail('Setup status is not available yet.', 'unavailable');
+      return asResult(await api().readLatestRuntimeReadinessForCompositionPlan!({ targetWorkspaceId: input.workspaceId, compositionPlanId: input.compositionPlanId }));
+    },
+    async readRuntimeReadinessDetail(input: { workspaceId: string; readinessBindingId: string }) {
+      if (!input.workspaceId || !input.readinessBindingId) return fail('Workspace id and setup id are required.', 'validation');
+      if (typeof api().readRuntimeReadinessDetail !== 'function') return fail('Setup detail is not available yet.', 'unavailable');
+      return asResult(await api().readRuntimeReadinessDetail!({ targetWorkspaceId: input.workspaceId, readinessBindingId: input.readinessBindingId }));
     },
     async createBinding(input: { workspaceId: string; compositionPlanId: string }) {
       if (!input.workspaceId || !input.compositionPlanId) return fail('Workspace id and composition plan id are required.', 'validation');
