@@ -37,3 +37,21 @@ test("returns not-found for missing plan", async () => {
   assert.equal(result.status, "failure");
   assert.equal(result.failure.kind, "not-found");
 });
+
+
+test("uses consistent readiness binding id across record bindings provenance", async () => {
+  const saved: any[] = [];
+  const useCase = new CreateRuntimeReadinessBindingUseCase({
+    compositionRepository: { readAssetCompositionPlanRecord: async () => structuredClone(basePlan) } as any,
+    inventoryRepository: { listRuntimeInventoryRecords: async () => ({ records: [inventory] }) } as any,
+    bindingRepository: { saveRuntimeReadinessBindingRecord: async (record: any) => (saved.push(record), record) } as any,
+    requirementExtractionService: new RuntimeRequirementExtractionService(), capabilityMatchingService: new RuntimeCapabilityMatchingService(), candidateSelectionService: new RuntimeBindingCandidateSelectionService(),
+    nextReadinessBindingId: () => "readiness.binding.42", nextRequirementId: () => "runtime.requirement.1", nextBindingCandidateId: () => "runtime.binding-candidate.1", nextBindingId: () => "runtime.binding.1", now: () => "2026-05-21T01:00:00.000Z",
+  });
+  const result = await useCase.execute({ targetWorkspaceId: workspaceId, compositionPlanId: planId } as any);
+  assert.equal(result.status, "success");
+  const record = saved[0];
+  assert.equal(record.readinessBindingId, "readiness.binding.42");
+  assert.equal(record.bindings[0].readinessBindingId, "readiness.binding.42");
+  assert.equal(record.provenance[0].readinessBindingId, "readiness.binding.42");
+});

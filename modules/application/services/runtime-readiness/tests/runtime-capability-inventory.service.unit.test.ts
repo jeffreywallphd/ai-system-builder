@@ -67,7 +67,17 @@ describe("RuntimeCapabilityInventorySummaryService", () => {
     if (result.status === "success") {
       assert.equal(result.value.capabilities, 1);
       assert.equal(result.value.providerCandidates, 1);
-      assert.equal("safeMetadata" in result.value.capabilitySummaries[0], false);
+      assert.equal("sourceRecords" in result.value, false);
     }
   });
+});
+
+
+it("reads latest record safely", async () => {
+  const { repo } = mkRepo();
+  await repo.saveRuntimeInventoryRecord({ targetWorkspaceId: createWorkspaceId("workspace.a"), inventorySourceId: "src.manual" as never, inventorySourceKind: "manual", discoveredProviderCandidates: [], discoveredCapabilities: [], inventoryStatus: "checked", diagnostics: [], blockers: [], checkedAt: "2026-05-21T00:00:00.000Z" });
+  repo.readLatestRuntimeInventoryRecord = async (q: any) => (await repo.listRuntimeInventoryRecords({ targetWorkspaceId: q.targetWorkspaceId })).records[0];
+  const service = new RuntimeCapabilityInventoryService(repo as never, [source]);
+  const result = await service.readLatestRuntimeInventory({ targetWorkspaceId: "workspace.a", sourceId: "src.manual" });
+  assert.equal(result.status, "success");
 });

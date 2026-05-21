@@ -1,4 +1,4 @@
-import type { RuntimeInventory, RuntimeInventorySourceId, RuntimeInventorySourceKind, RuntimeProviderAvailabilityStatus } from "../../../contracts/runtime-readiness";
+import type { RuntimeInventorySourceId, RuntimeInventorySourceKind, RuntimeProviderAvailabilityStatus } from "../../../contracts/runtime-readiness";
 
 export type RuntimeCapabilityInventoryOperationResult<T> =
   | { readonly status: "success"; readonly value: T; readonly diagnostics: readonly string[] }
@@ -49,5 +49,4 @@ export interface WorkspaceRuntimeCapabilitySummary {
   readonly lastCheckedAt?: string;
   readonly capabilitySummaries: readonly RuntimeCapabilitySummary[];
   readonly providerSummaries: readonly RuntimeProviderCandidateSummary[];
-  readonly sourceRecords: readonly RuntimeInventory[];
 }

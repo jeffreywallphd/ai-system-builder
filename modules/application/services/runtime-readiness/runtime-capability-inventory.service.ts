@@ -2,6 +2,7 @@ import {
   createWorkspaceId,
   normalizeRuntimeInventory,
   normalizeRuntimeInventorySourceId,
+  normalizeRuntimeInventorySourceKind,
   normalizeRuntimeProviderAvailabilityStatus,
   type RuntimeInventory,
   type RuntimeInventorySourceKind,
@@ -9,14 +10,7 @@ import {
 import type { RuntimeInventoryRepositoryPort } from "../../ports/runtime-readiness";
 import type { RuntimeCapabilityInventorySourcePort } from "./runtime-capability-inventory-source.port";
 import type { RuntimeCapabilityInventoryOperationResult } from "./runtime-capability-inventory-results";
-
-const sanitizeMessage = (value: unknown): string => {
-  const raw = typeof value === "string" ? value : "runtime inventory source unavailable";
-  if (/(secret|token|password|api[_-]?key|private[_-]?key|path|stack|trace|command|env|payload)/i.test(raw)) {
-    return "runtime inventory source unavailable";
-  }
-  return raw.slice(0, 160);
-};
+import { sanitizeRuntimeReadinessMessage } from "./runtime-readiness-safety";
 
 export class RuntimeCapabilityInventoryService {
   public constructor(
@@ -28,9 +22,17 @@ export class RuntimeCapabilityInventoryService {
   public async refreshInventoryFromSources(request: { targetWorkspaceId: string; sourceKind?: RuntimeInventorySourceKind; sourceId?: string }): Promise<RuntimeCapabilityInventoryOperationResult<{ records: readonly RuntimeInventory[] }>> {
     if (!request.targetWorkspaceId) return { status: "validation-failure", reason: "workspace-required", diagnostics: ["Target workspace is required."] };
     const workspaceId = createWorkspaceId(request.targetWorkspaceId);
+    let sourceKind: RuntimeInventorySourceKind | undefined;
+    let sourceId: string | undefined;
+    try {
+      sourceKind = request.sourceKind ? normalizeRuntimeInventorySourceKind(request.sourceKind) : undefined;
+      sourceId = request.sourceId ? normalizeRuntimeInventorySourceId(request.sourceId) : undefined;
+    } catch {
+      return { status: "validation-failure", reason: "inventory-source-filter-invalid", diagnostics: ["Invalid runtime inventory source filter."] };
+    }
     const selected = this.sources.filter((source) => {
-      if (request.sourceKind && source.sourceKind !== request.sourceKind) return false;
-      if (request.sourceId && source.sourceId !== request.sourceId) return false;
+      if (sourceKind && normalizeRuntimeInventorySourceKind(source.sourceKind) !== sourceKind) return false;
+      if (sourceId && normalizeRuntimeInventorySourceId(source.sourceId) !== sourceId) return false;
       return true;
     });
     const records: RuntimeInventory[] = [];
@@ -42,7 +44,7 @@ export class RuntimeCapabilityInventoryService {
         const saved = await this.repository.saveRuntimeInventoryRecord(normalized);
         records.push(saved);
       } catch (error) {
-        diagnostics.push(`source ${source.sourceId}: ${sanitizeMessage(error instanceof Error ? error.message : error)}`);
+        diagnostics.push(`source ${source.sourceId}: ${sanitizeRuntimeReadinessMessage(error instanceof Error ? error.message : error)}`);
       }
     }
     if (records.length === 0 && diagnostics.length > 0) return { status: "unavailable", reason: "sources-failed", diagnostics };
@@ -62,5 +64,20 @@ export class RuntimeCapabilityInventoryService {
     const record = await this.repository.readRuntimeInventoryRecord(createWorkspaceId(request.targetWorkspaceId), normalizeRuntimeInventorySourceId(request.inventorySourceId));
     if (!record) return { status: "not-found", reason: "inventory-not-found", diagnostics: [] };
     return { status: "success", value: { record }, diagnostics: [] };
+  }
+
+  public async readLatestRuntimeInventory(request: { targetWorkspaceId: string; sourceKind?: RuntimeInventorySourceKind; sourceId?: string }): Promise<RuntimeCapabilityInventoryOperationResult<{ record: RuntimeInventory }>> {
+    if (!request.targetWorkspaceId) return { status: "validation-failure", reason: "workspace-required", diagnostics: ["Target workspace is required."] };
+    try {
+      const record = await this.repository.readLatestRuntimeInventoryRecord({
+        targetWorkspaceId: createWorkspaceId(request.targetWorkspaceId),
+        ...(request.sourceKind ? { sourceKind: normalizeRuntimeInventorySourceKind(request.sourceKind) } : {}),
+        ...(request.sourceId ? { sourceId: normalizeRuntimeInventorySourceId(request.sourceId) } : {}),
+      });
+      if (!record) return { status: "not-found", reason: "inventory-not-found", diagnostics: [] };
+      return { status: "success", value: { record }, diagnostics: [] };
+    } catch {
+      return { status: "validation-failure", reason: "inventory-source-filter-invalid", diagnostics: ["Invalid runtime inventory source filter."] };
+    }
   }
 }
