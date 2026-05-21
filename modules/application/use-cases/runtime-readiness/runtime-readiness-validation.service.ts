@@ -1,4 +1,4 @@
-import type { RuntimeProviderAvailabilityStatus, RuntimeReadinessBinding, RuntimeReadinessBlocker, RuntimeReadinessDiagnostic, RuntimeReadinessDiagnosticCode, RuntimeReadinessStatus } from "../../../contracts/runtime-readiness";
+import type { RuntimeBinding, RuntimeBindingStatus, RuntimeProviderAvailabilityStatus, RuntimeReadinessBinding, RuntimeReadinessBlocker, RuntimeReadinessDiagnostic, RuntimeReadinessDiagnosticCode, RuntimeReadinessStatus } from "../../../contracts/runtime-readiness";
 
 const statusPriority: RuntimeReadinessStatus[] = [
   "invalid", "blocked", "missing-requirements", "provider-unavailable", "provider-unsupported", "configuration-required", "permission-required", "stale", "ready-for-setup", "draft",
@@ -23,8 +23,16 @@ const requiredStatusMap: Record<RuntimeProviderAvailabilityStatus, { status: Run
   error: { status: "provider-unavailable", code: "runtime-readiness-service-unavailable" },
 };
 
+const toBindingStatus = (status: RuntimeReadinessStatus): RuntimeBindingStatus => {
+  if (status === "provider-unsupported") return "unsupported";
+  if (status === "missing-requirements") return "missing-requirement";
+  if (status === "ready-for-setup") return "selected";
+  if (status === "draft" || status === "checking" || status === "archived") return "candidate";
+  return status;
+};
+
 export class RuntimeReadinessValidationService {
-  public validate(binding: RuntimeReadinessBinding, targetWorkspaceId: string): { status: RuntimeReadinessStatus; blockers: RuntimeReadinessBlocker[]; diagnostics: RuntimeReadinessDiagnostic[]; bindings: RuntimeReadinessBinding["bindings"] } {
+  public validate(binding: RuntimeReadinessBinding, targetWorkspaceId: string): { status: RuntimeReadinessStatus; blockers: RuntimeReadinessBlocker[]; diagnostics: RuntimeReadinessDiagnostic[]; bindings: readonly RuntimeBinding[] } {
     const blockers: RuntimeReadinessBlocker[] = [];
     const diagnostics: RuntimeReadinessDiagnostic[] = [];
 
@@ -33,7 +41,7 @@ export class RuntimeReadinessValidationService {
 
     const requirementsById = new Map(binding.requirements.map((item) => [item.requirementId, item]));
     const providersById = new Map(binding.providerCandidates.map((item) => [item.providerCandidateId, item]));
-    const candidatesByRequirement = new Map<string, RuntimeReadinessBinding["bindingCandidates"]>();
+    const candidatesByRequirement = new Map<string, RuntimeReadinessBinding["bindingCandidates"][number][]>();
 
     const evaluateAvailability = (requirementId: string, isRequired: boolean, scope: "provider" | "capability", availabilityStatus: RuntimeProviderAvailabilityStatus) => {
       const mapped = requiredStatusMap[availabilityStatus];
@@ -75,8 +83,8 @@ export class RuntimeReadinessValidationService {
         if (capability) evaluateAvailability(requirement.requirementId, requirement.isRequired, "capability", capability.availabilityStatus);
         const providerStatus = requiredStatusMap[provider.availabilityStatus].status;
         const capabilityStatus = capability ? requiredStatusMap[capability.availabilityStatus].status : "provider-unavailable";
-        if (providerStatus !== "ready-for-setup") status = providerStatus === "provider-unsupported" ? "unsupported" : providerStatus;
-        else if (capabilityStatus !== "ready-for-setup") status = capabilityStatus === "provider-unsupported" ? "unsupported" : capabilityStatus;
+        if (providerStatus !== "ready-for-setup") status = toBindingStatus(providerStatus);
+        else if (capabilityStatus !== "ready-for-setup") status = toBindingStatus(capabilityStatus);
       }
       return { ...item, status };
     });
@@ -107,6 +115,8 @@ export class RuntimeReadinessValidationService {
       stale: hasCode("runtime-readiness-inventory-stale", "runtime-readiness-composition-plan-stale"),
       "ready-for-setup": false,
       draft: false,
+      checking: false,
+      archived: false,
     }[status]);
 
     const requiredIds = binding.requirements.filter((entry) => entry.isRequired).map((entry) => entry.requirementId);

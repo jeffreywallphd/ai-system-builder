@@ -11,7 +11,7 @@ export const createSelectedProjectionReference = (
   effectiveAssetReference: projection.effectiveAssetReference,
   projectionStatusAtSelection: projection.status,
   projectionSourceKind: projection.sourceKind,
-  displayLabel: projection.target.displayLabel,
+  displayLabel: projection.target.targetLabel,
   selectedAt,
 });
 
@@ -32,8 +32,8 @@ export const createCompositionNodeFromProjection = (d: {
   providedCapabilities: [],
   diagnostics: [],
   blockers: [],
-  label: d.command.label?.trim() || d.projection.target.displayLabel?.trim() || "Selected projection",
-  summary: d.projection.target.effectiveSummary?.trim() || undefined,
+  label: d.command.label?.trim() || d.projection.target.targetLabel?.trim() || d.projection.source.sourceLabel?.trim() || "Selected projection",
+  summary: d.projection.source.sourceLabel?.trim() || undefined,
   createdAt: d.now,
   updatedAt: d.now,
 });

@@ -34,7 +34,11 @@ export interface RegisterExpressApiDependencies {
     & RegisterRuntimeReadinessApiRoutesDependencies["app"]
     & RegisterAssetRegistryApiRoutesDependencies["app"]
     & RegisterAssetMutationApiRoutesDependencies["app"]
-    & RegisterAssetAuthoringApiRoutesDependencies["app"];
+    & RegisterWorkspaceApiRoutesDependencies["app"]
+    & RegisterUserLibraryApiRoutesDependencies["app"]
+    & RegisterAssetAuthoringApiRoutesDependencies["app"]
+    & RegisterEffectiveAssetProjectionApiRoutesDependencies["app"]
+    & RegisterAssetCompositionApiRoutesDependencies["app"];
   getHuggingFaceTokenStatus: RegisterArtifactRepoApiRoutesDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];

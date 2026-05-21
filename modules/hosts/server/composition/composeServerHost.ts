@@ -1119,17 +1119,21 @@ export function composeServerHost(
             rootDir: registerOptions.storageRootDirectory,
             now: options.now,
           });
+          const effectiveProjectionRepository = createLocalEffectiveAssetProjectionRepositoryAdapter({
+            rootDir: registerOptions.storageRootDirectory,
+            now: options.now,
+          });
           return {
             createPlan: new CreateAssetCompositionPlanUseCase({ repository: compositionPlanRepository, generatePlanId: () => `plan.${randomUUID()}`, now: options.now }),
             updatePlan: new UpdateAssetCompositionPlanUseCase({ repository: compositionPlanRepository, now: options.now }),
             readPlan: new ReadAssetCompositionPlanUseCase({ repository: compositionPlanRepository }),
             listPlans: new ListAssetCompositionPlansUseCase({ repository: compositionPlanRepository }),
             archivePlan: new ArchiveAssetCompositionPlanUseCase({ repository: compositionPlanRepository, now: options.now }),
-            addProjection: new AddProjectionToCompositionPlanUseCase({ repository: compositionPlanRepository, projectionRepository: createLocalEffectiveAssetProjectionRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now }), generateNodeId: () => `node.${randomUUID()}`, now: options.now }),
+            addProjection: new AddProjectionToCompositionPlanUseCase({ repository: compositionPlanRepository, projectionRepository: effectiveProjectionRepository, generateNodeId: () => `node.${randomUUID()}`, now: options.now }),
             removeProjection: new RemoveProjectionFromCompositionPlanUseCase({ repository: compositionPlanRepository, now: options.now }),
             connectNodes: new ConnectCompositionNodesUseCase({ repository: compositionPlanRepository, generateRelationshipId: () => `rel.${randomUUID()}`, now: options.now }),
             disconnectNodes: new DisconnectCompositionNodesUseCase({ repository: compositionPlanRepository, now: options.now }),
-            validatePlan: new ValidateAssetCompositionPlanUseCase({ repository: compositionPlanRepository, now: options.now }),
+            validatePlan: new ValidateAssetCompositionPlanUseCase({ repository: compositionPlanRepository, projectionRepository: effectiveProjectionRepository, now: options.now }),
             readModel: new WorkspaceAssetCompositionReadModelService({ compositionPlanRepository }),
           };
         })(),

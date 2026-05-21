@@ -18,6 +18,8 @@ export interface WorkspaceActorReference {
   readonly displayName?: string;
 }
 
+export type WorkspaceActorRef = WorkspaceActorReference;
+
 export function isWorkspaceActorKind(
   value: unknown,
 ): value is WorkspaceActorKind {

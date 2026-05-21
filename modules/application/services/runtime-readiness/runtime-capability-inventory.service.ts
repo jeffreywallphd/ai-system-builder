@@ -1,5 +1,4 @@
 import {
-  createWorkspaceId,
   normalizeRuntimeInventory,
   normalizeRuntimeInventorySourceId,
   normalizeRuntimeInventorySourceKind,
@@ -7,6 +6,7 @@ import {
   type RuntimeInventory,
   type RuntimeInventorySourceKind,
 } from "../../../contracts/runtime-readiness";
+import { createWorkspaceId } from "../../../contracts/workspace";
 import type { RuntimeInventoryRepositoryPort } from "../../ports/runtime-readiness";
 import type { RuntimeCapabilityInventorySourcePort } from "./runtime-capability-inventory-source.port";
 import type { RuntimeCapabilityInventoryOperationResult } from "./runtime-capability-inventory-results";
@@ -69,11 +69,12 @@ export class RuntimeCapabilityInventoryService {
   public async readLatestRuntimeInventory(request: { targetWorkspaceId: string; sourceKind?: RuntimeInventorySourceKind; sourceId?: string }): Promise<RuntimeCapabilityInventoryOperationResult<{ record: RuntimeInventory }>> {
     if (!request.targetWorkspaceId) return { status: "validation-failure", reason: "workspace-required", diagnostics: ["Target workspace is required."] };
     try {
-      const record = await this.repository.readLatestRuntimeInventoryRecord({
-        targetWorkspaceId: createWorkspaceId(request.targetWorkspaceId),
-        ...(request.sourceKind ? { sourceKind: normalizeRuntimeInventorySourceKind(request.sourceKind) } : {}),
-        ...(request.sourceId ? { sourceId: normalizeRuntimeInventorySourceId(request.sourceId) } : {}),
-      });
+      const workspaceId = createWorkspaceId(request.targetWorkspaceId);
+      const record = request.sourceId
+        ? await this.repository.readRuntimeInventoryRecord(workspaceId, normalizeRuntimeInventorySourceId(request.sourceId))
+        : request.sourceKind
+          ? await this.repository.readLatestRuntimeInventoryRecord(workspaceId, normalizeRuntimeInventorySourceKind(request.sourceKind))
+          : (await this.repository.listRuntimeInventoryRecords({ targetWorkspaceId: workspaceId, limit: 1 })).records[0];
       if (!record) return { status: "not-found", reason: "inventory-not-found", diagnostics: [] };
       return { status: "success", value: { record }, diagnostics: [] };
     } catch {

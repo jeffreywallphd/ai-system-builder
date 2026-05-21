@@ -43,7 +43,3 @@ export const normalizeDisconnectCompositionNodesCommand=(v:DisconnectComposition
 export const normalizeValidateAssetCompositionPlanCommand=(v:ValidateAssetCompositionPlanCommand)=>normalizeReadAssetCompositionPlanCommand(v);
 export const normalizeRefreshAssetCompositionPlanFromProjectionsCommand=(v:RefreshAssetCompositionPlanFromProjectionsCommand)=>normalizeReadAssetCompositionPlanCommand(v);
 
-export const tryNormalizeAssetCompositionDiagnostic = tryNormalizeDiagnostic;
-export const tryNormalizeAssetCompositionBlocker = tryNormalizeBlocker;
-export const tryNormalizeAssetCompositionCapability = tryNormalizeCapability;
-export const tryNormalizeAssetCompositionProvenanceEvent = tryNormalizeProvenance;
