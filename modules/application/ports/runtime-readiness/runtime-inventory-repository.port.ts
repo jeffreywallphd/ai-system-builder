@@ -1,11 +1,11 @@
-import type { RuntimeInventory, RuntimeInventorySourceId, RuntimeInventorySourceKind, RuntimeInventoryStatus } from "../../../contracts/runtime-readiness";
+import type { RuntimeInventory, RuntimeInventorySourceId, RuntimeInventorySourceKind, RuntimeInventoryStatus, RuntimeProviderAvailabilityStatus } from "../../../contracts/runtime-readiness";
 import type { WorkspaceId } from "../../../contracts/workspace";
 
 export interface RuntimeInventoryListQuery {
   readonly targetWorkspaceId: WorkspaceId;
   readonly inventorySourceKind?: RuntimeInventorySourceKind;
   readonly inventoryStatus?: RuntimeInventoryStatus;
-  readonly providerAvailabilityStatus?: "available" | "unavailable" | "unknown" | "stale" | "error";
+  readonly providerAvailabilityStatus?: RuntimeProviderAvailabilityStatus;
   readonly blockedOnly?: boolean;
   readonly staleOnly?: boolean;
   readonly archived?: boolean;
