@@ -23,6 +23,20 @@ export function createThinClientRuntimeReadinessClient(base = '/api/runtime-read
       if (!input.workspaceId) return fail('Workspace id is required.', 'validation');
       try { return unwrap(await post(`${b}/workspaces/${encodeURIComponent(input.workspaceId)}/inventory/refresh`, { targetWorkspaceId: input.workspaceId, sourceKind: input.sourceKind, sourceId: input.sourceId })); } catch { return fail('Runtime readiness inventory refresh is unavailable.', 'unavailable'); }
     },
+
+    async summarizeInventory(workspaceId: string) {
+      if (!workspaceId) return fail('Workspace id is required.', 'validation');
+      try { return unwrap(await get(`${b}/workspaces/${encodeURIComponent(workspaceId)}/inventory-summary`)); } catch { return fail('Runtime readiness inventory summary is unavailable.', 'unavailable'); }
+    },
+    async validateBinding(input: { workspaceId: string; readinessBindingId: string }) {
+      if (!input.workspaceId || !input.readinessBindingId) return fail('Workspace id and readiness binding id are required.', 'validation');
+      try { return unwrap(await post(`${b}/workspaces/${encodeURIComponent(input.workspaceId)}/bindings/${encodeURIComponent(input.readinessBindingId)}/validate`, { targetWorkspaceId: input.workspaceId, readinessBindingId: input.readinessBindingId })); } catch { return fail('Runtime readiness binding validation is unavailable.', 'unavailable'); }
+    },
+    async readLatestInventory(input: { workspaceId: string; sourceKind?: string; sourceId?: string }) {
+      if (!input.workspaceId) return fail('Workspace id is required.', 'validation');
+      const q = new URLSearchParams(); if (input.sourceKind) q.set('sourceKind', input.sourceKind); if (input.sourceId) q.set('sourceId', input.sourceId);
+      try { return unwrap(await get(`${b}/workspaces/${encodeURIComponent(input.workspaceId)}/inventory/latest${q.toString()?`?${q.toString()}`:''}`)); } catch { return fail('Runtime readiness inventory is unavailable.', 'unavailable'); }
+    },
     async createBinding(input: { workspaceId: string; compositionPlanId: string }) {
       if (!input.workspaceId || !input.compositionPlanId) return fail('Workspace id and composition plan id are required.', 'validation');
       try { return unwrap(await post(`${b}/workspaces/${encodeURIComponent(input.workspaceId)}/bindings`, { targetWorkspaceId: input.workspaceId, compositionPlanId: input.compositionPlanId })); } catch { return fail('Runtime readiness binding creation is unavailable.', 'unavailable'); }
