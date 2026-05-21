@@ -324,3 +324,7 @@ Asset Composition Planning is defined in `docs/architecture/asset-composition-pl
 ## Phase 11 follow-on architecture
 
 After Phase 10 composition planning, Phase 11 introduces runtime readiness binding as a non-executing capability-matching layer before execution-oriented phases. See `docs/architecture/runtime-readiness-binding.md` and ADR-0021.
+
+## Execution Plan Preparation (Phase 12)
+
+Execution plan preparation is the non-executing planning layer between runtime readiness and later execution orchestration. See `docs/architecture/execution-plan-preparation.md` and ADR-0022 for boundaries and handoff semantics.

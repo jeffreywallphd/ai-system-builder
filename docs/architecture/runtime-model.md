@@ -148,3 +148,7 @@ Phase 6 Prompt 9 update: User/workspace-owned image asset records, generated-out
 Runtime readiness and host/system diagnostics may remain global. Workspace-owned runtime task outputs created by workspace actions require explicit workspace context where implemented and must not be listed or read as records for another workspace. Global readiness, installed-runtime/model diagnostics, and provider configuration diagnostics must not be presented as workspace model records or workspace task outputs.
 
 Phase 7 user-library/cross-workspace reuse should not change runtime readiness into a workspace-owned record and should preserve explicit provenance/link policy when copied or linked assets depend on runtime-produced outputs.
+
+## Phase 12 execution plan preparation boundary
+
+Phase 12 introduces a non-executing planning layer that depends on runtime readiness outputs and produces safe execution plan candidates/previews. Runtime/provider invocation remains deferred to later execution orchestration work.

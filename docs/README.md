@@ -41,3 +41,10 @@ See `docs/architecture/workspace-model.md` for the Phase 6 workspace model, incl
 - Start prompt assembly from `docs/context/packs/index.pack.md`.
 - Use `docs/context/prompt-routing.md` to choose only additional packs that are materially relevant.
 - Include `docs/context/packs/persistence-storage.pack.md` for DB-vs-file/blob boundary work.
+
+
+## Phase 12 Reference
+
+- Execution Plan Preparation architecture: `docs/architecture/execution-plan-preparation.md`.
+- Decision record: `docs/adr/ADR-0022-execution-plan-preparation.md`.
+- Context routing pack: `docs/context/packs/execution-plan-preparation.pack.md`.

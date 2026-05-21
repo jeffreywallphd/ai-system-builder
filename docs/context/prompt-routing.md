@@ -75,6 +75,7 @@ For tasks that materially involve effective projections built from user-library 
 | documentation updates, canonical-vs-context discipline, doc governance | `docs/context/packs/docs-standards.pack.md` |
 | structured logging behavior, diagnosability, log field/level discipline | `docs/context/packs/logging.pack.md` |
 | test strategy, regression coverage, layered testing expectations | `docs/context/packs/testing.pack.md` |
+| execution plan preparation, execution plan candidates/previews, planned execution steps/inputs/outputs, safety gates, preflight checks, dry-run planning, provider adapter references, execution blockers, or Phase 13 execution handoff | `docs/context/packs/execution-plan-preparation.pack.md` |
 | debugging, error diagnosis, failure lifecycle analysis, bug-fix prompts | `docs/context/packs/debugging-error-handling.pack.md` |
 
 ## Debugging/Error Routing (Explicit)
@@ -306,3 +307,12 @@ Routing combinations:
 - Phase 10 composition planning prompts: include both `docs/context/packs/effective-asset-projections.pack.md` and the future Phase 10 composition pack once created.
 - Authored/customized + projection prompts: include both `docs/context/packs/asset-authoring.pack.md` and `docs/context/packs/effective-asset-projections.pack.md`.
 - User Library linked/copied + projection prompts: include both `docs/context/packs/user-library.pack.md` and `docs/context/packs/effective-asset-projections.pack.md`.
+## Phase 12 execution-plan routing notes
+
+- For execution plans derived from runtime readiness bindings, include:
+  - `docs/context/packs/runtime-readiness-binding.pack.md`
+  - `docs/context/packs/execution-plan-preparation.pack.md`
+- If source composition-plan references matter, also include:
+  - `docs/context/packs/asset-composition-planning.pack.md`
+- If projection freshness/staleness affects planning, also include:
+  - `docs/context/packs/effective-asset-projections.pack.md`
