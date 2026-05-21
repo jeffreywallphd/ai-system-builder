@@ -15,7 +15,9 @@ import { LinkUserLibraryAssetToWorkspaceUseCase } from "../../../application/use
 import { CreateAssetDraftUseCase, CreateAssetOverrideUseCase, CreateWorkspaceAuthoredAssetUseCase, DisableAssetOverrideUseCase, PublishAssetDraftUseCase, UpdateAssetDraftUseCase, UpdateAssetOverrideUseCase } from "../../../application/use-cases/asset-authoring";
 import { CreateAuthoredAssetEffectiveProjectionUseCase, CreateOverrideEffectiveProjectionUseCase, PreviewDraftEffectiveAssetProjectionUseCase, RefreshAuthoredAssetEffectiveProjectionUseCase, RefreshOverrideEffectiveProjectionUseCase } from "../../../application/use-cases/effective-asset-projections";
 import { AddProjectionToCompositionPlanUseCase, ArchiveAssetCompositionPlanUseCase, ConnectCompositionNodesUseCase, CreateAssetCompositionPlanUseCase, DisconnectCompositionNodesUseCase, ListAssetCompositionPlansUseCase, ReadAssetCompositionPlanUseCase, RemoveProjectionFromCompositionPlanUseCase, UpdateAssetCompositionPlanUseCase, ValidateAssetCompositionPlanUseCase } from "../../../application/use-cases/asset-composition";
+import { CreateRuntimeReadinessBindingUseCase, ValidateRuntimeReadinessBindingUseCase, RuntimeRequirementExtractionService, RuntimeCapabilityMatchingService, RuntimeBindingCandidateSelectionService, RuntimeReadinessValidationService } from "../../../application/use-cases/runtime-readiness";
 import { WorkspaceAssetCompositionReadModelService, WorkspaceEffectiveAssetProjectionReadModelService } from "../../../application/services/asset";
+import { RuntimeCapabilityInventoryService, RuntimeCapabilityInventorySummaryService } from "../../../application/services/runtime-readiness";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
 import { createLocalWorkspaceRepository, createLocalWorkspaceSelectionRepository, createLocalWorkspaceSystemPackActivationRepository } from "../../../adapters/persistence/workspace";
@@ -23,6 +25,7 @@ import { createLocalUserLibraryAssetRepositoryAdapter, createLocalWorkspaceUserL
 import { createLocalAssetDraftRepositoryAdapter, createLocalAssetOverrideRepositoryAdapter, createLocalAssetRevisionRepositoryAdapter, createLocalAuthoredAssetRepositoryAdapter } from "../../../adapters/persistence/asset-authoring";
 import { createLocalEffectiveAssetProjectionRepositoryAdapter } from "../../../adapters/persistence/effective-asset-projections";
 import { createLocalAssetCompositionPlanRepositoryAdapter } from "../../../adapters/persistence/asset-composition";
+import { createLocalRuntimeInventoryRepositoryAdapter, createLocalRuntimeReadinessBindingRepositoryAdapter } from "../../../adapters/persistence/runtime-readiness";
 import { registerElectronIpc } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
@@ -356,6 +359,32 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
       const assetCompositionReadModel = new WorkspaceAssetCompositionReadModelService({ compositionPlanRepository: assetCompositionPlanRepository });
       const workspaceUserLibraryLinkRepository = createLocalWorkspaceUserLibraryLinkRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
 
+      const runtimeInventoryRepository = createLocalRuntimeInventoryRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const runtimeReadinessBindingRepository = createLocalRuntimeReadinessBindingRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const runtimeReadinessV2 = {
+        inventory: new RuntimeCapabilityInventoryService(runtimeInventoryRepository, [], now),
+        inventorySummary: new RuntimeCapabilityInventorySummaryService(runtimeInventoryRepository),
+        createBinding: new CreateRuntimeReadinessBindingUseCase({
+          compositionRepository: assetCompositionPlanRepository,
+          inventoryRepository: runtimeInventoryRepository,
+          bindingRepository: runtimeReadinessBindingRepository,
+          requirementExtractionService: new RuntimeRequirementExtractionService(),
+          capabilityMatchingService: new RuntimeCapabilityMatchingService(),
+          candidateSelectionService: new RuntimeBindingCandidateSelectionService(),
+          nextReadinessBindingId: () => `rrb.${randomUUID()}`,
+          nextRequirementId: () => `req.${randomUUID()}`,
+          nextBindingCandidateId: () => `rbc.${randomUUID()}`,
+          nextBindingId: () => `rb.${randomUUID()}`,
+          now: options.now,
+        }),
+        validateBinding: new ValidateRuntimeReadinessBindingUseCase({
+          bindingRepository: runtimeReadinessBindingRepository,
+          validationService: new RuntimeReadinessValidationService(),
+          compositionRepository: assetCompositionPlanRepository,
+          now: options.now,
+        }),
+      };
+
       const settingsUseCases = {
         listSettingsDefinitionsUseCase: new ListSettingsDefinitionsUseCase({ settings: applicationSettings }),
         readSettingsUseCase: new ReadSettingsUseCase({ settings: applicationSettings, secrets: applicationSecrets }),
@@ -381,6 +410,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
             readPythonRuntimeStatus,
           },
           runtimeReadiness,
+          runtimeReadinessV2,
           workspaceServices: startupWorkspaceShell,
           settingsUseCases,
           featureLifecycle: {

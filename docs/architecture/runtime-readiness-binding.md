@@ -313,3 +313,5 @@ If Prompt 8 transport scope is too broad, split into:
 - 8a API routes and server composition;
 - 8b IPC/preload and desktop composition;
 - 8c desktop/thin-client clients and parity tests.
+
+Prompt 8 implementation note (current): transport exposure is implemented as thin API/IPC/preload/client surfaces with explicit workspace context and safe failure envelopes. Runtime/provider/workflow/model execution and visible runtime-readiness UI remain deferred to later prompts.

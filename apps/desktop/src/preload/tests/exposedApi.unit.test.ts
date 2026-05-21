@@ -38,6 +38,13 @@ import {
   createDesktopPrepareTrainingDatasetTaskReadSuccessResponse,
   DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_REFRESH_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_LIST_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_LATEST_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_SUMMARIZE_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_CREATE_BINDING_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL,
   DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL,
   DESKTOP_WORKSPACE_CREATE_REQUEST_CHANNEL,
   DESKTOP_WORKSPACE_SELECTION_READ_REQUEST_CHANNEL,
@@ -157,6 +164,27 @@ describe("desktop preload exposedApi bridge", () => {
     });
   });
 
+
+  it("maps runtime readiness v2 IPC methods to dedicated channels", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue({ ok: true, value: {} });
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    await api.refreshRuntimeReadinessInventory({ targetWorkspaceId: "workspace.a" }, { requestId: "r1" });
+    await api.listRuntimeReadinessInventory({ targetWorkspaceId: "workspace.a" });
+    await api.readRuntimeReadinessInventory({ targetWorkspaceId: "workspace.a", inventorySourceId: "source.a" });
+    await api.readLatestRuntimeReadinessInventory({ targetWorkspaceId: "workspace.a", sourceKind: "desktop-runtime" });
+    await api.summarizeRuntimeReadinessInventory({ targetWorkspaceId: "workspace.a" });
+    await api.createRuntimeReadinessBinding({ targetWorkspaceId: "workspace.a", compositionPlanId: "plan.a" });
+    await api.validateRuntimeReadinessBinding({ targetWorkspaceId: "workspace.a", readinessBindingId: "rrb.a" });
+    expect(invoke.mock.calls.map((call) => call[0])).toEqual([
+      DESKTOP_RUNTIME_READINESS_REFRESH_INVENTORY_REQUEST_CHANNEL.value,
+      DESKTOP_RUNTIME_READINESS_LIST_INVENTORY_REQUEST_CHANNEL.value,
+      DESKTOP_RUNTIME_READINESS_READ_INVENTORY_REQUEST_CHANNEL.value,
+      DESKTOP_RUNTIME_READINESS_READ_LATEST_INVENTORY_REQUEST_CHANNEL.value,
+      DESKTOP_RUNTIME_READINESS_SUMMARIZE_INVENTORY_REQUEST_CHANNEL.value,
+      DESKTOP_RUNTIME_READINESS_CREATE_BINDING_REQUEST_CHANNEL.value,
+      DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL.value,
+    ]);
+  });
 
   it("maps workspace list/create/selection bridge calls to minimal workspace IPC channels", async () => {
     const workspace = {
