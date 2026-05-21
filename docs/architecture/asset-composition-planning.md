@@ -288,3 +288,12 @@ Phase 10 does not implement workflow execution, runtime execution, ComfyUI execu
 - `valid` means **Ready for planning** only; it does not mean runtime-ready or execution-ready.
 - Runtime-readiness binding and workflow/runtime/model execution remain deferred to Phase 11+.
 - API/IPC/preload/client exposure from Prompt 9 is the boundary used by UI operations; unsupported operations must render as unavailable in UI.
+
+## Phase 10 UI closeout (Review C)
+
+- Plans remain inside the **Assets** page as a `Plans` tab for desktop and thin client.
+- Plans list/detail UI consumes safe read-model responses (`summaries`, `summary`, `nodes`, `relationships`, `diagnostics`, `blockers`).
+- User-facing UI does not present Effective Asset Projection terminology as a primary concept.
+- `valid` means **ready for planning** only (not runtime-ready, execution-ready, or workflow-ready).
+- Runtime-readiness binding is deferred to Phase 11.
+- Workflow/runtime/model execution and visual canvas authoring remain deferred.
