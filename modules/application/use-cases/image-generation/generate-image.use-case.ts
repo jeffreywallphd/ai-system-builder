@@ -1,3 +1,4 @@
+import { isWorkspaceId } from "../../../contracts/workspace";
 import type { ImageGenerationRequest } from "../../../contracts/image-generation";
 import {
   TaskType,
@@ -39,6 +40,9 @@ export class GenerateImageUseCase {
     request: ImageGenerationRequest,
     context?: ApplicationRequestContext,
   ): Promise<StartRuntimeTaskResult> {
+    if (!isWorkspaceId(context?.workspaceId)) {
+      throw new Error("Workspace id is required for image generation.");
+    }
     assertValidPrompt(request);
     await this.dependencies.runtimeCapabilityGuard?.requireCapabilityReady("image-generation");
 
@@ -54,6 +58,8 @@ export class GenerateImageUseCase {
       taskType: TaskType.IMAGE_GENERATION,
       payload,
       requestId: context?.requestId,
+      workspaceId: context.workspaceId,
+      metadata: { workspaceId: context.workspaceId },
     });
 
     return result;

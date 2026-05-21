@@ -1,3 +1,4 @@
+import type { WorkspaceId } from "../workspace";
 import type { RuntimeTaskConcurrencyClass } from "./runtime-task-concurrency-class";
 import type { RuntimeTaskError } from "./runtime-task-error";
 import type { RuntimeTaskProgress } from "./runtime-task-progress";
@@ -6,6 +7,7 @@ import type { TaskType } from "./task-type";
 
 export interface RuntimeTaskRecord {
   requestId: string;
+  workspaceId?: WorkspaceId;
   taskType: TaskType;
   status: RuntimeTaskStatus;
   concurrencyClass: RuntimeTaskConcurrencyClass;

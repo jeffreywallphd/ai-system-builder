@@ -20,3 +20,9 @@ export * from "./huggingface-namespace-datasets-api-contract";
 export * from "./huggingface-dataset-parquet-files-api-contract";
 export * from "./runtime-readiness-api-contract";
 export * from "./asset-registry-api-contract";
+
+export * from "./workspace-api-contract";
+
+export * from "./user-library-api-contract";
+
+export * from "./asset-authoring-api-contract";

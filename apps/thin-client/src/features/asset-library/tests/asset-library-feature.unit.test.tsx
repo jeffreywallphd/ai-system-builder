@@ -30,6 +30,18 @@ const card: AssetLibraryDefinitionCard = {
   assetFamily: "resource-backed",
   lifecycleStatus: "published",
   builtIn: true,
+  sourcePackId: "system.foundation",
+  sourcePackVersion: "1.0.0",
+  sourcePackDisplayName: "System Foundation",
+  sourceKind: "system",
+  sourceLayer: "system-default",
+  trustStatus: "system-trusted",
+  packCategoryId: "ui-structure",
+  packCategoryDisplayName: "UI Structure",
+  systemDefault: true,
+  sourceBadgeLabel: "System default",
+  packLabel: "System Foundation",
+  categoryLabel: "UI Structure",
   updatedAt: "2026-05-02T00:00:00.000Z",
 };
 
@@ -100,6 +112,7 @@ const resourceViewCard: AssetLibraryResourceBackedViewCard = {
   assetFamily: "resource-backed",
   assetFamilyLabel: "Resource Backed",
   lifecycleStatusLabel: "Not registered",
+  sourceKind: "external-repository",
   registrationStatusLabel: "Not imported or registered",
 };
 
@@ -115,6 +128,10 @@ function createClient(overrides: Partial<AssetLibraryClient> = {}): AssetLibrary
     readAssetDefinitionVersion: testDouble.fn().mockResolvedValue({ ok: true, value: detailWithoutValidation }),
     listAssetResourceBackedViews: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [resourceViewCard] } }),
     readAssetResourceBackedView: testDouble.fn().mockResolvedValue({ ok: true, value: resourceViewDetail }),
+    registerResourceBackedViewAsAsset: testDouble.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.register-resource-backed-view", status: "created" } }),
+    finalizeGeneratedOutputAsAsset: testDouble.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.finalize-generated-output", status: "created" } }),
+    importExternalRepositoryObjectAsAsset: testDouble.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.import-external-repository-object", status: "created" } }),
+    localizeExternalRepositoryObjectAsAsset: testDouble.fn().mockResolvedValue({ ok: true, value: { ok: true, operation: "asset.localize-external-repository-object", status: "created" } }),
     ...overrides,
   };
 }
@@ -174,12 +191,14 @@ describe("thin-client AssetLibraryFeature", () => {
     return { container, client };
   }
 
-  it("renders cards with built-in, lifecycle, type, and family cues", async () => {
+  it("renders cards with category, system default, lifecycle, type, and family cues", async () => {
     const { container } = await render();
 
     expect(container.textContent).toContain("Document");
     expect(container.textContent).toContain("Document building block");
-    expect(container.textContent).toContain("Built-in");
+    expect(container.textContent).toContain("System default");
+    expect(container.textContent).toContain("System Foundation");
+    expect(container.textContent).toContain("UI Structure");
     expect(container.textContent).toContain("Resource Backed");
     expect(container.textContent).toContain("Published");
     expect(container.textContent).toContain("v1.0.0");
@@ -202,7 +221,116 @@ describe("thin-client AssetLibraryFeature", () => {
       { viewId: "asset-view.external-repository-object.internal.1" },
       { expand: ["metadata", "resourceBackings"] },
     );
-    assert.doesNotMatch(container.textContent ?? "", /Register asset|Import asset|Finalize asset|Scan resources/i);
+    expect(container.textContent).toContain("Import external object");
+    expect(container.textContent).toContain("Localize external object");
+    assert.doesNotMatch(container.textContent ?? "", /Create asset|Edit asset|Delete asset|Seed built-ins|Scan resources|Install pack|Import pack|Export pack|Activate pack|Disable pack|Edit override|Override asset/i);
+  });
+
+  it("requires confirmation and calls the import mutation with a safe thin-client command", async () => {
+    const client = createClient();
+    const { container } = await render(client);
+    const resourceTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Resource views") as HTMLButtonElement;
+
+    await act(async () => resourceTab.click());
+    await flush();
+    const cardButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("External object")) as HTMLButtonElement;
+    await act(async () => cardButton.click());
+    await flush();
+
+    const actionButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Import external object") as HTMLButtonElement;
+    await act(async () => actionButton.click());
+    await flush();
+
+    expect(container.textContent).toContain("Import this external object?");
+    expect(container.textContent).toContain("Network or provider");
+    expect(client.importExternalRepositoryObjectAsAsset).not.toHaveBeenCalled();
+
+    const dialog = container.querySelector("[role='dialog']") as HTMLElement;
+    const confirmButton = Array.from(dialog.querySelectorAll("button")).find((button) => button.textContent === "Import object") as HTMLButtonElement;
+    await act(async () => confirmButton.click());
+    await flush();
+
+    expect(client.importExternalRepositoryObjectAsAsset).toHaveBeenCalledWith({
+      operation: "asset.import-external-repository-object",
+      viewId: "asset-view.external-repository-object.internal.1",
+      importMode: "remote-reference",
+      approval: {
+        userConfirmed: true,
+        confirmationKind: "import-external-object",
+        allowNetworkAccess: true,
+        allowCredentialUse: true,
+        allowFilesystemWrite: true,
+        allowPartialCompletion: true,
+      },
+      actor: {
+        initiatedBy: "human",
+        automationSafe: false,
+        thinClientSafe: true,
+      },
+    });
+    expect(/metadata|C:\\|Bearer|base64|workflow|prompt/i.test(JSON.stringify((client.importExternalRepositoryObjectAsAsset as any).mock.calls[0][0]))).toBe(false);
+    expect(container.textContent).toContain("Asset registered.");
+    expect(client.readAssetResourceBackedView).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not render unsafe top-level diagnostics while preserving safe diagnostics", async () => {
+    const unsafeTopLevelDiagnostics = [
+      "C:\\Users\\name\\file.png",
+      "/tmp/generated.png",
+      "/home/user/cache",
+      "Bearer abc",
+      "token",
+      "secret",
+      "password",
+      "apiKey",
+      "signedUrl",
+      "access_token",
+      "base64",
+      "data:image",
+      "raw provider payload",
+      "workflowJson",
+      "prompt",
+      "stack",
+      "command line",
+      "process.env",
+    ];
+    const client = createClient({
+      listAssetDefinitions: testDouble.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          items: [card],
+          diagnostics: [
+            { severity: "info", code: "safe-definition", message: "Safe definition diagnostic." },
+            ...unsafeTopLevelDiagnostics.map((message, index) => ({
+              severity: "warning" as const,
+              code: `unsafe-definition-${index}`,
+              message,
+            })),
+          ],
+        },
+      }),
+      listAssetResourceBackedViews: testDouble.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          items: [resourceViewCard],
+          diagnostics: [
+            { severity: "info", code: "safe-resource", message: "Safe aggregate diagnostic." },
+            { severity: "warning", code: "unsafe-resource", message: "/tmp/secret Bearer token data:image base64 raw provider payload command line process.env" },
+          ],
+        },
+      }),
+    });
+    const { container } = await render(client);
+
+    expect(container.textContent).toContain("Safe definition diagnostic.");
+    expect(container.textContent).toContain("Safe aggregate diagnostic.");
+    const diagnosticStatusText = Array.from(container.querySelectorAll("[role='status'], [role='alert']"))
+      .map((element) => element.textContent ?? "")
+      .join(" ");
+    assert.doesNotMatch(
+      diagnosticStatusText,
+      /C:\\|\/tmp|\/home|Bearer|token|secret|password|apiKey|signedUrl|access_token|base64|data:image|raw provider payload|workflowJson|prompt|stack|command line|process\.env/i,
+    );
   });
 
   it("renders empty states for no registered definitions and filtered misses", async () => {
@@ -247,6 +375,42 @@ describe("thin-client AssetLibraryFeature", () => {
       lifecycleStatuses: ["published"],
       builtIn: "built-in",
     });
+  });
+
+  it("filters definitions locally by category and source metadata", async () => {
+    const client = createClient({
+      listAssetDefinitions: testDouble.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          items: [
+            card,
+            {
+              ...card,
+              id: "builtin.form.form@1.0.0",
+              definitionId: "builtin.form.form",
+              displayName: "Form",
+              packCategoryId: "forms-fields",
+              packCategoryDisplayName: "Forms and Fields",
+              categoryLabel: "Forms and Fields",
+            },
+          ],
+        },
+      }),
+    });
+    const { container } = await render(client);
+    const selects = Array.from(container.querySelectorAll("select"));
+
+    setSelectValue(selects[6] as HTMLSelectElement, "forms-fields");
+    await flush();
+
+    expect(container.textContent).toContain("Form");
+    expect(container.textContent).toContain("Forms and Fields");
+    expect(container.textContent).not.toContain("Document building block");
+
+    setSelectValue(selects[5] as HTMLSelectElement, "imported-pack");
+    await flush();
+
+    expect(container.textContent).toContain("No assets match the current filters.");
   });
 
   it("loads selected detail without validation and keeps advanced sections collapsed by default", async () => {
@@ -335,7 +499,7 @@ describe("thin-client AssetLibraryFeature", () => {
     await act(async () => cardButton.click());
     await flush();
 
-    for (const label of ["Configuration", "Inputs and outputs", "Requirements", "Source", "Details"]) {
+    for (const label of ["Configuration", "Inputs and outputs", "Requirements", "Pack and source", "Source", "Details"]) {
       expect(container.textContent).toContain(label);
     }
 
@@ -358,7 +522,7 @@ describe("thin-client AssetLibraryFeature", () => {
     await flush();
 
     const text = container.textContent ?? "";
-    assert.doesNotMatch(text, /Create asset|Edit asset|Delete asset|Register asset|Seed built-ins|Import asset|Finalize asset|Scan resources|Execute workflow/i);
+    assert.doesNotMatch(text, /Create asset|Edit asset|Delete asset|Seed built-ins|Scan resources|Execute workflow|Install pack|Import pack|Export pack|Activate pack|Disable pack|Edit override|Override asset/i);
     expect(text).not.toContain("C:\\Users\\name\\secret");
     expect(text).not.toContain("Bearer abc");
   });

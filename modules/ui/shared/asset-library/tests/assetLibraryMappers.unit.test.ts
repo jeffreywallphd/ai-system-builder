@@ -7,6 +7,15 @@ import {
   mapAssetResourceBackedViewDetail,
   mapAssetResourceBackedViewListResult,
   mapTransportEnvelopeError,
+  filterAssetDefinitionsByCategory,
+  filterAssetDefinitionsByPack,
+  filterAssetDefinitionsBySourceLayer,
+  getAssetCategoryLabel,
+  getAssetPackLabel,
+  getAssetSourceBadge,
+  groupAssetDefinitionsByCategory,
+  groupAssetDefinitionsByPack,
+  sanitizeAssetLibraryDiagnosticMessages,
 } from "../index";
 import * as assetLibraryExports from "../index";
 
@@ -14,8 +23,11 @@ const unsafeValues = [
   "C:\\Users\\name\\secret.txt",
   "/tmp/private/file",
   "/home/user/.cache/token",
+  "/Users/name/private/file",
   "Bearer abc123",
   "apiKey=abc123",
+  "signedUrl",
+  "access_token",
   "token",
   "password",
   "secret",
@@ -25,8 +37,12 @@ const unsafeValues = [
   "process.env",
   "base64",
   "data:image/png;base64,AAAA",
+  "workflowJson",
+  "prompt",
+  "command line",
   "bytes",
   "blobs",
+  "raw provider payload",
   "raw provider payloads",
   "https://example.invalid/object?X-Amz-Signature=abc",
   "https://example.invalid/object?token=abc",
@@ -111,7 +127,15 @@ describe("asset library mappers", () => {
           lifecycleStatus: "published",
           builtIn: true,
           provenance: { updatedAt: "2026-05-02T00:00:00.000Z" },
-          metadata: { localPath: "/tmp/secret" },
+          metadata: {
+            localPath: "/tmp/secret",
+            sourcePackId: "system.foundation",
+            sourcePackVersion: "1.0.0",
+            sourceKind: "system",
+            sourceLayer: "system-default",
+            trustStatus: "system-trusted",
+            categoryId: "ui-structure",
+          },
         },
         {
           definitionId: "custom.tool",
@@ -141,8 +165,20 @@ describe("asset library mappers", () => {
         lifecycleStatus: "published",
         lifecycleStatusLabel: "Published",
         builtIn: true,
+        sourcePackId: "system.foundation",
+        sourcePackVersion: "1.0.0",
+        sourcePackDisplayName: "System Foundation",
+        sourceKind: "system",
+        sourceLayer: "system-default",
+        trustStatus: "system-trusted",
+        packCategoryId: "ui-structure",
+        packCategoryDisplayName: "UI Structure",
+        systemDefault: true,
+        sourceBadgeLabel: "System default",
+        packLabel: "System Foundation",
+        categoryLabel: "UI Structure",
         updatedAt: "2026-05-02T00:00:00.000Z",
-        badges: ["Built-in", "Published"],
+        badges: ["System default", "From System Foundation", "Published"],
       },
       {
         id: "custom.tool@2.0.0",
@@ -158,8 +194,11 @@ describe("asset library mappers", () => {
         lifecycleStatus: "draft",
         lifecycleStatusLabel: "Draft",
         builtIn: false,
+        sourceBadgeLabel: "Custom",
+        packLabel: undefined,
+        categoryLabel: undefined,
         updatedAt: undefined,
-        badges: ["Draft"],
+        badges: ["Custom", "Draft"],
       },
     ]);
     expect(result.nextCursor).toBe("cursor-2");
@@ -249,7 +288,8 @@ describe("asset library mappers", () => {
       assetFamilyLabel: "Unknown family",
       lifecycleStatus: undefined,
       lifecycleStatusLabel: "Unknown status",
-      badges: undefined,
+      sourceBadgeLabel: "Custom",
+      badges: ["Custom"],
     });
     expect(result.items[1]).toMatchObject({
       assetType: undefined,
@@ -259,6 +299,280 @@ describe("asset library mappers", () => {
       lifecycleStatus: undefined,
       lifecycleStatusLabel: "Unknown status",
     });
+  });
+
+  it("maps pack source layers to safe source badges and labels", () => {
+    const result = mapAssetDefinitionListResult({
+      items: [
+        {
+          definitionId: "workspace.pack",
+          version: "1.0.0",
+          displayName: "Workspace Pack",
+          sourceLayer: "workspace-pack",
+          sourcePackId: "workspace.ui",
+        },
+        {
+          definitionId: "workspace.override",
+          version: "1.0.0",
+          displayName: "Workspace Override",
+          sourceLayer: "workspace-pack",
+          sourcePackId: "workspace.ui",
+          overridesDefinitionRef: { kind: "asset-definition-version", id: "builtin.ui.container", version: "1.0.0" },
+        },
+        {
+          definitionId: "organization.override",
+          version: "1.0.0",
+          displayName: "Organization Override",
+          sourceLayer: "organization-override",
+          sourcePackId: "org.ui",
+        },
+        {
+          definitionId: "user.override",
+          version: "1.0.0",
+          displayName: "User Override",
+          sourceLayer: "user-override",
+          sourcePackId: "user.ui",
+        },
+        {
+          definitionId: "imported.asset",
+          version: "1.0.0",
+          displayName: "Imported Asset",
+          sourceLayer: "imported-pack",
+          sourcePackId: "imported.ui",
+        },
+        {
+          definitionId: "installed.asset",
+          version: "1.0.0",
+          displayName: "Installed Asset",
+          sourceLayer: "installed-pack",
+          sourcePackId: "vendor.ui",
+        },
+        {
+          definitionId: "custom.asset",
+          version: "1.0.0",
+          displayName: "Custom Asset",
+        },
+      ],
+    });
+
+    expect(result.items.map(getAssetSourceBadge)).toEqual([
+      "Workspace pack",
+      "Workspace override",
+      "Organization override",
+      "User override",
+      "Imported pack",
+      "Installed pack",
+      "Custom",
+    ]);
+    expect(result.items[0]?.workspacePack).toBe(true);
+    expect(result.items[0]?.workspaceOverride).toBeUndefined();
+    expect(result.items[1]?.workspaceOverride).toBe(true);
+  });
+
+  it("displays system default only for trusted system foundation metadata", () => {
+    const result = mapAssetDefinitionListResult({
+      items: [
+        {
+          definitionId: "trusted.foundation",
+          version: "1.0.0",
+          displayName: "Trusted Foundation",
+          sourcePackId: "system.foundation",
+          sourceKind: "system",
+          sourceLayer: "system-default",
+          trustStatus: "system-trusted",
+        },
+        {
+          definitionId: "bare.foundation",
+          version: "1.0.0",
+          displayName: "Bare Foundation",
+          sourcePackId: "system.foundation",
+        },
+        {
+          definitionId: "marker.foundation",
+          version: "1.0.0",
+          displayName: "Installed Foundation",
+          metadata: {
+            sourcePackId: "system.foundation",
+            assetPackInstall: {
+              packId: "system.foundation",
+              packVersion: "1.0.0",
+              entryId: "marker.foundation",
+              fingerprint: "fnv1a:marker-foundation",
+              sourceKind: "system",
+              sourceLayer: "system-default",
+              trustStatus: "system-trusted",
+              managedBy: "asset-kernel",
+              installedAt: "2026-05-09T12:00:00.000Z",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(result.items[0]?.systemDefault).toBe(true);
+    expect(result.items[0]?.sourceBadgeLabel).toBe("System default");
+    expect(result.items[1]?.systemDefault).toBeUndefined();
+    expect(result.items[1]?.sourceBadgeLabel).toBe("Custom");
+    expect(result.items[1]?.badges).toEqual(["Custom", "From system.foundation"]);
+    expect(result.items[2]?.systemDefault).toBe(true);
+    expect(result.items[2]?.sourceBadgeLabel).toBe("System default");
+  });
+
+  it("does not display system default for spoofed system foundation metadata", () => {
+    const result = mapAssetDefinitionListResult({
+      items: [
+        {
+          definitionId: "wrong.kind",
+          version: "1.0.0",
+          displayName: "Wrong Kind",
+          metadata: {
+            sourcePackId: "system.foundation",
+            sourceKind: "user",
+            sourceLayer: "system-default",
+            trustStatus: "system-trusted",
+          },
+        },
+        {
+          definitionId: "wrong.layer",
+          version: "1.0.0",
+          displayName: "Wrong Layer",
+          metadata: {
+            sourcePackId: "system.foundation",
+            sourceKind: "system",
+            sourceLayer: "workspace-pack",
+            trustStatus: "system-trusted",
+          },
+        },
+        {
+          definitionId: "wrong.trust",
+          version: "1.0.0",
+          displayName: "Wrong Trust",
+          metadata: {
+            sourcePackId: "system.foundation",
+            sourceKind: "system",
+            sourceLayer: "system-default",
+            trustStatus: "unverified",
+          },
+        },
+      ],
+    });
+
+    expect(result.items.map(getAssetSourceBadge)).toEqual(["Custom", "Workspace pack", "Custom"]);
+    expect(result.items.some((item) => item.systemDefault === true)).toBe(false);
+    expect(result.items.some((item) => item.sourceBadgeLabel === "System default")).toBe(false);
+  });
+
+  it("displays workspace-pack override relationships as read-only metadata", () => {
+    const detail = mapAssetDefinitionDetail({
+      definition: {
+        definitionId: "workspace.override",
+        version: "1.0.0",
+        displayName: "Workspace Override",
+        metadata: {
+          sourceLayer: "workspace-pack",
+          sourcePackId: "workspace.ui",
+          overridesDefinitionRef: { kind: "asset-definition-version", id: "builtin.ui.container", version: "1.0.0" },
+        },
+      },
+    });
+
+    expect(detail.sourceBadgeLabel).toBe("Workspace override");
+    expect(detail.overridesDefinitionRef).toEqual({ kind: "asset-definition-version", id: "builtin.ui.container", version: "1.0.0" });
+    expect(JSON.stringify(detail)).not.toContain("Edit override");
+    expect(JSON.stringify(detail)).not.toContain("Create override");
+    expect(JSON.stringify(detail)).not.toContain("Delete override");
+    expect(JSON.stringify(detail)).not.toContain("Resolve asset");
+  });
+
+  it("groups and filters definitions by pack, category, and source layer", () => {
+    const result = mapAssetDefinitionListResult({
+      items: [
+        {
+          definitionId: "builtin.ui.container",
+          version: "1.0.0",
+          displayName: "Container",
+          sourcePackId: "system.foundation",
+          sourceLayer: "system-default",
+          packCategoryId: "ui-structure",
+        },
+        {
+          definitionId: "builtin.form.form",
+          version: "1.0.0",
+          displayName: "Form",
+          sourcePackId: "system.foundation",
+          sourceLayer: "system-default",
+          packCategoryId: "forms-fields",
+        },
+        {
+          definitionId: "custom.asset",
+          version: "1.0.0",
+          displayName: "Custom Asset",
+        },
+      ],
+    });
+
+    expect(groupAssetDefinitionsByPack(result.items).map((group) => [group.key, group.items.length])).toEqual([
+      ["system.foundation", 2],
+      ["custom", 1],
+    ]);
+    expect(groupAssetDefinitionsByCategory(result.items).map((group) => [group.key, group.label])).toEqual([
+      ["ui-structure", "UI Structure"],
+      ["forms-fields", "Forms and Fields"],
+      ["uncategorized", "Uncategorized"],
+    ]);
+    expect(filterAssetDefinitionsByPack(result.items, "system.foundation").map((asset) => asset.definitionId)).toEqual([
+      "builtin.ui.container",
+      "builtin.form.form",
+    ]);
+    expect(filterAssetDefinitionsBySourceLayer(result.items, "system-default").map((asset) => asset.definitionId)).toEqual([
+      "builtin.ui.container",
+      "builtin.form.form",
+    ]);
+    expect(filterAssetDefinitionsByCategory(result.items, "forms-fields").map((asset) => asset.definitionId)).toEqual([
+      "builtin.form.form",
+    ]);
+    expect(getAssetPackLabel(result.items[0]!)).toBe("system.foundation");
+    expect(getAssetCategoryLabel(result.items[0]!)).toBe("UI Structure");
+  });
+
+  it("drops unsafe pack and override metadata before display", () => {
+    const detail = mapAssetDefinitionDetail({
+      definition: {
+        definitionId: "custom.asset",
+        version: "1.0.0",
+        displayName: "Custom asset",
+        metadata: {
+          sourcePackId: "C:\\Users\\name\\pack",
+          sourcePackDisplayName: "Bearer abc123",
+          sourceLayer: "system-default",
+          categoryId: "/tmp/category",
+          overridesDefinitionRef: {
+            kind: "asset-definition-version",
+            id: "C:\\Users\\name\\secret",
+            version: "1.0.0",
+          },
+          overriddenByDefinitionRefs: [
+            { kind: "asset-definition-version", id: "workspace.override", version: "1.0.0" },
+            { kind: "asset-definition-version", id: "/tmp/unsafe", version: "1.0.0" },
+          ],
+          effectiveResolutionStatus: "applied",
+          resolutionSummary: "Workspace override is active",
+        },
+      },
+    });
+
+    expect(detail.sourcePackId).toBeUndefined();
+    expect(detail.sourcePackDisplayName).toBeUndefined();
+    expect(detail.packCategoryId).toBeUndefined();
+    expect(detail.overridesDefinitionRef).toBeUndefined();
+    expect(detail.overriddenByDefinitionRefs).toEqual([
+      { kind: "asset-definition-version", id: "workspace.override", version: "1.0.0" },
+    ]);
+    expect(detail.effectiveResolutionStatus).toBe("applied");
+    expect(detail.resolutionSummary).toBe("Workspace override is active");
+    expect(JSON.stringify(detail)).not.toContain("C:\\Users");
+    expect(JSON.stringify(detail)).not.toContain("/tmp");
+    expect(JSON.stringify(detail)).not.toContain("Bearer");
   });
 
   it("maps resource-backed cards safely and labels generated/external objects as unregistered", () => {
@@ -340,6 +654,80 @@ describe("asset library mappers", () => {
     expect(JSON.stringify(detail)).not.toContain("task-123");
     expect(JSON.stringify(detail)).not.toContain("X-Amz-Signature");
     expect(JSON.stringify(detail)).not.toContain("bytes");
+  });
+
+  it("sanitizes resource-backed view diagnostics while preserving safe messages", () => {
+    const unsafeDiagnostics = unsafeValues.map((message, index) => ({
+      severity: "warning",
+      code: `unsafe-${index}`,
+      message,
+    }));
+    const result = mapAssetResourceBackedViewListResult({
+      diagnostics: [
+        { severity: "info", code: "safe", message: "Provider is not configured for this host." },
+        ...unsafeDiagnostics,
+      ],
+      items: [{
+        viewId: "asset-view.artifact.safe",
+        viewKind: "artifact",
+        displayName: "Safe artifact",
+        sourceKind: "artifact-browser",
+        diagnostics: [
+          { severity: "info", code: "safe-card", message: "Safe descriptor-only diagnostic." },
+          ...unsafeDiagnostics,
+        ],
+      }],
+    });
+    const detail = mapAssetResourceBackedViewDetail({
+      view: {
+        viewId: "asset-view.artifact.safe",
+        viewKind: "artifact",
+        displayName: "Safe artifact",
+        sourceKind: "artifact-browser",
+        diagnostics: [
+          { severity: "info", code: "safe-detail", message: "Safe detail diagnostic." },
+          ...unsafeDiagnostics,
+        ],
+      },
+    });
+    const serialized = JSON.stringify({ result, detail });
+
+    expect(result.diagnostics).toEqual([{ severity: "info", code: "safe", message: "Provider is not configured for this host." }]);
+    expect(result.items[0]?.diagnostics).toEqual(["Safe descriptor-only diagnostic."]);
+    expect(detail.diagnostics).toEqual(["Safe detail diagnostic."]);
+    for (const unsafe of unsafeValues) {
+      expect(serialized.includes(unsafe)).toBe(false);
+    }
+  });
+
+  it("sanitizes standalone diagnostic message arrays for UI rendering", () => {
+    expect(sanitizeAssetLibraryDiagnosticMessages([
+      "Safe descriptor-only diagnostic.",
+      ...unsafeValues,
+    ])).toEqual(["Safe descriptor-only diagnostic."]);
+
+    expect(sanitizeAssetLibraryDiagnosticMessages(unsafeValues)).toEqual([]);
+    expect(sanitizeAssetLibraryDiagnosticMessages(undefined)).toEqual([]);
+    expect(/C:\\|\/tmp|\/home|Bearer|token|secret|password|apiKey|signedUrl|access_token|base64|data:image|raw provider payload|workflowJson|prompt|stack|command line|process\.env/i.test(JSON.stringify(sanitizeAssetLibraryDiagnosticMessages([
+      "C:\\Users\\name\\file.png",
+      "/tmp/generated.png",
+      "/home/user/cache",
+      "Bearer abc",
+      "token",
+      "secret",
+      "password",
+      "apiKey",
+      "signedUrl",
+      "access_token",
+      "base64",
+      "data:image",
+      "raw provider payload",
+      "workflowJson",
+      "prompt",
+      "stack",
+      "command line",
+      "process.env",
+    ])))).toBe(false);
   });
 
   it("normalizes safe client errors without exposing internal detail", () => {

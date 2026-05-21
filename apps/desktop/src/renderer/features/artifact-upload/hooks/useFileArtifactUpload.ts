@@ -24,7 +24,7 @@ let persistedFileUploadState: PersistedFileUploadState = {
 export function useFileArtifactUpload(
   uploadClient: ArtifactUploadClient,
   onUploadComplete?: () => void,
-  options: { persistState?: boolean } = {},
+  options: { persistState?: boolean; workspaceId?: string } = {},
 ): UseFileArtifactUploadResult {
   const shouldPersistState = options.persistState ?? true;
   const [selectedFile, setSelectedFile] = useState<File | null>(shouldPersistState ? persistedFileUploadState.selectedFile : null);
@@ -48,6 +48,13 @@ export function useFileArtifactUpload(
   async function onUploadSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
 
+    if (!options.workspaceId) {
+      const nextViewState = { status: "error" as const, message: "Select an active workspace before uploading." };
+      setViewState(nextViewState);
+      persist(selectedFile, nextViewState);
+      return;
+    }
+
     if (!selectedFile) {
       const nextViewState = { status: "error" as const, message: "Select one artifact file before uploading." };
       setViewState(nextViewState);
@@ -61,6 +68,7 @@ export function useFileArtifactUpload(
 
     try {
       const response = await uploadClient.uploadArtifact({
+        workspaceId: options.workspaceId,
         fileName: selectedFile.name,
         mediaType: resolveArtifactUploadMediaType({
           fileName: selectedFile.name,

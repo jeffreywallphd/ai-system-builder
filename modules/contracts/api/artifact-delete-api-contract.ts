@@ -1,3 +1,4 @@
+import { createWorkspaceId } from "../workspace";
 import { createTransportOperation } from "../transport";
 import { createApiError } from "./api-error";
 import { createApiRequest, type ApiRequest } from "./api-request";
@@ -20,6 +21,7 @@ export interface ApiArtifactRegisteredDeleteBoundaryContext {
 
 export interface ApiArtifactRegisteredDeleteRequestPayload {
   storageKey: string;
+  workspaceId: string;
   boundary: ApiArtifactRegisteredDeleteBoundaryContext;
 }
 
@@ -56,6 +58,7 @@ export function createApiArtifactRegisteredDeleteRequest(
     API_ARTIFACT_REGISTERED_DELETE_OPERATION,
     {
       storageKey: normalizeRequiredText(payload.storageKey, "storageKey"),
+      workspaceId: createWorkspaceId(payload.workspaceId),
       boundary: {
         host: "server",
         source: normalizeRequiredText(payload.boundary.source, "boundary.source"),

@@ -169,8 +169,8 @@ describe("composeServerHost", () => {
       runtimeRootDirectory,
     });
 
-    expect(app.post).toHaveBeenCalledTimes(33);
-    expect(app.get).toHaveBeenCalledTimes(8);
+    expect(app.post).toHaveBeenCalledTimes(51);
+    expect(app.get).toHaveBeenCalledTimes(26);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
     expect(registeredPaths).toEqual([
       "/api/artifact/upload",
@@ -205,9 +205,32 @@ describe("composeServerHost", () => {
       "/api/application-settings/read",
       "/api/application-settings/update",
       "/api/application-settings/clear",
+      "/api/workspaces",
+      "/api/workspaces/active-selection",
+      "/api/workspaces/active-selection/clear",
+      "/api/user-library/assets/promote",
+      "/api/user-library/workspace-links",
+      "/api/workspaces/:workspaceId/user-library/copies",
+      "/api/workspaces/:targetWorkspaceId/imports/workspace-asset",
+      "/api/assets/register-resource-backed-view",
+      "/api/assets/finalize-generated-output",
+      "/api/assets/import-external-repository-object",
+      "/api/assets/localize-external-repository-object",
+      "/api/asset-authoring/create-workspace-authored-asset",
+      "/api/asset-authoring/create-draft",
+      "/api/asset-authoring/update-draft",
+      "/api/asset-authoring/publish-draft",
+      "/api/asset-authoring/create-override",
+      "/api/asset-authoring/update-override",
+      "/api/asset-authoring/disable-override",
       "/api/server/restart",
     ]);
-    expect(registeredPaths.some((path) => String(path).startsWith("/api/assets"))).toBe(false);
+    expect(registeredPaths.filter((path) => String(path).startsWith("/api/assets"))).toEqual([
+      "/api/assets/register-resource-backed-view",
+      "/api/assets/finalize-generated-output",
+      "/api/assets/import-external-repository-object",
+      "/api/assets/localize-external-repository-object",
+    ]);
     expect(existsSync(join(storageRootDirectory, "asset-kernel", "manifest.json"))).toBe(true);
     expect(existsSync(join(runtimeRootDirectory, "asset-kernel", "manifest.json"))).toBe(false);
     const internalRegistry = host.getInternalAssetRegistry();
@@ -216,7 +239,7 @@ describe("composeServerHost", () => {
     expect(internalRegistry?.diagnostics.resourceBackedViewsEnabled).toBe(true);
     const resourceBacked = await internalRegistry?.readFacade.listResourceBackedViewCards({ limit: 10 });
     expect(resourceBacked?.items).toEqual([]);
-    expect(resourceBacked?.diagnostics?.some((diagnostic) => diagnostic.code.includes("source-unavailable") || diagnostic.code.includes("unsupported"))).toBe(true);
+    expect(resourceBacked?.diagnostics?.some((diagnostic) => diagnostic.code.includes("source-unavailable") || diagnostic.code.includes("unsupported") || diagnostic.code.includes("workspace"))).toBe(true);
     const missingResourceBackedDetail = await internalRegistry!.readFacade.readResourceBackedViewDetail("asset-view.image.internal.missing");
     expect(missingResourceBackedDetail).toBeUndefined();
     expect(artifactRepoFetch).not.toHaveBeenCalled();
@@ -230,13 +253,32 @@ describe("composeServerHost", () => {
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
 
     expect(registeredGetPaths).toContain("/api/assets/definitions");
-    expect(registeredGetPaths.some((path) => /\/api\/assets.*(create|update|delete|register|seed|import|finalize)/i.test(String(path)))).toBe(false);
+    expect(registeredPaths.some((path) => /\/api\/assets.*(create|update|delete|patch|edit|seed|publish|execute|run|scan)/i.test(String(path)))).toBe(false);
     expect(readFileSync(resolve("modules/hosts/server/composition/composeServerHost.ts"), "utf8")).toContain("assetRegistryRead: internalAssetRegistry.readFacade");
+    expect(readFileSync(resolve("modules/hosts/server/composition/composeServerHost.ts"), "utf8")).toContain("assetMutationUseCases");
     expect(registeredGetPaths).toEqual([
       "/api/artifact/upload/policy",
       "/api/artifact/media/view",
       "/api/config/huggingface-token",
+      "/api/workspaces",
+      "/api/workspaces/active-selection",
+      "/api/user-library/assets",
+      "/api/user-library/assets/:assetId",
+      "/api/workspaces/:workspaceId/user-library/links",
+      "/api/workspaces/:workspaceId/user-library/links/:linkId",
+      "/api/workspaces/:workspaceId/effective-asset-sources",
       "/api/assets/definitions",
+      "/api/asset-authoring/authored-assets",
+      "/api/asset-authoring/authored-assets/:authoredAssetId",
+      "/api/asset-authoring/drafts",
+      "/api/asset-authoring/drafts/:draftId",
+      "/api/asset-authoring/revisions",
+      "/api/asset-authoring/revisions/:revisionId",
+      "/api/asset-authoring/overrides",
+      "/api/asset-authoring/overrides/:overrideId",
+      "/api/asset-authoring/effective-summaries",
+      "/api/assets/resource-backed-views",
+      "/api/assets/resource-backed-views/:viewId",
       "/api/assets/definitions/:definitionId",
       "/api/assets/definitions/:definitionId/versions/:version",
       "/api/runtime/readiness",
@@ -482,7 +524,7 @@ describe("server ComfyUI python/runtime resolution", () => {
       .find((event) => event.event === "runtime.comfyui.server.configuration");
     expect(comfyLog?.data).toMatchObject({
       pythonEnvironmentMode: "managed-venv",
-      basePythonCommand: "python",
+      basePythonCommand: "python3",
       launchPythonExecutableSource: "managed-venv",
       skipPythonSetup: false,
       skipPythonValidation: false,

@@ -11,6 +11,7 @@ const CONTRACT_FAMILIES = [
   "artifactBrowser",
   "config",
   "dataset",
+  "executionPlans",
   "host",
   "artifactUpload",
   "ingestion",
@@ -27,6 +28,11 @@ const CONTRACT_FAMILIES = [
   "storage",
   "transform",
   "transport",
+  "workspace",
+  "userLibrary",
+  "assetAuthoring",
+  "assetComposition",
+  "runtimeReadiness",
 ] as const;
 
 const IMPORT_SCAN_ROOTS = [

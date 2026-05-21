@@ -1,3 +1,4 @@
+import { createWorkspaceId } from "../workspace";
 import { createOperationIdentity, type OperationIdentity } from "../shared";
 import {
   createIpcChannel,
@@ -32,6 +33,7 @@ export interface DesktopArtifactMediaViewBoundaryContext {
 
 export interface DesktopArtifactMediaViewRequestPayload {
   storageKey: string;
+  workspaceId: string;
   boundary: DesktopArtifactMediaViewBoundaryContext;
 }
 
@@ -71,6 +73,7 @@ function normalizeDesktopArtifactMediaViewPayload(
 ): DesktopArtifactMediaViewRequestPayload {
   return {
     storageKey: normalizeRequiredTextField(payload.storageKey, "storageKey"),
+    workspaceId: createWorkspaceId(payload.workspaceId),
     boundary: {
       host: "desktop",
       source: normalizeRequiredTextField(payload.boundary.source, "boundary.source"),

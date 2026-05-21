@@ -6,6 +6,7 @@ import type {
   AssetResourceBackedViewKind,
   AssetType,
 } from "../../../contracts/asset";
+import type { WorkspaceId } from "../../../contracts/workspace";
 
 export type AssetResourceBackedViewProviderDiagnosticSeverity = "info" | "warning" | "error";
 
@@ -26,6 +27,7 @@ export interface AssetResourceBackedViewListQuery {
   readonly viewKinds?: readonly AssetResourceBackedViewKind[];
   readonly limit?: number;
   readonly cursor?: string;
+  readonly workspaceId?: WorkspaceId | string;
 }
 
 export interface AssetResourceBackedViewListResult {
@@ -37,7 +39,7 @@ export interface AssetResourceBackedViewListResult {
 export interface AssetResourceBackedViewProvider {
   readonly providerId?: string;
   listResourceBackedViews(query?: AssetResourceBackedViewListQuery): Promise<AssetResourceBackedViewListResult>;
-  readResourceBackedView(viewId: string): Promise<AssetResourceBackedView | undefined>;
+  readResourceBackedView(viewId: string, query?: { readonly workspaceId?: WorkspaceId | string }): Promise<AssetResourceBackedView | undefined>;
 }
 
 export interface UnsupportedAssetResourceBackedViewProviderOptions {

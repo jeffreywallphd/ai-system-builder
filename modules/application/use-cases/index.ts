@@ -33,4 +33,16 @@ export * from "./model";
 
 export * from "./image-generation";
 
+export * from "./workspace";
+
 export * from "./asset";
+
+export * from "./user-library";
+
+export * from "./asset-authoring";
+
+export * from "./effective-asset-projections";
+
+export * from "./asset-composition";
+
+export * from "./runtime-readiness";

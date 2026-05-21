@@ -1,44 +1,140 @@
-import { useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 
 import { AppShell } from "./components/layout/AppShell";
+import { DesktopPageLoadingFallback } from "./components/layout/DesktopPageLoadingFallback";
 import { useDesktopPage } from "./hooks/useDesktopPage";
-import { AssetLibraryPage } from "./pages/AssetLibraryPage";
-import { ArtifactsPage } from "./pages/ArtifactsPage";
-import { HomePage } from "./pages/HomePage";
-import { ModelsPage } from "./pages/ModelsPage";
-import { ImageGenerationPage } from "./pages/ImageGenerationPage";
-import { SettingsPage } from "./pages/SettingsPage";
-import { SystemPage } from "./pages/SystemPage";
-import { desktopPageDefinitions, type DesktopPageKey } from "./routes/desktopPages";
+import { ActiveWorkspaceProvider, WorkspaceGate, WorkspaceRequiredSurface, useActiveWorkspace, type WorkspaceUiRecord } from "./features/workspace";
+import { desktopPageDefinitions, desktopPageRequiresWorkspace, type DesktopPageKey } from "./routes/desktopPages";
+import { desktopLazyPages, type DesktopLazyPageDiagnosticContext, type DesktopLazyPageRegistry } from "./routes/lazyDesktopPages";
+import { resolveDesktopWorkspaceRouteBoundary } from "./routes/workspaceRouteBoundary";
+import { recordRendererMemorySnapshot } from "./diagnostics/rendererMemoryDiagnostics";
+
+type DesktopWorkspacePageKey = Extract<DesktopPageKey, "artifacts" | "assets" | "user-library" | "models" | "image-generation">;
 
 export function App() {
+  useEffect(() => {
+    recordRendererMemorySnapshot({
+      milestone: "renderer.app.mounted",
+      component: "desktop-renderer",
+    });
+  }, []);
+
+  return (
+    <ActiveWorkspaceProvider>
+      <WorkspaceAwareDesktopApp />
+    </ActiveWorkspaceProvider>
+  );
+}
+
+export interface WorkspaceAwareDesktopAppProps {
+  readonly lazyPages?: DesktopLazyPageRegistry;
+}
+
+export function WorkspaceAwareDesktopApp({ lazyPages = desktopLazyPages }: WorkspaceAwareDesktopAppProps = {}) {
   const { activePage, setActivePage } = useDesktopPage();
+  const workspace = useActiveWorkspace();
   const [artifactRefreshToken, setArtifactRefreshToken] = useState(0);
 
-  const desktopPageContentMap: Record<DesktopPageKey, ReactNode> = {
-    home: <HomePage onGoToArtifacts={() => setActivePage("artifacts")} />,
-    artifacts: (
-      <ArtifactsPage
-        refreshToken={artifactRefreshToken}
-        onUploaded={() => {
-          setArtifactRefreshToken((current) => current + 1);
-        }}
-      />
-    ),
-    assets: <AssetLibraryPage />,
-    models: <ModelsPage />,
-    "image-generation": <ImageGenerationPage />,
-    settings: <SettingsPage />,
-    system: <SystemPage />,
+  const activePageDefinition = desktopPageDefinitions.find((page) => page.key === activePage);
+  const routeRequiresWorkspace = desktopPageRequiresWorkspace(activePage);
+  const routeBoundary = resolveDesktopWorkspaceRouteBoundary(activePage, workspace.status);
+  const lazyLoadContext: DesktopLazyPageDiagnosticContext = {
+    activePage,
+    visibleActivePage: routeBoundary.visibleActivePage,
+    workspaceStatus: workspace.status,
+    routeRequiresWorkspace,
   };
+
+  const lazyPageFallback = (
+    <DesktopPageLoadingFallback
+      activePage={activePage}
+      visibleActivePage={routeBoundary.visibleActivePage}
+      workspaceStatus={workspace.status}
+      routeRequiresWorkspace={routeRequiresWorkspace}
+    />
+  );
+
+  const renderWorkspacePageContent = (page: DesktopWorkspacePageKey, activeWorkspace: WorkspaceUiRecord): ReactNode => {
+    switch (page) {
+      case "artifacts": {
+        const ArtifactsPage = lazyPages.artifacts;
+        return (
+          <ArtifactsPage
+            __lazyLoadContext={lazyLoadContext}
+            workspaceId={activeWorkspace.id}
+            workspaceName={activeWorkspace.displayName}
+            refreshToken={artifactRefreshToken}
+            onUploaded={() => {
+              setArtifactRefreshToken((current) => current + 1);
+            }}
+          />
+        );
+      }
+      case "assets": {
+        const AssetLibraryPage = lazyPages.assets;
+        return <AssetLibraryPage __lazyLoadContext={lazyLoadContext} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
+      }
+      case "user-library": {
+        const UserLibraryPage = lazyPages["user-library"];
+        return <UserLibraryPage __lazyLoadContext={lazyLoadContext} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
+      }
+      case "models": {
+        const ModelsPage = lazyPages.models;
+        return <ModelsPage __lazyLoadContext={lazyLoadContext} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
+      }
+      case "image-generation": {
+        const ImageGenerationPage = lazyPages["image-generation"];
+        return <ImageGenerationPage __lazyLoadContext={lazyLoadContext} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
+      }
+    }
+  };
+
+  const renderGlobalPageContent = (page: DesktopPageKey): ReactNode => {
+    switch (page) {
+      case "home": {
+        const HomePage = lazyPages.home;
+        return <HomePage __lazyLoadContext={lazyLoadContext} onNavigate={setActivePage} />;
+      }
+      case "settings": {
+        const SettingsPage = lazyPages.settings;
+        return <SettingsPage __lazyLoadContext={lazyLoadContext} />;
+      }
+      case "system": {
+        const SystemPage = lazyPages.system;
+        return <SystemPage __lazyLoadContext={lazyLoadContext} />;
+      }
+      default:
+        return <WorkspaceRequiredSurface />;
+    }
+  };
+
+  useEffect(() => {
+    recordRendererMemorySnapshot({
+      milestone: "renderer.page.active.changed",
+      component: "desktop-renderer",
+      detail: {
+        activePage,
+        visibleActivePage: routeBoundary.visibleActivePage,
+        workspaceStatus: workspace.status,
+      },
+    });
+  }, [activePage, routeBoundary.visibleActivePage, workspace.status]);
+
+  const content = routeBoundary.blocked ? (
+    <WorkspaceRequiredSurface />
+  ) : routeRequiresWorkspace ? (
+    <WorkspaceGate pageLabel={activePageDefinition?.label ?? activePage}>
+      {(activeWorkspace) => renderWorkspacePageContent(activePage as DesktopWorkspacePageKey, activeWorkspace)}
+    </WorkspaceGate>
+  ) : renderGlobalPageContent(activePage);
 
   return (
     <AppShell
-      activePage={activePage}
+      activePage={routeBoundary.visibleActivePage}
       onNavigate={setActivePage}
       pages={desktopPageDefinitions}
     >
-      {desktopPageContentMap[activePage]}
+      <Suspense fallback={lazyPageFallback}>{content}</Suspense>
     </AppShell>
   );
 }

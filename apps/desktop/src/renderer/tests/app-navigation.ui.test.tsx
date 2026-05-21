@@ -1,8 +1,41 @@
+require.extensions[".svg"] = (module: NodeModule) => {
+  module.exports = "logo.svg";
+};
+
+import { JSDOM } from "jsdom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, testDouble } from "../../../../../modules/testing/node-test";
 
-import { App } from "../App";
+let AppComponent: typeof import("../App").App | undefined;
+
+async function loadApp() {
+  AppComponent ??= (await import("../App")).App;
+  return AppComponent;
+}
+
+const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
+(globalThis as any).window = dom.window;
+(globalThis as any).document = dom.window.document;
+(globalThis as any).Event = dom.window.Event;
+(globalThis as any).HTMLInputElement = dom.window.HTMLInputElement;
+(globalThis as any).HTMLSelectElement = dom.window.HTMLSelectElement;
+(globalThis as any).InputEvent = dom.window.InputEvent;
+(globalThis as any).FormData = dom.window.FormData;
+(globalThis as any).Request = dom.window.Request;
+(globalThis as any).Response = dom.window.Response;
+(globalThis as any).localStorage = dom.window.localStorage;
+(globalThis as any).sessionStorage = dom.window.sessionStorage;
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+
+async function waitForText(container: HTMLElement, text: string) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    if (container.textContent?.includes(text)) return;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+  }
+}
 
 describe("desktop renderer page composition", () => {
   let mountedRoot: Root | undefined;
@@ -16,6 +49,7 @@ describe("desktop renderer page composition", () => {
     }
     mountedContainer?.remove();
     delete window.desktopApi;
+    window.localStorage.clear();
     mountedRoot = undefined;
     mountedContainer = undefined;
   });
@@ -24,23 +58,37 @@ describe("desktop renderer page composition", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
+    const App = await loadApp();
     mountedRoot = root;
     mountedContainer = container;
 
+    const workspaces = [{ workspaceId: "research-workspace", displayName: "Research Workspace", status: "active", createdAt: "2026-05-14T00:00:00.000Z" }];
+    let selectedWorkspaceId: string | undefined;
     window.desktopApi = {
-      uploadArtifact: vi.fn().mockRejectedValue(new Error("unused")),
-      browseArtifacts: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
-      readArtifactDetail: vi.fn().mockRejectedValue(new Error("unused")),
-      readArtifactContentDescriptor: vi.fn().mockRejectedValue(new Error("unused")),
-      readArtifactViewerMedia: vi.fn().mockRejectedValue(new Error("unused")),
-      publishArtifactToRepo: vi.fn().mockRejectedValue(new Error("unused")),
-      verifyPublishedArtifactBacking: vi.fn().mockRejectedValue(new Error("unused")),
-      registerArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
-      localizeArtifactFromRepo: vi.fn().mockRejectedValue(new Error("unused")),
-      listAssetDefinitions: vi.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
-      readAssetDefinition: vi.fn().mockRejectedValue(new Error("unused")),
-      readAssetDefinitionVersion: vi.fn().mockRejectedValue(new Error("unused")),
-      readPythonRuntimeStatus: vi.fn().mockResolvedValue({
+      listWorkspaces: testDouble.fn(async () => ({ ok: true, value: { workspaces } })),
+      readActiveWorkspaceSelection: testDouble.fn(async () => ({ ok: true, value: selectedWorkspaceId ? { workspaceId: selectedWorkspaceId } : {} })),
+      saveActiveWorkspaceSelection: testDouble.fn(async (selection: { workspaceId?: string }) => { selectedWorkspaceId = selection.workspaceId; return { ok: true, value: { selection } }; }),
+      clearActiveWorkspaceSelection: testDouble.fn(async () => { selectedWorkspaceId = undefined; return { ok: true, value: {} }; }),
+      createWorkspace: testDouble.fn(async (input: { command: { displayName: string; includeSystemFoundationAssets?: boolean } }) => { const workspace = { workspaceId: "workspace.created", displayName: input.command.displayName, status: "active", createdAt: "2026-05-14T00:00:00.000Z", settings: { defaultIncludeSystemFoundationAssets: input.command.includeSystemFoundationAssets } }; workspaces.push(workspace); selectedWorkspaceId = workspace.workspaceId; return { ok: true, value: { workspace } }; }),
+      uploadArtifact: testDouble.fn().mockRejectedValue(new Error("unused")),
+      browseArtifacts: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readArtifactDetail: testDouble.fn().mockRejectedValue(new Error("unused")),
+      readArtifactContentDescriptor: testDouble.fn().mockRejectedValue(new Error("unused")),
+      readArtifactViewerMedia: testDouble.fn().mockRejectedValue(new Error("unused")),
+      publishArtifactToRepo: testDouble.fn().mockRejectedValue(new Error("unused")),
+      verifyPublishedArtifactBacking: testDouble.fn().mockRejectedValue(new Error("unused")),
+      registerArtifactFromRepo: testDouble.fn().mockRejectedValue(new Error("unused")),
+      localizeArtifactFromRepo: testDouble.fn().mockRejectedValue(new Error("unused")),
+      listAssetDefinitions: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readAssetDefinition: testDouble.fn().mockRejectedValue(new Error("unused")),
+      readAssetDefinitionVersion: testDouble.fn().mockRejectedValue(new Error("unused")),
+      listAssetResourceBackedViews: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
+      readAssetResourceBackedView: testDouble.fn().mockRejectedValue(new Error("unused")),
+      registerResourceBackedViewAsAsset: testDouble.fn().mockRejectedValue(new Error("unused")),
+      finalizeGeneratedOutputAsAsset: testDouble.fn().mockRejectedValue(new Error("unused")),
+      importExternalRepositoryObjectAsAsset: testDouble.fn().mockRejectedValue(new Error("unused")),
+      localizeExternalRepositoryObjectAsAsset: testDouble.fn().mockRejectedValue(new Error("unused")),
+      readPythonRuntimeStatus: testDouble.fn().mockResolvedValue({
         ok: true,
         value: {
           supervisorStatus: "stopped",
@@ -50,7 +98,7 @@ describe("desktop renderer page composition", () => {
           logs: [],
         },
       }),
-      controlPythonRuntime: vi.fn().mockResolvedValue({
+      controlPythonRuntime: testDouble.fn().mockResolvedValue({
         ok: true,
         value: {
           supervisorStatus: "starting",
@@ -60,19 +108,33 @@ describe("desktop renderer page composition", () => {
           logs: [],
         },
       }),
-      browseModels: vi.fn().mockResolvedValue({ ok: true, value: { models: [] } }),
-      getModelDetails: vi.fn().mockResolvedValue({ ok: true, value: { model: { provider: "huggingface", modelId: "org/demo", displayName: "Demo" } } }),
-      listModels: vi.fn().mockResolvedValue({ ok: true, value: { models: [] } }),
-      saveModelReference: vi.fn().mockResolvedValue({ ok: true, value: { model: { modelRecordId: "m1", displayName: "Demo", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-04-27T00:00:00.000Z" } } }),
-      updateModelRecord: vi.fn().mockResolvedValue({ ok: true, value: { model: { modelRecordId: "m1", displayName: "Demo", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-04-27T00:00:00.000Z" } } }),
-      deleteModelRecord: vi.fn().mockResolvedValue({ ok: true, value: { deletedModelRecordId: "m1", deletedRegistryRecord: true, deletedLocalFiles: false, deletedBackingArtifactIds: [] } }),
+      browseModels: testDouble.fn().mockResolvedValue({ ok: true, value: { models: [] } }),
+      getModelDetails: testDouble.fn().mockResolvedValue({ ok: true, value: { model: { provider: "huggingface", modelId: "org/demo", displayName: "Demo" } } }),
+      listModels: testDouble.fn().mockResolvedValue({ ok: true, value: { models: [] } }),
+      saveModelReference: testDouble.fn().mockResolvedValue({ ok: true, value: { model: { modelRecordId: "m1", displayName: "Demo", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-04-27T00:00:00.000Z" } } }),
+      updateModelRecord: testDouble.fn().mockResolvedValue({ ok: true, value: { model: { modelRecordId: "m1", displayName: "Demo", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-04-27T00:00:00.000Z" } } }),
+      deleteModelRecord: testDouble.fn().mockResolvedValue({ ok: true, value: { deletedModelRecordId: "m1", deletedRegistryRecord: true, deletedLocalFiles: false, deletedBackingArtifactIds: [] } }),
     };
 
     await act(async () => {
       root.render(<App />);
     });
 
-    expect(container.textContent).toContain("Build visual AI workflows from your artifacts");
+    await waitForText(container, "Choose your working context");
+    expect(container.textContent).toContain("Choose your working context");
+    expect(container.querySelector("header")?.textContent).toContain("AI System Builder");
+    expect(container.textContent).toContain("Open System");
+    expect(container.querySelector("header")?.textContent).not.toContain("Create workspace");
+
+    const menu = container.querySelector(".ui-shell__menu") as HTMLDetailsElement | null;
+    expect(menu).toBeDefined();
+    if (menu) {
+      menu.open = true;
+      await act(async () => {
+        document.dispatchEvent(new Event("mousedown", { bubbles: true }));
+      });
+      expect(menu.open).toBe(false);
+    }
 
     const artifactsButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Data",
@@ -83,42 +145,20 @@ describe("desktop renderer page composition", () => {
       artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("Data Artifact Ingester");
-    expect(container.textContent).not.toContain("Data Artifact Browser");
+    expect(container.textContent).toContain("Create a workspace to use Assets, Artifacts, Data, Models, and Images.");
+    expect(container.textContent).toContain("Create workspace");
+    expect(container.textContent).not.toContain("Data Artifact Ingester");
+    expect(window.desktopApi?.browseArtifacts).not.toHaveBeenCalled();
 
-    const artifactBrowserTab = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Artifact Browser",
-    );
-    expect(artifactBrowserTab).toBeDefined();
-
+    selectedWorkspaceId = "research-workspace";
     await act(async () => {
-      artifactBrowserTab?.dispatchEvent(new Event("click", { bubbles: true }));
+      root.unmount();
     });
-
-    expect(container.textContent).toContain("Artifact Browser");
-
-    const datasetPreparationTab = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Dataset Preparation",
-    );
-    expect(datasetPreparationTab).toBeDefined();
-
+    const remountedRoot = createRoot(container);
+    mountedRoot = remountedRoot;
     await act(async () => {
-      datasetPreparationTab?.dispatchEvent(new Event("click", { bubbles: true }));
+      remountedRoot.render(<App />);
     });
-
-    expect(container.textContent).toContain("Python Runtime");
-
-    const modelsButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Models",
-    );
-    expect(modelsButton).toBeDefined();
-
-    await act(async () => {
-      modelsButton?.dispatchEvent(new Event("click", { bubbles: true }));
-    });
-    expect(container.textContent).toContain("Model Management");
-    expect(container.textContent).toContain("Browse Models");
-
     const assetsButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Assets",
     );
@@ -127,19 +167,10 @@ describe("desktop renderer page composition", () => {
     await act(async () => {
       assetsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
+    await waitForText(container, "Asset Library");
     expect(container.textContent).toContain("Asset Library");
-    expect(container.textContent).toContain("No asset definitions are registered yet.");
-
-
-    const imageGenerationButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Image Generation",
-    );
-    expect(imageGenerationButton).toBeDefined();
-
-    await act(async () => {
-      imageGenerationButton?.dispatchEvent(new Event("click", { bubbles: true }));
-    });
-    expect(container.textContent).toContain("Run runtime-backed image generation tasks");
+    expect(container.querySelector("button[aria-current='page']")?.textContent).toBe("Assets");
+    expect(window.desktopApi?.listAssetDefinitions).toHaveBeenCalled();
 
     const settingsButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Settings",
@@ -149,7 +180,9 @@ describe("desktop renderer page composition", () => {
     await act(async () => {
       settingsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
-    expect(container.textContent).toContain("Manage global desktop defaults used by feature workflows.");
+    await waitForText(container, "Settings");
+    expect(container.textContent).toContain("Settings");
+    expect(container.querySelector("button[aria-current='page']")?.getAttribute("aria-label")).toBe("Settings");
 
     const systemButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "System",
@@ -160,6 +193,8 @@ describe("desktop renderer page composition", () => {
       systemButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("System workspace scaffolding for upcoming desktop surfaces.");
+    await waitForText(container, "Basic diagnostics");
+    expect(container.textContent).toContain("Basic diagnostics");
+    expect(container.querySelector("button[aria-current='page']")?.textContent).toBe("System");
   });
 });

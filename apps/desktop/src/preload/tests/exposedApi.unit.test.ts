@@ -38,11 +38,32 @@ import {
   createDesktopPrepareTrainingDatasetTaskReadSuccessResponse,
   DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_REFRESH_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_LIST_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_LATEST_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_SUMMARIZE_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_CREATE_BINDING_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_CREATE_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_READ_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_SAVE_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_SELECTION_CLEAR_REQUEST_CHANNEL,
+  createDesktopWorkspaceListSuccessResponse,
+  createDesktopWorkspaceCreateSuccessResponse,
+  createDesktopWorkspaceSelectionReadSuccessResponse,
+  createDesktopWorkspaceSelectionSaveSuccessResponse,
+  createDesktopWorkspaceSelectionClearSuccessResponse,
   DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL,
   DESKTOP_ASSET_DEFINITION_VERSION_READ_REQUEST_CHANNEL,
   DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_REQUEST_CHANNEL,
   DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_REQUEST_CHANNEL,
+  DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL,
+  DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL,
+  DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_PYTHON_RUNTIME_CONTROL_REQUEST_CHANNEL,
   createDesktopRuntimeReadinessReadSuccessResponse,
@@ -52,6 +73,11 @@ import {
   createDesktopAssetDefinitionVersionReadSuccessResponse,
   createDesktopAssetResourceBackedViewReadSuccessResponse,
   createDesktopAssetResourceBackedViewsListSuccessResponse,
+  createDesktopAssetMutationSuccessResponse,
+  DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL,
   createDesktopPythonRuntimeStatusReadSuccessResponse,
   createDesktopPythonRuntimeControlSuccessResponse,
   DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
@@ -71,6 +97,27 @@ import {
   createDesktopModelRecordDeleteSuccessResponse,
   createDesktopModelTrainSuccessResponse,
   createDesktopModelTrainStatusSuccessResponse,
+} from "../../../../../modules/contracts/ipc";
+import {
+  DESKTOP_USER_LIBRARY_PROMOTE_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_COPY_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_IMPORT_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_ASSET_LIST_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_ASSET_READ_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_LIST_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_READ_REQUEST_CHANNEL,
+  DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_REQUEST_CHANNEL,
+  DESKTOP_USER_LIBRARY_PROMOTE_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_COPY_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_IMPORT_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_ASSET_LIST_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_ASSET_READ_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_LIST_RESPONSE_CHANNEL,
+  DESKTOP_USER_LIBRARY_LINK_READ_RESPONSE_CHANNEL,
+  DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_RESPONSE_CHANNEL,
+  createDesktopUserLibraryOperationSuccessResponse,
 } from "../../../../../modules/contracts/ipc";
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
@@ -115,6 +162,85 @@ describe("desktop preload exposedApi bridge", () => {
         boundary: { host: "desktop", source: "desktop.renderer.runtime-readiness" },
       },
     });
+  });
+
+
+  it("maps runtime readiness v2 IPC methods to dedicated channels", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue({ ok: true, value: {} });
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    await api.refreshRuntimeReadinessInventory({ targetWorkspaceId: "workspace.a" }, { requestId: "r1" });
+    await api.listRuntimeReadinessInventory({ targetWorkspaceId: "workspace.a" });
+    await api.readRuntimeReadinessInventory({ targetWorkspaceId: "workspace.a", inventorySourceId: "source.a" });
+    await api.readLatestRuntimeReadinessInventory({ targetWorkspaceId: "workspace.a", sourceKind: "desktop-runtime" });
+    await api.summarizeRuntimeReadinessInventory({ targetWorkspaceId: "workspace.a" });
+    await api.createRuntimeReadinessBinding({ targetWorkspaceId: "workspace.a", compositionPlanId: "plan.a" });
+    await api.validateRuntimeReadinessBinding({ targetWorkspaceId: "workspace.a", readinessBindingId: "rrb.a" });
+    expect(invoke.mock.calls.map((call) => call[0])).toEqual([
+      DESKTOP_RUNTIME_READINESS_REFRESH_INVENTORY_REQUEST_CHANNEL.value,
+      DESKTOP_RUNTIME_READINESS_LIST_INVENTORY_REQUEST_CHANNEL.value,
+      DESKTOP_RUNTIME_READINESS_READ_INVENTORY_REQUEST_CHANNEL.value,
+      DESKTOP_RUNTIME_READINESS_READ_LATEST_INVENTORY_REQUEST_CHANNEL.value,
+      DESKTOP_RUNTIME_READINESS_SUMMARIZE_INVENTORY_REQUEST_CHANNEL.value,
+      DESKTOP_RUNTIME_READINESS_CREATE_BINDING_REQUEST_CHANNEL.value,
+      DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL.value,
+    ]);
+  });
+
+  it("maps workspace list/create/selection bridge calls to minimal workspace IPC channels", async () => {
+    const workspace = {
+      workspaceId: "workspace.generated-preload",
+      displayName: "Preload Workspace",
+      status: "active",
+      createdAt: "2026-05-14T00:00:00.000Z",
+      updatedAt: "2026-05-14T00:00:00.000Z",
+    } as const;
+    const responses = [
+      createDesktopWorkspaceListSuccessResponse({ workspaces: [workspace] }),
+      createDesktopWorkspaceCreateSuccessResponse({ workspace, activeSelection: { workspaceId: workspace.workspaceId } as never }),
+      createDesktopWorkspaceSelectionReadSuccessResponse({ workspaceId: workspace.workspaceId } as never),
+      createDesktopWorkspaceSelectionSaveSuccessResponse({ workspaceId: workspace.workspaceId } as never),
+      createDesktopWorkspaceSelectionClearSuccessResponse({}),
+    ];
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => responses.shift());
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+    await api.listWorkspaces({ requestId: "workspace-list" });
+    await api.createWorkspace({ command: { displayName: "Preload Workspace", includeSystemFoundationAssets: true }, selectAfterCreate: true });
+    await api.readActiveWorkspaceSelection();
+    await api.saveActiveWorkspaceSelection({ workspaceId: workspace.workspaceId } as never);
+    await api.clearActiveWorkspaceSelection();
+
+    expect(invoke.mock.calls.map((call) => call[0])).toEqual([
+      DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_CREATE_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_SELECTION_READ_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_SELECTION_SAVE_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_SELECTION_CLEAR_REQUEST_CHANNEL.value,
+    ]);
+    expect(JSON.stringify(invoke.mock.calls)).not.toContain("installer");
+    expect(JSON.stringify(invoke.mock.calls)).not.toContain("import-pack");
+  });
+
+  it("maps effective projection list/read bridge calls to dedicated IPC channels", async () => {
+    const responses = [
+      { ok: true, value: { summaries: [] } },
+      { ok: true, value: { projectionId: "projection.a" } },
+    ];
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => responses.shift());
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    await api.listEffectiveAssetProjections({ workspaceId: "workspace.a", limit: 10, status: "ready" }, { requestId: "req-1" });
+    await api.readEffectiveAssetProjection({ workspaceId: "workspace.a", projectionId: "projection.a" }, { requestId: "req-2" });
+    const listCall = invoke.mock.calls.find((call) => call[0] === "effective-asset-projections:list");
+    const readCall = invoke.mock.calls.find((call) => call[0] === "effective-asset-projections:read");
+    expect(listCall?.[1]).toMatchObject({ payload: { targetWorkspaceId: "workspace.a", limit: 10, status: "ready" } });
+    expect(readCall?.[1]).toMatchObject({ payload: { targetWorkspaceId: "workspace.a", projectionId: "projection.a" } });
+  });
+  it("reports projection refresh as deferred without invoking generic IPC", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>();
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    const response = await api.refreshEffectiveAssetProjection({ workspaceId: "workspace.a", projectionId: "projection.a" });
+    expect(response).toMatchObject({ ok: false, error: { code: "unsupported" } });
+    expect(invoke.mock.calls.length).toBe(0);
   });
 
   it("maps asset definition list reads to the read-only asset registry request channel", async () => {
@@ -249,7 +375,40 @@ describe("desktop preload exposedApi bridge", () => {
     });
   });
 
-  it("does not expose asset mutation or seeding methods", () => {
+  it("maps approved asset mutation methods to dedicated IPC channels", async () => {
+    const responses = [
+      createDesktopAssetMutationSuccessResponse(DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_RESPONSE_CHANNEL, { ok: true, operation: "asset.register-resource-backed-view", status: "created" }),
+      createDesktopAssetMutationSuccessResponse(DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_RESPONSE_CHANNEL, { ok: true, operation: "asset.finalize-generated-output", status: "existing" }),
+      createDesktopAssetMutationSuccessResponse(DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL, { ok: true, operation: "asset.import-external-repository-object", status: "existing" }),
+      createDesktopAssetMutationSuccessResponse(DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_RESPONSE_CHANNEL, { ok: true, operation: "asset.localize-external-repository-object", status: "existing" }),
+    ];
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => responses.shift());
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    const base = {
+      viewId: "asset-view.external.1",
+      approval: { userConfirmed: true, confirmationKind: "register-resource-backed-view" as const },
+      actor: { initiatedBy: "human" as const },
+    };
+
+    await api.registerResourceBackedViewAsAsset({ ...base, operation: "asset.register-resource-backed-view" }, { requestId: "r1", correlationId: "c1", idempotencyKey: "idem-1" });
+    await api.finalizeGeneratedOutputAsAsset({ operation: "asset.finalize-generated-output", generatedOutputId: "out-1", approval: base.approval, actor: base.actor }, { requestId: "r2" });
+    await api.importExternalRepositoryObjectAsAsset({ ...base, operation: "asset.import-external-repository-object" });
+    await api.localizeExternalRepositoryObjectAsAsset({ ...base, operation: "asset.localize-external-repository-object" });
+
+    expect(invoke.mock.calls.map((call) => call[0])).toEqual([
+      DESKTOP_ASSET_REGISTER_RESOURCE_BACKED_VIEW_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_FINALIZE_GENERATED_OUTPUT_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_IMPORT_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
+      DESKTOP_ASSET_LOCALIZE_EXTERNAL_REPOSITORY_OBJECT_REQUEST_CHANNEL.value,
+    ]);
+    expect(invoke.mock.calls[0]?.[1]).toMatchObject({
+      requestId: "r1",
+      correlationId: "c1",
+      payload: { context: { requestId: "r1", correlationId: "c1", idempotencyKey: "idem-1" } },
+    });
+  });
+
+  it("does not expose arbitrary asset mutation or seeding methods", () => {
     const api = createDesktopPreloadApi({ ipcRenderer: { invoke: testDouble.fn() } });
     const methodNames = Object.keys(api);
     const forbiddenAssetMethods = [
@@ -278,6 +437,10 @@ describe("desktop preload exposedApi bridge", () => {
     expect(methodNames).toContain("readAssetDefinitionVersion");
     expect(methodNames).toContain("listAssetResourceBackedViews");
     expect(methodNames).toContain("readAssetResourceBackedView");
+    expect(methodNames).toContain("registerResourceBackedViewAsAsset");
+    expect(methodNames).toContain("finalizeGeneratedOutputAsAsset");
+    expect(methodNames).toContain("importExternalRepositoryObjectAsAsset");
+    expect(methodNames).toContain("localizeExternalRepositoryObjectAsAsset");
     for (const method of forbiddenAssetMethods) {
       expect(methodNames).not.toContain(method);
     }
@@ -318,6 +481,7 @@ describe("desktop preload exposedApi bridge", () => {
         fileName: " kitten.png ",
         mediaType: " image/png ",
         bytes: new Uint8Array([137, 80, 78, 71]),
+        workspaceId: "workspace-a",
       },
       {
         requestId: "req-upload-1",
@@ -350,8 +514,8 @@ describe("desktop preload exposedApi bridge", () => {
     });
     const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
 
-    await api.browseArtifacts();
-    const mediaResponse = await api.readArtifactViewerMedia({ storageKey: "uploads/cat.png" });
+    await api.browseArtifacts({}, { workspaceId: "workspace-a" });
+    const mediaResponse = await api.readArtifactViewerMedia({ storageKey: "uploads/cat.png" }, { workspaceId: "workspace-a" });
 
     expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value);
     expect((invoke.mock.calls[0]?.[1] as { payload?: { artifactFamily?: string } } | undefined)?.payload?.artifactFamily).toBeUndefined();
@@ -365,7 +529,7 @@ describe("desktop preload exposedApi bridge", () => {
     );
     const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
 
-    await api.browseArtifacts({ artifactFamily: "structured-text" });
+    await api.browseArtifacts({ artifactFamily: "structured-text" }, { workspaceId: "workspace-a" });
 
     expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value);
     expect((invoke.mock.calls[0]?.[1] as { payload?: { artifactFamily?: string } } | undefined)?.payload?.artifactFamily).toBe("structured-text");
@@ -420,6 +584,7 @@ describe("desktop preload exposedApi bridge", () => {
         fileName: "cat.png",
         mediaType: "image/png",
         bytes: new Uint8Array([1]),
+        workspaceId: "workspace-a",
       }),
     ).rejects.toThrow("Received invalid desktop artifact upload IPC response envelope.");
   });
@@ -796,4 +961,47 @@ it("maps model management bridge calls to dedicated model channels", async () =>
   expect(invoke.mock.calls[6]?.[0]).toBe(DESKTOP_MODEL_RECORD_DELETE_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[7]?.[0]).toBe("ipc.model.train.request");
   expect(invoke.mock.calls[8]?.[0]).toBe(DESKTOP_MODEL_TRAIN_STATUS_REQUEST_CHANNEL.value);
+});
+
+
+describe("desktop preload user-library bridge", () => {
+  it("exposes narrow Phase 7 user-library methods on dedicated IPC channels", async () => {
+    const responseByRequestChannel = new Map<string, unknown>([
+      [DESKTOP_USER_LIBRARY_PROMOTE_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_PROMOTE_RESPONSE_CHANNEL, { ok: true })],
+      [DESKTOP_USER_LIBRARY_LINK_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_LINK_RESPONSE_CHANNEL, { ok: true })],
+      [DESKTOP_USER_LIBRARY_COPY_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_COPY_RESPONSE_CHANNEL, { ok: true })],
+      [DESKTOP_USER_LIBRARY_IMPORT_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_IMPORT_RESPONSE_CHANNEL, { ok: true })],
+      [DESKTOP_USER_LIBRARY_ASSET_LIST_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_ASSET_LIST_RESPONSE_CHANNEL, { assets: [] })],
+      [DESKTOP_USER_LIBRARY_ASSET_READ_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_ASSET_READ_RESPONSE_CHANNEL, { userLibraryAssetId: "library.asset", version: "1.0.0", displayName: "Asset", status: "active" })],
+      [DESKTOP_USER_LIBRARY_LINK_LIST_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_LINK_LIST_RESPONSE_CHANNEL, { links: [] })],
+      [DESKTOP_USER_LIBRARY_LINK_READ_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_USER_LIBRARY_LINK_READ_RESPONSE_CHANNEL, { linkId: "link.alpha", targetWorkspaceId: "workspace.target", status: "active" })],
+      [DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_REQUEST_CHANNEL.value, createDesktopUserLibraryOperationSuccessResponse(DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_RESPONSE_CHANNEL, { items: [] })],
+    ]);
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async (channel: string) => responseByRequestChannel.get(channel));
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+
+    await api.promoteWorkspaceAssetToUserLibrary({ sourceWorkspaceId: "workspace.source" as never, sourceAssetReference: { kind: "asset-definition", id: "asset.alpha" } as never, originWorkspaceBehavior: "keep-independent-workspace-copy" });
+    await api.linkUserLibraryAssetToWorkspace({ targetWorkspaceId: "workspace.target" as never, userLibraryAssetReference: { assetId: "library.asset" as never, version: "1.0.0" as never }, versionSelection: { kind: "pinned-version", version: "1.0.0" }, propagationPolicy: "pinned-version" });
+    await api.copyUserLibraryAssetToWorkspace({ targetWorkspaceId: "workspace.target" as never, userLibraryAssetReference: { assetId: "library.asset" as never, version: "1.0.0" as never }, selectedVersion: "1.0.0" as never });
+    await api.importWorkspaceAssetToWorkspace({ sourceWorkspaceId: "workspace.source" as never, targetWorkspaceId: "workspace.target" as never, sourceAssetReference: { kind: "asset-definition", id: "asset.alpha" } as never });
+    await api.listUserLibraryAssets();
+    await api.readUserLibraryAsset({ userLibraryAssetId: "library.asset" });
+    await api.listWorkspaceUserLibraryLinks({ workspaceId: "workspace.target" });
+    await api.readWorkspaceUserLibraryLink({ workspaceId: "workspace.target", linkId: "link.alpha" });
+    await api.readWorkspaceEffectiveAssetSources({ workspaceId: "workspace.target" });
+
+    expect(invoke.mock.calls.map((call) => call[0])).toEqual([
+      DESKTOP_USER_LIBRARY_PROMOTE_REQUEST_CHANNEL.value,
+      DESKTOP_USER_LIBRARY_LINK_REQUEST_CHANNEL.value,
+      DESKTOP_USER_LIBRARY_COPY_REQUEST_CHANNEL.value,
+      DESKTOP_USER_LIBRARY_IMPORT_REQUEST_CHANNEL.value,
+      DESKTOP_USER_LIBRARY_ASSET_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_USER_LIBRARY_ASSET_READ_REQUEST_CHANNEL.value,
+      DESKTOP_USER_LIBRARY_LINK_LIST_REQUEST_CHANNEL.value,
+      DESKTOP_USER_LIBRARY_LINK_READ_REQUEST_CHANNEL.value,
+      DESKTOP_WORKSPACE_EFFECTIVE_ASSET_SOURCE_LIST_REQUEST_CHANNEL.value,
+    ]);
+    expect(Object.keys(api)).not.toContain("invoke");
+    expect(Object.keys(api)).not.toContain("userLibraryAssetRepository");
+  });
 });

@@ -3,12 +3,18 @@ import type {
   AssetJsonValue,
   AssetLifecycleStatus,
   AssetMetadata,
+  AssetPackSourceKind,
+  AssetPackTrustStatus,
   AssetReference,
   AssetResourceBackedViewKind,
+  AssetSourceLayer,
   AssetType,
 } from "../../../contracts/asset";
 import {
   ASSET_RESOURCE_BACKED_VIEW_KINDS,
+  isAssetPackSourceKind,
+  isAssetPackTrustStatus,
+  isAssetSourceLayer,
   isAssetFamily,
   isAssetLifecycleStatus,
   isAssetType,
@@ -29,10 +35,21 @@ const LOCAL_PATH_VALUE_PATTERN =
 const SECRET_VALUE_PATTERN =
   /(bearer\s+[a-z0-9._~+/=-]+|\bapi[_-]?key\b|\bapikey\b|\btoken\b|\bpassword\b|\bsecret\b|\bauth\b|authorization\s*:)/i;
 const UNSAFE_DIAGNOSTIC_VALUE_PATTERN =
-  /\b(stack trace|stack|command|base64|bytes?|blobs?|raw provider payloads?|provider payloads?|raw exception|exception message|process\.env)\b/i;
+  /\b(stack trace|stack|command(?: line)?|base64|bytes?|blobs?|raw provider payloads?|provider payloads?|workflowJson|workflow json|prompt|signedUrl|access_token|data:image|data:|raw exception|exception message|process\.env)\b/i;
 const DATA_BASE64_VALUE_PATTERN = /^data:[^,;]+;base64,/i;
 const LONG_BASE64_VALUE_PATTERN = /^[A-Za-z0-9+/]{80,}={0,2}$/;
 const SIGNED_OR_QUERY_URL_VALUE_PATTERN = /^https?:\/\/\S+\?(?:\S*?(?:x-amz-signature|x-goog-signature|signature|sig|token|access_token|auth|expires|X-Amz-Signature)=\S+|\S{24,})/i;
+
+const SYSTEM_FOUNDATION_PACK_ID = "system.foundation";
+const SYSTEM_FOUNDATION_PACK_DISPLAY_NAME = "System Foundation";
+const SYSTEM_FOUNDATION_CATEGORY_LABELS: Readonly<Record<string, string>> = {
+  "ui-structure": "UI Structure",
+  "forms-fields": "Forms and Fields",
+  "data-display": "Data Display",
+  "state-messages": "State Messages",
+  "page-feature-shells": "Page and Feature Shells",
+  "workflow-system-shells": "Workflow and System Shells",
+};
 
 interface EnvelopeLike {
   readonly ok?: boolean;
@@ -65,6 +82,16 @@ function safeString(value: unknown): string | undefined {
     return undefined;
   }
   return trimmed;
+}
+
+export function sanitizeAssetLibraryDisplayText(value: unknown): string | undefined {
+  return safeString(value);
+}
+
+export function sanitizeAssetLibraryDiagnosticMessages(value: readonly string[] | undefined): readonly string[] {
+  return (value ?? [])
+    .map((message) => sanitizeAssetLibraryDisplayText(message))
+    .filter((message): message is string => typeof message === "string");
 }
 
 function safeJsonValue(value: unknown, seen = new WeakSet<object>()): AssetJsonValue | undefined {
@@ -116,6 +143,17 @@ function stringArray(values: readonly unknown[]): readonly string[] {
   return Array.from(new Set(values.map((value) => safeString(value)).filter((value): value is string => Boolean(value))));
 }
 
+function identifier(value: unknown): string | undefined {
+  const candidate = safeString(value);
+  if (!candidate || !/^[a-z0-9][a-z0-9._:-]*$/i.test(candidate)) return undefined;
+  return candidate;
+}
+
+function identifierArray(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value.map(identifier).filter((entry): entry is string => Boolean(entry))));
+}
+
 function countIssues(validationSummary: Record<string, unknown> | undefined) {
   const issues = safeArray(validationSummary?.issues);
   const severity = (issue: unknown) => isRecord(issue) && typeof issue.severity === "string" ? issue.severity : undefined;
@@ -159,6 +197,184 @@ function safeResourceBackedViewKind(value: unknown): AssetResourceBackedViewKind
     : undefined;
 }
 
+function safeAssetPackSourceKind(value: unknown): AssetPackSourceKind | undefined {
+  const candidate = safeString(value);
+  return candidate && isAssetPackSourceKind(candidate) ? candidate : undefined;
+}
+
+function safeAssetSourceLayer(value: unknown): AssetSourceLayer | undefined {
+  const candidate = safeString(value);
+  return candidate && isAssetSourceLayer(candidate) ? candidate : undefined;
+}
+
+function safeAssetPackTrustStatus(value: unknown): AssetPackTrustStatus | undefined {
+  const candidate = safeString(value);
+  return candidate && isAssetPackTrustStatus(candidate) ? candidate : undefined;
+}
+
+function safeAssetDefinitionRef(value: unknown): AssetReference | undefined {
+  if (!isRecord(value)) return undefined;
+  const kind = safeString(value.kind);
+  const id = identifier(value.id);
+  const version = safeString(value.version);
+  if (!kind || !id) return undefined;
+  if (kind !== "asset-definition" && kind !== "asset-definition-version") return undefined;
+  return {
+    kind,
+    id: id as AssetReference["id"],
+    ...(version ? { version } : {}),
+  };
+}
+
+function safeAssetDefinitionRefs(value: unknown): readonly AssetReference[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(safeAssetDefinitionRef).filter((entry): entry is AssetReference => Boolean(entry));
+}
+
+function sourceMetadataFrom(card: Record<string, unknown>) {
+  const metadata = isRecord(card.metadata) ? card.metadata : {};
+  const installMetadata = isRecord(metadata.assetPackInstall) ? metadata.assetPackInstall : {};
+  const sourcePackId = identifier(card.sourcePackId) ?? identifier(metadata.sourcePackId) ?? identifier(installMetadata.packId);
+  const sourcePackVersion =
+    safeString(card.sourcePackVersion) ??
+    safeString(metadata.sourcePackVersion) ??
+    safeString(installMetadata.packVersion);
+  const sourceKind =
+    safeAssetPackSourceKind(card.sourceKind) ??
+    safeAssetPackSourceKind(metadata.sourceKind) ??
+    safeAssetPackSourceKind(installMetadata.sourceKind);
+  const sourceLayer =
+    safeAssetSourceLayer(card.sourceLayer) ??
+    safeAssetSourceLayer(metadata.sourceLayer) ??
+    safeAssetSourceLayer(installMetadata.sourceLayer);
+  const trustStatus =
+    safeAssetPackTrustStatus(card.trustStatus) ??
+    safeAssetPackTrustStatus(metadata.trustStatus) ??
+    safeAssetPackTrustStatus(installMetadata.trustStatus);
+  const packCategoryId =
+    identifier(card.packCategoryId) ??
+    identifier(metadata.packCategoryId) ??
+    identifier(metadata.categoryId) ??
+    identifier(installMetadata.categoryId);
+  const packCategoryDisplayName =
+    safeString(card.packCategoryDisplayName) ??
+    safeString(metadata.packCategoryDisplayName) ??
+    (packCategoryId ? SYSTEM_FOUNDATION_CATEGORY_LABELS[packCategoryId] : undefined);
+  const packTags = identifierArray(card.packTags).length
+    ? identifierArray(card.packTags)
+    : identifierArray(metadata.packTags ?? metadata.tags);
+  const systemDefault =
+    card.systemDefault === true ||
+    hasTrustedSystemFoundationInstallMarker(metadata) ||
+    hasTrustedSystemFoundationSourceMetadata({
+      sourcePackId,
+      sourceKind,
+      sourceLayer,
+      trustStatus,
+    });
+  const sourcePackDisplayName =
+    safeString(card.sourcePackDisplayName) ??
+    safeString(metadata.sourcePackDisplayName) ??
+    (systemDefault ? SYSTEM_FOUNDATION_PACK_DISPLAY_NAME : undefined);
+  const installedPack = card.installedPack === true || sourceLayer === "installed-pack";
+  const importedPack = card.importedPack === true || sourceLayer === "imported-pack";
+  const overridesDefinitionRef = safeAssetDefinitionRef(card.overridesDefinitionRef ?? metadata.overridesDefinitionRef);
+  const workspacePack = card.workspacePack === true || sourceLayer === "workspace-pack";
+  const workspaceOverride = sourceLayer === "workspace-pack" && Boolean(overridesDefinitionRef);
+  const organizationOverride = card.organizationOverride === true || sourceLayer === "organization-override";
+  const userOverride = card.userOverride === true || sourceLayer === "user-override";
+
+  return {
+    ...(sourcePackId ? { sourcePackId } : {}),
+    ...(sourcePackVersion ? { sourcePackVersion } : {}),
+    ...(sourcePackDisplayName ? { sourcePackDisplayName } : {}),
+    ...(sourceKind ? { sourceKind } : {}),
+    ...(sourceLayer ? { sourceLayer } : {}),
+    ...(trustStatus ? { trustStatus } : {}),
+    ...(packCategoryId ? { packCategoryId } : {}),
+    ...(packCategoryDisplayName ? { packCategoryDisplayName } : {}),
+    ...(packTags.length ? { packTags } : {}),
+    ...(systemDefault ? { systemDefault: true } : {}),
+    ...(installedPack ? { installedPack: true } : {}),
+    ...(importedPack ? { importedPack: true } : {}),
+    ...(workspacePack ? { workspacePack: true } : {}),
+    ...(workspaceOverride ? { workspaceOverride: true } : {}),
+    ...(organizationOverride ? { organizationOverride: true } : {}),
+    ...(userOverride ? { userOverride: true } : {}),
+    sourceBadgeLabel: sourceBadgeLabel({
+      systemDefault,
+      installedPack,
+      importedPack,
+      workspacePack,
+      workspaceOverride,
+      organizationOverride,
+      userOverride,
+    }),
+    packLabel: sourcePackDisplayName ?? sourcePackId,
+    categoryLabel: packCategoryDisplayName ?? (packCategoryId ? formatKnownLabel(packCategoryId) : undefined),
+  };
+}
+
+function sourceBadgeLabel(input: {
+  readonly systemDefault: boolean;
+  readonly installedPack: boolean;
+  readonly importedPack: boolean;
+  readonly workspacePack: boolean;
+  readonly workspaceOverride: boolean;
+  readonly organizationOverride: boolean;
+  readonly userOverride: boolean;
+}): string {
+  if (input.systemDefault) return "System default";
+  if (input.installedPack) return "Installed pack";
+  if (input.importedPack) return "Imported pack";
+  if (input.workspaceOverride) return "Workspace override";
+  if (input.workspacePack) return "Workspace pack";
+  if (input.organizationOverride) return "Organization override";
+  if (input.userOverride) return "User override";
+  return "Custom";
+}
+
+function hasTrustedSystemFoundationInstallMarker(metadata: Record<string, unknown>): boolean {
+  const installMetadata = isRecord(metadata.assetPackInstall) ? metadata.assetPackInstall : undefined;
+  return Boolean(
+    installMetadata &&
+      identifier(installMetadata.packId) === SYSTEM_FOUNDATION_PACK_ID &&
+      typeof installMetadata.packVersion === "string" &&
+      typeof installMetadata.entryId === "string" &&
+      typeof installMetadata.fingerprint === "string" &&
+      installMetadata.sourceKind === "system" &&
+      installMetadata.sourceLayer === "system-default" &&
+      installMetadata.trustStatus === "system-trusted" &&
+      installMetadata.managedBy === "asset-kernel" &&
+      typeof installMetadata.installedAt === "string",
+  );
+}
+
+function hasTrustedSystemFoundationSourceMetadata(input: {
+  readonly sourcePackId?: string;
+  readonly sourceKind?: AssetPackSourceKind;
+  readonly sourceLayer?: AssetSourceLayer;
+  readonly trustStatus?: AssetPackTrustStatus;
+}): boolean {
+  return (
+    input.sourcePackId === SYSTEM_FOUNDATION_PACK_ID &&
+    input.sourceKind === "system" &&
+    input.sourceLayer === "system-default" &&
+    input.trustStatus === "system-trusted"
+  );
+}
+
+function cardRecordValue(
+  definition: Record<string, unknown>,
+  detail: Record<string, unknown>,
+  key: string,
+): unknown {
+  if (detail[key] !== undefined) return detail[key];
+  if (definition[key] !== undefined) return definition[key];
+  const metadata = isRecord(definition.metadata) ? definition.metadata : isRecord(detail.metadata) ? detail.metadata : undefined;
+  return metadata?.[key];
+}
+
 export function mapAssetDefinitionCard(payload: unknown): AssetLibraryDefinitionCard {
   const card = isRecord(payload) ? payload : {};
   const definitionId = safeString(card.definitionId) ?? "unknown-definition";
@@ -168,8 +384,10 @@ export function mapAssetDefinitionCard(payload: unknown): AssetLibraryDefinition
   const assetFamily = safeAssetFamily(card.assetFamily);
   const lifecycleStatus = safeAssetLifecycleStatus(card.lifecycleStatus);
   const updatedAt = safeString(card.updatedAt) ?? (isRecord(card.provenance) ? safeString(card.provenance.updatedAt) : undefined);
+  const sourceMetadata = sourceMetadataFrom(card);
   const badges = [
-    card.builtIn === true ? "Built-in" : undefined,
+    sourceMetadata.sourceBadgeLabel,
+    sourceMetadata.packLabel ? `From ${sourceMetadata.packLabel}` : undefined,
     lifecycleStatus ? formatKnownLabel(lifecycleStatus) : undefined,
   ].filter((entry): entry is string => Boolean(entry));
 
@@ -186,6 +404,7 @@ export function mapAssetDefinitionCard(payload: unknown): AssetLibraryDefinition
       ? { lifecycleStatus, lifecycleStatusLabel: formatKnownLabel(lifecycleStatus) }
       : { lifecycleStatusLabel: "Unknown status" }),
     builtIn: card.builtIn === true,
+    ...sourceMetadata,
     updatedAt,
     ...(badges.length > 0 ? { badges } : {}),
   };
@@ -214,6 +433,7 @@ export function mapAssetDefinitionDetail(payload: unknown): AssetLibraryDefiniti
   const detail = isRecord(payload) ? payload : {};
   const definition = isRecord(detail.definition) ? detail.definition : detail;
   const card = mapAssetDefinitionCard({
+    ...detail,
     definitionRef: detail.definitionRef ?? { kind: "asset-definition", id: definition.definitionId, version: definition.version },
     definitionId: definition.definitionId,
     version: definition.version,
@@ -223,6 +443,7 @@ export function mapAssetDefinitionDetail(payload: unknown): AssetLibraryDefiniti
     assetFamily: definition.assetFamily,
     lifecycleStatus: definition.lifecycleStatus,
     builtIn: detail.builtIn,
+    metadata: definition.metadata ?? detail.metadata,
     provenance: definition.provenance,
   });
   const aiContext = isRecord(definition.aiContext) ? definition.aiContext : undefined;
@@ -293,6 +514,18 @@ export function mapAssetDefinitionDetail(payload: unknown): AssetLibraryDefiniti
         ...issueCounts,
         validatedAt: safeString(validationSummary.validatedAt),
       },
+    } : {}),
+    ...(safeAssetDefinitionRef(cardRecordValue(definition, detail, "overridesDefinitionRef")) ? {
+      overridesDefinitionRef: safeAssetDefinitionRef(cardRecordValue(definition, detail, "overridesDefinitionRef")),
+    } : {}),
+    ...(safeAssetDefinitionRefs(cardRecordValue(definition, detail, "overriddenByDefinitionRefs")).length ? {
+      overriddenByDefinitionRefs: safeAssetDefinitionRefs(cardRecordValue(definition, detail, "overriddenByDefinitionRefs")),
+    } : {}),
+    ...(safeString(cardRecordValue(definition, detail, "effectiveResolutionStatus")) ? {
+      effectiveResolutionStatus: safeString(cardRecordValue(definition, detail, "effectiveResolutionStatus")),
+    } : {}),
+    ...(safeString(cardRecordValue(definition, detail, "resolutionSummary")) ? {
+      resolutionSummary: safeString(cardRecordValue(definition, detail, "resolutionSummary")),
     } : {}),
     ...(metadata ? { metadata } : {}),
   };

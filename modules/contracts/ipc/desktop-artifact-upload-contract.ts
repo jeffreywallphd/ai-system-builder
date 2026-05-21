@@ -1,3 +1,4 @@
+import { createWorkspaceId } from "../workspace";
 import {
   ARTIFACT_UPLOAD_OPERATION,
   ARTIFACT_UPLOAD_POLICY_READ_OPERATION,
@@ -54,6 +55,7 @@ export interface DesktopArtifactUploadRequestPayload {
   fileName: string;
   mediaType: string;
   bytes: Uint8Array;
+  workspaceId: string;
   boundary: DesktopArtifactUploadBoundaryContext;
 }
 
@@ -123,6 +125,7 @@ function normalizeDesktopArtifactUploadPayload(
     fileName: normalizeRequiredTextField(payload.fileName, "fileName"),
     mediaType: normalizeRequiredTextField(payload.mediaType, "mediaType"),
     bytes: payload.bytes,
+    workspaceId: createWorkspaceId(payload.workspaceId),
     boundary: {
       host: "desktop",
       source: normalizeRequiredTextField(payload.boundary.source, "boundary.source"),

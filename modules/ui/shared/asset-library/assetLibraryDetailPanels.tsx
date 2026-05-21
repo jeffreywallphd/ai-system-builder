@@ -14,6 +14,11 @@ import {
   getAssetLibraryLifecycleStatusLabel,
   getAssetLibraryTypeLabel,
 } from "./assetLibraryPresentation";
+import {
+  getAssetCategoryLabel,
+  getAssetPackLabel,
+  getAssetSourceBadge,
+} from "./assetLibraryPackDiscovery";
 
 export interface AssetLibraryDefinitionDetailViewProps {
   readonly detail?: AssetLibraryDefinitionDetail;
@@ -29,6 +34,8 @@ const COLLAPSED_SECTIONS: Readonly<Record<AssetLibraryAdvancedSectionKey, boolea
   configuration: false,
   ports: false,
   requirements: false,
+  packSource: false,
+  overrideResolution: false,
   provenance: false,
   validation: false,
   metadata: false,
@@ -168,8 +175,8 @@ export function AssetLibraryDefinitionDetailView({
           <h2>{detail.displayName}</h2>
           <p>{detail.summary ?? detail.overview?.description ?? "Reusable building block."}</p>
         </div>
-        <AssetLibraryBadge tone={detail.builtIn ? "system" : "custom"}>
-          {detail.builtIn ? "Built-in" : "Custom"}
+        <AssetLibraryBadge tone={detail.systemDefault || detail.builtIn ? "system" : "custom"}>
+          {getAssetSourceBadge(detail)}
         </AssetLibraryBadge>
       </div>
 
@@ -180,7 +187,10 @@ export function AssetLibraryDefinitionDetailView({
           <AssetLibraryDetailRow label="Family" value={getAssetLibraryFamilyLabel(detail)} />
           <AssetLibraryDetailRow label="Status" value={getAssetLibraryLifecycleStatusLabel(detail)} />
           <AssetLibraryDetailRow label="Version" value={`v${detail.version}`} />
-          <AssetLibraryDetailRow label="Source" value={detail.builtIn ? "Built-in" : "Custom"} />
+          <AssetLibraryDetailRow label="Source" value={getAssetSourceBadge(detail)} />
+          <AssetLibraryDetailRow label="Pack" value={getAssetPackLabel(detail)} />
+          <AssetLibraryDetailRow label="Category" value={getAssetCategoryLabel(detail)} />
+          {detail.sourcePackDisplayName ? <AssetLibraryDetailRow label="From" value={`From ${detail.sourcePackDisplayName}`} /> : null}
         </dl>
       </AssetLibraryDetailSection>
 

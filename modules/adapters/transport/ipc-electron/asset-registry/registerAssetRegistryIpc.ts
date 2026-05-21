@@ -72,8 +72,8 @@ export function createDesktopAssetResourceBackedViewsListIpcHandler(
     try {
       const result = await dependencies.assetRegistryRead.listResourceBackedViewCards(query);
       return createDesktopAssetResourceBackedViewsListSuccessResponse(sanitizeAssetViewValue(result), context);
-    } catch {
-      return failure(DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_RESPONSE_CHANNEL, "internal", "Unable to read asset resource-backed views.", context);
+    } catch (error) {
+      return workspaceReadFailure(DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_RESPONSE_CHANNEL, error, context, "Unable to read asset resource-backed views.");
     }
   };
 }
@@ -105,8 +105,8 @@ export function createDesktopAssetResourceBackedViewReadIpcHandler(
         return failure(DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL, "not-found", "Asset resource-backed view was not found.", context);
       }
       return createDesktopAssetResourceBackedViewReadSuccessResponse(sanitizeAssetViewValue(detail), context);
-    } catch {
-      return failure(DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL, "internal", "Unable to read asset resource-backed view.", context);
+    } catch (error) {
+      return workspaceReadFailure(DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL, error, context, "Unable to read asset resource-backed view.");
     }
   };
 }
@@ -129,8 +129,8 @@ export function createDesktopAssetDefinitionsListIpcHandler(
     try {
       const result = await dependencies.assetRegistryRead.listDefinitionCards(query);
       return createDesktopAssetDefinitionsListSuccessResponse(sanitizeAssetViewValue(result), context);
-    } catch {
-      return failure(DESKTOP_ASSET_DEFINITIONS_LIST_RESPONSE_CHANNEL, "internal", "Unable to read asset definitions.", context);
+    } catch (error) {
+      return workspaceReadFailure(DESKTOP_ASSET_DEFINITIONS_LIST_RESPONSE_CHANNEL, error, context, "Unable to read asset definitions.");
     }
   };
 }
@@ -159,8 +159,8 @@ export function createDesktopAssetDefinitionReadIpcHandler(
         return failure(DESKTOP_ASSET_DEFINITION_READ_RESPONSE_CHANNEL, "not-found", "Asset definition was not found.", context);
       }
       return createDesktopAssetDefinitionReadSuccessResponse(sanitizeAssetViewValue(detail), context);
-    } catch {
-      return failure(DESKTOP_ASSET_DEFINITION_READ_RESPONSE_CHANNEL, "internal", "Unable to read asset definition.", context);
+    } catch (error) {
+      return workspaceReadFailure(DESKTOP_ASSET_DEFINITION_READ_RESPONSE_CHANNEL, error, context, "Unable to read asset definition.");
     }
   };
 }
@@ -189,8 +189,8 @@ export function createDesktopAssetDefinitionVersionReadIpcHandler(
         return failure(DESKTOP_ASSET_DEFINITION_VERSION_READ_RESPONSE_CHANNEL, "not-found", "Asset definition version was not found.", context);
       }
       return createDesktopAssetDefinitionVersionReadSuccessResponse(sanitizeAssetViewValue(detail), context);
-    } catch {
-      return failure(DESKTOP_ASSET_DEFINITION_VERSION_READ_RESPONSE_CHANNEL, "internal", "Unable to read asset definition version.", context);
+    } catch (error) {
+      return workspaceReadFailure(DESKTOP_ASSET_DEFINITION_VERSION_READ_RESPONSE_CHANNEL, error, context, "Unable to read asset definition version.");
     }
   };
 }
@@ -237,6 +237,28 @@ function failure<TResponseChannel extends typeof DESKTOP_ASSET_DEFINITIONS_LIST_
     requestId: context.requestId,
     correlationId: context.correlationId,
   }));
+}
+
+function workspaceReadFailure<TResponseChannel extends typeof DESKTOP_ASSET_DEFINITIONS_LIST_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_DEFINITION_READ_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_DEFINITION_VERSION_READ_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_RESOURCE_BACKED_VIEWS_LIST_RESPONSE_CHANNEL | typeof DESKTOP_ASSET_RESOURCE_BACKED_VIEW_READ_RESPONSE_CHANNEL>(
+  channel: TResponseChannel,
+  error: unknown,
+  context: { requestId?: string; correlationId?: string },
+  fallback: string,
+): any {
+  return failure(channel, workspaceReadErrorCode(error), workspaceReadErrorMessage(error, fallback), context);
+}
+
+function workspaceReadErrorCode(error: unknown): "validation" | "internal" | "not-found" | "unavailable" {
+  const code = typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code) : "";
+  if (code === "workspace-required" || code === "workspace-invalid") return "validation";
+  if (code === "workspace-not-found" || code === "workspace-asset-not-in-effective-view") return "not-found";
+  if (code === "workspace-unavailable" || code === "workspace-resource-backed-view-deferred" || code === "workspace-system-pack-activation-unavailable") return "unavailable";
+  return "internal";
+}
+
+function workspaceReadErrorMessage(error: unknown, fallback: string): string {
+  const code = typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code) : "";
+  return code.startsWith("workspace-") && error instanceof Error && error.message ? error.message : fallback;
 }
 
 function parseListPayload(payload: unknown): DesktopAssetDefinitionsListRequestPayload {

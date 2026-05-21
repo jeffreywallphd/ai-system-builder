@@ -28,9 +28,10 @@ export interface StoreArtifactUploadUseCasePort {
     context?: {
       requestId?: string;
       correlationId?: string;
+      workspaceId?: string;
     },
   ) => Promise<StoreArtifactUploadUseCaseResult>;
-  getAcceptedUploadPolicy: () => ArtifactUploadAcceptedTypePolicy;
+  getAcceptedUploadPolicy: () => ArtifactUploadAcceptedTypePolicy | Promise<ArtifactUploadAcceptedTypePolicy>;
 }
 
 export interface RegisterArtifactUploadIpcDependencies {
@@ -52,6 +53,7 @@ export function mapIpcRequestPayload(
     },
     commandContext: {
       source: payload.boundary.source,
+      workspaceId: payload.workspaceId,
     },
   };
 }
@@ -95,6 +97,7 @@ export function createDesktopArtifactUploadIpcHandler(
       {
         requestId: request.requestId,
         correlationId: request.correlationId,
+        workspaceId: request.payload.workspaceId,
       },
     );
 
@@ -114,7 +117,7 @@ export function registerArtifactUploadIpc(
     DESKTOP_ARTIFACT_UPLOAD_POLICY_READ_REQUEST_CHANNEL.value,
     async (_event, request: { requestId?: string; correlationId?: string }) =>
       createDesktopArtifactUploadPolicyReadSuccessResponse(
-        dependencies.storeArtifactUploadUseCase.getAcceptedUploadPolicy(),
+        await dependencies.storeArtifactUploadUseCase.getAcceptedUploadPolicy(),
         {
           requestId: request.requestId,
           correlationId: request.correlationId,

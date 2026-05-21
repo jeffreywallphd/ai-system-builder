@@ -1,4 +1,7 @@
 import type {
+  WorkspaceId,
+} from "../../../contracts/workspace";
+import type {
   AssetInstance,
   AssetLifecycleStatus,
   AssetReference,
@@ -10,6 +13,7 @@ export interface AssetInstanceListQuery {
   readonly lifecycleStatus?: AssetLifecycleStatus;
   readonly reviewStatus?: AssetReviewStatus;
   readonly parentCompositionRef?: AssetReference;
+  readonly workspaceId?: WorkspaceId | string;
   readonly text?: string;
   readonly limit?: number;
   readonly cursor?: string;

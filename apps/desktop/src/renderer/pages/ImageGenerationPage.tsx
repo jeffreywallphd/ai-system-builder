@@ -1,5 +1,17 @@
 import { ImageGenerationFeature } from "../features/image-generation";
 
-export function ImageGenerationPage() {
-  return <section className="ui-stack ui-stack--sm"><h1>Image Generation</h1><p>Run runtime-backed image generation tasks and track progress to finalized assets.</p><ImageGenerationFeature /></section>;
+export interface WorkspaceScopedPageProps {
+  workspaceId: string;
+  workspaceName: string;
+}
+
+export function ImageGenerationPage({ workspaceId, workspaceName }: WorkspaceScopedPageProps) {
+  return (
+    <section className="ui-stack ui-stack--sm" data-workspace-name={workspaceName}>
+      <h1>Image Generation</h1>
+      <p>Showing records for: {workspaceName}</p>
+      <p>Run runtime-backed image generation tasks and track progress to finalized assets.</p>
+      <ImageGenerationFeature key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} />
+    </section>
+  );
 }

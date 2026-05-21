@@ -11,12 +11,14 @@ import {
 import { type ModelInferenceMode, normalizeModelInferenceMode } from "./model-inference-mode";
 import { type ModelBrowseProvider, normalizeModelBrowseProvider } from "./model-browse-provider";
 import { normalizeModelInventoryRecord, type ModelInventoryRecord } from "./model-inventory";
+import { createWorkspaceId, type WorkspaceId } from "../workspace";
 import { type ModelValidationStatus, normalizeModelValidationStatus } from "./model-validation";
 
 export const DEFAULT_LIST_MODELS_LIMIT = 50;
 export const MAX_LIST_MODELS_LIMIT = 500;
 
 export interface ListModelsRequest {
+  workspaceId?: WorkspaceId;
   source?: ModelSource;
   lifecycleStatus?: ModelLifecycleStatus;
   artifactForm?: ModelArtifactForm;
@@ -34,6 +36,7 @@ export interface ListModelsResult {
 }
 
 export interface SaveModelReferenceRequest {
+  workspaceId?: WorkspaceId;
   modelRecordId?: string;
   provider: ModelBrowseProvider;
   modelId: string;
@@ -49,6 +52,7 @@ export interface SaveModelReferenceResult {
 }
 
 export interface DownloadModelRequest {
+  workspaceId?: WorkspaceId;
   modelRecordId?: string;
   provider: ModelBrowseProvider;
   modelId: string;
@@ -71,6 +75,7 @@ export interface DownloadModelResult {
 }
 
 export interface RegisterDownloadedModelRequest {
+  workspaceId?: WorkspaceId;
   modelRecordId?: string;
   displayName: string;
   source: Extract<ModelSource, "local" | "huggingface">;
@@ -96,6 +101,7 @@ export interface RegisterDownloadedModelResult {
 }
 
 export interface RegisterGeneratedModelRequest {
+  workspaceId?: WorkspaceId;
   modelRecordId?: string;
   displayName: string;
   provider?: ModelBrowseProvider;
@@ -121,6 +127,7 @@ export interface RegisterGeneratedModelResult {
 }
 
 export interface UpdateModelRecordRequest {
+  workspaceId?: WorkspaceId;
   modelRecordId: string;
   patch: Partial<Omit<ModelInventoryRecord, "modelRecordId" | "createdAt">>;
 }
@@ -130,6 +137,7 @@ export interface UpdateModelRecordResult {
 }
 
 export interface DeleteModelRecordRequest {
+  workspaceId?: WorkspaceId;
   modelRecordId: string;
   deleteLocalFiles?: boolean;
   deleteBackingArtifacts?: boolean;
@@ -140,6 +148,13 @@ export interface DeleteModelRecordResult {
   deletedRegistryRecord: boolean;
   deletedLocalFiles: boolean;
   deletedBackingArtifactIds: string[];
+}
+
+function normalizeWorkspaceId(value: WorkspaceId | string | undefined): WorkspaceId {
+  if (typeof value !== "string") {
+    throw new Error("workspaceId must be provided for workspace-scoped model operations.");
+  }
+  return createWorkspaceId(value);
 }
 
 function normalizeOptionalText(value: string | undefined): string | undefined {
@@ -179,6 +194,7 @@ function normalizeListLimit(limit: number | undefined): number {
 
 export function normalizeListModelsRequest(request: ListModelsRequest): ListModelsRequest {
   return {
+    workspaceId: normalizeWorkspaceId(request.workspaceId),
     source: typeof request.source === "string" ? normalizeModelSource(request.source) : undefined,
     lifecycleStatus:
       typeof request.lifecycleStatus === "string"
@@ -204,6 +220,7 @@ export function normalizeListModelsResult(result: ListModelsResult): ListModelsR
 
 export function normalizeSaveModelReferenceRequest(request: SaveModelReferenceRequest): SaveModelReferenceRequest {
   return {
+    workspaceId: normalizeWorkspaceId(request.workspaceId),
     modelRecordId: normalizeOptionalText(request.modelRecordId),
     provider: normalizeModelBrowseProvider(request.provider),
     modelId: normalizeRequiredText(request.modelId, "modelId"),
@@ -217,6 +234,7 @@ export function normalizeSaveModelReferenceRequest(request: SaveModelReferenceRe
 
 export function normalizeDownloadModelRequest(request: DownloadModelRequest): DownloadModelRequest {
   return {
+    workspaceId: normalizeWorkspaceId(request.workspaceId),
     modelRecordId: normalizeOptionalText(request.modelRecordId),
     provider: normalizeModelBrowseProvider(request.provider),
     modelId: normalizeRequiredText(request.modelId, "modelId"),
@@ -233,6 +251,7 @@ export function normalizeRegisterDownloadedModelRequest(
 ): RegisterDownloadedModelRequest {
   return {
     ...request,
+    workspaceId: normalizeWorkspaceId(request.workspaceId),
     modelRecordId: normalizeOptionalText(request.modelRecordId),
     displayName: normalizeRequiredText(request.displayName, "displayName"),
     source: normalizeModelSource(request.source) as RegisterDownloadedModelRequest["source"],
@@ -262,6 +281,7 @@ export function normalizeRegisterGeneratedModelRequest(
 ): RegisterGeneratedModelRequest {
   return {
     ...request,
+    workspaceId: normalizeWorkspaceId(request.workspaceId),
     modelRecordId: normalizeOptionalText(request.modelRecordId),
     displayName: normalizeRequiredText(request.displayName, "displayName"),
     provider: typeof request.provider === "string" ? normalizeModelBrowseProvider(request.provider) : "unknown",
@@ -288,6 +308,7 @@ export function normalizeRegisterGeneratedModelRequest(
 
 export function normalizeUpdateModelRecordRequest(request: UpdateModelRecordRequest): UpdateModelRecordRequest {
   return {
+    workspaceId: normalizeWorkspaceId(request.workspaceId),
     modelRecordId: normalizeRequiredText(request.modelRecordId, "modelRecordId"),
     patch: request.patch,
   };
@@ -295,6 +316,7 @@ export function normalizeUpdateModelRecordRequest(request: UpdateModelRecordRequ
 
 export function normalizeDeleteModelRecordRequest(request: DeleteModelRecordRequest): DeleteModelRecordRequest {
   return {
+    workspaceId: normalizeWorkspaceId(request.workspaceId),
     modelRecordId: normalizeRequiredText(request.modelRecordId, "modelRecordId"),
     deleteLocalFiles: request.deleteLocalFiles === true,
     deleteBackingArtifacts: request.deleteBackingArtifacts === true,

@@ -1,6 +1,8 @@
 import type { ImageAsset } from "../../../contracts/image";
+import type { WorkspaceId } from "../../../contracts/workspace";
 
 export interface RegisterImageAssetInput {
+  workspaceId: WorkspaceId;
   assetId?: string;
   artifactId: string;
   source: "generated" | "uploaded";
@@ -21,5 +23,5 @@ export interface RegisterImageAssetInput {
 
 export interface ImageAssetRegistryPort {
   registerImageAsset(input: RegisterImageAssetInput): Promise<{ assetId: string }>;
-  getImageAsset(assetId: string): Promise<ImageAsset | null>;
+  getImageAsset(workspaceId: WorkspaceId, assetId: string): Promise<ImageAsset | null>;
 }

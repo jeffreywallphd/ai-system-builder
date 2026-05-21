@@ -21,7 +21,26 @@ describe("registerModelManagementApiRoutes",()=>{
     registerModelManagementApiRoutes({app,...deps});
     const a=response(); await handlers.get('/api/model/list')({body:null,headers:{}},a.res); expect(a.status).toHaveBeenCalledWith(400);
     const b=response(); await handlers.get('/api/model/browse')({body:{provider:'huggingface'},headers:{}},b.res); expect(b.status).toHaveBeenCalledWith(503);
-    const c=response(); await handlers.get('/api/model/download')({body:{provider:'huggingface',modelId:'x'},headers:{}},c.res); expect(c.status).toHaveBeenCalledWith(404);
+    const c=response(); await handlers.get('/api/model/download')({body:{workspaceId:'workspace-a',provider:'huggingface',modelId:'x'},headers:{}},c.res); expect(c.status).toHaveBeenCalledWith(404);
+  });
+
+
+  it("registers optional validation/publish routes and requires workspace ids", async()=>{
+    const handlers=new Map<string,any>(); const app:ModelManagementExpressRoutePort={post:testDouble.fn((p,h)=>handlers.set(p,h))};
+    const deps:any={browseModelsUseCase:{execute:testDouble.fn(async(x)=>x)},getModelDetailsUseCase:{execute:testDouble.fn(async(x)=>x)},listModelsUseCase:{execute:testDouble.fn(async(x)=>x)},saveModelReferenceUseCase:{execute:testDouble.fn(async(x)=>x)},downloadModelUseCase:{execute:testDouble.fn(async(x)=>x)},updateModelRecordUseCase:{execute:testDouble.fn(async(x)=>x)},deleteModelRecordUseCase:{execute:testDouble.fn(async(x)=>x)},validateModelUseCase:{execute:testDouble.fn(async(x)=>x)},publishModelUseCase:{execute:testDouble.fn(async(x)=>x)}};
+    registerModelManagementApiRoutes({app,...deps});
+    expect([...handlers.keys()]).toContain("/api/model/validate");
+    expect([...handlers.keys()]).toContain("/api/model/publish");
+
+    const validateMissing=response(); await handlers.get('/api/model/validate')({body:{modelRecordId:'m1'},headers:{}},validateMissing.res);
+    const publishMissing=response(); await handlers.get('/api/model/publish')({body:{modelRecordId:'m1',repository:'owner/repo'},headers:{}},publishMissing.res);
+    expect(validateMissing.status).toHaveBeenCalledWith(400);
+    expect(publishMissing.status).toHaveBeenCalledWith(400);
+
+    const validateOk=response(); await handlers.get('/api/model/validate')({body:{workspaceId:'workspace-a',modelRecordId:'m1'},headers:{}},validateOk.res);
+    const publishOk=response(); await handlers.get('/api/model/publish')({body:{workspaceId:'workspace-a',modelRecordId:'m1',repository:'owner/repo'},headers:{}},publishOk.res);
+    expect(deps.validateModelUseCase.execute).toHaveBeenCalledWith({workspaceId:'workspace-a',modelRecordId:'m1',modelPath:undefined,reportOutputDirectory:undefined,expectedLoRA:undefined,expectedRecurrentAdditions:undefined,allowWarnings:undefined,validationStrictness:undefined});
+    expect(deps.publishModelUseCase.execute).toHaveBeenCalledWith({workspaceId:'workspace-a',modelRecordId:'m1',repository:'owner/repo',owner:undefined,revision:undefined,private:undefined,pathPrefix:undefined,token:undefined,allowWarningValidation:undefined,allowInvalidValidation:undefined,allowInvalid:undefined,forceRevalidate:undefined});
   });
 
   it("logs browse request lifecycle", async()=>{
@@ -51,7 +70,7 @@ describe("registerModelManagementApiRoutes",()=>{
       updateModelRecordUseCase:{execute:testDouble.fn(async()=>({}))},
       deleteModelRecordUseCase:{execute:testDouble.fn(async()=>({}))},
     });
-    await handlers.get('/api/model/download')({body:{provider:'huggingface',modelId:'stabilityai/stable-diffusion-xl-base-1.0'},headers:{}},response().res);
+    await handlers.get('/api/model/download')({body:{workspaceId:'workspace-a',provider:'huggingface',modelId:'stabilityai/stable-diffusion-xl-base-1.0'},headers:{}},response().res);
     const infoCalls = logger.info.mock.calls;
     expect(infoCalls.some((call:any[]) => call[0]==='api.model.request.succeeded' && call[1]?.operation==='model.download' && call[1]?.modelId==='stabilityai/stable-diffusion-xl-base-1.0' && call[1]?.modelRecordId==='downloaded-stable-diffusion' && call[1]?.downloaded===true && call[1]?.fromCache===false && typeof call[1]?.elapsedMs==="number")).toBe(true);
   });

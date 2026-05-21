@@ -7,16 +7,19 @@ import { PythonRuntimeFooter } from "../features/python-runtime/components/Pytho
 import { TabbedPanel } from "../components/ui/TabbedPanel";
 
 export interface ArtifactsPageProps {
+  workspaceId: string;
+  workspaceName: string;
   refreshToken: number;
   onUploaded: () => void;
 }
 
-export function ArtifactsPage({ refreshToken, onUploaded }: ArtifactsPageProps) {
+export function ArtifactsPage({ workspaceId, workspaceName, refreshToken, onUploaded }: ArtifactsPageProps) {
   const [activeTabId, setActiveTabId] = useState("ingestion");
 
   return (
-    <section className="ui-stack ui-stack--sm" data-refresh-token={refreshToken}>
+    <section className="ui-stack ui-stack--sm" data-workspace-name={workspaceName} data-refresh-token={refreshToken}>
       <h1>Data Management</h1>
+      <p>Showing records for: {workspaceName}</p>
       <p>Use the Artifact Ingestion tool to add data artifacts into the system and view/manage data artifacts with the Artifact Browser</p>
       <TabbedPanel
         tabListAriaLabel="Artifact workspace panels"
@@ -26,17 +29,17 @@ export function ArtifactsPage({ refreshToken, onUploaded }: ArtifactsPageProps) 
           {
             id: "ingestion",
             label: "Artifact Ingestion",
-            content: <ArtifactIngestionFeature onUploadComplete={onUploaded} />,
+            content: <ArtifactIngestionFeature key={`ingest-${workspaceId}`} workspaceId={workspaceId} workspaceName={workspaceName} onUploadComplete={onUploaded} />,
           },
           {
             id: "browser",
             label: "Artifact Browser",
-            content: <ArtifactBrowserFeature key={refreshToken} />,
+            content: <ArtifactBrowserFeature key={`${workspaceId}-${refreshToken}`} workspaceId={workspaceId} workspaceName={workspaceName} />,
           },
           {
             id: "dataset-preparation",
             label: "Dataset Preparation",
-            content: <DatasetPreparationFeature onPrepared={onUploaded} />,
+            content: <DatasetPreparationFeature key={`dataset-${workspaceId}`} workspaceId={workspaceId} workspaceName={workspaceName} onPrepared={onUploaded} />,
           },
         ]}
       />

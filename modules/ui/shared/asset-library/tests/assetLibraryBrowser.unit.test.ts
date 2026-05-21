@@ -23,6 +23,9 @@ describe("asset library browser helpers", () => {
       assetFamily: "resource-backed",
       lifecycleStatus: "published",
       builtIn: "built-in",
+      packId: "all",
+      sourceLayer: "all",
+      categoryId: "all",
     })).toEqual({
       limit: 50,
       searchText: "document",
@@ -37,6 +40,9 @@ describe("asset library browser helpers", () => {
       assetFamily: "not-a-real-family",
       lifecycleStatus: "not-a-real-status",
       builtIn: "all",
+      packId: "all",
+      sourceLayer: "all",
+      categoryId: "all",
     })).toEqual({ limit: 50 });
   });
 
@@ -47,6 +53,9 @@ describe("asset library browser helpers", () => {
       assetFamily: "behavioral",
       lifecycleStatus: "draft",
       builtIn: "custom",
+      packId: "all",
+      sourceLayer: "all",
+      categoryId: "all",
     }) as Record<string, unknown>;
     const serialized = JSON.stringify(query);
 
@@ -64,6 +73,7 @@ describe("asset library browser helpers", () => {
     expect(assetLibraryFiltersAreActive(ASSET_LIBRARY_DEFAULT_FILTERS)).toBe(false);
     expect(assetLibraryFiltersAreActive({ ...ASSET_LIBRARY_DEFAULT_FILTERS, searchText: "asset" })).toBe(true);
     expect(assetLibraryFiltersAreActive({ ...ASSET_LIBRARY_DEFAULT_FILTERS, builtIn: "custom" })).toBe(true);
+    expect(assetLibraryFiltersAreActive({ ...ASSET_LIBRARY_DEFAULT_FILTERS, categoryId: "ui-structure" })).toBe(true);
   });
 
   it("reports advanced section availability without expanding validation by default", () => {

@@ -3,8 +3,10 @@ import {
   mapAssetDefinitionListResult,
   mapAssetResourceBackedViewDetail,
   mapAssetResourceBackedViewListResult,
+  mapAssetMutationTransportFailure,
   mapTransportEnvelopeError,
   mapTransportEnvelopeSuccess,
+  sanitizeAssetMutationResult,
   type AssetLibraryClient,
   type AssetLibraryClientResult,
   type AssetLibraryDefinitionCard,
@@ -17,22 +19,33 @@ import {
   type AssetLibraryResourceBackedViewDetailOptions,
   type AssetLibraryResourceBackedViewQuery,
 } from "../../../../../../../modules/ui/shared/asset-library";
+import type {
+  AssetMutationResult,
+  FinalizeGeneratedOutputCommand,
+  ImportExternalRepositoryObjectCommand,
+  LocalizeExternalRepositoryObjectCommand,
+  RegisterResourceBackedViewCommand,
+} from "../../../../../../../modules/contracts/asset";
 
 interface DesktopAssetLibraryApiBridge {
   listAssetDefinitions?: (input?: AssetLibraryQuery, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
   readAssetDefinition?: (
-    input: { definitionId: string; version?: string; expand?: AssetLibraryDetailOptions["expand"]; includeValidation?: boolean },
+    input: { definitionId: string; version?: string; expand?: AssetLibraryDetailOptions["expand"]; includeValidation?: boolean; workspaceId?: string },
     context?: { requestId?: string; correlationId?: string },
   ) => Promise<unknown>;
   readAssetDefinitionVersion?: (
-    input: { definitionId: string; version: string; expand?: AssetLibraryDetailOptions["expand"]; includeValidation?: boolean },
+    input: { definitionId: string; version: string; expand?: AssetLibraryDetailOptions["expand"]; includeValidation?: boolean; workspaceId?: string },
     context?: { requestId?: string; correlationId?: string },
   ) => Promise<unknown>;
   listAssetResourceBackedViews?: (input?: AssetLibraryResourceBackedViewQuery, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
   readAssetResourceBackedView?: (
-    input: { viewId: string; expand?: AssetLibraryResourceBackedViewDetailOptions["expand"]; includeValidation?: boolean },
+    input: { viewId: string; expand?: AssetLibraryResourceBackedViewDetailOptions["expand"]; includeValidation?: boolean; workspaceId?: string },
     context?: { requestId?: string; correlationId?: string },
   ) => Promise<unknown>;
+  registerResourceBackedViewAsAsset?: (command: RegisterResourceBackedViewCommand, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
+  finalizeGeneratedOutputAsAsset?: (command: FinalizeGeneratedOutputCommand, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
+  importExternalRepositoryObjectAsAsset?: (command: ImportExternalRepositoryObjectCommand, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
+  localizeExternalRepositoryObjectAsAsset?: (command: LocalizeExternalRepositoryObjectCommand, context?: { requestId?: string; correlationId?: string }) => Promise<unknown>;
 }
 
 function getDesktopAssetLibraryApi(): Required<DesktopAssetLibraryApiBridge> {
@@ -43,7 +56,11 @@ function getDesktopAssetLibraryApi(): Required<DesktopAssetLibraryApiBridge> {
     typeof desktopApi.readAssetDefinition !== "function" ||
     typeof desktopApi.readAssetDefinitionVersion !== "function" ||
     typeof desktopApi.listAssetResourceBackedViews !== "function" ||
-    typeof desktopApi.readAssetResourceBackedView !== "function"
+    typeof desktopApi.readAssetResourceBackedView !== "function" ||
+    typeof desktopApi.registerResourceBackedViewAsAsset !== "function" ||
+    typeof desktopApi.finalizeGeneratedOutputAsAsset !== "function" ||
+    typeof desktopApi.importExternalRepositoryObjectAsAsset !== "function" ||
+    typeof desktopApi.localizeExternalRepositoryObjectAsAsset !== "function"
   ) {
     throw new Error("Desktop Asset Library preload API is unavailable.");
   }
@@ -71,6 +88,26 @@ async function toClientResult<T>(
   }
 }
 
+async function toMutationClientResult(
+  call: () => Promise<unknown>,
+  operation: AssetMutationResult["operation"],
+): Promise<AssetLibraryClientResult<AssetMutationResult>> {
+  try {
+    const response = await call();
+    const success = mapTransportEnvelopeSuccess(response, sanitizeAssetMutationResult);
+    if (success) return success;
+    return { ok: true, value: mapAssetMutationTransportFailure(response, operation) };
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: "internal",
+        message: "Unable to complete this asset action.",
+      },
+    };
+  }
+}
+
 export function createDesktopAssetLibraryClient(): AssetLibraryClient {
   const desktopApi = getDesktopAssetLibraryApi();
 
@@ -89,6 +126,7 @@ export function createDesktopAssetLibraryClient(): AssetLibraryClient {
           definitionId: input.definitionId,
           ...(options.expand ? { expand: options.expand } : {}),
           ...(options.includeValidation !== undefined ? { includeValidation: options.includeValidation } : {}),
+          ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}),
         }),
         mapAssetDefinitionDetail,
         "Unable to read asset definition.",
@@ -102,6 +140,7 @@ export function createDesktopAssetLibraryClient(): AssetLibraryClient {
           version: input.version,
           ...(options.expand ? { expand: options.expand } : {}),
           ...(options.includeValidation !== undefined ? { includeValidation: options.includeValidation } : {}),
+          ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}),
         }),
         mapAssetDefinitionDetail,
         "Unable to read asset definition version.",
@@ -122,9 +161,38 @@ export function createDesktopAssetLibraryClient(): AssetLibraryClient {
           viewId: input.viewId,
           ...(options.expand ? { expand: options.expand } : {}),
           ...(options.includeValidation !== undefined ? { includeValidation: options.includeValidation } : {}),
+          ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}),
         }),
         mapAssetResourceBackedViewDetail,
         "Unable to read asset resource-backed view.",
+      );
+    },
+
+    async registerResourceBackedViewAsAsset(command) {
+      return toMutationClientResult(
+        () => desktopApi.registerResourceBackedViewAsAsset(command),
+        "asset.register-resource-backed-view",
+      );
+    },
+
+    async finalizeGeneratedOutputAsAsset(command) {
+      return toMutationClientResult(
+        () => desktopApi.finalizeGeneratedOutputAsAsset(command),
+        "asset.finalize-generated-output",
+      );
+    },
+
+    async importExternalRepositoryObjectAsAsset(command) {
+      return toMutationClientResult(
+        () => desktopApi.importExternalRepositoryObjectAsAsset(command),
+        "asset.import-external-repository-object",
+      );
+    },
+
+    async localizeExternalRepositoryObjectAsAsset(command) {
+      return toMutationClientResult(
+        () => desktopApi.localizeExternalRepositoryObjectAsAsset(command),
+        "asset.localize-external-repository-object",
       );
     },
   };

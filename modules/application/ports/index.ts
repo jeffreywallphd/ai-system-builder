@@ -23,3 +23,14 @@ export * from "./runtime-installer";
 export * from "./security";
 
 export * from "./asset";
+export * from "./workspace";
+export * from "./user-library";
+export * from "./asset-authoring";
+
+export * from "./effective-asset-projections";
+
+export * from "./asset-composition";
+
+export * from "./runtime-readiness";
+
+export * from "./execution-plans";

@@ -52,6 +52,10 @@ function api(overrides: Record<string, unknown> = {}) {
     readAssetDefinitionVersion: testDouble.fn().mockResolvedValue(success(detailValue())),
     listAssetResourceBackedViews: testDouble.fn().mockResolvedValue(success({ items: [] })),
     readAssetResourceBackedView: testDouble.fn().mockResolvedValue(success(resourceViewValue())),
+    registerResourceBackedViewAsAsset: testDouble.fn().mockResolvedValue(success({ ok: true, operation: "asset.register-resource-backed-view", status: "created" })),
+    finalizeGeneratedOutputAsAsset: testDouble.fn().mockResolvedValue(success({ ok: true, operation: "asset.finalize-generated-output", status: "created" })),
+    importExternalRepositoryObjectAsAsset: testDouble.fn().mockResolvedValue(success({ ok: true, operation: "asset.import-external-repository-object", status: "created" })),
+    localizeExternalRepositoryObjectAsAsset: testDouble.fn().mockResolvedValue(success({ ok: true, operation: "asset.localize-external-repository-object", status: "created" })),
     ...overrides,
   };
 }
@@ -126,6 +130,47 @@ describe("desktop asset library client", () => {
     expect(detail).toMatchObject({ ok: true, value: { registrationStatusLabel: "Not finalized or registered" } });
   });
 
+  it("calls controlled mutation preload methods and sanitizes mutation results", async () => {
+    const apiBridge = api({
+      finalizeGeneratedOutputAsAsset: testDouble.fn().mockResolvedValue(success({
+        ok: false,
+        operation: "asset.finalize-generated-output",
+        failure: {
+          code: "internal",
+          message: "stack at C:\\Users\\name\\secret",
+          operation: "asset.finalize-generated-output",
+          diagnostics: [{ severity: "error", code: "raw", message: "C:\\Users\\name\\secret" }],
+        },
+      })),
+    });
+    setDesktopApi(apiBridge);
+
+    const client = createDesktopAssetLibraryClient();
+    const command = {
+      operation: "asset.finalize-generated-output" as const,
+      viewId: "asset-view.generated-output.internal.1",
+      approval: {
+        userConfirmed: true,
+        confirmationKind: "finalize-generated-output" as const,
+        allowFilesystemWrite: true,
+        allowPartialCompletion: true,
+      },
+      actor: { initiatedBy: "human" as const, automationSafe: false },
+    };
+    const result = await client.finalizeGeneratedOutputAsAsset(command);
+
+    expect(apiBridge.finalizeGeneratedOutputAsAsset).toHaveBeenCalledWith(command);
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        ok: false,
+        operation: "asset.finalize-generated-output",
+        failure: { code: "internal", message: "Something went wrong while completing this action." },
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("C:\\Users\\name\\secret");
+  });
+
   it("maps validation, not-found, and internal failures safely", async () => {
     const apiBridge = api({
       listAssetDefinitions: testDouble.fn().mockResolvedValue(failure("validation", "Invalid query.", {
@@ -150,7 +195,7 @@ describe("desktop asset library client", () => {
     expect(JSON.stringify(internal).includes("C:\\Users\\name\\secret")).toBe(false);
   });
 
-  it("does not expose mutation or execution methods", () => {
+  it("exposes only controlled mutations and no arbitrary mutation or execution methods", () => {
     setDesktopApi({
       ...api(),
     });
@@ -159,6 +204,10 @@ describe("desktop asset library client", () => {
     for (const method of ["createAssetDefinition", "updateAssetDefinition", "deleteAssetDefinition", "seedBuiltInAssetDefinitions", "importAsset", "finalizeAsset", "scanResources", "executeAsset"]) {
       expect(client[method]).toBeUndefined();
     }
+    expect(typeof client.registerResourceBackedViewAsAsset).toBe("function");
+    expect(typeof client.finalizeGeneratedOutputAsAsset).toBe("function");
+    expect(typeof client.importExternalRepositoryObjectAsAsset).toBe("function");
+    expect(typeof client.localizeExternalRepositoryObjectAsAsset).toBe("function");
   });
 
   it("does not import forbidden application, host, persistence, or transport handler modules", () => {

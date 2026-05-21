@@ -2,9 +2,10 @@ import type { ReactNode } from "react";
 
 import type { ThinClientPageDefinition, ThinClientPageKey } from "../../routes/thinClientPages";
 import appLogoSrc from "../../../../../modules/ui/shared/assets/branding/logo.svg";
+import { WorkspaceSwitcher } from "../../features/workspace";
 
 export interface AppShellProps {
-  activePage: ThinClientPageKey;
+  activePage?: ThinClientPageKey;
   pages: readonly ThinClientPageDefinition[];
   onNavigate: (nextPage: ThinClientPageKey) => void;
   children: ReactNode;
@@ -22,6 +23,7 @@ export function AppShell({ activePage, onNavigate, pages, children }: AppShellPr
             </span>
             <h1 className="ui-shell__title">AI System Builder</h1>
           </div>
+          <WorkspaceSwitcher />
           <nav className="ui-shell__nav" aria-label="Primary">
             {primaryPages.map((page) => (
               <button

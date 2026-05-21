@@ -92,7 +92,7 @@ export function createDesktopImageGenerationClient() {
       return { ok: true, value: response.value as { cancelled: boolean; message?: string } };
     },
 
-    async finalizeImageGenerationIfCompleted(input: { requestId: string }, context?: { requestId?: string; correlationId?: string }): Promise<ImageGenerationFinalizeResult> {
+    async finalizeImageGenerationIfCompleted(input: { requestId: string; workspaceId?: string }, context?: { requestId?: string; correlationId?: string }): Promise<ImageGenerationFinalizeResult> {
       if (!api.finalizeImageGenerationIfCompleted) {
         return unavailable("finalizeImageGenerationIfCompleted");
       }

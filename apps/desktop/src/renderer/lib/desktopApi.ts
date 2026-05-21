@@ -44,11 +44,18 @@ import type {
 import type {
   AssetFamily,
   AssetLifecycleStatus,
+  FinalizeGeneratedOutputCommand,
+  ImportExternalRepositoryObjectCommand,
+  LocalizeExternalRepositoryObjectCommand,
+  RegisterResourceBackedViewCommand,
   AssetResourceBackedViewKind,
   AssetType,
+  AssetMutationResult,
 } from "../../../../../modules/contracts/asset";
+import type { ActiveWorkspaceSelection, CreateWorkspaceCommand } from "../../../../../modules/contracts/workspace";
 
 export interface DesktopArtifactUploadInput {
+  workspaceId: string;
   fileName: string;
   mediaType: string;
   bytes: Uint8Array;
@@ -301,6 +308,8 @@ export interface DesktopArtifactUploadApi {
 export interface DesktopBridgeRequestContext {
   requestId?: string;
   correlationId?: string;
+  idempotencyKey?: string;
+  workspaceId?: string;
 }
 
 export type DesktopAssetBuiltInFilter = "all" | "built-in" | "custom";
@@ -321,6 +330,7 @@ export interface DesktopAssetDefinitionsListInput {
   limit?: number;
   cursor?: string;
   includeMetadata?: boolean;
+  workspaceId?: string;
 }
 
 export interface DesktopAssetResourceBackedViewsListInput {
@@ -332,6 +342,7 @@ export interface DesktopAssetResourceBackedViewsListInput {
   limit?: number;
   cursor?: string;
   includeMetadata?: boolean;
+  workspaceId?: string;
 }
 
 export interface DesktopAssetDefinitionReadInput {
@@ -339,6 +350,7 @@ export interface DesktopAssetDefinitionReadInput {
   version?: string;
   expand?: readonly DesktopAssetDefinitionExpansion[];
   includeValidation?: boolean;
+  workspaceId?: string;
 }
 
 export type DesktopAssetResourceBackedViewExpansion =
@@ -350,6 +362,7 @@ export interface DesktopAssetResourceBackedViewReadInput {
   viewId: string;
   expand?: readonly DesktopAssetResourceBackedViewExpansion[];
   includeValidation?: boolean;
+  workspaceId?: string;
 }
 
 export type DesktopAssetDefinitionVersionReadInput = Required<Pick<DesktopAssetDefinitionReadInput, "definitionId" | "version">> & Omit<DesktopAssetDefinitionReadInput, "definitionId" | "version">;
@@ -373,7 +386,7 @@ export interface DesktopImageGenerationApi {
   startImageGeneration?: (input: ImageGenerationRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   cancelImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
-  finalizeImageGenerationIfCompleted?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  finalizeImageGenerationIfCompleted?: (input: { requestId: string; workspaceId?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readComfyUiInstallStatus?: (input?: { installRoot?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   repairComfyUiInstall?: (input?: { installRoot?: string; allowUpdate?: boolean; forceRepair?: boolean }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
 }
@@ -384,6 +397,7 @@ export interface DesktopPythonRuntimeApi {
 }
 
 interface DesktopApiBridge {
+  memoryDiagnosticsEnabled?: boolean;
   getHuggingFaceTokenStatus: () => Promise<unknown>;
   setHuggingFaceToken: (input: { token: string }) => Promise<unknown>;
   clearHuggingFaceToken: () => Promise<unknown>;
@@ -405,27 +419,39 @@ interface DesktopApiBridge {
   cancelPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readRuntimeReadiness?: (context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readRuntimeCapabilityStatus?: (input: { capabilityId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readFeatureLifecycleState?: (context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  disposeIdleFeatures?: (context?: DesktopBridgeRequestContext) => Promise<unknown>;
+
+  listWorkspaces?: (context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  createWorkspace?: (input: { command: CreateWorkspaceCommand; selectAfterCreate?: boolean }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readActiveWorkspaceSelection?: (context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  saveActiveWorkspaceSelection?: (selection: ActiveWorkspaceSelection, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  clearActiveWorkspaceSelection?: (context?: DesktopBridgeRequestContext) => Promise<unknown>;
   listAssetDefinitions?: (input?: DesktopAssetDefinitionsListInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readAssetDefinition?: (input: DesktopAssetDefinitionReadInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readAssetDefinitionVersion?: (input: DesktopAssetDefinitionVersionReadInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   listAssetResourceBackedViews?: (input?: DesktopAssetResourceBackedViewsListInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readAssetResourceBackedView?: (input: DesktopAssetResourceBackedViewReadInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  registerResourceBackedViewAsAsset?: (command: RegisterResourceBackedViewCommand, context?: DesktopBridgeRequestContext) => Promise<AssetMutationResult | unknown>;
+  finalizeGeneratedOutputAsAsset?: (command: FinalizeGeneratedOutputCommand, context?: DesktopBridgeRequestContext) => Promise<AssetMutationResult | unknown>;
+  importExternalRepositoryObjectAsAsset?: (command: ImportExternalRepositoryObjectCommand, context?: DesktopBridgeRequestContext) => Promise<AssetMutationResult | unknown>;
+  localizeExternalRepositoryObjectAsAsset?: (command: LocalizeExternalRepositoryObjectCommand, context?: DesktopBridgeRequestContext) => Promise<AssetMutationResult | unknown>;
   readPythonRuntimeStatus?: () => Promise<unknown>;
   controlPythonRuntime?: (input: { action: "start" | "stop" | "restart" | "unload-model" | "clear-logs" }) => Promise<unknown>;
   startImageGeneration?: (input: ImageGenerationRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   cancelImageGeneration?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
-  finalizeImageGenerationIfCompleted?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  finalizeImageGenerationIfCompleted?: (input: { requestId: string; workspaceId?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readComfyUiInstallStatus?: (input?: { installRoot?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   repairComfyUiInstall?: (input?: { installRoot?: string; allowUpdate?: boolean; forceRepair?: boolean }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
-  browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
-  browseUnregisteredArtifacts?: () => Promise<unknown>;
-  registerUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
-  deleteUnregisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
-  deleteRegisteredArtifact?: (input: { storageKey: string }) => Promise<unknown>;
-  readArtifactDetail: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
-  readArtifactContentDescriptor: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
-  readArtifactViewerMedia: (locator: DesktopArtifactBrowserLocator) => Promise<unknown>;
+  browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily; workspaceId?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  browseUnregisteredArtifacts?: (input?: { workspaceId?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  registerUnregisteredArtifact?: (input: { storageKey: string; workspaceId?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  deleteUnregisteredArtifact?: (input: { storageKey: string; workspaceId?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  deleteRegisteredArtifact?: (input: { storageKey: string; workspaceId?: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readArtifactDetail: (locator: DesktopArtifactBrowserLocator, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readArtifactContentDescriptor: (locator: DesktopArtifactBrowserLocator, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readArtifactViewerMedia: (locator: DesktopArtifactBrowserLocator, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   publishArtifactToRepo: (input: {
     artifactId: string;
     target: {

@@ -6,7 +6,7 @@ import {
   type AssetLibraryFeatureState,
   type AssetLibraryFiltersState,
   type AssetLibraryFilterValue,
-} from "../../../../../../modules/ui/shared/asset-library";
+} from "../../../../../../modules/ui/shared/asset-library/assetLibraryBrowser";
 import { createApiAssetLibraryClient } from "../api/apiAssetLibraryClient";
 
 export type {
@@ -15,7 +15,7 @@ export type {
   AssetLibraryFilterValue,
 };
 
-export function useAssetLibraryFeature(client?: AssetLibraryClient): AssetLibraryFeatureState {
+export function useAssetLibraryFeature(client?: AssetLibraryClient, workspaceId?: string): AssetLibraryFeatureState {
   const defaultClient = useMemo(() => client ?? createApiAssetLibraryClient(), [client]);
-  return useAssetLibraryDefinitionBrowser(defaultClient);
+  return useAssetLibraryDefinitionBrowser(defaultClient, workspaceId);
 }

@@ -1,5 +1,6 @@
 import type { ArtifactRepoStoragePort } from "../../../application/ports/storage";
 import { execFile as nodeExecFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -18,6 +19,16 @@ import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/m
 import { createHuggingFaceModelBrowseDetailsAdapter } from "../../../adapters/model/huggingface";
 import { createLocalImageAssetRegistryAdapter } from "../../../adapters/persistence/image";
 import { createLocalModelCheckpointResolverAdapter } from "../../../adapters/model/local";
+import { createLocalUserLibraryAssetRepositoryAdapter, createLocalWorkspaceUserLibraryLinkRepositoryAdapter } from "../../../adapters/persistence/user-library";
+import {
+  createLocalAssetDraftRepositoryAdapter,
+  createLocalAssetOverrideRepositoryAdapter,
+  createLocalAssetRevisionRepositoryAdapter,
+  createLocalAuthoredAssetRepositoryAdapter,
+} from "../../../adapters/persistence/asset-authoring";
+import { createLocalEffectiveAssetProjectionRepositoryAdapter } from "../../../adapters/persistence/effective-asset-projections";
+import { createLocalAssetCompositionPlanRepositoryAdapter } from "../../../adapters/persistence/asset-composition";
+import { LinkUserLibraryAssetToWorkspaceUseCase } from "../../../application/use-cases/user-library";
 import type { LoggingPort } from "../../../application/ports/logging";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
@@ -35,8 +46,11 @@ import {
   VerifyImportedArtifactSourceBackingUseCase,
   VerifyPublishedArtifactBackingUseCase,
   DeleteRegisteredArtifactUseCase,
+  FinalizeGeneratedOutputAsAssetUseCase,
+  ImportExternalRepositoryObjectAsAssetUseCase,
   BrowseModelsUseCase,
   GetModelDetailsUseCase,
+  LocalizeExternalRepositoryObjectAsAssetUseCase,
   ListModelsUseCase,
   SaveModelReferenceUseCase,
   DownloadModelUseCase,
@@ -46,6 +60,24 @@ import {
   ReadSettingsUseCase,
   UpdateSettingUseCase,
   ClearSettingUseCase,
+  RegisterResourceBackedViewAsAssetInstanceUseCase,
+  CreateAssetDraftUseCase,
+  CreateAssetOverrideUseCase,
+  CreateWorkspaceAuthoredAssetUseCase,
+  DisableAssetOverrideUseCase,
+  PublishAssetDraftUseCase,
+  UpdateAssetDraftUseCase,
+  UpdateAssetOverrideUseCase,
+  AddProjectionToCompositionPlanUseCase,
+  ArchiveAssetCompositionPlanUseCase,
+  ConnectCompositionNodesUseCase,
+  CreateAssetCompositionPlanUseCase,
+  DisconnectCompositionNodesUseCase,
+  ListAssetCompositionPlansUseCase,
+  ReadAssetCompositionPlanUseCase,
+  RemoveProjectionFromCompositionPlanUseCase,
+  UpdateAssetCompositionPlanUseCase,
+  ValidateAssetCompositionPlanUseCase,
 } from "../../../application/use-cases";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import {
@@ -89,6 +121,9 @@ import {
   type InternalAssetRegistryComposition,
 } from "../../shared/composition/composeInternalAssetRegistry";
 import { composeResourceBackedViewProviders } from "../../shared/composition/composeResourceBackedViewProviders";
+import type { AssetCustomizationTargetReaderPort } from "../../../application/ports/asset-authoring";
+import { WorkspaceAssetAuthoringReadModelService } from "../../../application/services/asset/workspace-asset-authoring-read-model.service";
+import { WorkspaceAssetCompositionReadModelService } from "../../../application/services/asset/workspace-asset-composition-read-model.service";
 
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
 const execFile = promisify(nodeExecFile);
@@ -528,20 +563,29 @@ export function composeServerHost(
         artifactCatalogRead: artifactCatalog,
       });
 
+      const workspaceFoundation = internalAssetRegistry ?? composeInternalAssetRegistry({
+        rootDirectory: registerOptions.storageRootDirectory,
+        now: options.now,
+      });
+      internalAssetRegistry = workspaceFoundation;
       const storeArtifactUploadUseCase = new StoreArtifactUploadUseCase({
         storage,
         logging: loggingPort,
         now: options.now,
+        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
       });
 
       const browseArtifacts = new BrowseArtifactsUseCase({
         artifactBrowserMetadataRead: artifactBrowserRead,
+        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
       });
       const readArtifactDetail = new ReadArtifactDetailUseCase({
         artifactBrowserMetadataRead: artifactBrowserRead,
+        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
       });
       const readArtifactContent = new ReadArtifactContentUseCase({
         artifactBrowserContentRead: artifactBrowserRead,
+        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
       });
 
       const hasArtifactInRepo = new HasArtifactInRepoUseCase({
@@ -595,6 +639,7 @@ export function composeServerHost(
         artifactCatalogDelete: artifactCatalog,
         storage,
         artifactBindingStorage: artifactBindings,
+        workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
       });
 
       const resolvedRuntimeDeviceMode = runtimeDeviceMode;
@@ -761,6 +806,38 @@ export function composeServerHost(
           publishedModelRegistry: modelRegistry,
         }),
       });
+      void internalAssetRegistry.installSystemFoundationPack.install();
+      const generateAssetInstanceId = () => `asset-instance.${randomUUID()}`;
+      const assetMutationUseCases = {
+        registerResourceBackedViewAsAsset: new RegisterResourceBackedViewAsAssetInstanceUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
+          now: options.now,
+          generateInstanceId: generateAssetInstanceId,
+        }),
+        finalizeGeneratedOutputAsAsset: new FinalizeGeneratedOutputAsAssetUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
+          now: options.now,
+          generateInstanceId: generateAssetInstanceId,
+        }),
+        importExternalRepositoryObjectAsAsset: new ImportExternalRepositoryObjectAsAssetUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
+          now: options.now,
+          generateInstanceId: generateAssetInstanceId,
+        }),
+        localizeExternalRepositoryObjectAsAsset: new LocalizeExternalRepositoryObjectAsAssetUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+          instanceRepository: internalAssetRegistry.assetKernel.repositories.instanceRepository,
+          now: options.now,
+          generateInstanceId: generateAssetInstanceId,
+        }),
+      };
       const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({
         accessTokenProvider: () => tokenConfigStore.getToken(),
         logger: modelManagementLogger,
@@ -947,7 +1024,119 @@ export function composeServerHost(
         modelManagementLogger,
         restartServer: options.restartServer,
         runtimeReadiness,
-        assetRegistryRead: internalAssetRegistry.readFacade,
+        assetRegistryRead: internalAssetRegistry.workspaceReadFacade,
+        workspaceServices: {
+          workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
+          workspaceSelectionRepository: workspaceFoundation.workspaceRepositories.workspaceSelectionRepository,
+          createWorkspaceUseCase: workspaceFoundation.workspaceUseCases.createWorkspace,
+        },
+        assetMutationUseCases,
+        userLibraryServices: (() => {
+          const userLibraryAssetRepository = createLocalUserLibraryAssetRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+          const workspaceUserLibraryLinkRepository = createLocalWorkspaceUserLibraryLinkRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+          return {
+            userLibraryAssetRepository,
+            workspaceUserLibraryLinkRepository,
+            promoteUseCase: undefined,
+            linkUseCase: new LinkUserLibraryAssetToWorkspaceUseCase({ userLibraryAssetRepository, workspaceLinkRepository: workspaceUserLibraryLinkRepository, now: options.now, generateUserLibraryLinkId: () => `link.${randomUUID()}` }),
+            copyUseCase: undefined,
+            importUseCase: undefined,
+            assetRegistryRead: internalAssetRegistry.workspaceReadFacade,
+          };
+        })(),
+        assetAuthoringServices: (() => {
+          const assetAuthoringRepositories = {
+            authoredAssetRepository: createLocalAuthoredAssetRepositoryAdapter({
+              rootDir: registerOptions.storageRootDirectory,
+              now: options.now,
+            }),
+            assetDraftRepository: createLocalAssetDraftRepositoryAdapter({
+              rootDir: registerOptions.storageRootDirectory,
+              now: options.now,
+            }),
+            assetRevisionRepository: createLocalAssetRevisionRepositoryAdapter({
+              rootDir: registerOptions.storageRootDirectory,
+              now: options.now,
+            }),
+            assetOverrideRepository: createLocalAssetOverrideRepositoryAdapter({
+              rootDir: registerOptions.storageRootDirectory,
+              now: options.now,
+            }),
+          };
+          const unavailableTargetReader: AssetCustomizationTargetReaderPort = {
+            async readCustomizationTargetByReference() {
+              throw new Error("asset-authoring.customization-target-reader.unavailable");
+            },
+          };
+          const effectiveSummaryReader = new WorkspaceAssetAuthoringReadModelService({
+            ...assetAuthoringRepositories,
+          });
+          return {
+            ...assetAuthoringRepositories,
+            createWorkspaceAuthoredAssetUseCase: new CreateWorkspaceAuthoredAssetUseCase({
+              authoredAssetRepository: assetAuthoringRepositories.authoredAssetRepository,
+              assetRevisionRepository: assetAuthoringRepositories.assetRevisionRepository,
+              now: options.now,
+              generateAuthoredAssetId: () => randomUUID(),
+              generateAssetRevisionId: () => randomUUID(),
+            }),
+            createAssetDraftUseCase: new CreateAssetDraftUseCase({
+              assetDraftRepository: assetAuthoringRepositories.assetDraftRepository,
+              now: options.now,
+              generateAssetDraftId: () => randomUUID(),
+            }),
+            updateAssetDraftUseCase: new UpdateAssetDraftUseCase({
+              assetDraftRepository: assetAuthoringRepositories.assetDraftRepository,
+              now: options.now,
+            }),
+            publishAssetDraftUseCase: new PublishAssetDraftUseCase({
+              authoredAssetRepository: assetAuthoringRepositories.authoredAssetRepository,
+              assetDraftRepository: assetAuthoringRepositories.assetDraftRepository,
+              assetRevisionRepository: assetAuthoringRepositories.assetRevisionRepository,
+              now: options.now,
+              generateAuthoredAssetId: () => randomUUID(),
+              generateAssetRevisionId: () => randomUUID(),
+            }),
+            createAssetOverrideUseCase: new CreateAssetOverrideUseCase({
+              assetOverrideRepository: assetAuthoringRepositories.assetOverrideRepository,
+              targetReader: unavailableTargetReader,
+              now: options.now,
+              generateAssetOverrideId: () => randomUUID(),
+            }),
+            updateAssetOverrideUseCase: new UpdateAssetOverrideUseCase({
+              assetOverrideRepository: assetAuthoringRepositories.assetOverrideRepository,
+              now: options.now,
+            }),
+            disableAssetOverrideUseCase: new DisableAssetOverrideUseCase({
+              assetOverrideRepository: assetAuthoringRepositories.assetOverrideRepository,
+              now: options.now,
+            }),
+            effectiveSummaryReader,
+          };
+        })(),
+        assetCompositionServices: (() => {
+          const compositionPlanRepository = createLocalAssetCompositionPlanRepositoryAdapter({
+            rootDir: registerOptions.storageRootDirectory,
+            now: options.now,
+          });
+          const effectiveProjectionRepository = createLocalEffectiveAssetProjectionRepositoryAdapter({
+            rootDir: registerOptions.storageRootDirectory,
+            now: options.now,
+          });
+          return {
+            createPlan: new CreateAssetCompositionPlanUseCase({ repository: compositionPlanRepository, generatePlanId: () => `plan.${randomUUID()}`, now: options.now }),
+            updatePlan: new UpdateAssetCompositionPlanUseCase({ repository: compositionPlanRepository, now: options.now }),
+            readPlan: new ReadAssetCompositionPlanUseCase({ repository: compositionPlanRepository }),
+            listPlans: new ListAssetCompositionPlansUseCase({ repository: compositionPlanRepository }),
+            archivePlan: new ArchiveAssetCompositionPlanUseCase({ repository: compositionPlanRepository, now: options.now }),
+            addProjection: new AddProjectionToCompositionPlanUseCase({ repository: compositionPlanRepository, projectionRepository: effectiveProjectionRepository, generateNodeId: () => `node.${randomUUID()}`, now: options.now }),
+            removeProjection: new RemoveProjectionFromCompositionPlanUseCase({ repository: compositionPlanRepository, now: options.now }),
+            connectNodes: new ConnectCompositionNodesUseCase({ repository: compositionPlanRepository, generateRelationshipId: () => `rel.${randomUUID()}`, now: options.now }),
+            disconnectNodes: new DisconnectCompositionNodesUseCase({ repository: compositionPlanRepository, now: options.now }),
+            validatePlan: new ValidateAssetCompositionPlanUseCase({ repository: compositionPlanRepository, projectionRepository: effectiveProjectionRepository, now: options.now }),
+            readModel: new WorkspaceAssetCompositionReadModelService({ compositionPlanRepository }),
+          };
+        })(),
       });
     },
   };

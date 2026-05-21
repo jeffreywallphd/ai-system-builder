@@ -1,10 +1,4 @@
 import {
-  mapAssetDefinitionDetail,
-  mapAssetDefinitionListResult,
-  mapAssetResourceBackedViewDetail,
-  mapAssetResourceBackedViewListResult,
-  mapTransportEnvelopeError,
-  mapTransportEnvelopeSuccess,
   type AssetLibraryClient,
   type AssetLibraryClientResult,
   type AssetLibraryDefinitionCard,
@@ -19,6 +13,25 @@ import {
   type AssetLibraryResourceBackedViewExpansion,
   type AssetLibraryResourceBackedViewQuery,
 } from "../../../../../../modules/ui/shared/asset-library";
+import {
+  mapAssetDefinitionDetail,
+  mapAssetDefinitionListResult,
+  mapAssetResourceBackedViewDetail,
+  mapAssetResourceBackedViewListResult,
+  mapTransportEnvelopeError,
+  mapTransportEnvelopeSuccess,
+} from "../../../../../../modules/ui/shared/asset-library/assetLibraryMappers";
+import {
+  mapAssetMutationTransportFailure,
+  sanitizeAssetMutationResult,
+} from "../../../../../../modules/ui/shared/asset-library/assetLibraryActions";
+import type {
+  AssetMutationResult,
+  FinalizeGeneratedOutputCommand,
+  ImportExternalRepositoryObjectCommand,
+  LocalizeExternalRepositoryObjectCommand,
+  RegisterResourceBackedViewCommand,
+} from "../../../../../../modules/contracts/asset";
 import { parseApiEnvelope } from "../../../security/apiErrorEnvelope";
 import { secureFetch } from "../../../security/secureFetch";
 
@@ -47,6 +60,7 @@ function queryStringForList(query: AssetLibraryQuery): string {
   if (query.builtIn) params.set("builtIn", query.builtIn);
   if (query.limit !== undefined) params.set("limit", String(query.limit));
   if (query.cursor) params.set("cursor", query.cursor);
+  if (query.workspaceId) params.set("workspaceId", query.workspaceId);
   const serialized = params.toString();
   return serialized ? `?${serialized}` : "";
 }
@@ -60,6 +74,7 @@ function queryStringForResourceBackedList(query: AssetLibraryResourceBackedViewQ
   appendCsv(params, "viewKind", query.viewKinds);
   if (query.limit !== undefined) params.set("limit", String(query.limit));
   if (query.cursor) params.set("cursor", query.cursor);
+  if (query.workspaceId) params.set("workspaceId", query.workspaceId);
   const serialized = params.toString();
   return serialized ? `?${serialized}` : "";
 }
@@ -68,6 +83,7 @@ function queryStringForDetail(options: AssetLibraryDetailOptions): string {
   const params = new URLSearchParams();
   appendCsv(params, "expand", options.expand as readonly AssetLibraryDefinitionExpansion[] | undefined);
   appendBoolean(params, "includeValidation", options.includeValidation);
+  if (options.workspaceId) params.set("workspaceId", options.workspaceId);
   const serialized = params.toString();
   return serialized ? `?${serialized}` : "";
 }
@@ -76,12 +92,25 @@ function queryStringForResourceBackedDetail(options: AssetLibraryResourceBackedV
   const params = new URLSearchParams();
   appendCsv(params, "expand", options.expand as readonly AssetLibraryResourceBackedViewExpansion[] | undefined);
   appendBoolean(params, "includeValidation", options.includeValidation);
+  if (options.workspaceId) params.set("workspaceId", options.workspaceId);
   const serialized = params.toString();
   return serialized ? `?${serialized}` : "";
 }
 
 async function getJson(endpoint: string): Promise<{ status: number; envelope: unknown }> {
   const response = await secureFetch(endpoint, { method: "GET" });
+  return {
+    status: response.status,
+    envelope: parseApiEnvelope(await response.json()),
+  };
+}
+
+async function postJson(endpoint: string, body: unknown): Promise<{ status: number; envelope: unknown }> {
+  const response = await secureFetch(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
   return {
     status: response.status,
     envelope: parseApiEnvelope(await response.json()),
@@ -104,6 +133,26 @@ async function toClientResult<T>(
       error: {
         code: "internal",
         message: fallbackMessage,
+      },
+    };
+  }
+}
+
+async function toMutationClientResult(
+  endpoint: string,
+  command: RegisterResourceBackedViewCommand | FinalizeGeneratedOutputCommand | ImportExternalRepositoryObjectCommand | LocalizeExternalRepositoryObjectCommand,
+): Promise<AssetLibraryClientResult<AssetMutationResult>> {
+  try {
+    const { envelope } = await postJson(endpoint, command);
+    const success = mapTransportEnvelopeSuccess(envelope, sanitizeAssetMutationResult);
+    if (success) return success;
+    return { ok: true, value: mapAssetMutationTransportFailure(envelope, command.operation) };
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: "internal",
+        message: "Unable to complete this asset action.",
       },
     };
   }
@@ -162,6 +211,22 @@ export function createApiAssetLibraryClient(
         mapAssetResourceBackedViewDetail,
         "Unable to read asset resource-backed view.",
       );
+    },
+
+    async registerResourceBackedViewAsAsset(command) {
+      return toMutationClientResult(createApiUrl(apiBaseUrl, "/assets/register-resource-backed-view"), command);
+    },
+
+    async finalizeGeneratedOutputAsAsset(command) {
+      return toMutationClientResult(createApiUrl(apiBaseUrl, "/assets/finalize-generated-output"), command);
+    },
+
+    async importExternalRepositoryObjectAsAsset(command) {
+      return toMutationClientResult(createApiUrl(apiBaseUrl, "/assets/import-external-repository-object"), command);
+    },
+
+    async localizeExternalRepositoryObjectAsAsset(command) {
+      return toMutationClientResult(createApiUrl(apiBaseUrl, "/assets/localize-external-repository-object"), command);
     },
   };
 }

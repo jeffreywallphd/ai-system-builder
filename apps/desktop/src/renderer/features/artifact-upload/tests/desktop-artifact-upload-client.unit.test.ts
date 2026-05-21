@@ -36,6 +36,7 @@ describe("desktop artifact upload client", () => {
       fileName: "cat.png",
       mediaType: "image/png",
       bytes: new Uint8Array([1, 2, 3]),
+      workspaceId: "workspace-a",
     };
 
     const response = await client.uploadArtifact(input);
@@ -81,6 +82,7 @@ describe("desktop artifact upload client", () => {
       fileName: "bad.pdf",
       mediaType: "application/pdf",
       bytes: new Uint8Array([1, 2]),
+      workspaceId: "workspace-a",
     });
 
     expect(response).toEqual({
@@ -91,6 +93,27 @@ describe("desktop artifact upload client", () => {
       },
     });
   });
+});
+
+
+it("blocks desktop upload before preload when workspace id is missing", async () => {
+  const uploadArtifact = vi.fn();
+  window.desktopApi = {
+    uploadArtifact,
+    getArtifactUploadPolicy: async () => ({ ok: true, value: { policy: { acceptedExtensions: [".txt"], acceptedMediaTypes: ["text/plain"] } } }),
+    browseArtifacts: async () => ({ ok: true, value: { items: [] } }),
+    readArtifactDetail: async () => ({ ok: true, value: { artifact: { locator: { storageKey: "uploads/a" }, artifactFamily: "document" } } }),
+    readArtifactContentDescriptor: async () => ({ ok: true, value: { content: { locator: { storageKey: "uploads/a" }, availability: "available", retrieval: "deferred" } } }),
+    readArtifactViewerMedia: async () => ({ ok: true, value: { storageKey: "uploads/a", bytes: new Uint8Array([1]) } }),
+    publishArtifactToRepo: async () => ({ ok: false, error: { message: "n/a" } }),
+    verifyPublishedArtifactBacking: async () => ({ ok: false, error: { message: "n/a" } }),
+    registerArtifactFromRepo: async () => ({ ok: false, error: { message: "n/a" } }),
+    localizeArtifactFromRepo: async () => ({ ok: false, error: { message: "n/a" } }),
+  };
+  const client = createDesktopArtifactUploadClient();
+  const response = await client.uploadArtifact({ fileName: "cat.txt", mediaType: "text/plain", bytes: new Uint8Array([1]), workspaceId: "" });
+  expect(uploadArtifact).not.toHaveBeenCalled();
+  expect(response).toEqual({ ok: false, error: { code: "validation", message: "Workspace id is required for artifact upload." } });
 });
 
 it("maps website single-page ingestion via preload bridge", async () => {

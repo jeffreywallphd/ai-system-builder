@@ -25,6 +25,8 @@
 - Asset Registry IPC input parsing should stay in parity with the server API through shared transport-adapter normalization. Malformed asset type/family/status, built-in, boolean, expansion, limit, cursor, or definition/version input returns validation failure before the read facade is called. Unexpected facade failures return sanitized internal failures while preserving request/correlation ids.
 - Phase 2C Prompt 8 fixed the initial IPC/preload surface at definition list/read/version-read; the final Phase 3 cleanup adds read-only resource-backed view list/detail channels. Do not add asset create/update/delete/register/import/finalize/seed/publish/execute/run/scan/sync/repair/install/start/train channels or preload methods. Validation diagnostics remain read-side details requested through `includeValidation`, not runtime validation tasks.
 - Phase 3 Prompt 8 keeps resource-backed provider wiring internal. Public desktop IPC/preload resource-backed channels may only call the read facade; mutation/import/finalization/localization/publishing/seeding/scan/runtime/provider/byte-read channels remain forbidden.
+- Phase 4 Prompt 7 is the only exception to the prior mutation ban: desktop IPC/preload may expose exactly four approved Asset Kernel mutation operations, `asset.register-resource-backed-view`, `asset.finalize-generated-output`, `asset.import-external-repository-object`, and `asset.localize-external-repository-object`. Handlers must depend only on matching narrow application use cases, perform shallow command validation, preserve request/correlation/idempotency metadata, return existing IPC envelopes, sanitize thrown errors, and must not expose arbitrary asset editor, seed, provider browse/download, runtime execution, scan, byte/content, or UI action channels.
+- Phase 5 Prompt 9 does not add IPC channels. Pack/source/category discoverability should flow through existing read-only Asset Registry definition list/read/version-read payloads and shared UI mappers; `workspace-pack` is a workspace pack label, not an override label unless explicit override metadata exists. Do not add pack install/import/export/activate/disable channels, override edit channels, resolver activation channels, raw resolver result channels, asset editor channels, scan channels, provider/network/runtime channels, or byte/content channels.
 
 ## Canonical Source Docs
 
@@ -32,3 +34,26 @@
 - `docs/architecture/module-dependency-rules.md`
 - `docs/architecture/runtime-model.md`
 - `docs/adr/ADR-0013-host-owned-runtime-execution-and-feature-placement.md`
+
+## Phase 6 Prompt 5 workspace boundary
+
+Workspace UI gating may use host/renderer active selection state. If IPC/preload workspace operations are added, keep them workspace-only (list/create/read selection/save selection/clear selection), sanitize diagnostics, avoid raw paths, and do not expose system pack installer, pack import/export/install, collaboration, permission, or resource-scoping channels.
+
+## Phase 6 Prompt 6 workspace activation IPC boundary
+
+Workspace system pack activation availability does not add Electron IPC or preload surface in this checkpoint. Keep activation read/list/status behavior internal to application use cases until a later prompt explicitly scopes transport exposure.
+
+## Workspace-aware Asset Library reads
+
+Desktop Asset Registry IPC/preload read payloads carry `workspaceId` for Asset Library list/detail/resource-backed reads. Missing or invalid workspace context must fail safely and must not call a global fallback read. IPC remains read-only for Asset Registry reads and must not expose pack install/import/export, activation-management, override-editing, or system-pack installer behavior.
+
+
+## Phase 6 Prompt 8 artifact workspace scoping
+
+Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.
+
+## Phase 6 Prompt 10 workspace IPC/preload UI contract
+
+Desktop workspace UI uses the real preload/IPC workspace operations for list, create, active-selection read/save/clear, and passes the selected workspace id through workspace-owned feature requests. Renderer code must not synthesize authoritative ids, use display-name slugs as ids, or bypass preload for workspace selection. Create workspace may request System Foundation inclusion only as the existing `system.foundation@1.0.0` activation reference.
+
+Workspace-required renderer pages must remain gated before an active workspace exists, and unavailable/archived/missing selections must show safe user-facing unavailable copy rather than raw ids, paths, stack traces, or provider payloads.

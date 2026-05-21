@@ -36,6 +36,7 @@ describe("desktop renderer artifact workflow page", () => {
     delete window.desktopApi;
     mountedRoot = undefined;
     mountedContainer = undefined;
+    window.localStorage.clear();
   });
 
   it("uploads and refreshes artifact listing on the dedicated Artifacts page", async () => {
@@ -66,7 +67,15 @@ describe("desktop renderer artifact workflow page", () => {
         },
       });
 
+    const workspaces: Array<{ workspaceId: string; displayName: string; status: "active"; createdAt: string; settings?: { defaultIncludeSystemFoundationAssets?: boolean } }> = [];
+    let selectedWorkspaceId: string | undefined;
+
     window.desktopApi = {
+      listWorkspaces: vi.fn(async () => ({ ok: true, value: { workspaces } })),
+      readActiveWorkspaceSelection: vi.fn(async () => ({ ok: true, value: selectedWorkspaceId ? { workspaceId: selectedWorkspaceId } : {} })),
+      saveActiveWorkspaceSelection: vi.fn(async (selection: { workspaceId?: string }) => { selectedWorkspaceId = selection.workspaceId; return { ok: true, value: { selection } }; }),
+      clearActiveWorkspaceSelection: vi.fn(async () => { selectedWorkspaceId = undefined; return { ok: true, value: {} }; }),
+      createWorkspace: vi.fn(async (input: { command: { displayName: string; includeSystemFoundationAssets?: boolean } }) => { const workspace = { workspaceId: "workspace.upload", displayName: input.command.displayName, status: "active" as const, createdAt: "2026-05-14T00:00:00.000Z", settings: { defaultIncludeSystemFoundationAssets: input.command.includeSystemFoundationAssets } }; workspaces.push(workspace); selectedWorkspaceId = workspace.workspaceId; return { ok: true, value: { workspace } }; }),
       uploadArtifact,
       browseArtifacts,
       readArtifactDetail: vi.fn().mockResolvedValue({
@@ -172,6 +181,16 @@ describe("desktop renderer artifact workflow page", () => {
     const artifactsButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Data");
     await act(async () => {
       artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    const nameInput = container.querySelector("input[placeholder=\"My Project\"]") as HTMLInputElement | null;
+    await act(async () => {
+      nameInput!.value = "Upload Workspace";
+      nameInput!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const createWorkspaceButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Create workspace");
+    await act(async () => {
+      createWorkspaceButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
     const input = container.querySelector("input[type='file']") as HTMLInputElement | null;

@@ -11,6 +11,7 @@ import type {
 import { normalizeAssetId } from "../../../contracts/asset";
 import type { ImageAsset } from "../../../contracts/image";
 import type { ImageGenerationOutput } from "../../../contracts/image-generation";
+import { isWorkspaceId } from "../../../contracts/workspace";
 import type { ImageAssetDescriptorReadPort } from "../../ports/image";
 import type {
   AssetResourceBackedViewListQuery,
@@ -41,8 +42,8 @@ export interface GeneratedImageOutputDescriptorListResult {
 // Asset Kernel port; host composition may inject it later without broadening the
 // application provider contract.
 export interface GeneratedImageOutputDescriptorSource {
-  listGeneratedImageOutputDescriptors(query?: { readonly searchText?: string; readonly limit?: number; readonly cursor?: string }): Promise<GeneratedImageOutputDescriptorListResult>;
-  readGeneratedImageOutputDescriptor?(outputId: string): Promise<GeneratedImageOutputDescriptor | null | undefined>;
+  listGeneratedImageOutputDescriptors(query: { readonly workspaceId: string; readonly searchText?: string; readonly limit?: number; readonly cursor?: string }): Promise<GeneratedImageOutputDescriptorListResult>;
+  readGeneratedImageOutputDescriptor?(workspaceId: string, outputId: string): Promise<GeneratedImageOutputDescriptor | null | undefined>;
 }
 
 export interface AssetImageResourceBackedViewProviderDependencies {
@@ -77,6 +78,12 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
   }
 
   public async listResourceBackedViews(query: AssetResourceBackedViewListQuery = {}): Promise<AssetResourceBackedViewListResult> {
+    if (!isWorkspaceId(query.workspaceId)) {
+      return {
+        items: [],
+        diagnostics: [this.diagnostic("error", "image-resource-backed-view-workspace-required", "Workspace id is required for image and generated-output resource-backed views.")],
+      };
+    }
     const diagnostics: AssetResourceBackedViewProviderDiagnostic[] = [];
     const limit = this.safeLimit(query.limit);
     const imageSourceActive = allowsViewKind(query, "image-asset") && Boolean(this.imageAssetDescriptorRead);
@@ -119,11 +126,12 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
     }) as AssetResourceBackedViewListResult;
   }
 
-  public async readResourceBackedView(viewId: string): Promise<AssetResourceBackedView | undefined> {
+  public async readResourceBackedView(viewId: string, query: { readonly workspaceId?: string } = {}): Promise<AssetResourceBackedView | undefined> {
+    if (!isWorkspaceId(query.workspaceId)) return undefined;
     const directImageAssetId = parseDirectViewId(viewId, IMAGE_VIEW_ID_PREFIX);
     if (directImageAssetId && this.imageAssetDescriptorRead?.readImageAssetDescriptor) {
       try {
-        const descriptor = await this.imageAssetDescriptorRead.readImageAssetDescriptor(directImageAssetId);
+        const descriptor = await this.imageAssetDescriptorRead.readImageAssetDescriptor(query.workspaceId, directImageAssetId);
         if (descriptor) {
           const diagnostics: AssetResourceBackedViewProviderDiagnostic[] = [];
           const view = this.viewFromImageAsset(descriptor, diagnostics);
@@ -137,7 +145,7 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
     const directOutputId = parseDirectViewId(viewId, GENERATED_OUTPUT_VIEW_ID_PREFIX);
     if (directOutputId && this.generatedImageOutputDescriptorSource?.readGeneratedImageOutputDescriptor) {
       try {
-        const descriptor = await this.generatedImageOutputDescriptorSource.readGeneratedImageOutputDescriptor(directOutputId);
+        const descriptor = await this.generatedImageOutputDescriptorSource.readGeneratedImageOutputDescriptor(query.workspaceId, directOutputId);
         if (descriptor) {
           const diagnostics: AssetResourceBackedViewProviderDiagnostic[] = [];
           const view = this.viewFromGeneratedOutputDescriptor(descriptor, diagnostics);
@@ -148,7 +156,7 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
       }
     }
 
-    const result = await this.listResourceBackedViews({ limit: this.maxListLimit });
+    const result = await this.listResourceBackedViews({ limit: this.maxListLimit, workspaceId: query.workspaceId });
     const view = result.items.find((item) => item.viewId === viewId);
     return view ? withDetailFallbackDiagnostic(view, this.diagnostic("info", "image-resource-backed-view-detail-list-fallback-limited", "Detail read used the bounded descriptor list fallback because a direct descriptor read seam or reversible safe view id was not available.")) : undefined;
   }
@@ -169,6 +177,7 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
     let nextCursor: string | undefined;
     try {
       const result = await this.imageAssetDescriptorRead.listImageAssetDescriptors({
+        workspaceId: query.workspaceId as never,
         searchText: query.searchText,
         limit,
         cursor,
@@ -208,6 +217,7 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
     let nextCursor: string | undefined;
     try {
       const result = await this.generatedImageOutputDescriptorSource.listGeneratedImageOutputDescriptors({
+        workspaceId: query.workspaceId as string,
         searchText: query.searchText,
         limit,
         cursor,
@@ -283,6 +293,7 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
       summary: "Finalized image asset resource view; not a newly registered Asset Kernel instance.",
       lifecycleStatus: "published",
       metadata: metadataOf({
+        workspaceId: image.workspaceId,
         imageAssetId: imageIdentity.publicId,
         artifactId: artifactIdentity.publicId,
         source: image.source,
@@ -331,6 +342,7 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
       displayName,
       summary: "Generated image output descriptor; not finalized or registered as an image asset.",
       metadata: metadataOf({
+        workspaceId: descriptor.generatedOutput?.metadata?.workspaceId ?? descriptor.metadata?.workspaceId,
         outputId: outputIdentity.publicId,
         producedAssetType: "image",
         finalized: false,
@@ -377,6 +389,7 @@ export class AssetImageResourceBackedViewProvider implements AssetResourceBacked
       producedAt: safeMetadataString(descriptor.producedAt ?? base.producedAt),
       ...(artifactRef ? { sourceRefs: [artifactRef] } : {}),
       metadata: metadataOf({
+        workspaceId: descriptor.generatedOutput?.metadata?.workspaceId ?? descriptor.metadata?.workspaceId,
         ...safeGeneratedOutputMetadata(base.metadata),
         ...safeImageGenerationMetadata(descriptor.metadata),
         artifactId: artifactIdentity?.publicId,

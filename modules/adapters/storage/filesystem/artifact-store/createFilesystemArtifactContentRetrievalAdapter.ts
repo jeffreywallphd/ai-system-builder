@@ -7,6 +7,7 @@ import type {
 import type { ArtifactObjectStoragePort } from "../../../../application/ports/storage";
 import { createContractError, createFailureResult, createSuccessResult } from "../../../../contracts/shared";
 import { normalizeStorageArtifactKey } from "../../../../contracts/storage";
+import { isWorkspaceId } from "../../../../contracts/workspace";
 
 export interface CreateFilesystemArtifactContentRetrievalAdapterOptions {
   storage: Pick<ArtifactObjectStoragePort, "retrieveArtifact">;
@@ -22,19 +23,28 @@ export function createFilesystemArtifactContentRetrievalAdapter(
       context: ApplicationRequestContext = {},
     ) {
       const storageKey = normalizeStorageArtifactKey(request.storageKey);
-      const [catalogResult, retrieveResult] = await Promise.all([
-        options.artifactCatalogRead.readArtifactCatalogRecord({ storageKey }, context),
-        options.storage.retrieveArtifact(
-          {
-            key: storageKey,
-          },
-          context,
-        ),
-      ]);
+      const catalogResult = await options.artifactCatalogRead.readArtifactCatalogRecord(
+        { workspaceId: isWorkspaceId(context.workspaceId) ? context.workspaceId : undefined, storageKey },
+        context,
+      );
 
       if (!catalogResult.ok) {
         return catalogResult;
       }
+
+      if (catalogResult.value.record.workspaceId !== context.workspaceId || catalogResult.value.record.storageKey !== storageKey) {
+        return createFailureResult(
+          createContractError("not-found", `Artifact not found for storage key \"${storageKey}\".`),
+          context,
+        );
+      }
+
+      const retrieveResult = await options.storage.retrieveArtifact(
+        {
+          key: storageKey,
+        },
+        context,
+      );
 
       if (!retrieveResult.ok) {
         return createFailureResult(

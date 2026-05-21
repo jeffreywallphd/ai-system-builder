@@ -204,6 +204,16 @@ describe("desktop artifact upload end-to-end", () => {
         artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
       });
 
+      const nameInput = container.querySelector("input[placeholder=\"My Project\"]") as HTMLInputElement | null;
+      await act(async () => {
+        nameInput!.value = "Upload Workspace";
+        nameInput!.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      const createWorkspaceButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Create workspace");
+      await act(async () => {
+        createWorkspaceButton?.dispatchEvent(new Event("click", { bubbles: true }));
+      });
+
       const input = container.querySelector("input[type='file']") as HTMLInputElement | null;
       const form = container.querySelector("form") as HTMLFormElement | null;
       expect(input).not.toBeNull();
@@ -242,6 +252,7 @@ describe("desktop artifact upload end-to-end", () => {
         root.unmount();
       });
       container.remove();
+      window.localStorage.clear();
     }
   });
 });

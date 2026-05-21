@@ -11,6 +11,8 @@ export interface ArtifactIngestionFeatureProps {
   client?: ApiArtifactUploadClient;
   ingestionClient?: ArtifactBrowserApiClient;
   onUploadComplete?: () => void;
+  workspaceId?: string;
+  workspaceName?: string;
 }
 
 type ExpandedPanelsState = {
@@ -79,7 +81,7 @@ function writeStoredExpandedPanels(expandedPanels: ExpandedPanelsState): void {
   }
 }
 
-export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComplete }: ArtifactIngestionFeatureProps) {
+export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComplete, workspaceId, workspaceName }: ArtifactIngestionFeatureProps) {
   const [expandedPanels, setExpandedPanels] = useState<ExpandedPanelsState>(() => readStoredExpandedPanels());
 
   function togglePanel(panel: keyof typeof expandedPanels): void {
@@ -107,7 +109,7 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
     setWebsiteBatchMode,
     ingestWebsiteSingle,
     ingestWebsiteBatch,
-  } = useArtifactUploadFeature(client, onUploadComplete);
+  } = useArtifactUploadFeature(client, onUploadComplete, workspaceId);
 
   useEffect(() => {
     writeStoredExpandedPanels(expandedPanels);

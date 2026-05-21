@@ -1,4 +1,5 @@
 import type { ImageGenerationOutput } from "../../../contracts/image-generation";
+import { isWorkspaceId } from "../../../contracts/workspace";
 import type { RuntimeTaskRecord } from "../../../contracts/runtime";
 import type { ImageAssetRegistryPort, GeneratedImagePersistencePort } from "../../ports/image";
 
@@ -12,6 +13,7 @@ export class FinalizeImageGenerationService {
   public async finalizeCompletedTask(task: RuntimeTaskRecord): Promise<{ assets: FinalizedAssetRef[] }> {
     const existing = this.finalizedByRequestId.get(task.requestId);
     if (existing) return { assets: existing };
+    if (!isWorkspaceId(task.workspaceId)) throw new Error("Image generation finalization requires a workspace-owned runtime task.");
     if (task.status !== "succeeded") throw new Error("Image generation finalization requires a succeeded runtime task.");
 
     const outputs = this.getOutputs(task.data);
@@ -19,11 +21,13 @@ export class FinalizeImageGenerationService {
     const assets: FinalizedAssetRef[] = [];
     for (const output of outputs) {
       const persisted = await this.dependencies.generatedImagePersistence.persistGeneratedImage({
+        workspaceId: task.workspaceId,
         output,
         requestId: task.requestId,
       });
       const requestedAssetId = this.dependencies.createAssetId?.() ?? `img-${task.requestId}-${assets.length + 1}`;
       const registered = await this.dependencies.imageAssetRegistry.registerImageAsset({
+        workspaceId: task.workspaceId,
         assetId: requestedAssetId,
         artifactId: persisted.artifactId,
         source: "generated",

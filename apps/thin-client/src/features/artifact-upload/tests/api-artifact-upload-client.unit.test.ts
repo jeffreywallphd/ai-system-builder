@@ -32,6 +32,7 @@ describe("api artifact upload client", () => {
       fileName: "cat.png",
       mediaType: "image/png",
       bytes: new Uint8Array([1, 2, 3]),
+      workspaceId: "workspace-a",
     };
 
     const result = await client.uploadArtifact(input);
@@ -40,11 +41,12 @@ describe("api artifact upload client", () => {
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/artifact/upload");
     expect(options.method).toBe("POST");
-    expect(options.headers).toBeUndefined();
+    expect(options.headers).toBeInstanceOf(Headers);
     expect(options.body).toBeInstanceOf(FormData);
 
     const formData = options.body as FormData;
     expect(formData.get("source")).toBe("thin-client.artifact-upload.form");
+    expect(formData.get("workspaceId")).toBe("workspace-a");
     const file = formData.get("file");
     expect(file).toBeInstanceOf(File);
     expect((file as File).name).toBe("cat.png");
@@ -82,6 +84,7 @@ describe("api artifact upload client", () => {
       fileName: "bad.pdf",
       mediaType: "application/pdf",
       bytes: new Uint8Array([1, 2]),
+      workspaceId: "workspace-a",
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -112,6 +115,7 @@ describe("api artifact upload client", () => {
       fileName: "cat.png",
       mediaType: "image/png",
       bytes: new Uint8Array([1, 2, 3]),
+      workspaceId: "workspace-a",
     });
 
     expect(result).toEqual({
@@ -122,4 +126,19 @@ describe("api artifact upload client", () => {
       },
     });
   });
+
+  it("blocks upload before fetch when workspace id is missing", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createApiArtifactUploadClient();
+    const result = await client.uploadArtifact({
+      fileName: "cat.png",
+      mediaType: "image/png",
+      bytes: new Uint8Array([1]),
+      workspaceId: "",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: false, error: { code: "validation", message: "Workspace id is required for artifact upload." } });
+  });
+
 });

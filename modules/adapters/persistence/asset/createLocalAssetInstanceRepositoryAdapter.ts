@@ -36,6 +36,7 @@ export function createLocalAssetInstanceRepositoryAdapter(options: LocalAssetRec
 }
 
 function matchesInstance(instance: AssetInstance, query: AssetInstanceListQuery): boolean {
+  if (query.workspaceId && !matchesWorkspace(instance, String(query.workspaceId))) return false;
   if (query.definitionRef && !referenceEquals(instance.definitionRef, query.definitionRef)) return false;
   if (query.lifecycleStatus && instance.lifecycleStatus !== query.lifecycleStatus) return false;
   if (query.reviewStatus && instance.reviewStatus !== query.reviewStatus) return false;
@@ -51,4 +52,25 @@ function matchesInstance(instance: AssetInstance, query: AssetInstanceListQuery)
 
 function instanceStorageKey(instance: AssetInstance): string {
   return String(instance.instanceId);
+}
+
+function matchesWorkspace(instance: AssetInstance, workspaceId: string): boolean {
+  const metadata = instance.metadata as Record<string, unknown> | undefined;
+  return (
+    nestedWorkspaceId(metadata?.assetFinalization) === workspaceId ||
+    nestedWorkspaceId(nestedRecord(metadata?.assetFinalization)?.finalizedImage) === workspaceId ||
+    nestedWorkspaceId(metadata?.assetRegistration) === workspaceId ||
+    nestedWorkspaceId(metadata?.workspaceOwnership) === workspaceId ||
+    metadata?.workspaceId === workspaceId
+  );
+}
+
+function nestedWorkspaceId(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const workspaceId = (value as Record<string, unknown>).workspaceId;
+  return typeof workspaceId === "string" ? workspaceId : undefined;
+}
+
+function nestedRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" ? value as Record<string, unknown> : undefined;
 }

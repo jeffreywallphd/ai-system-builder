@@ -11,6 +11,8 @@ export type AssetLibraryAdvancedSectionKey =
   | "configuration"
   | "ports"
   | "requirements"
+  | "packSource"
+  | "overrideResolution"
   | "provenance"
   | "validation"
   | "metadata";
@@ -102,6 +104,51 @@ export function buildAssetLibraryAdvancedSections(
     });
   }
 
+  if (
+    detail.sourcePackId ||
+    detail.sourceLayer ||
+    detail.sourceKind ||
+    detail.trustStatus ||
+    detail.packCategoryId ||
+    detail.packTags?.length
+  ) {
+    sections.push({
+      key: "packSource",
+      title: "Pack and source",
+      summary: "Read-only catalog origin details.",
+      rows: [
+        { label: "Pack", value: detail.packLabel },
+        { label: "Pack ID", value: detail.sourcePackId },
+        { label: "Pack version", value: detail.sourcePackVersion },
+        { label: "Source kind", value: formatAssetLibraryLabel(detail.sourceKind) },
+        { label: "Source layer", value: formatAssetLibraryLabel(detail.sourceLayer) },
+        { label: "Trust", value: formatAssetLibraryLabel(detail.trustStatus) },
+        { label: "Category", value: detail.categoryLabel },
+        { label: "Category ID", value: detail.packCategoryId },
+        { label: "Tags", value: joined(detail.packTags ?? []) },
+      ],
+    });
+  }
+
+  if (
+    detail.overridesDefinitionRef ||
+    detail.overriddenByDefinitionRefs?.length ||
+    detail.effectiveResolutionStatus ||
+    detail.resolutionSummary
+  ) {
+    sections.push({
+      key: "overrideResolution",
+      title: "Override relationship",
+      summary: "Informational only. This does not apply or edit overrides.",
+      rows: [
+        { label: "Overrides", value: formatAssetRef(detail.overridesDefinitionRef) },
+        { label: "Overridden by", value: joined((detail.overriddenByDefinitionRefs ?? []).map(formatAssetRef).filter((value): value is string => Boolean(value))) },
+        { label: "Effective status", value: formatAssetLibraryLabel(detail.effectiveResolutionStatus) },
+        { label: "Resolution summary", value: detail.resolutionSummary },
+      ],
+    });
+  }
+
   if (detail.provenanceSummary) {
     sections.push({
       key: "provenance",
@@ -144,6 +191,11 @@ export function buildAssetLibraryAdvancedSections(
   }
 
   return sections;
+}
+
+function formatAssetRef(ref: { readonly id: string; readonly version?: string } | undefined): string | undefined {
+  if (!ref) return undefined;
+  return ref.version ? `${ref.id}@${ref.version}` : ref.id;
 }
 
 export function getAssetLibraryAdvancedSections(

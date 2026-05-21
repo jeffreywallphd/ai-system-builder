@@ -1,4 +1,9 @@
 import type {
+  WorkspaceId,
+} from "../../../contracts/workspace";
+import type { UserLibraryEffectiveSourceSummary } from "../../../contracts/user-library";
+import type { AssetAuthoringEffectiveSourceSummary } from "../../../contracts/asset-authoring/asset-authoring-effective-source";
+import type {
   AssetBinding,
   AssetComposition,
   AssetCompositionType,
@@ -9,9 +14,12 @@ import type {
   AssetInstanceStateSummary,
   AssetLifecycleStatus,
   AssetMetadata,
+  AssetPackSourceKind,
+  AssetPackTrustStatus,
   AssetReference,
   AssetResourceBackedView,
   AssetResourceBackedViewKind,
+  AssetSourceLayer,
   AssetType,
 } from "../../../contracts/asset";
 export type {
@@ -33,6 +41,7 @@ export interface AssetRegistryListQuery {
   readonly includeMetadata?: boolean;
   readonly limit?: number;
   readonly cursor?: string;
+  readonly workspaceId?: WorkspaceId | string;
 }
 
 export interface AssetRegistryReadOptions {
@@ -43,6 +52,7 @@ export interface AssetRegistryReadOptions {
   readonly includeRequirements?: boolean;
   readonly includeResourceBackings?: boolean;
   readonly includeMetadata?: boolean;
+  readonly workspaceId?: WorkspaceId | string;
 }
 
 export interface AssetRegistryListDiagnostic {
@@ -70,13 +80,37 @@ export interface AssetDefinitionCard {
   readonly summary?: string;
   readonly lifecycleStatus: AssetLifecycleStatus;
   readonly builtIn?: boolean;
+  readonly sourcePackId?: string;
+  readonly sourcePackVersion?: string;
+  readonly sourcePackDisplayName?: string;
+  readonly sourceKind?: AssetPackSourceKind;
+  readonly sourceLayer?: AssetSourceLayer;
+  readonly trustStatus?: AssetPackTrustStatus;
+  readonly packCategoryId?: string;
+  readonly packCategoryDisplayName?: string;
+  readonly packTags?: readonly string[];
+  readonly systemDefault?: boolean;
+  readonly installedPack?: boolean;
+  readonly importedPack?: boolean;
+  readonly workspacePack?: boolean;
+  readonly workspaceOverride?: boolean;
+  readonly organizationOverride?: boolean;
+  readonly userOverride?: boolean;
+  readonly overridesDefinitionRef?: AssetReference;
+  readonly overriddenByDefinitionRefs?: readonly AssetReference[];
+  readonly effectiveResolutionStatus?: string;
+  readonly resolutionSummary?: string;
   readonly metadata?: AssetMetadata;
+  readonly effectiveSourceSummary?: UserLibraryEffectiveSourceSummary;
+  readonly assetAuthoringEffectiveSourceSummary?: AssetAuthoringEffectiveSourceSummary;
 }
 
 export interface AssetDefinitionDetail {
   readonly definition: AssetDefinition;
   readonly builtIn?: boolean;
   readonly validationSummary?: AssetValidationResult;
+  readonly effectiveSourceSummary?: UserLibraryEffectiveSourceSummary;
+  readonly assetAuthoringEffectiveSourceSummary?: AssetAuthoringEffectiveSourceSummary;
 }
 
 export interface AssetInstanceCard {

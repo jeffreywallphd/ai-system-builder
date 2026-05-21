@@ -2,6 +2,7 @@ import type {
   ArtifactBrowseItem,
 } from "../../../contracts/artifact-browser";
 import { isContractFailure } from "../../../contracts/shared";
+import { isWorkspaceId } from "../../../contracts/workspace";
 import type {
   AssetFamily,
   AssetMetadata,
@@ -71,6 +72,16 @@ export class ArtifactResourceBackedViewProvider implements AssetResourceBackedVi
       diagnostics.push(this.diagnostic("info", "artifact-resource-backed-view-lifecycle-filter-unsupported", "Artifact lifecycle state is not mapped to Asset Kernel lifecycle status by this provider."));
     }
 
+    if (!isWorkspaceId(query.workspaceId)) {
+      return {
+        items: [],
+        diagnostics: [
+          ...diagnostics,
+          this.diagnostic("warning", "workspace-required", "Workspace id is required for artifact-backed resource views."),
+        ],
+      };
+    }
+
     if (!this.artifactBrowserMetadataRead) {
       return {
         items: [],
@@ -83,7 +94,7 @@ export class ArtifactResourceBackedViewProvider implements AssetResourceBackedVi
 
     let items: readonly ArtifactBrowseItem[];
     try {
-      const result = await this.artifactBrowserMetadataRead.browseArtifacts({});
+      const result = await this.artifactBrowserMetadataRead.browseArtifacts({}, { workspaceId: query.workspaceId });
       if (isContractFailure(result)) {
         return {
           items: [],
@@ -123,8 +134,8 @@ export class ArtifactResourceBackedViewProvider implements AssetResourceBackedVi
     }) as AssetResourceBackedViewListResult;
   }
 
-  public async readResourceBackedView(viewId: string): Promise<AssetResourceBackedView | undefined> {
-    const result = await this.listResourceBackedViews({ limit: this.maxListLimit });
+  public async readResourceBackedView(viewId: string, query: { readonly workspaceId?: string } = {}): Promise<AssetResourceBackedView | undefined> {
+    const result = await this.listResourceBackedViews({ limit: this.maxListLimit, workspaceId: query.workspaceId });
     const view = result.items.find((item) => item.viewId === viewId);
     return view ? withDetailFallbackDiagnostic(view, this.diagnostic("info", "artifact-resource-backed-view-detail-list-fallback-limited", "Artifact detail read used the bounded browse-list fallback because public view ids do not expose reversible artifact locators.")) : undefined;
   }
