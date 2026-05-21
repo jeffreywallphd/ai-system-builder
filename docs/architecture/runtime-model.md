@@ -140,3 +140,8 @@ Runtime adapters must harden process invocation against command injection, contr
 - These reads wrap the shared `RuntimeReadinessSnapshot`, `RuntimeCapabilityStatus`, and `RuntimeCapabilityId` contracts; API-specific files must not duplicate the readiness shape.
 - Readiness reads are no-start/no-install/no-repair operations: they may read bounded supervisor/installer status, but they must not start Python or ComfyUI, call feature-specific generation/model endpoints, install, repair, or probe runtime sidecars as a general readiness check.
 - Feature-specific endpoints remain execution APIs, not general runtime readiness probes. Desktop IPC readiness exposure remains a separate transport surface from the server API, and thin-client UI consumption is deferred to later UI prompts.
+
+
+## Phase 12 execution plan preparation boundary
+
+Phase 12 introduces a non-executing planning layer that depends on runtime readiness outputs and produces safe execution plan candidates/previews. Runtime/provider invocation remains deferred to later execution orchestration work.
