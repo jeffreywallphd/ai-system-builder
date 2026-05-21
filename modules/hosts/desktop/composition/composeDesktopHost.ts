@@ -17,7 +17,7 @@ import { CreateAuthoredAssetEffectiveProjectionUseCase, CreateOverrideEffectiveP
 import { AddProjectionToCompositionPlanUseCase, ArchiveAssetCompositionPlanUseCase, ConnectCompositionNodesUseCase, CreateAssetCompositionPlanUseCase, DisconnectCompositionNodesUseCase, ListAssetCompositionPlansUseCase, ReadAssetCompositionPlanUseCase, RemoveProjectionFromCompositionPlanUseCase, UpdateAssetCompositionPlanUseCase, ValidateAssetCompositionPlanUseCase } from "../../../application/use-cases/asset-composition";
 import { CreateRuntimeReadinessBindingUseCase, ValidateRuntimeReadinessBindingUseCase, RuntimeRequirementExtractionService, RuntimeCapabilityMatchingService, RuntimeBindingCandidateSelectionService, RuntimeReadinessValidationService } from "../../../application/use-cases/runtime-readiness";
 import { WorkspaceAssetCompositionReadModelService, WorkspaceEffectiveAssetProjectionReadModelService } from "../../../application/services/asset";
-import { RuntimeCapabilityInventoryService, RuntimeCapabilityInventorySummaryService } from "../../../application/services/runtime-readiness";
+import { RuntimeCapabilityInventoryService, RuntimeCapabilityInventorySummaryService, WorkspaceRuntimeReadinessReadModelService } from "../../../application/services/runtime-readiness";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
 import { createLocalWorkspaceRepository, createLocalWorkspaceSelectionRepository, createLocalWorkspaceSystemPackActivationRepository } from "../../../adapters/persistence/workspace";
@@ -377,6 +377,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           nextBindingId: () => `rb.${randomUUID()}`,
           now: options.now,
         }),
+        readModel: new WorkspaceRuntimeReadinessReadModelService({ bindingRepository: runtimeReadinessBindingRepository, inventoryRepository: runtimeInventoryRepository }),
         validateBinding: new ValidateRuntimeReadinessBindingUseCase({
           bindingRepository: runtimeReadinessBindingRepository,
           validationService: new RuntimeReadinessValidationService(),
