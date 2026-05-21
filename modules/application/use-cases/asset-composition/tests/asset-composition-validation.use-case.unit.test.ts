@@ -24,3 +24,15 @@ describe("ValidateAssetCompositionPlanUseCase", () => {
     assert.equal(r.status, "failure");
   });
 });
+
+
+it("marks effective asset mismatch as blocking invalid", async () => {
+  const useCase = new ValidateAssetCompositionPlanUseCase({ repository: { readAssetCompositionPlanRecord: async () => plan(), updateAssetCompositionPlanRecord: async (p) => p, listAssetCompositionPlanRecords: async () => { throw new Error(); }, saveAssetCompositionPlanRecord: async () => { throw new Error(); } }, projectionRepository: { readEffectiveAssetProjectionRecord: async () => ({ ...proj(), effectiveAssetReference: { kind: "artifact" as never, id: "ea2" as never } }), readEffectiveAssetProjectionRecordByEffectiveAssetReference: async () => undefined, listEffectiveAssetProjectionRecords: async () => { throw new Error(); }, listBlockedConflictedOrStaleEffectiveAssetProjectionRecords: async () => [], saveEffectiveAssetProjectionRecord: async () => { throw new Error(); }, updateEffectiveAssetProjectionRecord: async () => { throw new Error(); } } });
+  const r = await useCase.execute({ targetWorkspaceId: ws, planId: "plan.a" as never });
+  assert.equal(r.status, "success");
+  if (r.status === "success") {
+    assert.equal(r.value.status, "invalid");
+    assert.equal(r.value.nodes[0]?.status, "invalid");
+    assert.ok(r.value.blockers.some((b) => b.code === "asset-composition-node-reference-mismatch"));
+  }
+});

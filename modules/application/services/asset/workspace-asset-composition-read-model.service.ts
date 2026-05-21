@@ -102,11 +102,11 @@ export class WorkspaceAssetCompositionReadModelService {
   private toDetail(plan: AssetCompositionPlan): WorkspaceAssetCompositionPlanDetail {
     return {
       summary: this.toSummary(plan),
-      selectedProjections: plan.selectedProjections.map((p) => ({ projectionId: p.projectionId, targetWorkspaceId: p.targetWorkspaceId, displayLabel: p.displayLabel, effectiveAssetReference: p.effectiveAssetReference, projectionStatusAtSelection: p.projectionStatusAtSelection })),
+      selectedProjections: plan.selectedProjections.map((p) => ({ projectionId: p.projectionId, targetWorkspaceId: p.targetWorkspaceId, displayLabel: sanitizeText(p.displayLabel), effectiveAssetReference: p.effectiveAssetReference, projectionStatusAtSelection: p.projectionStatusAtSelection })),
       nodes: plan.nodes.map((n) => this.toNodeSummary(n)),
       relationships: plan.relationships.map((r) => this.toRelationshipSummary(r)),
       diagnostics: plan.compatibilityDiagnostics.map((d) => this.toDiagnostic(d)),
-      blockers: plan.blockers.map((b) => ({ code: b.code, message: b.message })),
+      blockers: plan.blockers.map((b) => ({ code: b.code, message: sanitizeText(b.message) ?? "Sanitized composition planning blocker." })),
       planningSummary: {
         totalNodes: plan.planningSummary.totalNodes,
         totalRelationships: plan.planningSummary.totalRelationships,
@@ -132,8 +132,8 @@ export class WorkspaceAssetCompositionReadModelService {
     return {
       planId: plan.planId,
       targetWorkspaceId: plan.targetWorkspaceId,
-      name: plan.name,
-      description: plan.description,
+      name: sanitizeText(plan.name) ?? "Untitled",
+      description: sanitizeText(plan.description),
       status: plan.status,
       planningReadiness: plan.planningSummary.planningReadiness,
       totalNodes: plan.planningSummary.totalNodes,
@@ -169,7 +169,13 @@ export class WorkspaceAssetCompositionReadModelService {
     return "Needs attention";
   }
 
-  private toNodeSummary(node: AssetCompositionNode) { return { nodeId: node.nodeId, role: node.role, status: node.status, safeLabel: node.label, safeSummary: node.summary, effectiveAssetReference: node.effectiveAssetReference, selectedProjectionId: node.selectedProjection.projectionId, requiredCapabilityCount: node.requiredCapabilities.length, providedCapabilityCount: node.providedCapabilities.length, diagnosticCount: node.diagnostics.length, blockerCount: node.blockers.length, createdAt: node.createdAt, updatedAt: node.updatedAt }; }
-  private toRelationshipSummary(relationship: AssetCompositionRelationship) { return { relationshipId: relationship.relationshipId, sourceNodeId: relationship.sourceNodeId, targetNodeId: relationship.targetNodeId, kind: relationship.kind, compatibilityStatus: relationship.compatibilityStatus, safeLabel: relationship.label, safeSummary: relationship.summary, diagnosticCount: relationship.diagnostics.length, blockerCount: relationship.blockers.length, createdAt: relationship.createdAt, updatedAt: relationship.updatedAt }; }
-  private toDiagnostic(diagnostic: AssetCompositionDiagnostic) { return { code: diagnostic.code, severity: diagnostic.severity, message: diagnostic.message }; }
+  private toNodeSummary(node: AssetCompositionNode) { return { nodeId: node.nodeId, role: node.role, status: node.status, safeLabel: sanitizeText(node.label), safeSummary: sanitizeText(node.summary), effectiveAssetReference: node.effectiveAssetReference, selectedProjectionId: node.selectedProjection.projectionId, requiredCapabilityCount: node.requiredCapabilities.length, providedCapabilityCount: node.providedCapabilities.length, diagnosticCount: node.diagnostics.length, blockerCount: node.blockers.length, createdAt: node.createdAt, updatedAt: node.updatedAt }; }
+  private toRelationshipSummary(relationship: AssetCompositionRelationship) { return { relationshipId: relationship.relationshipId, sourceNodeId: relationship.sourceNodeId, targetNodeId: relationship.targetNodeId, kind: relationship.kind, compatibilityStatus: relationship.compatibilityStatus, safeLabel: sanitizeText(relationship.label), safeSummary: sanitizeText(relationship.summary), diagnosticCount: relationship.diagnostics.length, blockerCount: relationship.blockers.length, createdAt: relationship.createdAt, updatedAt: relationship.updatedAt }; }
+  private toDiagnostic(diagnostic: AssetCompositionDiagnostic) { return { code: diagnostic.code, severity: diagnostic.severity, message: sanitizeText(diagnostic.message) ?? "Sanitized composition planning diagnostic." }; }
 }
+
+const sanitizeText = (value: string | undefined): string | undefined => {
+  if (!value) return undefined;
+  const stripped = value.replace(/[<>]/g, "").trim();
+  return stripped.length > 0 ? stripped : undefined;
+};
