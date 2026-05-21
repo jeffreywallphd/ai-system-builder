@@ -1,7 +1,7 @@
-import type { RuntimeReadinessBinding, RuntimeReadinessBlocker, RuntimeReadinessDiagnostic, RuntimeReadinessStatus } from "../../../contracts/runtime-readiness";
+import type { RuntimeProviderAvailabilityStatus, RuntimeReadinessBinding, RuntimeReadinessBlocker, RuntimeReadinessDiagnostic, RuntimeReadinessDiagnosticCode, RuntimeReadinessStatus } from "../../../contracts/runtime-readiness";
 
 const statusPriority: RuntimeReadinessStatus[] = [
-  "invalid","blocked","missing-requirements","provider-unavailable","provider-unsupported","configuration-required","permission-required","stale","ready-for-setup","draft",
+  "invalid", "blocked", "missing-requirements", "provider-unavailable", "provider-unsupported", "configuration-required", "permission-required", "stale", "ready-for-setup", "draft",
 ];
 
 const pushBlocker = (list: RuntimeReadinessBlocker[], code: RuntimeReadinessBlocker["code"], message: string, safeDetails?: Record<string, string>) => {
@@ -11,76 +11,108 @@ const pushDiagnostic = (list: RuntimeReadinessDiagnostic[], code: RuntimeReadine
   list.push({ code, severity, message });
 };
 
+const requiredStatusMap: Record<RuntimeProviderAvailabilityStatus, { status: RuntimeReadinessStatus; code: RuntimeReadinessDiagnosticCode }> = {
+  available: { status: "ready-for-setup", code: "runtime-readiness-execution-deferred" },
+  unavailable: { status: "provider-unavailable", code: "runtime-readiness-provider-unavailable" },
+  "not-installed": { status: "provider-unavailable", code: "runtime-readiness-provider-not-installed" },
+  unsupported: { status: "provider-unsupported", code: "runtime-readiness-capability-unsupported" },
+  "not-configured": { status: "configuration-required", code: "runtime-readiness-provider-not-configured" },
+  "permission-required": { status: "permission-required", code: "runtime-readiness-provider-permission-required" },
+  stale: { status: "stale", code: "runtime-readiness-inventory-stale" },
+  unknown: { status: "provider-unavailable", code: "runtime-readiness-provider-unavailable" },
+  error: { status: "provider-unavailable", code: "runtime-readiness-service-unavailable" },
+};
+
 export class RuntimeReadinessValidationService {
   public validate(binding: RuntimeReadinessBinding, targetWorkspaceId: string): { status: RuntimeReadinessStatus; blockers: RuntimeReadinessBlocker[]; diagnostics: RuntimeReadinessDiagnostic[]; bindings: RuntimeReadinessBinding["bindings"] } {
     const blockers: RuntimeReadinessBlocker[] = [];
     const diagnostics: RuntimeReadinessDiagnostic[] = [];
 
-    if (binding.targetWorkspaceId !== targetWorkspaceId) {
-      pushBlocker(blockers, "runtime-readiness-workspace-invalid", "Readiness binding workspace mismatch.");
-    }
-    if (!binding.compositionPlanId) {
-      pushBlocker(blockers, "runtime-readiness-composition-plan-required", "Readiness binding does not reference a composition plan.");
-    }
+    if (binding.targetWorkspaceId !== targetWorkspaceId) pushBlocker(blockers, "runtime-readiness-workspace-invalid", "Readiness binding workspace mismatch.");
+    if (!binding.compositionPlanId) pushBlocker(blockers, "runtime-readiness-composition-plan-required", "Readiness binding does not reference a composition plan.");
 
     const requirementsById = new Map(binding.requirements.map((item) => [item.requirementId, item]));
     const providersById = new Map(binding.providerCandidates.map((item) => [item.providerCandidateId, item]));
-    const availabilityByRequirement = new Map<string, RuntimeReadinessStatus[]>();
+    const candidatesByRequirement = new Map<string, RuntimeReadinessBinding["bindingCandidates"]>();
+
+    const evaluateAvailability = (requirementId: string, isRequired: boolean, scope: "provider" | "capability", availabilityStatus: RuntimeProviderAvailabilityStatus) => {
+      const mapped = requiredStatusMap[availabilityStatus];
+      if (mapped.status === "ready-for-setup") return;
+      const message = mapped.code === "runtime-readiness-service-unavailable" ? `${scope} availability check failed with sanitized error.` : `Required ${scope} is ${availabilityStatus}.`;
+      if (isRequired) pushBlocker(blockers, mapped.code, message, { requirementId });
+      else pushDiagnostic(diagnostics, mapped.code, "warning", `Optional ${scope} is ${availabilityStatus}.`);
+    };
 
     for (const candidate of binding.bindingCandidates) {
-      if (!requirementsById.has(candidate.requirementId)) pushBlocker(blockers, "runtime-readiness-requirement-missing", "Binding candidate references unknown requirement.");
-      if (!providersById.has(candidate.providerCandidateId)) pushBlocker(blockers, "runtime-readiness-provider-missing", "Binding candidate references unknown provider candidate.");
+      if (!candidatesByRequirement.has(candidate.requirementId)) candidatesByRequirement.set(candidate.requirementId, []);
+      candidatesByRequirement.get(candidate.requirementId)?.push(candidate);
+      const requirement = requirementsById.get(candidate.requirementId);
+      const provider = providersById.get(candidate.providerCandidateId);
+      if (!requirement) pushBlocker(blockers, "runtime-readiness-requirement-missing", "Binding candidate references unknown requirement.");
+      if (!provider) pushBlocker(blockers, "runtime-readiness-provider-missing", "Binding candidate references unknown provider candidate.");
+      const capability = provider?.capabilities.find((item) => item.capabilityId === candidate.capabilityId);
+      if (candidate.capabilityId && !capability) pushBlocker(blockers, "runtime-readiness-capability-missing", "Binding candidate references unknown capability.");
+      if (requirement && provider) {
+        evaluateAvailability(requirement.requirementId, requirement.isRequired, "provider", provider.availabilityStatus);
+        if (capability) evaluateAvailability(requirement.requirementId, requirement.isRequired, "capability", capability.availabilityStatus);
+      }
     }
 
     const nextBindings = binding.bindings.map((item) => {
       const requirement = requirementsById.get(item.requirementId);
       const provider = providersById.get(item.selectedProviderCandidateId);
+      const selectedCandidate = binding.bindingCandidates.find((candidate) => candidate.requirementId === item.requirementId && candidate.providerCandidateId === item.selectedProviderCandidateId && candidate.capabilityId === item.selectedCapabilityId);
+      const capability = provider?.capabilities.find((entry) => entry.capabilityId === item.selectedCapabilityId);
       let status = item.status;
-      if (!requirement) {
-        pushBlocker(blockers, "runtime-readiness-requirement-missing", "Selected binding references unknown requirement.");
-        status = "invalid";
+
+      if (!requirement) { pushBlocker(blockers, "runtime-readiness-requirement-missing", "Selected binding references unknown requirement."); status = "invalid"; }
+      if (!provider) { pushBlocker(blockers, "runtime-readiness-provider-missing", "Selected binding references unknown provider candidate."); status = "invalid"; }
+      if (item.selectedCapabilityId && !capability) { pushBlocker(blockers, "runtime-readiness-capability-missing", "Selected binding references unknown capability."); status = "invalid"; }
+      if (!selectedCandidate) { pushBlocker(blockers, "runtime-readiness-binding-candidate-missing", "Selected binding does not map to a known binding candidate."); status = "invalid"; }
+
+      if (requirement && provider) {
+        evaluateAvailability(requirement.requirementId, requirement.isRequired, "provider", provider.availabilityStatus);
+        if (capability) evaluateAvailability(requirement.requirementId, requirement.isRequired, "capability", capability.availabilityStatus);
+        const providerStatus = requiredStatusMap[provider.availabilityStatus].status;
+        const capabilityStatus = capability ? requiredStatusMap[capability.availabilityStatus].status : "provider-unavailable";
+        if (providerStatus !== "ready-for-setup") status = providerStatus === "provider-unsupported" ? "unsupported" : providerStatus;
+        else if (capabilityStatus !== "ready-for-setup") status = capabilityStatus === "provider-unsupported" ? "unsupported" : capabilityStatus;
       }
-      if (!provider) {
-        pushBlocker(blockers, "runtime-readiness-provider-missing", "Selected binding references unknown provider candidate.");
-        status = "invalid";
-      }
-      if (provider && ["unavailable", "not-installed", "error", "unknown"].includes(provider.availabilityStatus)) {
-        if (requirement?.isRequired) pushBlocker(blockers, "runtime-readiness-provider-unavailable", "Required provider candidate is unavailable."); else pushDiagnostic(diagnostics, "runtime-readiness-provider-unavailable", "warning", "Optional provider candidate is unavailable.");
-        status = "provider-unavailable";
-        availabilityByRequirement.set(item.requirementId, [...(availabilityByRequirement.get(item.requirementId) ?? []), "provider-unavailable"]);
-      }
-      if (provider?.availabilityStatus === "unsupported") { if (requirement?.isRequired) pushBlocker(blockers, "runtime-readiness-capability-unsupported", "Required provider candidate is unsupported."); status = "unsupported"; availabilityByRequirement.set(item.requirementId,[...(availabilityByRequirement.get(item.requirementId)??[]),"provider-unsupported"]); }
-      if (provider?.availabilityStatus === "not-configured") { if (requirement?.isRequired) pushBlocker(blockers,"runtime-readiness-configuration-required","Provider configuration is required."); status = "configuration-required"; availabilityByRequirement.set(item.requirementId,[...(availabilityByRequirement.get(item.requirementId)??[]),"configuration-required"]); }
-      if (provider?.availabilityStatus === "permission-required") { if (requirement?.isRequired) pushBlocker(blockers,"runtime-readiness-permission-required","Provider permission is required."); status = "permission-required"; availabilityByRequirement.set(item.requirementId,[...(availabilityByRequirement.get(item.requirementId)??[]),"permission-required"]); }
-      if (provider?.availabilityStatus === "stale") { if (requirement?.isRequired) pushBlocker(blockers,"runtime-readiness-inventory-stale","Runtime inventory is stale for required binding."); else pushDiagnostic(diagnostics,"runtime-readiness-inventory-stale","warning","Optional provider inventory is stale."); status = "stale"; availabilityByRequirement.set(item.requirementId,[...(availabilityByRequirement.get(item.requirementId)??[]),"stale"]); }
       return { ...item, status };
     });
 
     for (const requirement of binding.requirements) {
       if (requirement.targetWorkspaceId !== binding.targetWorkspaceId) pushBlocker(blockers, "runtime-readiness-workspace-invalid", "Requirement workspace mismatch.");
       if (requirement.compositionPlanId !== binding.compositionPlanId) pushBlocker(blockers, "runtime-readiness-composition-plan-not-valid", "Requirement composition plan mismatch.");
-      const candidateCount = binding.bindingCandidates.filter((c) => c.requirementId === requirement.requirementId).length;
-      const selectedCount = nextBindings.filter((c) => c.requirementId === requirement.requirementId && ["selected","bound"].includes(c.status)).length;
-      if (candidateCount + selectedCount === 0) {
+      const candidates = candidatesByRequirement.get(requirement.requirementId) ?? [];
+      const selected = nextBindings.filter((entry) => entry.requirementId === requirement.requirementId && ["selected", "bound"].includes(entry.status));
+      if (candidates.length === 0) {
         if (requirement.isRequired) pushBlocker(blockers, "runtime-readiness-capability-missing", "Required capability has no runtime candidate.", { capabilityKey: requirement.capabilityKey });
         else pushDiagnostic(diagnostics, "runtime-readiness-capability-missing", "warning", "Optional capability has no runtime candidate.");
       }
-      if (selectedCount > 1 && requirement.isRequired) pushBlocker(blockers, "runtime-readiness-binding-candidate-missing", "Conflicting selected bindings found for one required capability.");
+      if (selected.length > 1 && requirement.isRequired) pushBlocker(blockers, "runtime-readiness-binding-candidate-missing", "Conflicting selected bindings found for one required capability.");
+      if (requirement.isRequired && candidates.length > 0 && selected.length === 0) pushBlocker(blockers, "runtime-readiness-provider-unavailable", "Required capability has candidates but no safe selected binding.");
+      if (!requirement.isRequired && candidates.length > 1 && selected.length === 0) pushDiagnostic(diagnostics, "runtime-readiness-binding-candidate-missing", "warning", "Optional capability has ambiguous unselected candidates.");
     }
 
-    const has = (s: RuntimeReadinessStatus) => blockers.some((b) => ({
-      invalid:["runtime-readiness-workspace-invalid","runtime-readiness-requirement-missing","runtime-readiness-provider-missing"],
-      blocked:["runtime-readiness-composition-plan-not-valid","runtime-readiness-composition-plan-missing"],
-      "missing-requirements":["runtime-readiness-capability-missing","runtime-readiness-model-missing"],
-      "provider-unavailable":["runtime-readiness-provider-unavailable","runtime-readiness-provider-not-installed"],
-      "provider-unsupported":["runtime-readiness-capability-unsupported","runtime-readiness-provider-missing"],
-      "configuration-required":["runtime-readiness-configuration-required","runtime-readiness-provider-not-configured"],
-      "permission-required":["runtime-readiness-permission-required","runtime-readiness-provider-permission-required"],
-      stale:["runtime-readiness-inventory-stale","runtime-readiness-composition-plan-stale"],
-      "ready-for-setup":[], draft:[]
-    }[s] as string[]).includes(b.code));
+    const hasCode = (...codes: string[]) => blockers.some((entry) => codes.includes(entry.code));
+    const has = (status: RuntimeReadinessStatus) => ({
+      invalid: hasCode("runtime-readiness-workspace-invalid", "runtime-readiness-requirement-missing", "runtime-readiness-provider-missing"),
+      blocked: hasCode("runtime-readiness-composition-plan-not-valid", "runtime-readiness-composition-plan-missing", "runtime-readiness-composition-plan-required"),
+      "missing-requirements": hasCode("runtime-readiness-capability-missing", "runtime-readiness-model-missing"),
+      "provider-unavailable": hasCode("runtime-readiness-provider-unavailable", "runtime-readiness-provider-not-installed", "runtime-readiness-service-unavailable"),
+      "provider-unsupported": hasCode("runtime-readiness-capability-unsupported"),
+      "configuration-required": hasCode("runtime-readiness-configuration-required", "runtime-readiness-provider-not-configured"),
+      "permission-required": hasCode("runtime-readiness-permission-required", "runtime-readiness-provider-permission-required"),
+      stale: hasCode("runtime-readiness-inventory-stale", "runtime-readiness-composition-plan-stale"),
+      "ready-for-setup": false,
+      draft: false,
+    }[status]);
 
-    const status = statusPriority.find((s) => s === "ready-for-setup" ? blockers.length === 0 && binding.requirements.filter((x)=>x.isRequired).every((r)=>nextBindings.some((b)=>b.requirementId===r.requirementId&&["selected","bound"].includes(b.status))) : has(s)) ?? "draft";
+    const requiredIds = binding.requirements.filter((entry) => entry.isRequired).map((entry) => entry.requirementId);
+    const allRequiredSafe = requiredIds.every((requirementId) => nextBindings.some((entry) => entry.requirementId === requirementId && ["selected", "bound"].includes(entry.status)));
+    const status = statusPriority.find((entry) => entry === "ready-for-setup" ? blockers.length === 0 && allRequiredSafe : has(entry)) ?? "draft";
+
     return { status, blockers, diagnostics, bindings: nextBindings };
   }
 }
