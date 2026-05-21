@@ -20,7 +20,7 @@ export class ConnectCompositionNodesUseCase {
       if (!guarded.ok) return assetCompositionPlanFailure(guarded.code === "asset-composition-relationship-duplicate" ? "conflict" : "blocked", guarded.code);
       const relationshipId = c.relationshipId ?? normalizeAssetCompositionRelationshipId(this.d.generateRelationshipId());
       const relationship = createAssetCompositionRelationship({ relationshipId, targetWorkspaceId: c.targetWorkspaceId, sourceNodeId: c.sourceNodeId, targetNodeId: c.targetNodeId, kind: c.relationshipKind, compatibilityStatus: "unknown", now });
-      const next = normalizeAssetCompositionPlan({ ...plan, relationships: [...plan.relationships, relationship], planningSummary: recomputeAssetCompositionPlanningSummary({ ...plan, relationships: [...plan.relationships, relationship] }), provenance: [...plan.provenance, { ...createPlanProvenanceEvent("relationship-added", c.targetWorkspaceId, c.planId, now), kind: "relationship-added", sourceNodeId: c.sourceNodeId, targetNodeId: c.targetNodeId, relationshipId, relationshipKind: c.relationshipKind }], updatedAt: now });
+      const next = normalizeAssetCompositionPlan({ ...plan, relationships: [...plan.relationships, relationship], planningSummary: recomputeAssetCompositionPlanningSummary({ ...plan, relationships: [...plan.relationships, relationship] }), provenance: [...plan.provenance, { ...createPlanProvenanceEvent("relationship-added", c.targetWorkspaceId, c.planId, now), relationshipId }], updatedAt: now });
       return { status: "success", value: await this.d.repository.updateAssetCompositionPlanRecord(next) };
     } catch { return assetCompositionPlanFailure("unavailable", "asset-composition-repository-unavailable"); }
   }

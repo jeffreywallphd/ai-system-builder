@@ -18,6 +18,7 @@ import { AddProjectionToCompositionPlanUseCase, ArchiveAssetCompositionPlanUseCa
 import { CreateRuntimeReadinessBindingUseCase, ValidateRuntimeReadinessBindingUseCase, RuntimeRequirementExtractionService, RuntimeCapabilityMatchingService, RuntimeBindingCandidateSelectionService, RuntimeReadinessValidationService } from "../../../application/use-cases/runtime-readiness";
 import { WorkspaceAssetCompositionReadModelService, WorkspaceEffectiveAssetProjectionReadModelService } from "../../../application/services/asset";
 import { RuntimeCapabilityInventoryService, RuntimeCapabilityInventorySummaryService, WorkspaceRuntimeReadinessReadModelService } from "../../../application/services/runtime-readiness";
+import { normalizeRuntimeBindingCandidateId, normalizeRuntimeBindingId, normalizeRuntimeRequirementId } from "../../../contracts/runtime-readiness";
 import { createLogger, type StructuredLogSink } from "../../../adapters/observability/logging";
 import { createInMemorySecretsAdapter, createLocalApplicationSettingsAdapter } from "../../../adapters/persistence/settings";
 import { createLocalWorkspaceRepository, createLocalWorkspaceSelectionRepository, createLocalWorkspaceSystemPackActivationRepository } from "../../../adapters/persistence/workspace";
@@ -372,9 +373,9 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           capabilityMatchingService: new RuntimeCapabilityMatchingService(),
           candidateSelectionService: new RuntimeBindingCandidateSelectionService(),
           nextReadinessBindingId: () => `rrb.${randomUUID()}`,
-          nextRequirementId: () => `req.${randomUUID()}`,
-          nextBindingCandidateId: () => `rbc.${randomUUID()}`,
-          nextBindingId: () => `rb.${randomUUID()}`,
+          nextRequirementId: () => normalizeRuntimeRequirementId(`req.${randomUUID()}`),
+          nextBindingCandidateId: () => normalizeRuntimeBindingCandidateId(`rbc.${randomUUID()}`),
+          nextBindingId: () => normalizeRuntimeBindingId(`rb.${randomUUID()}`),
           now: options.now,
         }),
         readModel: new WorkspaceRuntimeReadinessReadModelService({ bindingRepository: runtimeReadinessBindingRepository, inventoryRepository: runtimeInventoryRepository }),
@@ -474,7 +475,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           removeProjection: new RemoveProjectionFromCompositionPlanUseCase({ repository: assetCompositionPlanRepository, now: options.now }),
           connectNodes: new ConnectCompositionNodesUseCase({ repository: assetCompositionPlanRepository, generateRelationshipId: () => `rel.${randomUUID()}`, now: options.now }),
           disconnectNodes: new DisconnectCompositionNodesUseCase({ repository: assetCompositionPlanRepository, now: options.now }),
-          validatePlan: new ValidateAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository, now: options.now }),
+          validatePlan: new ValidateAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository, projectionRepository: effectiveAssetProjectionRepository, now: options.now }),
           readModel: assetCompositionReadModel,
         },
       });

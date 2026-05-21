@@ -17,13 +17,16 @@ export function createLocalAssetCompositionPlanRepositoryAdapter(o:{rootDir:stri
     async listAssetCompositionPlanRecords(query){
       if (!query.targetWorkspaceId) throw new Error("targetWorkspaceId is required.");
       const safeProjectionId = query.selectedProjectionId ? normalizeEffectiveAssetProjectionId(query.selectedProjectionId) : undefined;
+      const safeNodeRole = query.nodeRole ? normalizeAssetCompositionNodeRole(query.nodeRole) : undefined;
+      const safeRelationshipKind = query.relationshipKind ? normalizeAssetCompositionRelationshipKind(query.relationshipKind) : undefined;
+      const safeCompatibilityStatus = query.compatibilityStatus ? normalizeAssetCompositionCompatibilityStatus(query.compatibilityStatus) : undefined;
       const plans = (await store.readPlans<AssetCompositionPlan>()).map(normalizeAssetCompositionPlan).filter((x)=>x.targetWorkspaceId===query.targetWorkspaceId
         && (!query.status || x.status===normalizeAssetCompositionPlanStatus(query.status))
         && (!safeProjectionId || x.selectedProjections.some((p)=>p.projectionId===safeProjectionId))
         && (!query.effectiveAssetReference || x.nodes.some((n)=>hasRef(n.effectiveAssetReference, query.effectiveAssetReference)))
-        && (!query.nodeRole || x.nodes.some((n)=>n.role===normalizeAssetCompositionNodeRole(query.nodeRole)))
-        && (!query.relationshipKind || x.relationships.some((r)=>r.kind===normalizeAssetCompositionRelationshipKind(query.relationshipKind)))
-        && (!query.compatibilityStatus || x.relationships.some((r)=>r.compatibilityStatus===normalizeAssetCompositionCompatibilityStatus(query.compatibilityStatus)))
+        && (!safeNodeRole || x.nodes.some((n)=>n.role===safeNodeRole))
+        && (!safeRelationshipKind || x.relationships.some((r)=>r.kind===safeRelationshipKind))
+        && (!safeCompatibilityStatus || x.relationships.some((r)=>r.compatibilityStatus===safeCompatibilityStatus))
         && (!query.blockedOnly || x.blockers.length>0)
         && (!query.conflictedOnly || x.status==="conflicted")
         && (!query.staleOnly || x.status==="stale")

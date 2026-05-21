@@ -8,6 +8,7 @@ import { evaluateCompatibility } from "./asset-composition-compatibility.service
 import { computePlanningReadiness } from "./asset-composition-readiness.service";
 import { findMissingCapabilityDiagnostics } from "./asset-composition-dependency.service";
 import { computeValidatedPlanStatus } from "./asset-composition-validation-result.service";
+import type { EffectiveAssetProjectionId, EffectiveAssetProjectionRecord } from "../../../contracts/effective-asset-projections";
 
 export class ValidateAssetCompositionPlanUseCase {
   constructor(private readonly d: { repository: AssetCompositionPlanRepositoryPort; projectionRepository: EffectiveAssetProjectionRepositoryPort; now?: () => string }) {}
@@ -18,7 +19,7 @@ export class ValidateAssetCompositionPlanUseCase {
       const plan = await this.d.repository.readAssetCompositionPlanRecord(c.targetWorkspaceId, c.planId);
       if (!plan) return assetCompositionPlanFailure("not-found", "asset-composition-plan-not-found");
       if (plan.status === "archived") return assetCompositionPlanFailure("conflict", "asset-composition-plan-archived");
-      const projectionMap = new Map<string, Awaited<ReturnType<EffectiveAssetProjectionRepositoryPort["readEffectiveAssetProjectionRecord"]> extends infer T ? T : never>>();
+      const projectionMap = new Map<EffectiveAssetProjectionId, EffectiveAssetProjectionRecord>();
       for (const p of plan.selectedProjections) {
         const rec = await this.d.projectionRepository.readEffectiveAssetProjectionRecord(c.targetWorkspaceId, p.projectionId);
         if (rec) projectionMap.set(p.projectionId, rec);
