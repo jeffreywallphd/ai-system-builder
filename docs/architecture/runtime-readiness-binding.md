@@ -43,7 +43,7 @@ Phase 11 is:
 - **Execution deferred**: explicit marker that Phase 11 does not execute workflows/runtimes/providers/models.
 - **Execution handoff**: constrained handoff object for later phases.
 
-User-facing UI labels should remain simpler (for example: **Ready for setup**, **Needs setup**, **Missing requirement**, **Provider unavailable**, **Model missing**, **Storage unavailable**, **Check setup**, **Nothing runs from this screen**).
+User-facing UI labels should remain simpler (for example: **Ready for setup**, **Needs setup**, **Missing requirement**, **Provider unavailable**, **Model missing**, **Storage unavailable**, **Check setup**, **Nothing runs from this screen**). Runtime setup/readiness presentation is placed inside **Assets / Plans** (desktop and thin-client), not as a separate top-level Runtime Readiness page.
 
 ## Conceptual model (non-contract baseline)
 
@@ -131,7 +131,8 @@ Baseline status vocabulary:
 Status rules:
 
 - `ready-for-setup` does **not** mean executable.
-- `ready-for-setup` does **not** mean runtime-ready-to-run.
+- `ready-for-setup` does **not** mean runtime-ready.
+- `ready-for-setup` does **not** mean ready-to-run.
 - `blocked` means at least one required capability cannot be bound safely.
 - `missing-requirements` means no matching candidates for required capabilities.
 - `configuration-required` means capability may exist but required configuration is missing.
