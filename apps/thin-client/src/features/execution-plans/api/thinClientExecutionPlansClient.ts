@@ -1,0 +1,12 @@
+import { parseApiEnvelope } from '../../../security/apiErrorEnvelope';
+import { secureFetch } from '../../../security/secureFetch';
+type Result<T> = { ok: true; value: T } | { ok: false; error: { code: string; message: string } };
+const fail = (message: string, code = 'internal'): Result<never> => ({ ok: false, error: { code, message } });
+const unwrap = <T,>(v: unknown): Result<T> => { const r=v as any; return r?.ok===true?{ok:true,value:r.value as T}:fail(r?.error?.message ?? 'Unable to complete request.', r?.error?.code ?? 'internal'); };
+const get = async (url: string) => parseApiEnvelope(await (await secureFetch(url, { method: 'GET' })).json());
+const post = async (url: string, body: unknown) => parseApiEnvelope(await (await secureFetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json());
+export function createThinClientExecutionPlansClient(base='/api/execution-plans'){const b=base.replace(/\/+$/,'');return {
+ async createExecutionPlan(input:{workspaceId:string;runtimeReadinessBindingId:string}){ if(!input.workspaceId||!input.runtimeReadinessBindingId) return fail('Workspace id and runtime readiness binding id are required.','validation'); try{return unwrap(await post(`${b}/workspaces/${encodeURIComponent(input.workspaceId)}/plans`,{workspaceId:input.workspaceId,runtimeReadinessBindingId:input.runtimeReadinessBindingId}));}catch{return fail('Execution plan creation is unavailable.','unavailable');}},
+ async validateExecutionPlan(input:{workspaceId:string;executionPlanId:string}){ if(!input.workspaceId||!input.executionPlanId) return fail('Workspace id and execution plan id are required.','validation'); try{return unwrap(await post(`${b}/workspaces/${encodeURIComponent(input.workspaceId)}/plans/${encodeURIComponent(input.executionPlanId)}/validate`,{workspaceId:input.workspaceId,executionPlanId:input.executionPlanId}));}catch{return fail('Execution plan validation is unavailable.','unavailable');}},
+ async listExecutionPlanSummaries(workspaceId:string){ if(!workspaceId) return fail('Workspace id is required.','validation'); try{return unwrap(await get(`${b}/workspaces/${encodeURIComponent(workspaceId)}/plans`));}catch{return fail('Execution plan summaries are unavailable.','unavailable');}},
+};}

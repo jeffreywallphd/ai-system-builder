@@ -27,6 +27,8 @@ import { createLocalAssetDraftRepositoryAdapter, createLocalAssetOverrideReposit
 import { createLocalEffectiveAssetProjectionRepositoryAdapter } from "../../../adapters/persistence/effective-asset-projections";
 import { createLocalAssetCompositionPlanRepositoryAdapter } from "../../../adapters/persistence/asset-composition";
 import { createLocalRuntimeInventoryRepositoryAdapter, createLocalRuntimeReadinessBindingRepositoryAdapter } from "../../../adapters/persistence/runtime-readiness";
+import { createLocalExecutionPlanRepositoryAdapter } from "../../../adapters/persistence/execution-plans";
+import { composeExecutionPlanServices } from "../../shared/composition/composeExecutionPlanServices";
 import { registerElectronIpc } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
@@ -362,6 +364,8 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
 
       const runtimeInventoryRepository = createLocalRuntimeInventoryRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
       const runtimeReadinessBindingRepository = createLocalRuntimeReadinessBindingRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const executionPlanRepository = createLocalExecutionPlanRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const executionPlanServices = composeExecutionPlanServices({ executionPlanRepository, runtimeReadinessBindingRepository, compositionPlanRepository: assetCompositionPlanRepository, now: options.now });
       const runtimeReadinessV2 = {
         inventory: new RuntimeCapabilityInventoryService(runtimeInventoryRepository, [], now),
         inventorySummary: new RuntimeCapabilityInventorySummaryService(runtimeInventoryRepository),
@@ -413,6 +417,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           },
           runtimeReadiness,
           runtimeReadinessV2,
+          executionPlans: { create: executionPlanServices.createPlan, validate: executionPlanServices.validatePlan, readModel: executionPlanServices.readModel },
           workspaceServices: startupWorkspaceShell,
           settingsUseCases,
           featureLifecycle: {

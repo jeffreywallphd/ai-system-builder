@@ -1111,6 +1111,18 @@ export function createDesktopPreloadApi(
       return dependencies.ipcRenderer.invoke(DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input });
     },
 
+
+    async createExecutionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:create-plan", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async validateExecutionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:validate-plan", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async archiveExecutionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:archive-plan", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async listExecutionPlanSummaries(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:list-summaries", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async readExecutionPlanDetail(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:read-detail", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async listExecutionPlansForCompositionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:list-for-composition-plan", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async readLatestExecutionPlanForCompositionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:read-latest-for-composition-plan", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async listExecutionPlansForRuntimeReadinessBinding(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:list-for-runtime-readiness-binding", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async readLatestExecutionPlanForRuntimeReadinessBinding(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:read-latest-for-runtime-readiness-binding", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async listExecutionPlansNeedingAttention(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:list-needing-attention", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async summarizeWorkspaceExecutionPlans(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:summarize-workspace", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
     async readFeatureLifecycleState(context = {}) {
       const request = createDesktopFeatureLifecycleStateReadRequest(
         {
