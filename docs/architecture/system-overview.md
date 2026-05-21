@@ -308,3 +308,12 @@ Later roadmap: Phase 8 is **Asset Authoring, Customization, and Override Managem
 ## Phase 10 note
 
 Asset Composition Planning is defined in `docs/architecture/asset-composition-planning.md` and ADR-0020. It consumes Phase 9 effective projection summaries as planning inputs and does not execute workflows/runtime behavior.
+
+
+## Phase 10 UI closeout
+
+- Composition planning is exposed inside the **Assets** area as a `Plans` tab, not as a separate top-level page.
+- The Phase 10 UI is structured form/list planning (plans, assets in plan, connections, check plan), not visual canvas authoring.
+- `valid` means **Ready for planning** only; it does not mean runtime-ready or execution-ready.
+- Runtime-readiness binding and workflow/runtime/model execution remain deferred to Phase 11+.
+- API/IPC/preload/client exposure from Prompt 9 is the boundary used by UI operations; unsupported operations must render as unavailable in UI.

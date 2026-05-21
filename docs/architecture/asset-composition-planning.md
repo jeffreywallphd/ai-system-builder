@@ -279,3 +279,12 @@ Phase 11 may still remain non-executing unless a later phase introduces executio
 ## Non-goals (explicit)
 
 Phase 10 does not implement workflow execution, runtime execution, ComfyUI execution, model execution, visual canvas authoring, arbitrary graph editing, prompt/workflow JSON editing, materialized workflow payload generation, conflict rebase/resolution, background propagation, live workspace linking/sync, collaboration permissions, pack import/export, marketplace behavior, or mutation/copy of `system.foundation`.
+
+
+## Phase 10 UI closeout
+
+- Composition planning is exposed inside the **Assets** area as a `Plans` tab, not as a separate top-level page.
+- The Phase 10 UI is structured form/list planning (plans, assets in plan, connections, check plan), not visual canvas authoring.
+- `valid` means **Ready for planning** only; it does not mean runtime-ready or execution-ready.
+- Runtime-readiness binding and workflow/runtime/model execution remain deferred to Phase 11+.
+- API/IPC/preload/client exposure from Prompt 9 is the boundary used by UI operations; unsupported operations must render as unavailable in UI.
