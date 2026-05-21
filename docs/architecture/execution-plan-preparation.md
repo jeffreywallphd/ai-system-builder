@@ -133,6 +133,7 @@ Allowed statuses:
 Clarifications:
 
 - `ready-for-review` does **not** mean executable or ready-to-run.
+- `ready-for-review` does **not** mean execution can start.
 - `needs-setup` means setup/readiness metadata is insufficient.
 - `missing-inputs` means required inputs cannot be safely planned.
 - `missing-outputs` means safe output destination planning is incomplete.
@@ -272,3 +273,8 @@ No runtime/workflow/model/ComfyUI execution, provider invocation, dependency ins
 13. Review C — Final Phase 12 closeout review.
 
 Prompt 8 may later split into 8a/8b/8c if transport scope grows.
+
+
+## Phase 12 handoff exclusions
+
+Phase 12 handoff excludes credentials, secrets, raw env values, shell commands, command output, local paths, storage roots, raw workflow/provider payloads, runnable graph JSON, executable payloads, bytes/blobs/base64, and signed URLs.
