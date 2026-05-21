@@ -261,3 +261,8 @@ Desktop renderer artifact-browser publish/re-check UX should call the preload-ba
 ## Security architecture posture
 
 Security is cross-cutting and layered rather than a monolithic module. The first implementation target is **HTTPS + LAN pairing bearer token** (`lan-https-token`). Transport security remains adapter-based and swappable, while authorization policy is shared but enforced at both transport and application/resource boundaries. Storage and runtime security concerns remain separate from transport security and are enforced in their own adapter/application seams. ADR-0015 is the canonical security architecture reference.
+
+
+## Execution Plan Preparation (Phase 12)
+
+Execution plan preparation is the non-executing planning layer between runtime readiness and later execution orchestration. See `docs/architecture/execution-plan-preparation.md` and ADR-0022 for boundaries and handoff semantics.

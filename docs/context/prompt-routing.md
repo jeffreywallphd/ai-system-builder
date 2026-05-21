@@ -28,6 +28,7 @@ Use this guide to select **minimum-sufficient** context packs for prompts.
 | documentation updates, canonical-vs-context discipline, doc governance | `docs/context/packs/docs-standards.pack.md` |
 | structured logging behavior, diagnosability, log field/level discipline | `docs/context/packs/logging.pack.md` |
 | test strategy, regression coverage, layered testing expectations | `docs/context/packs/testing.pack.md` |
+| execution plan preparation, execution plan candidates/previews, planned execution steps/inputs/outputs, safety gates, preflight checks, dry-run planning, provider adapter references, execution blockers, or Phase 13 execution handoff | `docs/context/packs/execution-plan-preparation.pack.md` |
 | debugging, error diagnosis, failure lifecycle analysis, bug-fix prompts | `docs/context/packs/debugging-error-handling.pack.md` |
 
 ## Debugging/Error Routing (Explicit)
@@ -137,3 +138,13 @@ For final Phase 2C stabilization prompts, include `asset-kernel`, `desktop-host`
 For resource-backed provider work, include `asset-kernel`, `persistence-storage`, `security`, `runtime`, `runtime-task-registry`, `desktop-host`, `server-host`, and `testing` as relevant, plus canonical Asset Kernel, host, persistence/storage, runtime, and module-dependency docs. Provider implementations belong in application ports/services; host wiring belongs in host composition; UI must stay behind transport/preload/client layers.
 
 For API/IPC/UI Asset Library work that touches resource-backed Asset Registry reads, also include `ipc-electron`, `desktop-host`, `server-host`, and `security`. Keep public surfaces read-only and do not add registration, import, finalization, localization, publishing, seeding, scans, provider calls, runtime calls, workflow execution, or byte/content reads unless a later phase explicitly scopes controlled mutation behavior.
+
+## Phase 12 execution-plan routing notes
+
+- For execution plans derived from runtime readiness bindings, include:
+  - `docs/context/packs/runtime-readiness-binding.pack.md`
+  - `docs/context/packs/execution-plan-preparation.pack.md`
+- If source composition-plan references matter, also include:
+  - `docs/context/packs/asset-composition-planning.pack.md`
+- If projection freshness/staleness affects planning, also include:
+  - `docs/context/packs/effective-asset-projections.pack.md`
