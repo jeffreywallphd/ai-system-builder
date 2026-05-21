@@ -105,6 +105,8 @@ Effective-source summaries answer **where visibility came from**. Projections an
 
 ### Projection and future runtime readiness
 
+Phase 11 runtime readiness binding should consume validated Phase 10 composition plan outputs first, and only consult projection summaries as freshness context where safely exposed. See `docs/architecture/runtime-readiness-binding.md`.
+
 `ready` projections indicate safe metadata availability for later phases; they do not imply execution has run or should run automatically.
 
 ## Ownership model and workspace scope

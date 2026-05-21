@@ -319,3 +319,8 @@ Asset Composition Planning is defined in `docs/architecture/asset-composition-pl
 - API/IPC/preload/client exposure from Prompt 9 is the boundary used by UI operations; unsupported operations must render as unavailable in UI.
 
 - Asset composition planning in Phase 10 is surfaced in the Assets page (Plans tab) and remains non-runtime; runtime-readiness binding is a Phase 11 responsibility.
+
+
+## Phase 11 follow-on architecture
+
+After Phase 10 composition planning, Phase 11 introduces runtime readiness binding as a non-executing capability-matching layer before execution-oriented phases. See `docs/architecture/runtime-readiness-binding.md` and ADR-0021.
