@@ -23,7 +23,7 @@ export class ValidateAssetCompositionPlanUseCase {
         const rec = await this.d.projectionRepository.readEffectiveAssetProjectionRecord(c.targetWorkspaceId, p.projectionId);
         if (rec) projectionMap.set(p.projectionId, rec);
       }
-      const compat = evaluateCompatibility(plan, projectionMap as never);
+      const compat = evaluateCompatibility(plan, projectionMap);
       const dependencyDiagnostics = findMissingCapabilityDiagnostics({ ...plan, nodes: compat.nodes });
       const blockers = [...compat.blockers, ...dependencyDiagnostics.map((d) => ({ code: d.code, message: "Sanitized composition planning blocker." }))];
       const diagnostics = [...compat.diagnostics, ...dependencyDiagnostics, { code: "asset-composition-runtime-readiness-deferred", severity: "info", message: "Sanitized composition planning diagnostic." } as const];
