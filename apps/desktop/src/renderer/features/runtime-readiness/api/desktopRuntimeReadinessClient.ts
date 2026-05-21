@@ -30,6 +30,22 @@ export function createDesktopRuntimeReadinessClient() {
       if (typeof api().listRuntimeReadinessInventory !== 'function') return fail('Runtime readiness inventory list is not available yet.', 'unavailable');
       return asResult(await api().listRuntimeReadinessInventory!({ targetWorkspaceId: workspaceId }));
     },
+
+    async summarizeInventory(workspaceId: string) {
+      if (!workspaceId) return fail('Workspace id is required.', 'validation');
+      if (typeof api().summarizeRuntimeReadinessInventory !== 'function') return fail('Runtime readiness inventory summary is not available yet.', 'unavailable');
+      return asResult(await api().summarizeRuntimeReadinessInventory!({ targetWorkspaceId: workspaceId }));
+    },
+    async validateBinding(input: { workspaceId: string; readinessBindingId: string }) {
+      if (!input.workspaceId || !input.readinessBindingId) return fail('Workspace id and readiness binding id are required.', 'validation');
+      if (typeof api().validateRuntimeReadinessBinding !== 'function') return fail('Runtime readiness binding validation is not available yet.', 'unavailable');
+      return asResult(await api().validateRuntimeReadinessBinding!({ targetWorkspaceId: input.workspaceId, readinessBindingId: input.readinessBindingId }));
+    },
+    async readLatestInventory(input: { workspaceId: string; sourceKind?: string; sourceId?: string }) {
+      if (!input.workspaceId) return fail('Workspace id is required.', 'validation');
+      if (typeof api().readLatestRuntimeReadinessInventory !== 'function') return fail('Runtime readiness inventory read is not available yet.', 'unavailable');
+      return asResult(await api().readLatestRuntimeReadinessInventory!({ targetWorkspaceId: input.workspaceId, sourceKind: input.sourceKind, sourceId: input.sourceId }));
+    },
     async createBinding(input: { workspaceId: string; compositionPlanId: string }) {
       if (!input.workspaceId || !input.compositionPlanId) return fail('Workspace id and composition plan id are required.', 'validation');
       if (typeof api().createRuntimeReadinessBinding !== 'function') return fail('Runtime readiness binding creation is not available yet.', 'unavailable');
