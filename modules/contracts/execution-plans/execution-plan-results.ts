@@ -1,0 +1,15 @@
+import type { ExecutionDiagnostic } from './execution-plan-diagnostics'; import type { ExecutionPlanRecord } from './execution-plan-record';
+export type ExecutionPlanFailureKind='validation'|'not-found'|'conflict'|'blocked'|'stale'|'unavailable'|'unsupported'|'safety-review-required'|'source-readiness-not-ready'|'internal';
+export type ExecutionPlanFailure={ kind:'failure'; failureKind:ExecutionPlanFailureKind; diagnostics: ExecutionDiagnostic[] };
+export type ExecutionPlanSuccess<T>={ kind:'success'; value:T };
+export type CreateExecutionPlanResult=ExecutionPlanSuccess<ExecutionPlanRecord>|ExecutionPlanFailure;
+export type ReadExecutionPlanResult=ExecutionPlanSuccess<ExecutionPlanRecord>|ExecutionPlanFailure;
+export type ListExecutionPlansResult=ExecutionPlanSuccess<ExecutionPlanRecord[]>|ExecutionPlanFailure;
+export type ArchiveExecutionPlanResult=ExecutionPlanSuccess<ExecutionPlanRecord>|ExecutionPlanFailure;
+export type RefreshExecutionPlanResult=ExecutionPlanSuccess<ExecutionPlanRecord>|ExecutionPlanFailure;
+export type PrepareExecutionStepsResult=ExecutionPlanSuccess<ExecutionPlanRecord>|ExecutionPlanFailure;
+export type PrepareExecutionDependenciesResult=ExecutionPlanSuccess<ExecutionPlanRecord>|ExecutionPlanFailure;
+export type PrepareExecutionInputsResult=ExecutionPlanSuccess<ExecutionPlanRecord>|ExecutionPlanFailure;
+export type PrepareExecutionOutputsResult=ExecutionPlanSuccess<ExecutionPlanRecord>|ExecutionPlanFailure;
+export type ValidateExecutionPlanResult=ExecutionPlanSuccess<ExecutionPlanRecord>|ExecutionPlanFailure;
+export type PreviewExecutionPlanResult=ExecutionPlanSuccess<ExecutionPlanRecord>|ExecutionPlanFailure;
