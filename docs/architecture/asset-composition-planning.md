@@ -236,7 +236,7 @@ Deferred from Phase 10:
 - pack import/export and marketplace behavior;
 - source mutation (authoring/library/system foundation).
 
-## Phase 11 handoff
+## Phase 11 handoff (runtime readiness binding)
 
 Phase 11 is **Runtime Readiness Binding**.
 

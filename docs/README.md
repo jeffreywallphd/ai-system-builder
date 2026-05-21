@@ -31,10 +31,10 @@ This directory is organized into four documentation areas with distinct roles.
 - Phase 8 is **Asset Authoring, Customization, and Override Management**.
 - Phase 9 is **Materialized / Effective Asset Projections**.
 - Phase 10 is **Asset Composition Planning**.
-- Phase 11 is **Pack Import/Export, Sharing, and Distribution**.
-- Phase 12 is **Collaboration, Permissions, and Multi-User Workspaces**.
+- Phase 11 is **Runtime Readiness Binding**.
+- Phase 12 is **Execution Plan Preparation** (execution-oriented planning handoff, still non-executing unless explicitly expanded).
 
-See `docs/architecture/workspace-model.md` for the Phase 6 workspace model, including reference-only `system.foundation@1.0.0` activation and the no-hidden-workspace/no-auto-migration rule. See `docs/architecture/user-library-and-cross-workspace-reuse.md` and ADR-0017 for the finalized Phase 7 reuse closeout state and Phase 8 handoff constraints, then `docs/architecture/asset-authoring-customization-and-overrides.md` and ADR-0018 for Phase 8 authoring/customization/override baseline rules. See `docs/architecture/effective-asset-projections.md` and ADR-0019 for the finalized Phase 9 closeout baseline (readiness-for-planning, non-executing). See `docs/architecture/asset-composition-planning.md` and ADR-0020 for the Phase 10 composition-planning baseline (non-runtime, execution deferred, Phase 11 handoff oriented).
+See `docs/architecture/workspace-model.md` for the Phase 6 workspace model, including reference-only `system.foundation@1.0.0` activation and the no-hidden-workspace/no-auto-migration rule. See `docs/architecture/user-library-and-cross-workspace-reuse.md` and ADR-0017 for the finalized Phase 7 reuse closeout state and Phase 8 handoff constraints, then `docs/architecture/asset-authoring-customization-and-overrides.md` and ADR-0018 for Phase 8 authoring/customization/override baseline rules. See `docs/architecture/effective-asset-projections.md` and ADR-0019 for the finalized Phase 9 closeout baseline (readiness-for-planning, non-executing). See `docs/architecture/asset-composition-planning.md` and ADR-0020 for the Phase 10 composition-planning baseline (non-runtime, execution deferred). See `docs/architecture/runtime-readiness-binding.md` and ADR-0021 for the Phase 11 runtime-readiness-binding baseline (non-executing, capability-binding, Phase 12 handoff oriented).
 
 ## Automation Note
 
