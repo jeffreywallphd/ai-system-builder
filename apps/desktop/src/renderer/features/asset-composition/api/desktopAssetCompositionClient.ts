@@ -13,5 +13,13 @@ export function createDesktopAssetCompositionClient(){
     connectNodes: async (input:{targetWorkspaceId:string; planId:string; sourceNodeId:string; kind:string; targetNodeId:string}) => typeof api.connectAssetCompositionNodes !== "function" ? err("Connections are not available yet.","unavailable") : unwrap(await api.connectAssetCompositionNodes(input)),
     disconnectNodes: async (input:{targetWorkspaceId:string; planId:string; relationshipId:string}) => typeof api.disconnectAssetCompositionNodes !== "function" ? err("Removing connections is not available yet.","unavailable") : unwrap(await api.disconnectAssetCompositionNodes(input)),
     validatePlan: async (input:{targetWorkspaceId:string; planId:string}) => typeof api.validateAssetCompositionPlan !== "function" ? err("Plan checking is not available yet.","unavailable") : unwrap(await api.validateAssetCompositionPlan(input)),
+
+    archivePlan: async (input:{targetWorkspaceId:string; planId:string}) => typeof api.archiveAssetCompositionPlan !== "function" ? err("Asset composition is unavailable.","unavailable") : unwrap(await api.archiveAssetCompositionPlan(input)),
+    listPlanSummaries: async (input:{targetWorkspaceId:string}) => typeof api.listAssetCompositionPlanSummaries !== "function" ? err("Asset composition is unavailable.","unavailable") : unwrap(await api.listAssetCompositionPlanSummaries(input)),
+    readPlanDetail: async (input:{targetWorkspaceId:string; planId:string}) => typeof api.readAssetCompositionPlanDetail !== "function" ? err("Asset composition is unavailable.","unavailable") : unwrap(await api.readAssetCompositionPlanDetail(input)),
+    listPlansForProjection: async (input:{targetWorkspaceId:string; projectionId:string}) => typeof api.listCompositionPlansForProjection !== "function" ? err("Asset composition is unavailable.","unavailable") : unwrap(await api.listCompositionPlansForProjection(input)),
+    listPlansForEffectiveAsset: async (input:{targetWorkspaceId:string; effectiveAssetReference:{kind:string;id:string;version?:string}}) => typeof api.listCompositionPlansForEffectiveAsset !== "function" ? err("Asset composition is unavailable.","unavailable") : unwrap(await api.listCompositionPlansForEffectiveAsset(input)),
+    listPlansNeedingAttention: async (input:{targetWorkspaceId:string}) => typeof api.listCompositionPlansNeedingAttention !== "function" ? err("Asset composition is unavailable.","unavailable") : unwrap(await api.listCompositionPlansNeedingAttention(input)),
+
   };
 }

@@ -18,7 +18,7 @@ export class ValidateAssetCompositionPlanUseCase {
       const plan = await this.d.repository.readAssetCompositionPlanRecord(c.targetWorkspaceId, c.planId);
       if (!plan) return assetCompositionPlanFailure("not-found", "asset-composition-plan-not-found");
       if (plan.status === "archived") return assetCompositionPlanFailure("conflict", "asset-composition-plan-archived");
-      const projectionMap = new Map();
+      const projectionMap = new Map<string, Awaited<ReturnType<EffectiveAssetProjectionRepositoryPort["readEffectiveAssetProjectionRecord"]> extends infer T ? T : never>>();
       for (const p of plan.selectedProjections) {
         const rec = await this.d.projectionRepository.readEffectiveAssetProjectionRecord(c.targetWorkspaceId, p.projectionId);
         if (rec) projectionMap.set(p.projectionId, rec);
@@ -37,7 +37,7 @@ export class ValidateAssetCompositionPlanUseCase {
       });
       const draft = { ...plan, nodes: compat.nodes, relationships: compat.relationships, blockers, compatibilityDiagnostics: diagnostics, status: nextStatus, updatedAt: now, provenance: [...plan.provenance, createPlanProvenanceEvent("plan-validated", c.targetWorkspaceId, c.planId, now)] };
       const withSummary = { ...draft, planningSummary: { ...recomputeAssetCompositionPlanningSummary(draft), planningReadiness: computePlanningReadiness({ ...draft, status: nextStatus } as never) } };
-      const normalized = normalizeAssetCompositionPlan(withSummary as never);
+      const normalized = normalizeAssetCompositionPlan(withSummary);
       return { status: "success", value: await this.d.repository.updateAssetCompositionPlanRecord(normalized) };
     } catch { return assetCompositionPlanFailure("unavailable", "asset-composition-repository-unavailable"); }
   }

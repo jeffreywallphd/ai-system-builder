@@ -56,11 +56,21 @@ test("plans for projection/effective ref and needing-attention are workspace sco
 function plan(id: string, workspaceId: any, status: any): AssetCompositionPlan {
   return {
     planId: id as any, targetWorkspaceId: workspaceId, name: id, status,
-    selectedProjections: [{ targetWorkspaceId: workspaceId, projectionId: "proj.1" as any, effectiveAssetReference: { kind: "asset-instance", id: "asset.1", version: "1.0.0" } as any, displayLabel: "Proj" }],
-    nodes: [{ nodeId: "n1" as any, targetWorkspaceId: workspaceId, selectedProjection: { targetWorkspaceId: workspaceId, projectionId: "proj.1" as any }, role: "primary-input" as any, status: "ready-for-planning", requiredCapabilities: [{ capabilityId: "c1", capabilityKind: "data" } as any], providedCapabilities: [], diagnostics: [{ code: "asset-composition-missing-dependency", severity: "warning", message: "msg", safeDetails: { command: "rm -rf" } } as any], blockers: [], createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }],
+    selectedProjections: [{ targetWorkspaceId: workspaceId, projectionId: "proj.1" as any, effectiveAssetReference: { kind: "asset-instance", id: "asset.1", version: "1.0.0" } as any, displayLabel: "<b>Proj</b>" }],
+    nodes: [{ nodeId: "n1" as any, targetWorkspaceId: workspaceId, selectedProjection: { targetWorkspaceId: workspaceId, projectionId: "proj.1" as any }, role: "primary-input" as any, status: "ready-for-planning", requiredCapabilities: [{ capabilityId: "c1", capabilityKind: "data" } as any], providedCapabilities: [], diagnostics: [{ code: "asset-composition-missing-dependency", severity: "warning", message: "<x>msg</x>", safeDetails: { command: "rm -rf" } } as any], blockers: [], createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }],
     relationships: [{ relationshipId: "r1" as any, targetWorkspaceId: workspaceId, sourceNodeId: "n1" as any, targetNodeId: "n1" as any, kind: "depends-on", compatibilityStatus: "compatible", diagnostics: [], blockers: [], createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z" }],
     compatibilityDiagnostics: [{ code: "asset-composition-missing-dependency", severity: "warning", message: "diag", safeDetails: { token: "x" } } as any], blockers: status === "blocked" ? [{ code: "asset-composition-missing-dependency", message: "blocked" } as any] : [],
     planningSummary: { totalNodes: 1, compatibleNodeCount: 1, blockedNodeCount: 0, conflictedNodeCount: 0, missingDependencyCount: 0, staleProjectionCount: 0, unsupportedCount: 0, totalRelationships: 1, compatibleRelationshipCount: 1, blockedRelationshipCount: 0, planningReadiness: "Ready for planning" },
     provenance: [], createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-02T00:00:00.000Z",
   } as any;
 }
+
+
+test("sanitizes unsafe display fields", async () => {
+  const repo = new FakeRepo(); repo.records = [plan("p.safe", wa, "blocked")];
+  const svc = new WorkspaceAssetCompositionReadModelService({ compositionPlanRepository: repo as any });
+  const detail = await svc.readCompositionPlanDetail({ targetWorkspaceId: wa, planId: "p.safe" });
+  assert.equal(detail?.summary.name.includes("<"), false);
+  assert.equal(detail?.selectedProjections[0]?.displayLabel?.includes("<"), false);
+  assert.equal(detail?.diagnostics[0]?.message.includes("<"), false);
+});

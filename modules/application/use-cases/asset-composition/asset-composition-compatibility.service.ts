@@ -17,8 +17,11 @@ export const evaluateCompatibility = (plan: AssetCompositionPlan, projectionMap:
       diagnostics.push(planningDiagnostic("asset-composition-workspace-invalid")); blockers.push(planningBlocker("asset-composition-workspace-invalid"));
       return { ...n, status: "invalid" as const };
     }
-    const mismatch = n.effectiveAssetReference && JSON.stringify(n.effectiveAssetReference) !== JSON.stringify(pr.effectiveAssetReference);
-    if (mismatch) diagnostics.push(planningDiagnostic("asset-composition-node-reference-mismatch"));
+    const mismatch = referencesMismatch(n.effectiveAssetReference, pr.effectiveAssetReference);
+    if (mismatch) {
+      diagnostics.push(planningDiagnostic("asset-composition-node-reference-mismatch"));
+      blockers.push(planningBlocker("asset-composition-node-reference-mismatch"));
+    }
     return { ...n, status: mismatch ? "invalid" : mapProjectionStatusToNodeStatus(pr.status) };
   });
   const nodeMap = new Map(nodes.map((n) => [n.nodeId, n]));
@@ -30,4 +33,13 @@ export const evaluateCompatibility = (plan: AssetCompositionPlan, projectionMap:
     return { ...r, compatibilityStatus };
   });
   return { nodes, relationships, diagnostics, blockers };
+};
+
+const referencesMismatch = (nodeRef: AssetCompositionPlan["nodes"][number]["effectiveAssetReference"], projectionRef: EffectiveAssetProjectionRecord["effectiveAssetReference"]) => {
+  if (!nodeRef) return false;
+  if (nodeRef.kind !== projectionRef.kind || nodeRef.id !== projectionRef.id) return true;
+  if (typeof nodeRef.version === "string" && nodeRef.version.length > 0) {
+    return nodeRef.version !== projectionRef.version;
+  }
+  return false;
 };
