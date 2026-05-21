@@ -77,3 +77,12 @@ If required projection summaries are missing or stale, Phase 10 reports diagnost
 Phase 10 outputs validated composition-plan structures suitable for Phase 11 runtime-readiness binding.
 
 Phase 11 can evaluate runtime/provider/model/storage/API/dependency/environment capability availability against required capabilities from validated plans, still without requiring immediate workflow execution.
+
+
+## Phase 10 UI closeout
+
+- Composition planning is exposed inside the **Assets** area as a `Plans` tab, not as a separate top-level page.
+- The Phase 10 UI is structured form/list planning (plans, assets in plan, connections, check plan), not visual canvas authoring.
+- `valid` means **Ready for planning** only; it does not mean runtime-ready or execution-ready.
+- Runtime-readiness binding and workflow/runtime/model execution remain deferred to Phase 11+.
+- API/IPC/preload/client exposure from Prompt 9 is the boundary used by UI operations; unsupported operations must render as unavailable in UI.

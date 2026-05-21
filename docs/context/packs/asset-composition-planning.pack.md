@@ -69,3 +69,12 @@ No workflow/runtime/model execution, runtime/provider binding, visual-canvas-fir
 ## Phase 11 handoff
 
 Phase 10 prepares validated composition plan outputs for **Runtime Readiness Binding** in Phase 11, where required capabilities are matched against available runtime/provider/environment capabilities without implying immediate execution.
+
+
+## Phase 10 UI closeout
+
+- Composition planning is exposed inside the **Assets** area as a `Plans` tab, not as a separate top-level page.
+- The Phase 10 UI is structured form/list planning (plans, assets in plan, connections, check plan), not visual canvas authoring.
+- `valid` means **Ready for planning** only; it does not mean runtime-ready or execution-ready.
+- Runtime-readiness binding and workflow/runtime/model execution remain deferred to Phase 11+.
+- API/IPC/preload/client exposure from Prompt 9 is the boundary used by UI operations; unsupported operations must render as unavailable in UI.
