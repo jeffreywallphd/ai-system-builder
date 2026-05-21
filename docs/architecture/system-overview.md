@@ -317,3 +317,5 @@ Asset Composition Planning is defined in `docs/architecture/asset-composition-pl
 - `valid` means **Ready for planning** only; it does not mean runtime-ready or execution-ready.
 - Runtime-readiness binding and workflow/runtime/model execution remain deferred to Phase 11+.
 - API/IPC/preload/client exposure from Prompt 9 is the boundary used by UI operations; unsupported operations must render as unavailable in UI.
+
+- Asset composition planning in Phase 10 is surfaced in the Assets page (Plans tab) and remains non-runtime; runtime-readiness binding is a Phase 11 responsibility.

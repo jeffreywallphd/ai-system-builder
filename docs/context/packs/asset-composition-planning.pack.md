@@ -78,3 +78,5 @@ Phase 10 prepares validated composition plan outputs for **Runtime Readiness Bin
 - `valid` means **Ready for planning** only; it does not mean runtime-ready or execution-ready.
 - Runtime-readiness binding and workflow/runtime/model execution remain deferred to Phase 11+.
 - API/IPC/preload/client exposure from Prompt 9 is the boundary used by UI operations; unsupported operations must render as unavailable in UI.
+
+- In UI closeout, keep planning inside the Assets area and avoid exposing projection internals as primary end-user jargon.

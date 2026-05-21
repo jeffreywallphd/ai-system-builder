@@ -86,3 +86,7 @@ Phase 11 can evaluate runtime/provider/model/storage/API/dependency/environment 
 - `valid` means **Ready for planning** only; it does not mean runtime-ready or execution-ready.
 - Runtime-readiness binding and workflow/runtime/model execution remain deferred to Phase 11+.
 - API/IPC/preload/client exposure from Prompt 9 is the boundary used by UI operations; unsupported operations must render as unavailable in UI.
+
+## Review C UI closeout note
+
+Phase 10 closes with Assets-embedded Plans tab behavior only. The UI reads plan summaries/details via Phase 10 read-model endpoints and refreshes those read models after supported mutations. Runtime readiness and execution concerns remain explicitly deferred to Phase 11+.
