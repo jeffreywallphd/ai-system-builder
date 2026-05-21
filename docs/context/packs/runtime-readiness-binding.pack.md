@@ -55,7 +55,7 @@
 - API, IPC, preload, and client transport exposure is intended to remain thin and workspace-explicit.
 - Operation families should be semantically aligned across API/IPC/preload/desktop-client/thin-client surfaces.
 - Deferred or unavailable operations must be represented consistently and safely.
-- Visible runtime-readiness UI remains deferred (Prompt 9 scope).
+- Visible runtime setup/readiness UI is implemented inside Assets / Plans (Prompt 9), with no separate top-level Runtime Readiness page.
 - Runtime/provider/workflow/model execution remains out of scope for Prompt 8.
 
 ## Non-goals
