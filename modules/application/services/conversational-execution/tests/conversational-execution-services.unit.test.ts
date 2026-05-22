@@ -9,11 +9,11 @@ test('adapter selection returns deferred when unsupported', async () => {
   assert.equal(result.status, 'deferred');
 });
 
-test('context validation blocks unsafe tokens and allows technical text', () => {
+test('context validation allows technical text while enforcing structural bounds', () => {
   const svc = new ConversationalInvocationContextValidationService();
-  const ok = svc.validate({ conversationSessionId: 's1', userTurnContent: 'Explain runtime failures conceptually, do not include sensitive values.', history: [] });
+  const ok = svc.validate({ conversationSessionId: 's1', userTurnContent: 'Show me a curl example with a bearer token placeholder and JSON payload.', history: [] });
   assert.equal(ok.valid, true);
-  const bad = svc.validate({ conversationSessionId: 's1', userTurnContent: 'api_key=secret', history: [] });
+  const bad = svc.validate({ conversationSessionId: 's1', userTurnContent: 'hello', history: new Array(51).fill({ role: 'user', content: 'x' }) as any });
   assert.equal(bad.valid, false);
 });
 

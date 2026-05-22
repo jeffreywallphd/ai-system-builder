@@ -26,7 +26,7 @@ export class ConversationTurnFailureClassificationService {
     if (status === 'unsupported' || status === 'deferred') return 'runtime-unsupported';
     if (status === 'timed-out') return 'invocation-timed-out';
     if (status === 'cancelled') return 'invocation-cancelled';
-    if (status === 'blocked') return 'assistant-response-too-long';
+    if (status === 'blocked') return 'runtime-readiness-not-acceptable';
     if (status === 'failed') return 'invocation-failed';
     return 'internal-error';
   }

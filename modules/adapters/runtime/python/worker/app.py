@@ -168,10 +168,15 @@ def _run_task(request: StartPythonRuntimeTaskRequest) -> Any:
         messages = payload.get("messages") if isinstance(payload.get("messages"), list) else []
         if not messages:
             raise RuntimeError("Conversation text generation requires at least one message.")
+        selected_model_id = payload.get("selectedModelId")
+        if not isinstance(selected_model_id, str) or not selected_model_id.strip():
+            raise RuntimeError("Conversation text generation requires an approved selected model reference.")
         loaded_models = describe_loaded_generation_models()
         if not loaded_models:
             raise RuntimeError("Conversation text generation requires a loaded local generation model.")
-        selected_model = loaded_models[0]
+        selected_model = next((model for model in loaded_models if model.modelId == selected_model_id), None)
+        if selected_model is None:
+            raise RuntimeError("Conversation text generation selected model is unavailable.")
         generation_payload = payload.get("generation") if isinstance(payload.get("generation"), dict) else {}
         params = GenerationParams(
             temperature=generation_payload.get("temperature") if isinstance(generation_payload.get("temperature"), (int, float)) else None,
@@ -400,4 +405,3 @@ def unload_models() -> UnloadModelsResult | JSONResponse:
         return JSONResponse(status_code=409, content={"error": PythonRuntimeError(code="model_unload_blocked", message="Cannot unload generation model while a runtime task is active.", details={"activeTaskCount": active_task_count}, retryable=True).model_dump(mode="json")})
     unloaded = unload_generation_models()
     return UnloadModelsResult(unloadedModels=[LoadedModelDescriptor.model_validate(model) for model in unloaded], activeTaskCount=0)
-
