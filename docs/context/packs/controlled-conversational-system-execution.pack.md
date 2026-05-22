@@ -79,7 +79,16 @@ Beginning with Phase 13, do not combine in one prompt:
 
 ## Deferred capabilities
 
-Tools/function-calling, retrieval/RAG, memory, multimodal IO, image generation/ComfyUI execution, arbitrary workflow execution, background/distributed execution, and transport/UI implementation are deferred.
+Tools/function-calling, retrieval/RAG, memory, multimodal IO, image generation/ComfyUI execution, arbitrary workflow execution, background/distributed execution, and streaming are deferred.
+
+## Review C Cleanup C1 boundary rules
+
+- Conversational source/read summaries must rely on verified source evidence, not composition-plan ids, labels, summaries, runtime capability strings, or caller-provided display claims.
+- Session creation across API, IPC/preload, and clients carries only workspace scope and reviewed execution-plan identity. `systemLabel`, `systemSummary`, raw source claims, prompt materialization, runtime/model/provider overrides, and protected context are not accepted at the external boundary.
+- Current action availability comes from application eligibility/approval/readiness/runtime/host state. Provenance text alone must not enable submission.
+- Transcript is the intentional full visible-content read surface. Operational read models, activity, capability summaries, cancel/retry results, diagnostics, and errors stay content-safe.
+- Desktop and server hosts may expose only capabilities they actually compose. Cancel, retry, and streaming remain unsupported/deferred unless an application/runtime path genuinely supports them.
+- Run & Test UI correctness remains a C2 responsibility; C1 may only keep compilation aligned with repaired boundary/client types.
 
 ## Phase 13 prompt ownership
 
@@ -98,6 +107,6 @@ Tools/function-calling, retrieval/RAG, memory, multimodal IO, image generation/C
 
 ## Phase 13 Prompt 5 status
 
-Application-facing conversational invocation seams now exist for protected context preparation, adapter catalog selection, runtime guard checks, and single-turn orchestration. This phase remains non-executing: no concrete text-generation runtime adapter is implemented, production response generation remains deferred/unsupported, Prompt 6 will add the first supported adapter, and Prompt 7 will add persisted turn/run/result lifecycle integration. Approval/session eligibility and asset-derived source boundaries remain mandatory prerequisites.
+Application-facing conversational invocation seams now exist for protected context preparation, adapter catalog selection, runtime guard checks, single-turn orchestration, and the supported Python text-generation runtime adapter path. Approval/session eligibility and asset-derived source boundaries remain mandatory prerequisites.
 
 - Phase 13 Prompt 12 adds the first user-facing Assets-area **Run & Test** surface for composed conversational systems, using existing safe desktop/thin-client conversation clients and preserving approval/readiness/execution-plan boundaries.

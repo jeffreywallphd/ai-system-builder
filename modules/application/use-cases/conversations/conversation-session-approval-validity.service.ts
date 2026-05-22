@@ -10,7 +10,7 @@ export class ConversationSessionApprovalValidityService {
   public constructor(private readonly d?: { executionPlanRepository: ExecutionPlanRepositoryPort; runtimeReadinessRepository: RuntimeReadinessBindingRepositoryPort; assetCompositionPlanRepository: AssetCompositionPlanRepositoryPort; eligibilityService: ConversationalExecutionPlanEligibilityService; sourceVerificationService: ConversationalSourceSystemVerificationService }) {}
   public isValid(session: ConversationSessionRecord, approval?: ExecutionApprovalRecord) {
     if (session.status !== 'approved' && session.status !== 'active') return { valid: false, reason: 'approval-required' };
-    if (!approval || approval.approvalStatus !== 'approved' || approval.invalidatedAt) return { valid: false, reason: 'approval-invalidated' };
+    if (!approval || approval.approvalStatus !== 'granted' || approval.invalidatedAt) return { valid: false, reason: 'approval-invalidated' };
     if (session.executionApprovalId && approval.id !== session.executionApprovalId) return { valid: false, reason: 'approval-invalidated' };
     if (approval.runtimeReferenceId && session.runtimeReferenceId && approval.runtimeReferenceId !== session.runtimeReferenceId) return { valid: false, reason: 'approval-invalidated' };
     return { valid: true as const };

@@ -8,6 +8,7 @@ import {
   ExecutionPlanProviderPlanningService,
   ExecutionPlanInputOutputPlanningService,
   ExecutionPlanDependencyPlanningService,
+  ExecutionPlanSafetyGatePlanningService,
   ExecutionPlanResourceEstimateService,
   ExecutionPlanPreflightValidationService,
   ExecutionPlanSafetyGateValidationService,
@@ -28,6 +29,7 @@ export function composeExecutionPlanServices(dependencies: ComposeExecutionPlanS
   const providerPlanningService = new ExecutionPlanProviderPlanningService();
   const inputOutputPlanningService = new ExecutionPlanInputOutputPlanningService();
   const dependencyPlanningService = new ExecutionPlanDependencyPlanningService();
+  const safetyGatePlanningService = new ExecutionPlanSafetyGatePlanningService();
   const resourceEstimateService = new ExecutionPlanResourceEstimateService();
 
   return {
@@ -40,6 +42,7 @@ export function composeExecutionPlanServices(dependencies: ComposeExecutionPlanS
       providerPlanningService,
       inputOutputPlanningService,
       dependencyPlanningService,
+      safetyGatePlanningService,
       resourceEstimateService,
       nextExecutionPlanId: () => `ep.${randomUUID()}`,
       nextExecutionStepId: () => `eps.${randomUUID()}`,

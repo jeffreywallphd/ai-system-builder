@@ -1058,17 +1058,17 @@ describe("desktop preload execution-plan bridge", () => {
     await api.summarizeWorkspaceExecutionPlans({ workspaceId: "ws.1" });
 
     expect(invoke.mock.calls.map((call) => call[0])).toEqual([
-      "execution-plans:create-plan",
-      "execution-plans:validate-plan",
-      "execution-plans:archive-plan",
-      "execution-plans:list-summaries",
-      "execution-plans:read-detail",
-      "execution-plans:list-for-composition-plan",
-      "execution-plans:read-latest-for-composition-plan",
-      "execution-plans:list-for-runtime-readiness-binding",
-      "execution-plans:read-latest-for-runtime-readiness-binding",
-      "execution-plans:list-needing-attention",
-      "execution-plans:summarize-workspace",
+      "ipc.execution-plans.create-plan.request",
+      "ipc.execution-plans.validate-plan.request",
+      "ipc.execution-plans.archive-plan.request",
+      "ipc.execution-plans.list-summaries.request",
+      "ipc.execution-plans.read-detail.request",
+      "ipc.execution-plans.list-for-composition-plan.request",
+      "ipc.execution-plans.read-latest-for-composition-plan.request",
+      "ipc.execution-plans.list-for-runtime-readiness-binding.request",
+      "ipc.execution-plans.read-latest-for-runtime-readiness-binding.request",
+      "ipc.execution-plans.list-needing-attention.request",
+      "ipc.execution-plans.summarize-workspace.request",
     ]);
   });
 });

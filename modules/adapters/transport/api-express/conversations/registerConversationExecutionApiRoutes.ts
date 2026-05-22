@@ -51,7 +51,8 @@ function sendInternal(response: ExpressResponseLike): void {
 
 function sendMappedFailure(response: ExpressResponseLike, kind: string | undefined, message: string): void {
   const status = kind === 'validation' ? 400 : kind === 'not-found' ? 404 : (kind === 'conflict' || kind === 'runtime-not-ready' || kind === 'blocked' || kind === 'retry-not-allowed') ? 409 : 500;
-  response.status(status).json(createApiFailureResponse(createApiError(OPERATION, kind ?? 'internal', message)));
+  const code = kind === 'validation' || kind === 'not-found' || kind === 'conflict' || kind === 'unavailable' || kind === 'not-supported' ? kind : status === 409 ? 'conflict' : 'internal';
+  response.status(status).json(createApiFailureResponse(createApiError(OPERATION, code, message)));
 }
 
 function hasOnlyKeys(body: Record<string, unknown> | undefined, allowed: readonly string[]): boolean {
@@ -65,12 +66,10 @@ export function registerConversationExecutionApiRoutes(dependencies: RegisterCon
   app.post('/api/conversations/workspaces/:workspaceId/sessions', async (request, response) => {
     const workspaceId = asText(request.params?.workspaceId);
     const sourceExecutionPlanId = asText(request.body?.sourceExecutionPlanId);
-    const systemLabel = asText(request.body?.systemLabel);
-    const systemSummary = asText(request.body?.systemSummary);
     if (!workspaceId || !sourceExecutionPlanId) return void sendValidation(response, 'Workspace id and source execution plan id are required.');
-    if (!hasOnlyKeys(request.body, ['sourceExecutionPlanId', 'systemLabel', 'systemSummary'])) return void sendValidation(response, 'Unsupported request fields.');
+    if (!hasOnlyKeys(request.body, ['sourceExecutionPlanId'])) return void sendValidation(response, 'Unsupported request fields.');
     try {
-      const result = await conversations.create.execute({ workspaceId, sourceExecutionPlanId, systemLabel: systemLabel || undefined, systemSummary: systemSummary || undefined });
+      const result = await conversations.create.execute({ workspaceId, sourceExecutionPlanId });
       if (result.kind === 'success') return void response.status(200).json(createApiSuccessResponse(OPERATION, result.value));
       return void sendMappedFailure(response, result.failureKind, result.diagnostics[0]?.message ?? 'Conversation session creation failed.');
     } catch { return void sendInternal(response); }
@@ -83,7 +82,7 @@ export function registerConversationExecutionApiRoutes(dependencies: RegisterCon
     if (!workspaceId || !conversationSessionId || !executionApprovalId) return void sendValidation(response, 'Workspace, session, and approval ids are required.');
     if (!hasOnlyKeys(request.body, ['executionApprovalId'])) return void sendValidation(response, 'Unsupported request fields.');
     try {
-      const result = await conversations.approve.execute({ workspaceId, conversationSessionId, executionApprovalId });
+      const result = await conversations.approve.execute({ workspaceId, conversationSessionId, approvalId: executionApprovalId });
       if (result.kind === 'success') return void response.status(200).json(createApiSuccessResponse(OPERATION, result.value));
       return void sendMappedFailure(response, result.failureKind, result.diagnostics[0]?.message ?? 'Conversation session approval failed.');
     } catch { return void sendInternal(response); }
@@ -100,7 +99,7 @@ export function registerConversationExecutionApiRoutes(dependencies: RegisterCon
     const limit = asLimit(request.query?.limit);
     if (request.query?.limit !== undefined && limit === undefined) return void sendValidation(response, 'Invalid limit filter.');
     try {
-      const value = await conversations.readSessions.listSummaries({ workspaceId, status: status as never, includeArchived, sourceExecutionPlanId: asText(request.query?.sourceExecutionPlanId) || undefined, cursor: asText(request.query?.cursor) || undefined, limit });
+      const value = await conversations.readSessions.listConversationSessions({ workspaceId, status: status as never, includeArchived, sourceExecutionPlanId: asText(request.query?.sourceExecutionPlanId) || undefined, cursor: asText(request.query?.cursor) || undefined, limit });
       response.status(200).json(createApiSuccessResponse(OPERATION, value));
     } catch { sendInternal(response); }
   });

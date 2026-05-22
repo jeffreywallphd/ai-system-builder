@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { ConversationTurnInvocationOutcome, ConversationTurnInvocationPort, ConversationTurnInvocationRequest, ConversationalRuntimeAdapterCatalogPort, ConversationalRuntimeGuardPort } from '../../../application/ports/conversational-execution';
 import type { PythonRuntimePort } from '../../../application/ports/runtime';
-import { PYTHON_RUNTIME_CAPABILITY_CONVERSATION_TEXT_GENERATION } from '../../../contracts/runtime';
 
 export const PYTHON_CONVERSATIONAL_ADAPTER_ID = 'python-runtime.conversation-text-generation.v1';
+const PYTHON_RUNTIME_CAPABILITY_CONVERSATION_TEXT_GENERATION = 'conversation-text-generation';
 
 function toMessages(request: ConversationTurnInvocationRequest): Array<{ role: 'system' | 'user' | 'assistant'; content: string }> {
   const out: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [];

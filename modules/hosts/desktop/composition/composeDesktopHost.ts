@@ -28,7 +28,10 @@ import { createLocalEffectiveAssetProjectionRepositoryAdapter } from "../../../a
 import { createLocalAssetCompositionPlanRepositoryAdapter } from "../../../adapters/persistence/asset-composition";
 import { createLocalRuntimeInventoryRepositoryAdapter, createLocalRuntimeReadinessBindingRepositoryAdapter } from "../../../adapters/persistence/runtime-readiness";
 import { createLocalExecutionPlanRepositoryAdapter } from "../../../adapters/persistence/execution-plans";
+import { createLocalConversationRepositoryAdapters } from "../../../adapters/persistence/conversations";
+import { createLocalExecutionRunRepositoryAdapters } from "../../../adapters/persistence/execution-runs";
 import { composeExecutionPlanServices } from "../../shared/composition/composeExecutionPlanServices";
+import { composeConversationExecutionServices } from "../../shared/composition/composeConversationExecutionServices";
 import { registerElectronIpc } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
@@ -41,6 +44,7 @@ import { recordDesktopMemorySnapshot } from "../diagnostics";
 import { createDesktopRuntimeReadinessService } from "./composeDesktopRuntimeReadiness";
 import { createDesktopFeatureLifecycleRegistry, type DesktopFeatureDisposeReason, type DesktopFeatureDisposeResult, type DesktopFeatureLifecyclePolicy, type DesktopFeatureLifecycleStateEntry } from "./featureLifecycle";
 import { createUnavailablePythonRuntimeStatus, resolvePythonRuntimeBaseUrl, type DesktopPythonRuntimeFeature } from "./desktopPythonRuntimeHelpers";
+import { createPythonConversationalRuntimeAdapterCatalog, createPythonConversationalRuntimeGuard, createPythonConversationalTextGenerationInvocationAdapter } from "../../../adapters/runtime/conversational-text-generation";
 export { createDesktopRuntimeReadinessService, type CreateDesktopRuntimeReadinessServiceOptions } from "./composeDesktopRuntimeReadiness";
 
 const HUGGING_FACE_TOKEN_SETTING_KEY = "huggingface.token" as const;
@@ -366,6 +370,20 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
       const runtimeReadinessBindingRepository = createLocalRuntimeReadinessBindingRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
       const executionPlanRepository = createLocalExecutionPlanRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
       const executionPlanServices = composeExecutionPlanServices({ executionPlanRepository, runtimeReadinessBindingRepository, compositionPlanRepository: assetCompositionPlanRepository, now: options.now });
+      const conversationRepositories = createLocalConversationRepositoryAdapters({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const executionRunRepositories = createLocalExecutionRunRepositoryAdapters({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const conversationExecutionServices = composeConversationExecutionServices({
+        ...conversationRepositories,
+        ...executionRunRepositories,
+        executionPlanRepository,
+        runtimeReadinessBindingRepository,
+        assetCompositionPlanRepository,
+        adapterCatalog: createPythonConversationalRuntimeAdapterCatalog(),
+        runtimeGuard: { async getRuntimeStatus(adapterId) { return createPythonConversationalRuntimeGuard((await getPythonRuntimeFoundation()).runtimePort).getRuntimeStatus(adapterId); } },
+        invocationPort: { async invokeConversationTurn(request) { return createPythonConversationalTextGenerationInvocationAdapter((await getPythonRuntimeFoundation()).runtimePort).invokeConversationTurn(request); } },
+        hostCapabilities: { submitTurn: "supported", cancelTurn: "unsupported", retryTurn: "unsupported", streaming: false },
+        now: options.now,
+      });
       const runtimeReadinessV2 = {
         inventory: new RuntimeCapabilityInventoryService(runtimeInventoryRepository, [], now),
         inventorySummary: new RuntimeCapabilityInventorySummaryService(runtimeInventoryRepository),
@@ -482,6 +500,10 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           disconnectNodes: new DisconnectCompositionNodesUseCase({ repository: assetCompositionPlanRepository, now: options.now }),
           validatePlan: new ValidateAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository, projectionRepository: effectiveAssetProjectionRepository, now: options.now }),
           readModel: assetCompositionReadModel,
+        },
+        conversations: {
+          ipcMain: registerOptions.ipcMain,
+          conversations: conversationExecutionServices,
         },
       });
       recordHostMemorySnapshot("desktop.host.ipc-registration.lazy-handlers.after");

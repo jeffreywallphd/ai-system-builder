@@ -253,3 +253,15 @@ The Assets workspace now includes a **Run & Test** tab for conversational system
 The UI shows only safe conversation/transcript/read-model content and user-facing status guidance. Advanced runtime internals and protected context remain outside the primary UI surface.
 
 Host differences are represented truthfully in the run/test surface: submission controls follow the reported session/approval/availability state, and unsupported actions are not presented as functional. Streaming, tools/retrieval/memory/multimodal behavior, and broader runnable-system experiences remain deferred.
+
+## Review C Cleanup C1 boundary repair status
+
+Review C tightened the non-UI conversational boundary before the Run & Test surface is repaired in C2.
+
+- Session/source summaries derive reusable/customized conversational-system claims from structured verified source evidence. A composition-plan id, label, summary, runtime capability string, or renderer/browser-provided text is not proof of conversational origin.
+- Conversation session creation accepts reviewed execution-plan identity and workspace scope only. Display/source identity is derived from verified source records rather than caller-provided `systemLabel` or `systemSummary` claims.
+- Session read models project submission/action availability from current application eligibility: session status, approval validity, source validity, runtime-readiness/runtime-reference state, host submit support, and active-turn constraints. Provenance text alone is not execution readiness.
+- Transcript reads and completed submit results are the deliberate visible-content surfaces. Session summaries, action availability, activity, approval/cancel/retry, diagnostics, and errors remain operational and must not copy full transcript text or protected runtime/provider context.
+- API, IPC, preload, desktop-client, and thin-client surfaces use typed safe DTOs for conversational operations. Cancel and retry remain unsupported/deferred unless application behavior can actually perform them. Streaming remains deferred.
+- Real server and desktop hosts compose the conversational service family. Both expose session/read/approval boundaries; turn submission is wired only through the controlled application/orchestration/runtime-adapter path and must still pass approval/source/readiness/runtime guards. No production fake response generator is allowed.
+- The current Run & Test UI is not considered corrected by C1. It received only narrow compile-accommodation changes where corrected client result types surfaced existing UI mismatches. C2 owns selected-system context, wording, DTO mapping, UI state, behavior tests, and final documentation closeout.

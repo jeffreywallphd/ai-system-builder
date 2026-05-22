@@ -4,13 +4,13 @@ import { ApproveConversationSessionUseCase, ConversationSessionApprovalValidityS
 
 const workspaceId = 'workspace.main' as any;
 const basePlan: any = { id:'execution.plan.1', workspaceId, sourceCompositionPlanId:'composition.plan.1', sourceRuntimeReadinessBindingId:'readiness.binding.1', status:'ready-for-review', blockers:[], steps:[{kind:'generate-text',label:'Chat'}], adapterReferences:[{kind:'provider-capability',capabilityKind:'text-generation'}] };
-const baseReadiness: any = { readinessBindingId:'readiness.binding.1', targetWorkspaceId:workspaceId, status:'ready', blockers:[] };
-const baseComposition: any = { planId:'composition.plan.1', status:'valid', archivedAt: undefined, nodes:[{ role:'ui-surface', providedCapabilities:[{ kind:'text-output' }]}] };
+const baseReadiness: any = { readinessBindingId:'readiness.binding.1', targetWorkspaceId:workspaceId, compositionPlanId:'composition.plan.1', status:'ready-for-setup', blockers:[] };
+const baseComposition: any = { planId:'composition.plan.1', name:'Verified Chat', status:'valid', archivedAt: undefined, nodes:[{ role:'ui-surface', providedCapabilities:[{ kind:'text-output' }]}] };
 
 test('creates awaiting-approval session from eligible reviewed plan', async () => {
   const saved:any[] = [];
   const uc = new CreateConversationExecutionSessionFromPlanUseCase({ sessionRepository:{saveConversationSession:async(r:any)=>(saved.push(r),r)} as any, executionPlanRepository:{getExecutionPlanById:async()=>basePlan} as any, runtimeReadinessRepository:{readRuntimeReadinessBindingRecord:async()=>baseReadiness} as any, assetCompositionPlanRepository: { readAssetCompositionPlanRecord: async () => baseComposition } as any, eligibilityService:new ConversationalExecutionPlanEligibilityService(), sourceVerificationService:new ConversationalSourceSystemVerificationService(), nextConversationSessionId:()=> 'conversation.session.1', now:()=> '2026-05-22T00:00:00.000Z' });
-  const result = await uc.execute({ workspaceId, sourceExecutionPlanId: 'execution.plan.1', systemLabel: 'My Chat' } as any);
+  const result = await uc.execute({ workspaceId, sourceExecutionPlanId: 'execution.plan.1' } as any);
   assert.equal(result.kind, 'success');
   assert.equal(result.value.status, 'awaiting-approval');
   assert.equal(saved.length, 1);
@@ -34,7 +34,7 @@ test('approves session without creating run/turn/message', async () => {
 
 test('turn eligibility reflects ready invocation after approval validity passes', async () => {
   const session:any = { id:'conversation.session.1', workspaceId, sourceExecutionPlanId:'execution.plan.1', status:'approved', executionApprovalId:'execution.approval.1' };
-  const approval:any = { id:'execution.approval.1', approvalStatus:'approved' };
+  const approval:any = { id:'execution.approval.1', approvalStatus:'granted' };
   const uc = new ValidateConversationTurnEligibilityUseCase({ sessionRepository:{getConversationSessionById:async()=>session} as any, approvalRepository:{getExecutionApprovalById:async()=>approval} as any, approvalValidityService:new ConversationSessionApprovalValidityService() });
   const result = await uc.execute({ workspaceId, conversationSessionId:'conversation.session.1' });
   assert.equal(result.eligible, true);
