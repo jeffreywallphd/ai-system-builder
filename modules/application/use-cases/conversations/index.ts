@@ -7,3 +7,8 @@ export * from './conversational-execution-plan-eligibility.service';
 export * from './conversational-source-system-verification.service';
 
 export * from './conversation-session-provenance.service';
+
+export * from './submit-conversation-turn.use-case';
+export * from './cancel-conversation-turn.use-case';
+export * from './retry-conversation-turn.use-case';
+export * from './conversation-turn-failure-classification.service';
