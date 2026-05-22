@@ -48,3 +48,10 @@ See `docs/architecture/workspace-model.md` for the Phase 6 workspace model, incl
 - Execution Plan Preparation architecture: `docs/architecture/execution-plan-preparation.md`.
 - Decision record: `docs/adr/ADR-0022-execution-plan-preparation.md`.
 - Context routing pack: `docs/context/packs/execution-plan-preparation.pack.md`.
+
+## Phase 13 Reference
+
+- Controlled conversational execution architecture: `docs/architecture/controlled-conversational-system-execution.md`.
+- Decision record: `docs/adr/ADR-0023-controlled-conversational-system-execution.md`.
+- Context routing pack: `docs/context/packs/controlled-conversational-system-execution.pack.md`.
+- Phase 13 follows Phase 12 preview-only planning; execution requires explicit approval plus supported runtime invocation boundaries.

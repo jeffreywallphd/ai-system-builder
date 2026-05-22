@@ -328,3 +328,8 @@ After Phase 10 composition planning, Phase 11 introduces runtime readiness bindi
 ## Execution Plan Preparation (Phase 12)
 
 Execution plan preparation is the non-executing planning layer between runtime readiness and later execution orchestration. See `docs/architecture/execution-plan-preparation.md` and ADR-0022 for boundaries and handoff semantics.
+
+
+## Phase 13 controlled conversational execution handoff
+
+After Phase 12 execution-plan preparation, the first runnable-system proof is controlled conversational execution (not image-generation-first). This remains part of the general composed-system architecture and requires explicit approval before invocation. See `docs/architecture/controlled-conversational-system-execution.md` and ADR-0023.

@@ -278,3 +278,8 @@ Prompt 8 may later split into 8a/8b/8c if transport scope grows.
 ## Phase 12 handoff exclusions
 
 Phase 12 handoff excludes credentials, secrets, raw env values, shell commands, command output, local paths, storage roots, raw workflow/provider payloads, runnable graph JSON, executable payloads, bytes/blobs/base64, and signed URLs.
+
+
+## Phase 13 handoff note
+
+Phase 12 remains preview-only and non-executing. The next phase is controlled conversational-system execution with explicit approval and supported runtime invocation boundaries; see `docs/architecture/controlled-conversational-system-execution.md` and ADR-0023.

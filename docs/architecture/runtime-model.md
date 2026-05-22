@@ -152,3 +152,7 @@ Phase 7 user-library/cross-workspace reuse should not change runtime readiness i
 ## Phase 12 execution plan preparation boundary
 
 Phase 12 introduces a non-executing planning layer that depends on runtime readiness outputs and produces safe execution plan candidates/previews. Runtime/provider invocation remains deferred to later execution orchestration work.
+
+## Phase 13 note
+
+Phase 13 introduces controlled conversational-system execution as the first runnable slice, gated by explicit approval and supported text-generation adapters; Phase 12 remains non-executing.
