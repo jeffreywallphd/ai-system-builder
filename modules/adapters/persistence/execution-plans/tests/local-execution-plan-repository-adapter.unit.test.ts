@@ -49,7 +49,12 @@ describe("local execution plan repository adapter", () => {
   it("rejects missing workspace and unsafe metadata", async () => {
     const repository = createLocalExecutionPlanRepositoryAdapter({ rootDir: await root(), now });
     await assert.rejects(() => repository.listExecutionPlans({ workspaceId: "" as never }));
-    await assert.rejects(() => repository.saveExecutionPlan(plan(wsA, "p-unsafe", { diagnostics: [{ code: "x", severity: "error", message: "contains token" }] })));
+    await assert.rejects(() =>
+      repository.saveExecutionPlan({
+        ...plan(wsA, "p-unsafe"),
+        diagnostics: [{ code: "unsafe.metadata", severity: "error", message: "contains token" }],
+      }),
+    );
   });
 
   it("fails safely for manifest mismatch", async () => {

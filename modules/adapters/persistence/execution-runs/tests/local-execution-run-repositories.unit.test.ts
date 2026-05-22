@@ -31,6 +31,7 @@ test('retryable list is explicit and not inferred from failed/cancelled', async(
 
 test('manifest/schema and malformed JSON failures surface', async()=>{const {root,a}=await setup();
   const dir=join(root,'execution-runs');
+  await a.executionRunRepository.listExecutionRuns({workspaceId:wsA});
   await writeFile(join(dir,'execution-runs-manifest.json'),'{"schemaVersion":2,"storeKind":"execution-runs-local-store"}');
   await assert.rejects(()=>a.executionRunRepository.listExecutionRuns({workspaceId:wsA}));
   await writeFile(join(dir,'execution-runs-manifest.json'),'{"schemaVersion":1,"storeKind":"execution-runs-local-store"}');
