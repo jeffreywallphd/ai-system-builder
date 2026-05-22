@@ -15,3 +15,17 @@ test('validate use case saves and returns success', async ()=>{
  assert.equal(r.kind,'success');
  assert.equal(r.value.status,'safety-review-required');
 });
+
+
+test('validation is idempotent for derived blockers/diagnostics', async ()=>{
+ let stored:any = JSON.parse(JSON.stringify(record));
+ stored.outputs=[{id:'eo_1',stepId:'es_1',kind:'artifact',status:'missing',label:'o',destinationReferenceKind:'composition-node',required:true,blockers:[],diagnostics:[]}];
+ stored.safetyGates=[{id:'g1',kind:'output-destination-planned',status:'planned',label:'g',outputId:'eo_1',blockers:[],diagnostics:[]}];
+ const repo:any={getExecutionPlanById:async()=>stored, updateExecutionPlan:async(v:any)=>{stored=v; return v;}};
+ const uc = new ValidateExecutionPlanUseCase({executionPlanRepository:repo, preflightValidationService:new ExecutionPlanPreflightValidationService(), safetyGateValidationService:new ExecutionPlanSafetyGateValidationService(), resourceEstimateService:new ExecutionPlanResourceEstimateService(), statusService:new ExecutionPlanStatusService(), now:()=> '2026-05-21T00:00:00.000Z'});
+ await uc.execute({workspaceId:'ws_1',executionPlanId:'ep_1'});
+ const once = { blockers: stored.blockers.length, diagnostics: stored.diagnostics.length };
+ await uc.execute({workspaceId:'ws_1',executionPlanId:'ep_1'});
+ assert.equal(stored.blockers.length, once.blockers);
+ assert.equal(stored.diagnostics.length, once.diagnostics);
+});

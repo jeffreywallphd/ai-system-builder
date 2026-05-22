@@ -17,6 +17,9 @@ export interface RegisterExecutionPlanApiRoutesDependencies {
 }
 
 const OPERATION = "execution-plans.preview" as const;
+
+const VALID_STATUSES = new Set(['draft','preparing','ready-for-review','needs-setup','missing-inputs','missing-outputs','provider-setup-required','safety-review-required','blocked','stale','invalid','archived']);
+
 const asText = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 const asWorkspaceId = (request: ExpressRequestLike): string => asText(request.params?.workspaceId);
 const asQueryBool = (value: unknown): boolean | undefined => (value === "true" ? true : value === "false" ? false : undefined);
@@ -39,7 +42,7 @@ export function registerExecutionPlanApiRoutes(dependencies: RegisterExecutionPl
     const bodyWorkspaceId = asText((request.body as { workspaceId?: unknown })?.workspaceId);
     const runtimeReadinessBindingId = asText((request.body as { runtimeReadinessBindingId?: unknown })?.runtimeReadinessBindingId);
     if (!routeWorkspaceId || !bodyWorkspaceId || routeWorkspaceId !== bodyWorkspaceId || !runtimeReadinessBindingId) return void sendValidation(response, "Workspace id and runtime readiness binding id are required.");
-    try { sendOk(response, await executionPlans.create.execute(request.body as any)); } catch { sendInternal(response); }
+    try { sendOk(response, await executionPlans.create.execute({ workspaceId: bodyWorkspaceId, runtimeReadinessBindingId, compositionPlanId: asText((request.body as { compositionPlanId?: unknown })?.compositionPlanId) || undefined })); } catch { sendInternal(response); }
   });
 
   app.post("/api/execution-plans/workspaces/:workspaceId/plans/:executionPlanId/validate", async (request, response) => {
@@ -48,7 +51,7 @@ export function registerExecutionPlanApiRoutes(dependencies: RegisterExecutionPl
     const bodyWorkspaceId = asText((request.body as { workspaceId?: unknown })?.workspaceId);
     const bodyExecutionPlanId = asText((request.body as { executionPlanId?: unknown })?.executionPlanId);
     if (!routeWorkspaceId || !routeExecutionPlanId || !bodyWorkspaceId || !bodyExecutionPlanId || routeWorkspaceId !== bodyWorkspaceId || routeExecutionPlanId !== bodyExecutionPlanId) return void sendValidation(response, "Workspace id and execution plan id are required.");
-    try { sendOk(response, await executionPlans.validate.execute(request.body as any)); } catch { sendInternal(response); }
+    try { sendOk(response, await executionPlans.validate.execute({ workspaceId: bodyWorkspaceId, executionPlanId: bodyExecutionPlanId })); } catch { sendInternal(response); }
   });
 
   app.post("/api/execution-plans/workspaces/:workspaceId/plans/:executionPlanId/archive", async (request, response) => {
@@ -64,7 +67,10 @@ export function registerExecutionPlanApiRoutes(dependencies: RegisterExecutionPl
     if (!workspaceId) return void sendValidation(response, "Workspace id is required.");
     const limit = asQueryNumber(request.query?.limit);
     if (request.query?.limit !== undefined && limit === undefined) return void sendValidation(response, "Invalid limit filter.");
-    try { sendOk(response, await executionPlans.readModel.listExecutionPlanSummaries({ workspaceId, limit, cursor: asText(request.query?.cursor), includeArchived: asQueryBool(request.query?.archived), status: asText(request.query?.status) as any })); } catch { sendInternal(response); }
+    const statusRaw = asText(request.query?.status);
+    const status = statusRaw.length === 0 ? undefined : statusRaw;
+    if (status && !VALID_STATUSES.has(status)) return void sendValidation(response, "Invalid status filter.");
+    try { sendOk(response, await executionPlans.readModel.listExecutionPlanSummaries({ workspaceId, limit, cursor: asText(request.query?.cursor), includeArchived: asQueryBool(request.query?.archived), status: status as never })); } catch { sendInternal(response); }
   });
 
   app.get("/api/execution-plans/workspaces/:workspaceId/plans/:executionPlanId", async (request, response) => {

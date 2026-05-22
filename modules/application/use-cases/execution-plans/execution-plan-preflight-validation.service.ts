@@ -18,11 +18,12 @@ export class ExecutionPlanPreflightValidationService {
     const gateIds = new Set(plan.safetyGates.map((g) => g.id));
 
     for (const dep of plan.dependencies) {
-      if (dep.requiredStepId && !stepIds.has(dep.requiredStepId)) blockers.push(this.b('execution-plan-unknown-step-dependency','Dependency references unknown step.', dep.id));
-      if (dep.requiredInputId && !inputIds.has(dep.requiredInputId)) blockers.push(this.b('execution-plan-missing-required-input','Dependency references unknown input.', dep.id));
-      if (dep.requiredOutputId && !outputIds.has(dep.requiredOutputId)) blockers.push(this.b('execution-plan-missing-required-output','Dependency references unknown output.', dep.id));
-      if (dep.requiredAdapterReferenceId && !adapterIds.has(dep.requiredAdapterReferenceId)) blockers.push(this.b('execution-plan-missing-adapter-reference','Dependency references unknown adapter.', dep.id));
-      if (dep.requiredSafetyGateId && !gateIds.has(dep.requiredSafetyGateId)) blockers.push(this.b('execution-plan-safety-gate-target-missing','Dependency references unknown safety gate.', dep.id));
+      if (dep.sourceStepId && !stepIds.has(dep.sourceStepId)) blockers.push(this.b('execution-plan-invalid-source-step-dependency','Dependency references unknown source step.', dep.id));
+      if (dep.targetStepId && !stepIds.has(dep.targetStepId)) blockers.push(this.b('execution-plan-invalid-target-step-dependency','Dependency references unknown target step.', dep.id));
+      if (dep.inputId && !inputIds.has(dep.inputId)) blockers.push(this.b('execution-plan-missing-required-input','Dependency references unknown input.', dep.id));
+      if (dep.outputId && !outputIds.has(dep.outputId)) blockers.push(this.b('execution-plan-missing-required-output','Dependency references unknown output.', dep.id));
+      if (dep.adapterReferenceId && !adapterIds.has(dep.adapterReferenceId)) blockers.push(this.b('execution-plan-missing-adapter-reference','Dependency references unknown adapter.', dep.id));
+      if (dep.safetyGateId && !gateIds.has(dep.safetyGateId)) blockers.push(this.b('execution-plan-safety-gate-target-missing','Dependency references unknown safety gate.', dep.id));
     }
 
     for (const i of plan.inputs) if (!stepIds.has(i.stepId)) blockers.push(this.b('execution-plan-input-step-unknown','Input references unknown step.', i.id));
