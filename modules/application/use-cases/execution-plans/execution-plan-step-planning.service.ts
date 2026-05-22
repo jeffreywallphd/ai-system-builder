@@ -1,13 +1,13 @@
 import type { AssetCompositionPlan } from "../../../contracts/asset-composition";
-import type { ExecutionBlocker, ExecutionDiagnostic, ExecutionStep, ExecutionStepId } from "../../../contracts/execution-plans";
+import { normalizeExecutionStepId, type ExecutionBlocker, type ExecutionDiagnostic, type ExecutionPlanId, type ExecutionStep, type ExecutionStepId } from "../../../contracts/execution-plans";
 
 export class ExecutionPlanStepPlanningService {
-  public plan(args: { planId: string; compositionPlan: AssetCompositionPlan; nextExecutionStepId: () => ExecutionStepId | string; sourceCompositionPlanId: string; }) {
+  public plan(args: { planId: ExecutionPlanId; compositionPlan: AssetCompositionPlan; nextExecutionStepId: () => ExecutionStepId | string; sourceCompositionPlanId: string; }) {
     const blockers: ExecutionBlocker[] = [];
     const diagnostics: ExecutionDiagnostic[] = [];
     const steps: ExecutionStep[] = args.compositionPlan.nodes.map((node) => {
       const role = `${node.role}`.toLowerCase();
-      const capabilities = [...node.requiredCapabilities, ...node.providedCapabilities].map((c) => `${c.capabilityKind}:${c.capabilityKey}`.toLowerCase()).join(" ");
+      const capabilities = [...node.requiredCapabilities, ...node.providedCapabilities].map((c) => `${c.kind}:${c.key}`.toLowerCase()).join(" ");
       let kind: ExecutionStep["kind"] = "manual-review";
       if (capabilities.includes("image") || role.includes("image")) kind = "generate-image";
       else if (capabilities.includes("text") || role.includes("text")) kind = "generate-text";
@@ -21,7 +21,7 @@ export class ExecutionPlanStepPlanningService {
         blockers.push({ code: "execution-plan-unsupported-node", message: "Unsupported composition node requires manual review.", targetReferenceId: node.nodeId, targetReferenceKind: "composition-node" });
         diagnostics.push({ code: "execution-plan-step-manual-review", message: "Step mapped to manual review.", severity: "warning", targetReferenceId: node.nodeId, targetReferenceKind: "composition-node" });
       }
-      return { id: args.nextExecutionStepId(), planId: args.planId, sourceCompositionPlanId: args.sourceCompositionPlanId, sourceNodeId: node.nodeId, kind, status: kind === "manual-review" ? "needs-review" : "planned", label: node.label ?? `Planned ${kind}`, summary: node.summary ?? "Planning-only execution step.", requiredAdapterReferenceIds: [], inputIds: [], outputIds: [], dependencyIds: [], safetyGateIds: [], blockers: [], diagnostics: [] };
+      return { id: normalizeExecutionStepId(String(args.nextExecutionStepId())), planId: args.planId, sourceCompositionPlanId: args.sourceCompositionPlanId, sourceNodeId: node.nodeId, kind, status: kind === "manual-review" ? "needs-review" : "planned", label: node.label ?? `Planned ${kind}`, summary: node.summary ?? "Planning-only execution step.", requiredAdapterReferenceIds: [], inputIds: [], outputIds: [], dependencyIds: [], safetyGateIds: [], blockers: [], diagnostics: [] };
     });
     return { steps, blockers, diagnostics };
   }

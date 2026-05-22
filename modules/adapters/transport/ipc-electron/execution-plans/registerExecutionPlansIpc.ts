@@ -47,8 +47,9 @@ export function registerExecutionPlansIpc({ ipcMain, executionPlans }: RegisterE
   ipcMain.handle(DESKTOP_EXECUTION_PLANS_ARCHIVE_PLAN_REQUEST_CHANNEL.value, async (_e, r: IpcRequest<{ workspaceId: string; executionPlanId: string }>) => {
     if (!executionPlans.archive) return fail(r, "unavailable", "Execution plan archive is not available.");
     const p = r?.payload;
-    if (!asText(p?.workspaceId) || !asText(p?.executionPlanId)) return fail(r, "validation", "Workspace id and execution plan id are required.");
-    try { return ok(r, await executionPlans.archive.execute(p)); } catch { return fail(r, "internal", "Unable to complete request."); }
+    if (!p || !asText(p.workspaceId) || !asText(p.executionPlanId)) return fail(r, "validation", "Workspace id and execution plan id are required.");
+    const payload = { workspaceId: p.workspaceId, executionPlanId: p.executionPlanId };
+    try { return ok(r, await executionPlans.archive.execute(payload)); } catch { return fail(r, "internal", "Unable to complete request."); }
   });
   ipcMain.handle(DESKTOP_EXECUTION_PLANS_LIST_SUMMARIES_REQUEST_CHANNEL.value, req((p: { workspaceId: string; status?: string }) => executionPlans.readModel.listExecutionPlanSummaries({ ...p, status: p.status as ExecutionPlanStatus | undefined }), (p) => {
     if (!asText(p?.workspaceId)) return "Workspace id is required.";
