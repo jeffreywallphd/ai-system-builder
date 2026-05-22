@@ -283,3 +283,6 @@ Phase 12 handoff excludes credentials, secrets, raw env values, shell commands, 
 ## Phase 13 handoff note
 
 Phase 12 remains preview-only and non-executing. The next phase is controlled conversational-system execution with explicit approval and supported runtime invocation boundaries; see `docs/architecture/controlled-conversational-system-execution.md` and ADR-0023.
+
+
+Phase 13 handoff correction: execution plans that feed conversational execution must originate from asset-derived conversational system composition (foundation-referenced reusable assets), not from ad hoc runtime session structures.

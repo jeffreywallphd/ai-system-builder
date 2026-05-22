@@ -21,18 +21,14 @@ describe('phase 13 controlled conversational execution docs closeout', () => {
     expect(routing).toContain('do **not** combine API/server-host, IPC/preload/desktop-host, and desktop/thin-client client/parity');
   });
 
-  it('documents conversational-first runnable proof with non-executing phase 12 and explicit approval', () => {
+  it('documents asset-first conversational proof and runtime-record separation', () => {
     const arch = read('docs/architecture/controlled-conversational-system-execution.md');
-    expect(arch).toContain('first runnable proof is now conversational');
-    expect(arch).toContain('Phase 12 remains preview-only and non-executing');
-    expect(arch).toContain('explicit approval');
-    expect(arch).toContain('Conversation session');
-    expect(arch).toContain('Execution run');
-    expect(arch).toContain('Execution attempt');
-    expect(arch).toContain('Execution event');
-    expect(arch).toContain('Execution result');
-    expect(arch).toContain('Prompt 1 is architecture/docs/context only');
-    expect(arch).toContain('tools/retrieval/memory/multimodal');
-    expect(arch).toContain('workflow/image/ComfyUI execution');
+    const adr = read('docs/adr/ADR-0023-controlled-conversational-system-execution.md');
+    expect(arch).toContain('Layer A — Reusable conversational asset family');
+    expect(arch).toContain('Layer B — Controlled runtime instances');
+    expect(arch).toContain('`system.foundation` primitives → reusable conversational composite assets');
+    expect(arch).toContain('Runtime records are operational records only and are never reusable asset substitutes.');
+    expect(adr).toContain('Corrective decisions before Review A');
+    expect(adr).toContain('must not duplicate foundation records into workspace authored storage merely through import/use');
   });
 });

@@ -41,3 +41,15 @@ Phase 13 depends on reviewed Phase 12 execution plans and related readiness/comp
 ## Later runnable-system slice implications
 
 The Phase 13 orchestration model must later support additional system types such as image generation, data transformation, document QA, retrieval-augmented systems, tool-using assistants, API-connected systems, multimodal interaction, and potential scheduled/distributed execution.
+
+
+## Corrective decisions before Review A
+
+1. The first runnable proof is **reusable conversational asset-family composition + controlled execution**, not a hard-coded chatbot feature.
+2. Conversational assets must compose from referenced `system.foundation` primitives where applicable.
+3. `system.foundation` remains limited to generic primitives; chatbot-specific composites are derived reusable assets (or explicitly distinguished in the shipped built-in mechanism).
+4. Foundation usage preserves reference/lineage semantics and must not duplicate foundation records into workspace authored storage merely through import/use.
+5. A starter conversational composite/template must be importable into other compositions.
+6. Imported conversational assets must remain customizable through existing asset authoring/override/effective-projection mechanisms.
+7. Conversation/execution records are runtime operational records and are not importable reusable assets.
+8. Existing Prompt 2–3 contract/persistence work remains valid only as runtime-record support for systems built through the reusable asset layer.

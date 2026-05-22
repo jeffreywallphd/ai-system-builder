@@ -165,3 +165,6 @@ Phase 7 is User Library and Cross-Workspace Asset Reuse. It should define explic
 Phase 8 is Asset Authoring, Customization, and Override Management. For Phase 8 prompts, include `docs/context/packs/asset-authoring.pack.md` and then read `docs/architecture/asset-authoring-customization-and-overrides.md` with ADR-0018. When a task combines Phase 7 reuse relationships with Phase 8 customization/override behavior, include both `user-library.pack.md` and `asset-authoring.pack.md`.
 
 - Phase 13 is Controlled Conversational System Execution; include `docs/context/packs/controlled-conversational-system-execution.pack.md` for conversational runnable-system execution/session/turn/run/adapter/approval work.
+
+
+- Phase 13 includes an **asset-first corrective step before Review A**: reusable conversational assets (composed from referenced `system.foundation` primitives) must precede controlled runtime execution records. Review A evaluates both Prompt 1–3 runtime-contract/persistence work and conversational asset-family/importability/lineage integration.
