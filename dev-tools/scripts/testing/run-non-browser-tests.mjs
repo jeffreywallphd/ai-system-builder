@@ -18,6 +18,7 @@ import {
   buildNonBrowserNodeTestRunOptions,
   isIgnorableRunnerSpawnFailure,
 } from "./non-browser-test-runner-core.mjs";
+import { assertNoSourceTreeJavaScriptArtifacts } from "./source-tree-contamination-guard.mjs";
 
 const runnerDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(runnerDir, "../../..");
@@ -407,6 +408,7 @@ const resolveSourcePath = (maybeRuntimeFile) => {
 };
 
 try {
+  assertNoSourceTreeJavaScriptArtifacts(repoRoot);
   discoverAndPrepareRuntime();
   let ignoredRunnerSpawnFailures = 0;
 
