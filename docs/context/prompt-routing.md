@@ -316,3 +316,19 @@ Routing combinations:
   - `docs/context/packs/asset-composition-planning.pack.md`
 - If projection freshness/staleness affects planning, also include:
   - `docs/context/packs/effective-asset-projections.pack.md`
+
+
+## Phase 13 Controlled Conversational Execution Routing
+
+Include `docs/context/packs/controlled-conversational-system-execution.pack.md` for tasks involving Phase 13, runnable conversational systems, chatbot-style run/test surfaces, conversation sessions, messages/assistant responses, execution runs/attempts/events/results, text-generation invocation, runtime approval/start/cancel/retry, execution progress, or supported runtime adapters.
+
+Required routing combinations:
+- Deriving execution behavior from Phase 12 plans: include
+  - `docs/context/packs/execution-plan-preparation.pack.md`
+  - `docs/context/packs/controlled-conversational-system-execution.pack.md`
+- Verifying runtime readiness for execution: also include
+  - `docs/context/packs/runtime-readiness-binding.pack.md`
+- Referencing composition context: also include
+  - `docs/context/packs/asset-composition-planning.pack.md`
+
+Transport split rule (Phase 13+): do **not** combine API/server-host, IPC/preload/desktop-host, and desktop/thin-client client/parity implementation into one prompt; route these as separate prompts and review each boundary explicitly.
