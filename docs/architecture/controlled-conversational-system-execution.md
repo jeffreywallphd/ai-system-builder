@@ -205,3 +205,34 @@ These must be routed and reviewed as separate prompts.
 ## Non-goals for Prompt 1
 
 Prompt 1 is architecture/docs/context only. It does not implement contracts, ports, adapters, use cases, read models, runtime invocation, provider integration, persistence, API/IPC/preload/client/UI surfaces, message persistence, cancellation/retry runtime behavior, workflow/image/ComfyUI execution, tools/retrieval/memory/multimodal/background/distributed execution, or mutation of Phase 9/10/11/12 records.
+
+
+## Asset-first corrective architecture (Review A cleanup)
+
+### Layer A — Reusable conversational asset family
+The first runnable conversational proof starts from reusable/importable conversational assets composed from referenced `system.foundation` primitives where applicable.
+
+### Layer B — Controlled runtime instances
+Conversation sessions, turns, messages, assistant responses, execution runs, attempts, events, approvals, cancellation requests, retry requests, and results are created only when the composed system is used at runtime. These runtime records are not reusable/importable composition assets.
+
+### Corrected pipeline
+```text
+system.foundation primitives
+  → reusable conversational composite assets
+  → import/customize in workspace
+  → compose a chatbot system
+  → runtime readiness binding
+  → execution plan preview
+  → approved conversation session
+  → controlled turn execution
+  → assistant response/result records
+```
+
+### No-copy semantics
+- `system.foundation` definitions remain canonical.
+- Reuse establishes references, dependencies, and lineage instead of copied foundation records.
+- Importing/using/composing conversational starter assets must not copy foundation records into workspace-authored storage merely through use.
+- Workspace-authored records are created only by deliberate customization/override behavior.
+- Derived conversational assets are reusable composites and are not reclassified as primitive defaults unless built-in pack metadata explicitly preserves derived lineage.
+
+Runtime records are operational records only and are never reusable asset substitutes.
