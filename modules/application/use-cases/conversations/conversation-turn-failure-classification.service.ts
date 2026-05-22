@@ -1,24 +1,7 @@
-export type ConversationTurnFailureCode =
-  | 'approval-required'
-  | 'approval-invalidated'
-  | 'source-plan-not-ready'
-  | 'source-plan-stale'
-  | 'runtime-readiness-not-acceptable'
-  | 'runtime-unavailable'
-  | 'runtime-not-ready'
-  | 'runtime-unsupported'
-  | 'invocation-failed'
-  | 'invocation-cancelled'
-  | 'invocation-timed-out'
-  | 'assistant-response-invalid'
-  | 'assistant-response-too-long'
-  | 'response-recording-failed'
-  | 'result-recording-failed'
-  | 'retry-not-allowed'
-  | 'internal-error';
+import type { ExecutionFailureClassification } from '../../../contracts/execution-runs';
 
 export class ConversationTurnFailureClassificationService {
-  public classify(status: string): ConversationTurnFailureCode {
+  public classify(status: string): ExecutionFailureClassification {
     if (status === 'approval-required') return 'approval-required';
     if (status === 'approval-invalidated') return 'approval-invalidated';
     if (status === 'not-ready') return 'runtime-not-ready';

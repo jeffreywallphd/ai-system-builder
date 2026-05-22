@@ -1,4 +1,7 @@
 import { normalizeExecutionPlanRecord, normalizeValidateExecutionPlanCommand, type ValidateExecutionPlanCommand, type ValidateExecutionPlanResult } from '../../../contracts/execution-plans';
+import { createWorkspaceId } from '../../../contracts/workspace';
+import { normalizeAssetCompositionPlanId } from '../../../contracts/asset-composition';
+import { normalizeRuntimeReadinessBindingId, type RuntimeReadinessStatus } from '../../../contracts/runtime-readiness';
 import type { AssetCompositionPlanRepositoryPort } from '../../ports/asset-composition';
 import type { ExecutionPlanRepositoryPort } from '../../ports/execution-plans';
 import type { RuntimeReadinessBindingRepositoryPort } from '../../ports/runtime-readiness';
@@ -17,17 +20,17 @@ export class ValidateExecutionPlanUseCase {
     try {
       const record = await this.d.executionPlanRepository.getExecutionPlanById(c.workspaceId, c.executionPlanId);
       if (!record) return executionPlanFailure('not-found','execution-plan-not-found');
-      if (record.status === 'archived') return executionPlanFailure('archived','execution-plan-archived');
+      if (record.status === 'archived') return executionPlanFailure('conflict','execution-plan-archived');
       let hasStaleSource = false;
       let readinessStatus = record.sourceReadinessStatus;
       if (this.d.runtimeReadinessBindingRepository) {
-        const readiness = await this.d.runtimeReadinessBindingRepository.readRuntimeReadinessBindingRecord(record.workspaceId, record.sourceRuntimeReadinessBindingId);
+        const readiness = await this.d.runtimeReadinessBindingRepository.readRuntimeReadinessBindingRecord(createWorkspaceId(record.workspaceId), normalizeRuntimeReadinessBindingId(record.sourceRuntimeReadinessBindingId));
         if (!readiness) return executionPlanFailure('source-readiness-not-ready','execution-plan-source-readiness-not-found');
         readinessStatus = readiness.status;
         if (new Date(readiness.updatedAt).getTime() > new Date(record.updatedAt).getTime()) hasStaleSource = true;
       }
       if (this.d.compositionPlanRepository) {
-        const comp = await this.d.compositionPlanRepository.readAssetCompositionPlanRecord(record.workspaceId, record.sourceCompositionPlanId);
+        const comp = await this.d.compositionPlanRepository.readAssetCompositionPlanRecord(createWorkspaceId(record.workspaceId), normalizeAssetCompositionPlanId(record.sourceCompositionPlanId));
         if (!comp) return executionPlanFailure('blocked','execution-plan-source-composition-not-found');
         if (new Date(comp.updatedAt).getTime() > new Date(record.updatedAt).getTime()) hasStaleSource = true;
       }
@@ -45,8 +48,8 @@ export class ValidateExecutionPlanUseCase {
         safetyGates: gates.safetyGates,
       };
       const resourceEstimates = this.d.resourceEstimateService.estimate(withDerived);
-      const status = this.d.statusService.calculate({ readinessStatus, hasStaleSource, hasBlockers: withDerived.blockers.length > 0, hasMissingInputs: pre.hasMissingInputs, hasMissingOutputs: pre.hasMissingOutputs, hasMissingAdapters: pre.hasMissingAdapters, requiresSafetyReview: gates.requiresReview, isInvalid: pre.hasUnsafeDetails });
-      const next = normalizeExecutionPlanRecord({ ...withDerived, status, resourceEstimates, provenance: [...withDerived.provenance, createExecutionPlanProvenanceEvent('execution-plan-validated', now, { workspaceId: record.workspaceId, executionPlanId: record.id })], updatedAt: now });
+      const status = this.d.statusService.calculate({ readinessStatus: readinessStatus as RuntimeReadinessStatus, hasStaleSource, hasBlockers: withDerived.blockers.length > 0, hasMissingInputs: pre.hasMissingInputs, hasMissingOutputs: pre.hasMissingOutputs, hasMissingAdapters: pre.hasMissingAdapters, requiresSafetyReview: gates.requiresReview, isInvalid: pre.hasUnsafeDetails });
+      const next = normalizeExecutionPlanRecord({ ...withDerived, status, resourceEstimates, provenance: [...withDerived.provenance, createExecutionPlanProvenanceEvent('execution-plan-refreshed', now, { workspaceId: record.workspaceId, executionPlanId: record.id })], updatedAt: now });
       const saved = await this.d.executionPlanRepository.updateExecutionPlan(next);
       return { kind: 'success', value: saved };
     } catch { return executionPlanFailure('unavailable','execution-plan-service-unavailable'); }

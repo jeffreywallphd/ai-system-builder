@@ -26,18 +26,18 @@ const foundation = {
 } as const;
 
 export const CONVERSATION_ASSET_DEFINITIONS: readonly AssetDefinition[] = [
-  def(ids.userInput,'data-contract','structural','Conversation User Message Input','Bounded one-turn user text input contract.',[foundation.textInput]),
-  def(ids.assistantOutput,'data-contract','structural','Conversation Assistant Text Response Output','Bounded assistant text output contract.',[foundation.detail]),
-  def(ids.historyRef,'data-contract','structural','Conversation History Reference','Ordered conversational history reference contract.',[foundation.list]),
+  def(ids.userInput,'schema','structural','Conversation User Message Input','Bounded one-turn user text input contract.',[foundation.textInput]),
+  def(ids.assistantOutput,'schema','structural','Conversation Assistant Text Response Output','Bounded assistant text output contract.',[foundation.detail]),
+  def(ids.historyRef,'schema','structural','Conversation History Reference','Ordered conversational history reference contract.',[foundation.list]),
   def(ids.composer,'ui-component','composition','Conversation Message Composer','Composed message composer using foundational text input and submit semantics.',[ids.userInput,foundation.textInput,foundation.submit,foundation.status]),
   def(ids.historyDisplay,'ui-component','composition','Conversation Message History Display','Composed conversational history display using foundational list/container semantics.',[ids.historyRef,foundation.list,foundation.container]),
   def(ids.responsePanel,'ui-component','composition','Conversation Assistant Response Panel','Composed assistant response panel with text display and loading/error/status semantics.',[ids.assistantOutput,foundation.detail,foundation.loading,foundation.error,foundation.status]),
   def(ids.chatShell,'feature','composition','Conversation Chat Shell','Composed conversational shell that arranges history display, response panel, and message composer.',[ids.historyDisplay,ids.responsePanel,ids.composer,foundation.stack,foundation.container]),
-  def(ids.sessionBehavior,'behavior','behavioral','Conversation Session Behavior','Declarative session-level turn and history relationship semantics.',[ids.turnBehavior,ids.historyCtxBehavior]),
-  def(ids.turnBehavior,'behavior','behavioral','Conversation Turn Behavior','Declarative one-turn user-input to assistant-response interaction semantics.',[ids.userInput,ids.assistantOutput]),
-  def(ids.runtimeReq,'runtime','context','Conversation Text Generation Runtime Requirement','Requires supported text-generation runtime capability only.',[foundation.subsystem]),
-  def(ids.responseGenBehavior,'behavior','behavioral','Conversation Assistant Response Generation Behavior','Declarative behavior that depends on text-generation runtime capability.',[ids.runtimeReq]),
-  def(ids.historyCtxBehavior,'behavior','behavioral','Conversation History Context Behavior','Declarative behavior that maps prior history to response-generation context.',[ids.historyRef]),
+  def(ids.sessionBehavior,'workflow-step','behavioral','Conversation Session Behavior','Declarative session-level turn and history relationship semantics.',[ids.turnBehavior,ids.historyCtxBehavior]),
+  def(ids.turnBehavior,'workflow-step','behavioral','Conversation Turn Behavior','Declarative one-turn user-input to assistant-response interaction semantics.',[ids.userInput,ids.assistantOutput]),
+  def(ids.runtimeReq,'runtime-binding','context','Conversation Text Generation Runtime Requirement','Requires supported text-generation runtime capability only.',[foundation.subsystem]),
+  def(ids.responseGenBehavior,'workflow-step','behavioral','Conversation Assistant Response Generation Behavior','Declarative behavior that depends on text-generation runtime capability.',[ids.runtimeReq]),
+  def(ids.historyCtxBehavior,'workflow-step','behavioral','Conversation History Context Behavior','Declarative behavior that maps prior history to response-generation context.',[ids.historyRef]),
   def(ids.starter,'system','composition','Conversation Basic Assistant System','Reusable starter conversational assistant system composed from conversation assets and foundation shell semantics.',[ids.chatShell,ids.sessionBehavior,ids.turnBehavior,ids.responseGenBehavior,ids.historyCtxBehavior,ids.userInput,ids.assistantOutput,ids.historyRef,ids.runtimeReq,foundation.system]),
 ];
 

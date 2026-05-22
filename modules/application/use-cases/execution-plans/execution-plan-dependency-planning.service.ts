@@ -1,8 +1,18 @@
 import type { AssetCompositionPlan } from '../../../contracts/asset-composition';
 import type { ExecutionAdapterReference, ExecutionBlocker, ExecutionDependency, ExecutionDependencyId, ExecutionDependencyStatus, ExecutionDiagnostic, ExecutionInput, ExecutionOutput, ExecutionSafetyGate, ExecutionStep } from '../../../contracts/execution-plans';
 
-const adapterToDep = (status: ExecutionAdapterReference['status']): ExecutionDependencyStatus => status === 'available-by-readiness' ? 'satisfied-by-plan' : status === 'planned' ? 'planned' : status === 'needs-setup' || status === 'missing' ? 'missing' : status;
-const gateToDep = (status: ExecutionSafetyGate['status']): ExecutionDependencyStatus => status === 'passed-by-plan' ? 'satisfied-by-plan' : status === 'needs-review' ? 'planned' : status;
+const adapterToDep = (status: ExecutionAdapterReference['status']): ExecutionDependencyStatus => {
+  if (status === 'available-by-readiness') return 'satisfied-by-plan';
+  if (status === 'planned') return 'planned';
+  if (status === 'needs-setup' || status === 'missing' || status === 'unsupported' || status === 'deferred') return 'missing';
+  return status;
+};
+const gateToDep = (status: ExecutionSafetyGate['status']): ExecutionDependencyStatus => {
+  if (status === 'passed-by-plan') return 'satisfied-by-plan';
+  if (status === 'needs-review' || status === 'deferred' || status === 'not-applicable') return 'planned';
+  if (status === 'failed') return 'blocked';
+  return status;
+};
 
 export class ExecutionPlanDependencyPlanningService {
   public plan(args: { compositionPlan: AssetCompositionPlan; steps: ExecutionStep[]; inputs: ExecutionInput[]; outputs: ExecutionOutput[]; adapterReferences: ExecutionAdapterReference[]; safetyGates: ExecutionSafetyGate[]; nextExecutionDependencyId: () => ExecutionDependencyId | string; }) {

@@ -1,4 +1,5 @@
-import type { ExecutionAdapterReference, ExecutionAdapterReferenceKind, ExecutionAdapterReferenceStatus, ExecutionBlocker, ExecutionDiagnostic, ExecutionStep } from '../../../contracts/execution-plans';
+import { normalizeExecutionAdapterReferenceId, type ExecutionAdapterReference, type ExecutionAdapterReferenceKind, type ExecutionAdapterReferenceStatus, type ExecutionBlocker, type ExecutionDiagnostic, type ExecutionStep } from '../../../contracts/execution-plans';
+import type { RuntimeReadinessBinding } from '../../../contracts/runtime-readiness';
 
 const needsProvider = new Set<ExecutionStep['kind']>(['generate-image','generate-text','embed-content','call-api','store-artifact','read-artifact']);
 
@@ -12,16 +13,23 @@ const inferCapability = (stepKind: ExecutionStep['kind']): string => {
 };
 
 export class ExecutionPlanProviderPlanningService {
-  public plan(args:{ planId:string; sourceRuntimeReadinessBindingId:string; readiness:{selectedRuntimeBindings?:Array<{runtimeBindingId:string; providerKind?:string; capabilityKind?:string; status?:string; label?:string}>}; steps:ExecutionStep[]; createAdapterReferenceId:()=>string; }) {
+  public plan(args:{ planId:string; sourceRuntimeReadinessBindingId:string; readiness:RuntimeReadinessBinding; steps:ExecutionStep[]; createAdapterReferenceId:()=>string; }) {
     const adapterReferences:ExecutionAdapterReference[]=[]; const blockers:ExecutionBlocker[]=[]; const diagnostics:ExecutionDiagnostic[]=[];
-    const selected = args.readiness.selectedRuntimeBindings ?? [];
+    const selected = args.readiness.bindings
+      .filter((binding) => binding.status === 'selected' || binding.status === 'bound')
+      .map((binding) => {
+        const capability = args.readiness.providerCandidates
+          .flatMap((provider) => provider.capabilities)
+          .find((candidateCapability) => candidateCapability.capabilityId === binding.selectedCapabilityId);
+        return { runtimeBindingId: binding.bindingId, providerKind: binding.selectedProviderCandidateId, capabilityKind: capability?.capabilityKind, status: binding.status, label: capability?.label };
+      });
     const steps = args.steps.map((step)=>{
       if (!needsProvider.has(step.kind)) return step;
       const requiredCapability = inferCapability(step.kind);
       const binding = selected.find((b)=> (b.capabilityKind ?? '').toLowerCase() === requiredCapability);
       const status:ExecutionAdapterReferenceStatus = binding ? 'available-by-readiness':'needs-setup';
       const kind:ExecutionAdapterReferenceKind = step.kind === 'call-api' ? 'api-adapter' : step.kind === 'store-artifact' ? 'storage-adapter' : step.kind === 'read-artifact' ? 'artifact-adapter' : step.kind === 'generate-image' ? 'model-adapter' : 'provider-adapter';
-      const ar:ExecutionAdapterReference = { id: args.createAdapterReferenceId(), kind, status, sourceRuntimeReadinessBindingId: args.sourceRuntimeReadinessBindingId, sourceRuntimeBindingId: binding?.runtimeBindingId, providerKind: binding?.providerKind, capabilityKind: binding?.capabilityKind, label: binding?.label ?? `Setup required for ${step.kind}`, blockers:[], diagnostics:[] };
+      const ar:ExecutionAdapterReference = { id: normalizeExecutionAdapterReferenceId(args.createAdapterReferenceId()), kind, status, sourceRuntimeReadinessBindingId: args.sourceRuntimeReadinessBindingId, sourceRuntimeBindingId: binding?.runtimeBindingId, providerKind: binding?.providerKind, capabilityKind: binding?.capabilityKind, label: binding?.label ?? `Setup required for ${step.kind}`, blockers:[], diagnostics:[] };
       adapterReferences.push(ar);
       if (!binding) blockers.push({ code:'execution-plan-provider-setup-required', message:'Provider setup selection required.', targetReferenceKind:'execution-step', targetReferenceId:step.id });
 
