@@ -97,6 +97,15 @@ import {
   createDesktopModelRecordDeleteSuccessResponse,
   createDesktopModelTrainSuccessResponse,
   createDesktopModelTrainStatusSuccessResponse,
+  DESKTOP_CONVERSATION_EXECUTION_V2_CREATE_SESSION_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_APPROVE_SESSION_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_LIST_SESSIONS_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_READ_SESSION_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_READ_TRANSCRIPT_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_READ_TURN_ACTIVITY_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_SUBMIT_TURN_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_CANCEL_TURN_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_RETRY_TURN_REQUEST_CHANNEL,
 } from "../../../../../modules/contracts/ipc";
 import {
   DESKTOP_USER_LIBRARY_PROMOTE_REQUEST_CHANNEL,
@@ -122,6 +131,31 @@ import {
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
 describe("desktop preload exposedApi bridge", () => {
+
+  it("maps conversation execution bridge calls to conversation IPC channels", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue({ ok: true, value: {} });
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    await api.createConversationExecutionSessionFromPlan({ workspaceId: 'ws.1', sourceExecutionPlanId: 'ep.1' });
+    await api.approveConversationSession({ workspaceId: 'ws.1', conversationSessionId: 's.1', executionApprovalId: 'ea.1' });
+    await api.listConversationSessions({ workspaceId: 'ws.1' });
+    await api.readConversationSession({ workspaceId: 'ws.1', conversationSessionId: 's.1' });
+    await api.readConversationTranscript({ workspaceId: 'ws.1', conversationSessionId: 's.1' });
+    await api.readConversationTurnActivity({ workspaceId: 'ws.1', conversationSessionId: 's.1', conversationTurnId: 't.1' });
+    await api.submitConversationTurn({ workspaceId: 'ws.1', conversationSessionId: 's.1', text: 'hello', operationId: 'op.1' });
+    await api.cancelConversationTurn({ workspaceId: 'ws.1', conversationSessionId: 's.1', conversationTurnId: 't.1', operationId: 'op.2' });
+    await api.retryConversationTurn({ workspaceId: 'ws.1', conversationSessionId: 's.1', conversationTurnId: 't.1', operationId: 'op.3' });
+    expect(invoke.mock.calls.map((call) => call[0])).toEqual([
+      DESKTOP_CONVERSATION_EXECUTION_V2_CREATE_SESSION_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_APPROVE_SESSION_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_LIST_SESSIONS_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_READ_SESSION_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_READ_TRANSCRIPT_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_READ_TURN_ACTIVITY_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_SUBMIT_TURN_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_CANCEL_TURN_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_RETRY_TURN_REQUEST_CHANNEL.value,
+    ]);
+  });
   it("maps runtime readiness reads to dedicated request channel", async () => {
     const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createDesktopRuntimeReadinessReadSuccessResponse({
