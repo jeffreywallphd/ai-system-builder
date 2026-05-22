@@ -16,6 +16,10 @@ Define and protect Phase 13 controlled execution orchestration for the first run
 - Text-generation runtime invocation boundaries.
 
 ## Canonical files to inspect
+- `docs/architecture/asset-kernel.md`
+- `docs/architecture/user-library-and-cross-workspace-reuse.md`
+- `docs/architecture/asset-authoring-customization-and-overrides.md`
+- `docs/architecture/effective-asset-projections.md`
 
 - `docs/architecture/controlled-conversational-system-execution.md`
 - `docs/adr/ADR-0023-controlled-conversational-system-execution.md`

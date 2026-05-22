@@ -53,3 +53,11 @@ The Phase 13 orchestration model must later support additional system types such
 6. Imported conversational assets must remain customizable through existing asset authoring/override/effective-projection mechanisms.
 7. Conversation/execution records are runtime operational records and are not importable reusable assets.
 8. Existing Prompt 2–3 contract/persistence work remains valid only as runtime-record support for systems built through the reusable asset layer.
+
+
+## Review A asset-first acceptance details
+- The asset-first proof is part of the accepted architecture, not a temporary note.
+- Foundation composition and no-copy semantics are required architecture constraints.
+- The starter conversational system must be importable/customizable through existing asset authoring/override/effective-projection behavior.
+- Runtime records are operational and are not reusable asset definitions.
+- Later execution use cases must originate from execution plans derived from composed conversational assets.
