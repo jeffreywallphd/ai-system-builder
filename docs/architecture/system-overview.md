@@ -336,3 +336,5 @@ After Phase 12 execution-plan preparation, the first runnable-system proof is co
 
 
 Phase 13 Review A includes an asset-first corrective requirement: the first conversational proof must originate from reusable conversational assets composed from referenced `system.foundation` primitives where relevant, then execute through controlled runtime session/run records.
+
+- Assets now includes a Run & Test tab for conversational composed-system proof flows (plan-derived session creation, approval, transcript, and safe message submission via existing clients).

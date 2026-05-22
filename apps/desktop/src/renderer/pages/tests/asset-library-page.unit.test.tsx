@@ -47,7 +47,8 @@ describe("AssetLibraryPage", () => {
       root.render(<AssetLibraryPage />);
     });
 
-    expect(container.textContent).toContain("Asset Library");
+    expect(container.textContent).toContain("Assets");
+    expect(container.textContent).toContain("Run & Test");
     expect(container.textContent).toContain("Browse reusable building blocks available in this workspace.");
   });
 

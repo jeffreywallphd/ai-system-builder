@@ -245,3 +245,11 @@ Application-facing conversational invocation seams now exist for protected conte
 - Phase 13 Prompt 8 adds application-layer conversational read models for session list/detail, transcript projection, and safe per-turn activity views. Transcript projections are the only read boundary that expose user/assistant text; operational views remain status-only and redact protected runtime internals. Transport exposure (API, IPC/preload, client/UI) remains deferred.
 
 - Prompt 11 adds desktop renderer and thin-client conversational execution wrappers over preload and API transports respectively; they expose matched safe session/read/submit/cancel/retry operations with truthful host-result capability differences and keep streaming deferred.
+
+## Phase 13 Prompt 12 UI proof
+
+The Assets workspace now includes a **Run & Test** tab for conversational systems. The tab is asset-workflow scoped: users choose a reviewed run plan, create/open a test conversation session, approve when required, and send messages through the established conversation execution clients (desktop IPC wrapper or thin-client API wrapper).
+
+The UI shows only safe conversation/transcript/read-model content and user-facing status guidance. Advanced runtime internals and protected context remain outside the primary UI surface.
+
+Host differences are represented truthfully in the run/test surface: submission controls follow the reported session/approval/availability state, and unsupported actions are not presented as functional. Streaming, tools/retrieval/memory/multimodal behavior, and broader runnable-system experiences remain deferred.

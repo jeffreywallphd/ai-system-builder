@@ -99,3 +99,5 @@ Tools/function-calling, retrieval/RAG, memory, multimodal IO, image generation/C
 ## Phase 13 Prompt 5 status
 
 Application-facing conversational invocation seams now exist for protected context preparation, adapter catalog selection, runtime guard checks, and single-turn orchestration. This phase remains non-executing: no concrete text-generation runtime adapter is implemented, production response generation remains deferred/unsupported, Prompt 6 will add the first supported adapter, and Prompt 7 will add persisted turn/run/result lifecycle integration. Approval/session eligibility and asset-derived source boundaries remain mandatory prerequisites.
+
+- Phase 13 Prompt 12 adds the first user-facing Assets-area **Run & Test** surface for composed conversational systems, using existing safe desktop/thin-client conversation clients and preserving approval/readiness/execution-plan boundaries.
