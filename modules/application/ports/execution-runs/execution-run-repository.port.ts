@@ -1,7 +1,8 @@
+import type { WorkspaceId } from '../../../contracts/workspace';
 import type { ExecutionRunId, ExecutionRunRecord, ExecutionRunSourceContextKind, ExecutionRunStatus } from '../../../contracts/execution-runs';
 
 export interface ExecutionRunListQuery {
-  readonly workspaceId: string;
+  readonly workspaceId: WorkspaceId;
   readonly status?: ExecutionRunStatus;
   readonly sourceExecutionPlanId?: string;
   readonly sourceCompositionPlanId?: string;
@@ -23,9 +24,9 @@ export interface ExecutionRunListResult { readonly runs: readonly ExecutionRunRe
 export interface ExecutionRunRepositoryPort {
   saveExecutionRun(record: ExecutionRunRecord): Promise<ExecutionRunRecord>;
   updateExecutionRun(record: ExecutionRunRecord): Promise<ExecutionRunRecord>;
-  getExecutionRunById(workspaceId: string, executionRunId: ExecutionRunId): Promise<ExecutionRunRecord | undefined>;
+  getExecutionRunById(workspaceId: WorkspaceId, executionRunId: ExecutionRunId): Promise<ExecutionRunRecord | undefined>;
   listExecutionRuns(query: ExecutionRunListQuery): Promise<ExecutionRunListResult>;
-  listActiveExecutionRuns(workspaceId: string): Promise<readonly ExecutionRunRecord[]>;
-  listRetryableExecutionRuns(workspaceId: string): Promise<readonly ExecutionRunRecord[]>;
-  archiveExecutionRun(workspaceId: string, executionRunId: ExecutionRunId, archivedAt: string): Promise<ExecutionRunRecord | undefined>;
+  listActiveExecutionRuns(workspaceId: WorkspaceId): Promise<readonly ExecutionRunRecord[]>;
+  listRetryableExecutionRuns(workspaceId: WorkspaceId): Promise<readonly ExecutionRunRecord[]>;
+  archiveExecutionRun(workspaceId: WorkspaceId, executionRunId: ExecutionRunId, archivedAt: string): Promise<ExecutionRunRecord | undefined>;
 }

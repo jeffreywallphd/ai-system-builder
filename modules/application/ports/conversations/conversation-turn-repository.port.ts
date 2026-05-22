@@ -1,9 +1,11 @@
-import type { ConversationTurnId, ConversationTurnRecord, ConversationTurnStatus } from '../../../contracts/conversations';
+import type { WorkspaceId } from '../../../contracts/workspace';
+import type { ConversationSessionId, ConversationTurnId, ConversationTurnRecord, ConversationTurnStatus } from '../../../contracts/conversations';
+import type { ExecutionRunId } from '../../../contracts/execution-runs';
 export interface ConversationTurnRepositoryPort {
   saveConversationTurn(record: ConversationTurnRecord): Promise<ConversationTurnRecord>;
   updateConversationTurn(record: ConversationTurnRecord): Promise<ConversationTurnRecord>;
-  getConversationTurnById(workspaceId: string, turnId: ConversationTurnId): Promise<ConversationTurnRecord | undefined>;
-  listConversationTurnsBySession(workspaceId: string, conversationSessionId: string, status?: ConversationTurnStatus): Promise<readonly ConversationTurnRecord[]>;
-  listConversationTurnsByExecutionRun(workspaceId: string, executionRunId: string): Promise<readonly ConversationTurnRecord[]>;
-  getLatestConversationTurnBySession(workspaceId: string, conversationSessionId: string): Promise<ConversationTurnRecord | undefined>;
+  getConversationTurnById(workspaceId: WorkspaceId, turnId: ConversationTurnId): Promise<ConversationTurnRecord | undefined>;
+  listConversationTurnsBySession(workspaceId: WorkspaceId, conversationSessionId: ConversationSessionId, status?: ConversationTurnStatus): Promise<readonly ConversationTurnRecord[]>;
+  listConversationTurnsByExecutionRun(workspaceId: WorkspaceId, executionRunId: ExecutionRunId): Promise<readonly ConversationTurnRecord[]>;
+  getLatestConversationTurnBySession(workspaceId: WorkspaceId, conversationSessionId: ConversationSessionId): Promise<ConversationTurnRecord | undefined>;
 }
