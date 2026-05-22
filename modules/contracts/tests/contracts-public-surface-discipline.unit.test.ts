@@ -33,6 +33,8 @@ const CONTRACT_FAMILIES = [
   "assetAuthoring",
   "assetComposition",
   "runtimeReadiness",
+  "executionRuns",
+  "conversations",
 ] as const;
 
 const IMPORT_SCAN_ROOTS = [
