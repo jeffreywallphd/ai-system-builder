@@ -37,3 +37,5 @@ export * from "./execution-plans";
 
 export * from "./execution-runs";
 export * from "./conversations";
+
+export * from "./conversational-execution";
