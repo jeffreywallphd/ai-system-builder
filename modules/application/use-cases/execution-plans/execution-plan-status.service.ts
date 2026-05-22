@@ -6,10 +6,10 @@ export class ExecutionPlanStatusService {
     if (args.isInvalid) return "invalid";
     if (args.readinessStatus !== "ready-for-setup") return "needs-setup";
     if (args.hasStaleSource) return "stale";
-    if (args.hasBlockers) return "blocked";
     if (args.hasMissingInputs) return "missing-inputs";
     if (args.hasMissingOutputs) return "missing-outputs";
     if (args.hasMissingAdapters) return "provider-setup-required";
+    if (args.hasBlockers) return "blocked";
     if (args.requiresSafetyReview) return "safety-review-required";
     return "ready-for-review";
   }

@@ -143,6 +143,17 @@ import {
   DESKTOP_RUNTIME_READINESS_SUMMARIZE_INVENTORY_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_READINESS_CREATE_BINDING_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_CREATE_PLAN_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_VALIDATE_PLAN_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_ARCHIVE_PLAN_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_LIST_SUMMARIES_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_READ_DETAIL_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_LIST_FOR_COMPOSITION_PLAN_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_READ_LATEST_FOR_COMPOSITION_PLAN_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_LIST_FOR_RUNTIME_READINESS_BINDING_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_READ_LATEST_FOR_RUNTIME_READINESS_BINDING_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_LIST_NEEDING_ATTENTION_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_SUMMARIZE_WORKSPACE_REQUEST_CHANNEL,
 
   DESKTOP_WORKSPACE_LIST_OPERATION,
   DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL,
@@ -485,6 +496,17 @@ export interface DesktopPreloadApi {
   summarizeRuntimeReadinessInventory: (input: { targetWorkspaceId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
   createRuntimeReadinessBinding: (input: { targetWorkspaceId: string; compositionPlanId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
   validateRuntimeReadinessBinding: (input: { targetWorkspaceId: string; readinessBindingId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  createExecutionPlan: (input: { workspaceId: string; runtimeReadinessBindingId: string; compositionPlanId?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  validateExecutionPlan: (input: { workspaceId: string; executionPlanId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  archiveExecutionPlan: (input: { workspaceId: string; executionPlanId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  listExecutionPlanSummaries: (input: { workspaceId: string; includeArchived?: boolean; limit?: number; cursor?: string; status?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  readExecutionPlanDetail: (input: { workspaceId: string; executionPlanId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  listExecutionPlansForCompositionPlan: (input: { workspaceId: string; compositionPlanId: string; includeArchived?: boolean }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  readLatestExecutionPlanForCompositionPlan: (input: { workspaceId: string; compositionPlanId: string; includeArchived?: boolean }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  listExecutionPlansForRuntimeReadinessBinding: (input: { workspaceId: string; runtimeReadinessBindingId: string; includeArchived?: boolean }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  readLatestExecutionPlanForRuntimeReadinessBinding: (input: { workspaceId: string; runtimeReadinessBindingId: string; includeArchived?: boolean }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  listExecutionPlansNeedingAttention: (input: { workspaceId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  summarizeWorkspaceExecutionPlans: (input: { workspaceId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
   readFeatureLifecycleState: (
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopFeatureLifecycleStateReadResponse>;
@@ -1112,17 +1134,17 @@ export function createDesktopPreloadApi(
     },
 
 
-    async createExecutionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:create-plan", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
-    async validateExecutionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:validate-plan", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
-    async archiveExecutionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:archive-plan", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
-    async listExecutionPlanSummaries(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:list-summaries", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
-    async readExecutionPlanDetail(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:read-detail", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
-    async listExecutionPlansForCompositionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:list-for-composition-plan", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
-    async readLatestExecutionPlanForCompositionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:read-latest-for-composition-plan", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
-    async listExecutionPlansForRuntimeReadinessBinding(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:list-for-runtime-readiness-binding", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
-    async readLatestExecutionPlanForRuntimeReadinessBinding(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:read-latest-for-runtime-readiness-binding", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
-    async listExecutionPlansNeedingAttention(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:list-needing-attention", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
-    async summarizeWorkspaceExecutionPlans(input, context = {}) { return dependencies.ipcRenderer.invoke("execution-plans:summarize-workspace", { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async createExecutionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_CREATE_PLAN_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async validateExecutionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_VALIDATE_PLAN_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async archiveExecutionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_ARCHIVE_PLAN_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async listExecutionPlanSummaries(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_LIST_SUMMARIES_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async readExecutionPlanDetail(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_READ_DETAIL_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async listExecutionPlansForCompositionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_LIST_FOR_COMPOSITION_PLAN_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async readLatestExecutionPlanForCompositionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_READ_LATEST_FOR_COMPOSITION_PLAN_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async listExecutionPlansForRuntimeReadinessBinding(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_LIST_FOR_RUNTIME_READINESS_BINDING_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async readLatestExecutionPlanForRuntimeReadinessBinding(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_READ_LATEST_FOR_RUNTIME_READINESS_BINDING_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async listExecutionPlansNeedingAttention(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_LIST_NEEDING_ATTENTION_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async summarizeWorkspaceExecutionPlans(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_SUMMARIZE_WORKSPACE_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
     async readFeatureLifecycleState(context = {}) {
       const request = createDesktopFeatureLifecycleStateReadRequest(
         {

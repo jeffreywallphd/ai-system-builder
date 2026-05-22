@@ -1005,3 +1005,36 @@ describe("desktop preload user-library bridge", () => {
     expect(Object.keys(api)).not.toContain("userLibraryAssetRepository");
   });
 });
+
+
+describe("desktop preload execution-plan bridge", () => {
+  it("uses execution-plan IPC contract channels", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue({ ok: true, value: {} });
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    await api.createExecutionPlan({ workspaceId: "ws.1", runtimeReadinessBindingId: "rrb.1" });
+    await api.validateExecutionPlan({ workspaceId: "ws.1", executionPlanId: "ep.1" });
+    await api.archiveExecutionPlan({ workspaceId: "ws.1", executionPlanId: "ep.1" });
+    await api.listExecutionPlanSummaries({ workspaceId: "ws.1" });
+    await api.readExecutionPlanDetail({ workspaceId: "ws.1", executionPlanId: "ep.1" });
+    await api.listExecutionPlansForCompositionPlan({ workspaceId: "ws.1", compositionPlanId: "cp.1" });
+    await api.readLatestExecutionPlanForCompositionPlan({ workspaceId: "ws.1", compositionPlanId: "cp.1" });
+    await api.listExecutionPlansForRuntimeReadinessBinding({ workspaceId: "ws.1", runtimeReadinessBindingId: "rrb.1" });
+    await api.readLatestExecutionPlanForRuntimeReadinessBinding({ workspaceId: "ws.1", runtimeReadinessBindingId: "rrb.1" });
+    await api.listExecutionPlansNeedingAttention({ workspaceId: "ws.1" });
+    await api.summarizeWorkspaceExecutionPlans({ workspaceId: "ws.1" });
+
+    expect(invoke.mock.calls.map((call) => call[0])).toEqual([
+      "execution-plans:create-plan",
+      "execution-plans:validate-plan",
+      "execution-plans:archive-plan",
+      "execution-plans:list-summaries",
+      "execution-plans:read-detail",
+      "execution-plans:list-for-composition-plan",
+      "execution-plans:read-latest-for-composition-plan",
+      "execution-plans:list-for-runtime-readiness-binding",
+      "execution-plans:read-latest-for-runtime-readiness-binding",
+      "execution-plans:list-needing-attention",
+      "execution-plans:summarize-workspace",
+    ]);
+  });
+});

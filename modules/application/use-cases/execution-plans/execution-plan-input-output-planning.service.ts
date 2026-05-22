@@ -25,6 +25,11 @@ export class ExecutionPlanInputOutputPlanningService {
       }
       if (role.includes('output') || role.includes('storage') || role.includes('report') || role.includes('preview') || role.includes('workspace-record') || producesOutput) {
         const output: ExecutionOutput = { id: args.nextExecutionOutputId() as ExecutionOutputId, stepId: step.id, kind: role.includes('report') ? 'report' : role.includes('preview') ? 'preview' : role.includes('workspace-record') ? 'workspace-record' : 'artifact', status: 'planned', label: node.label ?? `Output for ${step.label}`, destinationReferenceKind: 'composition-node', destinationReferenceId: node.nodeId, required: true, blockers: [], diagnostics: [] };
+        if (!output.destinationReferenceId) {
+          output.status = 'missing';
+          output.blockers.push({ code: 'execution-plan-missing-outputs', message: 'Missing output destination.', targetReferenceKind: 'execution-output', targetReferenceId: output.id });
+          blockers.push({ code: 'execution-plan-missing-outputs', message: 'Missing output destination.', targetReferenceKind: 'execution-step', targetReferenceId: step.id });
+        }
         outputs.push(output);
       } else if (producesOutput) {
         blockers.push({ code: 'execution-plan-missing-outputs', message: 'Missing output destination.', targetReferenceKind: 'execution-step', targetReferenceId: step.id });

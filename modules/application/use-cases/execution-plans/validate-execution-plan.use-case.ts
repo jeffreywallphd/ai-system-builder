@@ -32,11 +32,21 @@ export class ValidateExecutionPlanUseCase {
         if (new Date(comp.updatedAt).getTime() > new Date(record.updatedAt).getTime()) hasStaleSource = true;
       }
       const pre = this.d.preflightValidationService.validate(record);
-      const withPre = { ...record, blockers: [...record.blockers, ...pre.blockers], diagnostics: [...record.diagnostics, ...pre.diagnostics] };
+      const derivedCodes = new Set([...(pre.blockers.map((b)=>b.code)), ...(pre.diagnostics.map((d)=>d.code))]);
+      const retainedBlockers = record.blockers.filter((b)=>!derivedCodes.has(b.code));
+      const retainedDiagnostics = record.diagnostics.filter((d)=>!derivedCodes.has(d.code));
+      const withPre = { ...record, blockers: [...retainedBlockers, ...pre.blockers], diagnostics: [...retainedDiagnostics, ...pre.diagnostics] };
       const gates = this.d.safetyGateValidationService.validate(withPre);
-      const resourceEstimates = this.d.resourceEstimateService.estimate(withPre);
-      const status = this.d.statusService.calculate({ readinessStatus, hasStaleSource, hasBlockers: withPre.blockers.length + gates.blockers.length > 0, hasMissingInputs: pre.hasMissingInputs, hasMissingOutputs: pre.hasMissingOutputs, hasMissingAdapters: pre.hasMissingAdapters, requiresSafetyReview: gates.requiresReview, isInvalid: pre.hasUnsafeDetails });
-      const next = normalizeExecutionPlanRecord({ ...withPre, status, resourceEstimates, blockers: [...withPre.blockers, ...gates.blockers], diagnostics: [...withPre.diagnostics, ...gates.diagnostics], provenance: [...withPre.provenance, createExecutionPlanProvenanceEvent('execution-plan-validated', now, { workspaceId: record.workspaceId, executionPlanId: record.id })], updatedAt: now });
+      const gateCodes = new Set([...(gates.blockers.map((b)=>b.code)), ...(gates.diagnostics.map((d)=>d.code))]);
+      const withDerived = {
+        ...withPre,
+        blockers: [...withPre.blockers.filter((b)=>!gateCodes.has(b.code)), ...gates.blockers],
+        diagnostics: [...withPre.diagnostics.filter((d)=>!gateCodes.has(d.code)), ...gates.diagnostics],
+        safetyGates: gates.safetyGates,
+      };
+      const resourceEstimates = this.d.resourceEstimateService.estimate(withDerived);
+      const status = this.d.statusService.calculate({ readinessStatus, hasStaleSource, hasBlockers: withDerived.blockers.length > 0, hasMissingInputs: pre.hasMissingInputs, hasMissingOutputs: pre.hasMissingOutputs, hasMissingAdapters: pre.hasMissingAdapters, requiresSafetyReview: gates.requiresReview, isInvalid: pre.hasUnsafeDetails });
+      const next = normalizeExecutionPlanRecord({ ...withDerived, status, resourceEstimates, provenance: [...withDerived.provenance, createExecutionPlanProvenanceEvent('execution-plan-validated', now, { workspaceId: record.workspaceId, executionPlanId: record.id })], updatedAt: now });
       const saved = await this.d.executionPlanRepository.updateExecutionPlan(next);
       return { kind: 'success', value: saved };
     } catch { return executionPlanFailure('unavailable','execution-plan-service-unavailable'); }
