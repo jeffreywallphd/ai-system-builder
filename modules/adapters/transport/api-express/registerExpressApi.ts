@@ -23,6 +23,7 @@ import { registerAssetAuthoringApiRoutes, type RegisterAssetAuthoringApiRoutesDe
 import { registerEffectiveAssetProjectionApiRoutes, type RegisterEffectiveAssetProjectionApiRoutesDependencies } from "./effective-asset-projections/registerEffectiveAssetProjectionApiRoutes";
 import { registerAssetCompositionApiRoutes, type RegisterAssetCompositionApiRoutesDependencies } from "./asset-composition/registerAssetCompositionApiRoutes";
 import { registerExecutionPlanApiRoutes, type RegisterExecutionPlanApiRoutesDependencies } from "./execution-plans/registerExecutionPlanApiRoutes";
+import { registerConversationExecutionApiRoutes, type RegisterConversationExecutionApiRoutesDependencies } from "./conversations/registerConversationExecutionApiRoutes";
 
 export interface RegisterExpressApiDependencies {
   app: RegisterArtifactUploadApiRouteDependencies["app"]
@@ -40,7 +41,8 @@ export interface RegisterExpressApiDependencies {
     & RegisterAssetAuthoringApiRoutesDependencies["app"]
     & RegisterEffectiveAssetProjectionApiRoutesDependencies["app"]
     & RegisterAssetCompositionApiRoutesDependencies["app"]
-    & RegisterExecutionPlanApiRoutesDependencies["app"];
+    & RegisterExecutionPlanApiRoutesDependencies["app"]
+    & RegisterConversationExecutionApiRoutesDependencies["app"];
   getHuggingFaceTokenStatus: RegisterArtifactRepoApiRoutesDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];
@@ -86,6 +88,7 @@ export interface RegisterExpressApiDependencies {
   effectiveAssetProjectionServices?: Omit<RegisterEffectiveAssetProjectionApiRoutesDependencies, "app">;
   assetCompositionServices?: Omit<RegisterAssetCompositionApiRoutesDependencies, "app">;
   executionPlanServices?: Omit<RegisterExecutionPlanApiRoutesDependencies, "app">;
+  conversationExecutionServices?: Omit<RegisterConversationExecutionApiRoutesDependencies, "app">;
 }
 
 export function registerExpressApi(
@@ -177,6 +180,9 @@ export function registerExpressApi(
   }
   if (dependencies.executionPlanServices) {
     registerExecutionPlanApiRoutes({ app: dependencies.app, ...dependencies.executionPlanServices });
+  }
+  if (dependencies.conversationExecutionServices) {
+    registerConversationExecutionApiRoutes({ app: dependencies.app, ...dependencies.conversationExecutionServices });
   }
 
   if (dependencies.assetRegistryRead) {
