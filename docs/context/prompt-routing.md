@@ -332,3 +332,6 @@ Required routing combinations:
   - `docs/context/packs/asset-composition-planning.pack.md`
 
 Transport split rule (Phase 13+): do **not** combine API/server-host, IPC/preload/desktop-host, and desktop/thin-client client/parity implementation into one prompt; route these as separate prompts and review each boundary explicitly.
+
+
+- For Phase 13 tasks that change the starter conversational system or run/test surfaces, include: `asset-kernel.pack.md`, `user-library.pack.md`, `asset-authoring.pack.md`, `effective-asset-projections.pack.md`, `asset-composition-planning.pack.md`, `runtime-readiness-binding.pack.md`, `execution-plan-preparation.pack.md`, and `controlled-conversational-system-execution.pack.md`.

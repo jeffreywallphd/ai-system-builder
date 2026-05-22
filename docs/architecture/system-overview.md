@@ -333,3 +333,6 @@ Execution plan preparation is the non-executing planning layer between runtime r
 ## Phase 13 controlled conversational execution handoff
 
 After Phase 12 execution-plan preparation, the first runnable-system proof is controlled conversational execution (not image-generation-first). This remains part of the general composed-system architecture and requires explicit approval before invocation. See `docs/architecture/controlled-conversational-system-execution.md` and ADR-0023.
+
+
+Phase 13 Review A includes an asset-first corrective requirement: the first conversational proof must originate from reusable conversational assets composed from referenced `system.foundation` primitives where relevant, then execute through controlled runtime session/run records.

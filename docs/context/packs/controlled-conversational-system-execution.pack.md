@@ -84,3 +84,9 @@ Tools/function-calling, retrieval/RAG, memory, multimodal IO, image generation/C
 3. Prompt 3 — ports/persistence adapters.
 4. Review A.
 5. Prompt 4 onward — approval/session creation, orchestration, adapter, lifecycle, monitoring, transports, UI, hardening, closeout.
+
+
+## Phase 13 corrective invariant (pre-Review A)
+- Preserve asset-kernel, `system.foundation`, user-library importability, asset-authoring overrides, effective projections, composition planning, runtime readiness, and execution-plan preparation while implementing conversational execution work.
+- Phase 13 conversational starter-system/run-surface changes must include asset/foundation/composition packs, not only execution packs.
+- Runtime conversation/execution records are not reusable assets; reusable conversational assets must remain importable/customizable and lineage-linked to foundation primitives.
