@@ -70,7 +70,7 @@ export function registerExecutionPlanApiRoutes(dependencies: RegisterExecutionPl
     const statusRaw = asText(request.query?.status);
     const status = statusRaw.length === 0 ? undefined : statusRaw;
     if (status && !VALID_STATUSES.has(status)) return void sendValidation(response, "Invalid status filter.");
-    try { sendOk(response, await executionPlans.readModel.listExecutionPlanSummaries({ workspaceId, limit, cursor: asText(request.query?.cursor), includeArchived: asQueryBool(request.query?.archived), status: status as never })); } catch { sendInternal(response); }
+    try { sendOk(response, await executionPlans.readModel.listExecutionPlanSummaries({ workspaceId, limit, cursor: asText(request.query?.cursor), includeArchived: asQueryBool(request.query?.archived), status: status as Parameters<ExecutionPlanReadModelService["listExecutionPlanSummaries"]>[0]["status"] })); } catch { sendInternal(response); }
   });
 
   app.get("/api/execution-plans/workspaces/:workspaceId/plans/:executionPlanId", async (request, response) => {

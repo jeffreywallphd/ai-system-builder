@@ -1,7 +1,5 @@
 import type { ExecutionPlanRecord, ExecutionBlocker, ExecutionDiagnostic } from '../../../contracts/execution-plans';
 
-const UNSAFE_PATTERNS = [/payload/i,/workflow/i,/graph/i,/base64/i,/secret/i,/token/i,/api[-_]?key/i,/private[-_]?key/i,/signed[-_]?url/i,/command/i,/env/i,/path/i];
-
 export class ExecutionPlanPreflightValidationService {
   public validate(plan: ExecutionPlanRecord): { blockers: ExecutionBlocker[]; diagnostics: ExecutionDiagnostic[]; hasMissingInputs: boolean; hasMissingOutputs: boolean; hasMissingAdapters: boolean; hasUnsafeDetails: boolean } {
     const blockers: ExecutionBlocker[] = [];
@@ -40,10 +38,20 @@ export class ExecutionPlanPreflightValidationService {
       if (g.adapterReferenceId && !adapterIds.has(g.adapterReferenceId)) blockers.push(this.b('execution-plan-safety-gate-target-missing','Safety gate references unknown adapter.', g.id));
     }
 
-    const serialized = JSON.stringify(plan);
-    const hasUnsafeDetails = UNSAFE_PATTERNS.some((p) => p.test(serialized));
+    const hasUnsafeDetails = this.hasForbiddenDetails(plan);
     if (hasUnsafeDetails) diagnostics.push({ code: 'execution-plan-unsafe-details-redacted', severity: 'warning', message: 'Unsafe details were detected and deferred.' });
     return { blockers, diagnostics, hasMissingInputs: blockers.some((b) => b.code.includes('input')), hasMissingOutputs: blockers.some((b) => b.code.includes('output')), hasMissingAdapters: blockers.some((b) => b.code.includes('adapter') || b.code.includes('provider-setup')), hasUnsafeDetails };
+  }
+  private hasForbiddenDetails(plan: ExecutionPlanRecord): boolean {
+    const textFields = [
+      ...plan.steps.map((x)=>x.summary ?? ''),
+      ...plan.diagnostics.map((x)=>x.message ?? ''),
+      ...plan.blockers.map((x)=>x.message ?? ''),
+    ].join(' ').toLowerCase();
+    const hasForbiddenField = plan.outputs.some((o)=> (o as unknown as Record<string, unknown>).rawPath || (o as unknown as Record<string, unknown>).payload)
+      || plan.inputs.some((i)=> (i as unknown as Record<string, unknown>).token || (i as unknown as Record<string, unknown>).secret)
+      || textFields.includes('base64://');
+    return hasForbiddenField;
   }
   private b(code: string, message: string, targetReferenceId?: string): ExecutionBlocker { return { code, message, ...(targetReferenceId ? { targetReferenceKind: 'execution-step', targetReferenceId: targetReferenceId } : {}) }; }
 }
