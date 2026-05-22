@@ -1,0 +1,32 @@
+import { normalizeCreateConversationSessionCommand, normalizeConversationSessionId, normalizeConversationSessionRecord, type ConversationSessionId, type CreateConversationSessionCommand, type CreateConversationSessionResult } from '../../../contracts/conversations';
+import type { ConversationSessionRepositoryPort } from '../../ports/conversations';
+import type { ExecutionPlanRepositoryPort } from '../../ports/execution-plans';
+import type { RuntimeReadinessBindingRepositoryPort } from '../../ports/runtime-readiness';
+import { conversationSessionFailure } from './conversation-session-result-helpers';
+import { ConversationalExecutionPlanEligibilityService } from './conversational-execution-plan-eligibility.service';
+import { ConversationalSourceSystemVerificationService } from './conversational-source-system-verification.service';
+
+export class CreateConversationExecutionSessionFromPlanUseCase {
+  public constructor(private readonly d: { sessionRepository: ConversationSessionRepositoryPort; executionPlanRepository: ExecutionPlanRepositoryPort; runtimeReadinessRepository: RuntimeReadinessBindingRepositoryPort; eligibilityService: ConversationalExecutionPlanEligibilityService; sourceVerificationService: ConversationalSourceSystemVerificationService; nextConversationSessionId: () => ConversationSessionId | string; now?: () => string }) {}
+  public async execute(command: CreateConversationSessionCommand): Promise<CreateConversationSessionResult> {
+    let c: CreateConversationSessionCommand;
+    try { c = normalizeCreateConversationSessionCommand(command); } catch { return conversationSessionFailure('validation', 'workspace-or-source-execution-plan-required', 'Workspace and source execution plan are required.'); }
+    const now = (this.d.now ?? (() => new Date().toISOString()))();
+    try {
+      const plan = await this.d.executionPlanRepository.getExecutionPlanById(c.workspaceId, c.sourceExecutionPlanId);
+      if (!plan) return conversationSessionFailure('not-found', 'source-execution-plan-not-found', 'Source execution plan was not found.');
+      const planEligibility = this.d.eligibilityService.evaluatePlan(plan);
+      if (!planEligibility.eligible) return conversationSessionFailure('conflict', planEligibility.code!, planEligibility.message!);
+      const sourceVerification = this.d.sourceVerificationService.verify(plan);
+      if (!sourceVerification.ok) return conversationSessionFailure('conflict', sourceVerification.code, sourceVerification.message);
+      const readiness = await this.d.runtimeReadinessRepository.readRuntimeReadinessBindingRecord(c.workspaceId, plan.sourceRuntimeReadinessBindingId as any);
+      const readinessEligibility = this.d.eligibilityService.evaluateReadiness(readiness, c.workspaceId, plan.sourceCompositionPlanId);
+      if (!readinessEligibility.eligible) return conversationSessionFailure('runtime-not-ready', readinessEligibility.code!, readinessEligibility.message!);
+      const sessionId = normalizeConversationSessionId(this.d.nextConversationSessionId());
+      const session = normalizeConversationSessionRecord({ id: sessionId, workspaceId: c.workspaceId, sourceExecutionPlanId: plan.id, sourceCompositionPlanId: plan.sourceCompositionPlanId, sourceRuntimeReadinessBindingId: plan.sourceRuntimeReadinessBindingId, status: 'awaiting-approval', systemLabel: c.systemLabel ?? plan.steps.find((s) => s.kind === 'generate-text')?.label ?? 'Conversational Session', systemSummary: c.systemSummary, turnIds: [], blockers: [], diagnostics: [{ code: 'turn-invocation-deferred-pending-supported-adapter', message: 'Turn invocation remains deferred until a supported runtime adapter is implemented.' }], provenance: [{ at: now, kind: 'conversation-execution-session-created', actor: 'application' }], createdAt: now, updatedAt: now });
+      return { kind: 'success', value: await this.d.sessionRepository.saveConversationSession(session) };
+    } catch {
+      return conversationSessionFailure('internal', 'conversation-session-service-unavailable', 'Conversation session service is unavailable.');
+    }
+  }
+}
