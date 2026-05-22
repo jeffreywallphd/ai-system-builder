@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import ts from 'typescript';
 import { createWorkspaceId } from '../../../../contracts/workspace';
 import { normalizeExecutionRunId } from '../../../../contracts/execution-runs';
 import { createLocalExecutionRunRepositoryAdapters } from '../index';
@@ -10,7 +11,7 @@ import { createLocalExecutionRunRepositoryAdapters } from '../index';
 const now='2026-01-01T00:00:00.000Z';
 const wsA=createWorkspaceId('ws-a'); const wsB=createWorkspaceId('ws-b');
 const runId=normalizeExecutionRunId('run-1');
-const runBase={sourceExecutionPlanId:'plan-1',attemptIds:[],eventIds:[],resultIds:[],blockers:[],diagnostics:[],provenance:[],createdAt:now,updatedAt:now} as const;
+const runBase={sourceExecutionPlanId:'plan-1',attemptIds:[],eventIds:[],resultIds:[],blockers:[],diagnostics:[],provenance:[],createdAt:now,updatedAt:now};
 async function setup(){const root=await mkdtemp(join(tmpdir(),'exec-')); return {root,a:createLocalExecutionRunRepositoryAdapters({rootDir:root,now:()=>now})};}
 
 test('workspace isolation and shared-id non-overwrite for execution runs', async()=>{const {a}=await setup();
@@ -35,4 +36,21 @@ test('manifest/schema and malformed JSON failures surface', async()=>{const {roo
   await writeFile(join(dir,'execution-runs-manifest.json'),'{"schemaVersion":1,"storeKind":"execution-runs-local-store"}');
   await writeFile(join(dir,'execution-runs.json'),'{broken-json');
   await assert.rejects(()=>a.executionRunRepository.listExecutionRuns({workspaceId:wsA}));
+});
+
+test('execution run repositories type-check their normalized persistence boundary', ()=>{
+  const adapterFile=resolve(process.cwd(),'modules/adapters/persistence/execution-runs/createLocalExecutionRunRepositoryAdapters.ts');
+  const program=ts.createProgram([adapterFile],{
+    target:ts.ScriptTarget.ES2021,
+    module:ts.ModuleKind.CommonJS,
+    moduleResolution:ts.ModuleResolutionKind.Node10,
+    strict:true,
+    esModuleInterop:true,
+    skipLibCheck:true,
+    noEmit:true,
+    noEmitOnError:true,
+    types:['node'],
+  });
+  const diagnostics=ts.getPreEmitDiagnostics(program);
+  assert.deepEqual(diagnostics.map(d=>ts.flattenDiagnosticMessageText(d.messageText,'\n')),[]);
 });
