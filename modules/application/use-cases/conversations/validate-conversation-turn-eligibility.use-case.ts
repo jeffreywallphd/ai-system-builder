@@ -10,7 +10,7 @@ export class ValidateConversationTurnEligibilityUseCase {
     const session=await this.d.sessionRepository.getConversationSessionById(c.workspaceId,c.conversationSessionId); if(!session) return {eligible:false,reason:'session-not-found',invocation:'deferred'};
     if (['closed','archived','stale','invalid','blocked'].includes(session.status)) return {eligible:false,reason:'session-not-eligible',invocation:'deferred'};
     const approval = session.executionApprovalId ? await this.d.approvalRepository.getExecutionApprovalById(c.workspaceId, session.executionApprovalId) : undefined;
-    const validity=this.d.approvalValidityService.isValid(session,approval); if(!validity.valid) return {eligible:false,reason:validity.reason,invocation:'deferred'};
-    return {eligible:true,reason:'session-approved-prerequisites-pass',invocation:'deferred',invocationReason:'supported-text-generation-adapter-not-yet-implemented'};
+    const validity=await this.d.approvalValidityService.isValidForInvocation(session,approval); if(!validity.valid) return {eligible:false,reason:validity.reason,invocation:'deferred'};
+    return {eligible:true,reason:'session-approved-prerequisites-pass',invocation:'ready'};
   }
 }

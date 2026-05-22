@@ -18,14 +18,14 @@ export function createPythonConversationalTextGenerationInvocationAdapter(runtim
     if (request.runtime.runtimeId !== 'python-sidecar' || request.runtime.capabilityKind !== 'text-generation') return { status: 'unsupported' };
     const requestId = `conversation-text-generation-${randomUUID()}`;
     try {
-      await runtimePort.startTask({ requestId, taskType: 'conversation-text-generation', payload: { messages: toMessages(request), generation: request.context.generation }, metadata: { operation: 'conversation.turn.invoke', workspaceId: request.workspaceId, conversationSessionId: request.conversationSessionId } });
+      await runtimePort.startTask({ requestId, taskType: 'conversation-text-generation', payload: { messages: toMessages(request), generation: request.context.generation, selectedModelId: request.runtime.adapterHintId }, metadata: { operation: 'conversation.turn.invoke', workspaceId: request.workspaceId, conversationSessionId: request.conversationSessionId } });
       const deadline = Date.now() + 30_000;
       while (Date.now() < deadline) {
         const status = await runtimePort.readTaskStatus(requestId);
         if (status.status === 'succeeded') {
           const text = typeof (status.data as any)?.assistantResponseText === 'string' ? (status.data as any).assistantResponseText.trim() : '';
           if (!text) return { status: 'failed', code: 'validation' };
-          if (text.length > 8_000) return { status: 'blocked' };
+          if (text.length > 8_000) return { status: 'failed', code: 'validation' };
           return { status: 'completed', assistantResponseText: text };
         }
         if (status.status === 'failed') return { status: 'failed', code: 'runtime-error' };
