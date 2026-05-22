@@ -63,7 +63,7 @@ Use narrow invocation/cancellation/progress/result ports; first adapter is suppo
 
 - No raw provider payloads in general execution records.
 - No raw runtime request/response exposure in diagnostics.
-- Message content persistence boundary is intentionally deferred to later Phase 13 prompts.
+- Conversation message/assistant-response contract records are defined in Phase 13 Prompt 2; persistence adapter behavior remains deferred to later corrective prompts.
 
 ## Anti-drift rules
 
