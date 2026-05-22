@@ -32,10 +32,12 @@ from .models import (
     TrainModelTaskRequest,
     UnloadModelsResult,
     ValidateModelTaskRequest,
+    ExampleGenerationConfig,
+    GenerationParams,
     ValidateModelTaskResult,
 )
 from .tasks.example_generation import ensure_generation_model_downloaded
-from .tasks.local_text_generation import describe_loaded_generation_models, unload_generation_models
+from .tasks.local_text_generation import describe_loaded_generation_models, get_or_create_local_text_generator, unload_generation_models
 from .tasks.model_validation import validate_model_output
 from .tasks.prepare_training_dataset import prepare_training_dataset
 from .tasks.train_model import train_model
@@ -160,6 +162,33 @@ def _run_task(request: StartPythonRuntimeTaskRequest) -> Any:
 
         return prepare_training_dataset(payload, on_generation_progress=on_generation_progress).model_dump(mode="json")
 
+
+    if request.taskType == "conversation-text-generation":
+        payload = request.payload if isinstance(request.payload, dict) else {}
+        messages = payload.get("messages") if isinstance(payload.get("messages"), list) else []
+        if not messages:
+            raise RuntimeError("Conversation text generation requires at least one message.")
+        loaded_models = describe_loaded_generation_models()
+        if not loaded_models:
+            raise RuntimeError("Conversation text generation requires a loaded local generation model.")
+        selected_model = loaded_models[0]
+        generation_payload = payload.get("generation") if isinstance(payload.get("generation"), dict) else {}
+        params = GenerationParams(
+            temperature=generation_payload.get("temperature") if isinstance(generation_payload.get("temperature"), (int, float)) else None,
+            maxNewTokens=generation_payload.get("maxOutputTokens") if isinstance(generation_payload.get("maxOutputTokens"), int) else None,
+        )
+        config = ExampleGenerationConfig(
+            mode="qa",
+            model=LocalModelConfig(provider="transformers", modelId=selected_model.modelId, inferenceMode=selected_model.inferenceMode, device=selected_model.device, torchDtype=selected_model.torchDtype),
+            generationParams=params,
+        )
+        generator = get_or_create_local_text_generator(config)
+        prompt = _build_conversation_prompt(messages)
+        assistant_response_text = generator.generate_text(prompt).strip()
+        if not assistant_response_text:
+            raise RuntimeError("Conversation text generation returned empty assistant text.")
+        return {"assistantResponseText": assistant_response_text}
+
     if request.taskType == "validate-model":
         payload = ValidateModelTaskRequest.model_validate(request.payload)
         result = validate_model_output(
@@ -187,6 +216,25 @@ def _run_task(request: StartPythonRuntimeTaskRequest) -> Any:
         ).model_dump(mode="json")
 
     raise RuntimeError(f"Task type '{request.taskType}' is not implemented yet.")
+
+
+
+
+def _build_conversation_prompt(messages: list[dict[str, Any]]) -> str:
+    parts: list[str] = []
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        role = message.get("role")
+        content = message.get("content")
+        if role not in {"system", "user", "assistant"} or not isinstance(content, str):
+            continue
+        cleaned = content.strip()
+        if not cleaned:
+            continue
+        parts.append(f"{role.upper()}: {cleaned}")
+    parts.append("ASSISTANT:")
+    return "\n\n".join(parts)
 
 
 def _ensure_model_download_data(
@@ -259,7 +307,7 @@ def health() -> PythonRuntimeHealthCheckResult:
 
 @app.get("/capabilities", response_model=PythonRuntimeCapabilitiesResult)
 def capabilities() -> PythonRuntimeCapabilitiesResult:
-    return PythonRuntimeCapabilitiesResult(runtimeId=RUNTIME_ID, capabilities=["prepare-training-dataset", "ensure-model-download", "model-status", "unload-model", "dataset-preparation.auto-inference-mode", "train-model", "validate-model"])
+    return PythonRuntimeCapabilitiesResult(runtimeId=RUNTIME_ID, capabilities=["prepare-training-dataset", "ensure-model-download", "model-status", "unload-model", "dataset-preparation.auto-inference-mode", "train-model", "validate-model", "conversation-text-generation"])
 
 
 @app.post("/tasks/start", response_model=StartPythonRuntimeTaskResult)
