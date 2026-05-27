@@ -13,6 +13,7 @@ export interface RegisterDesktopStartupIpcDependencies {
   runtimeReadinessV2?: RegisterRuntimeReadinessIpcDependencies["runtimeReadinessV2"];
   workspaceServices?: Omit<RegisterWorkspaceIpcDependencies, "ipcMain">;
   settingsUseCases: any;
+  selectFolder?: (options?: { title?: string; defaultPath?: string }) => Promise<{ canceled: boolean; path?: string }>;
   executionPlans?: RegisterExecutionPlansIpcDependencies["executionPlans"];
   featureLifecycle?: FeatureLifecycleDiagnosticsPort;
 }
@@ -20,7 +21,7 @@ export interface RegisterDesktopStartupIpcDependencies {
 export function registerDesktopStartupIpc(dependencies: RegisterDesktopStartupIpcDependencies): void {
   registerRuntimeReadinessIpc({ ipcMain: dependencies.ipcMain, runtimeReadiness: dependencies.runtimeReadiness, runtimeReadinessV2: dependencies.runtimeReadinessV2 });
   if (dependencies.workspaceServices) registerWorkspaceIpc({ ipcMain: dependencies.ipcMain, ...dependencies.workspaceServices });
-  registerApplicationSettingsIpc({ ipcMain: dependencies.ipcMain, ...dependencies.settingsUseCases });
+  registerApplicationSettingsIpc({ ipcMain: dependencies.ipcMain, ...dependencies.settingsUseCases, selectFolder: dependencies.selectFolder });
   if (dependencies.executionPlans) registerExecutionPlansIpc({ ipcMain: dependencies.ipcMain, executionPlans: dependencies.executionPlans });
   registerPythonRuntimeIpc({ ipcMain: dependencies.ipcMain, ...dependencies.pythonRuntime });
   if (dependencies.featureLifecycle) registerFeatureLifecycleDiagnosticsIpc({ ipcMain: dependencies.ipcMain, featureLifecycle: dependencies.featureLifecycle });

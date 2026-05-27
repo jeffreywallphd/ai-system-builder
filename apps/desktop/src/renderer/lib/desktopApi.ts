@@ -488,6 +488,7 @@ interface DesktopApiBridge {
   clearApplicationSetting?: (input: { key: string }) => Promise<unknown>;
   resolveApplicationModelDefault?: (input: ResolveModelDefaultRequest) => Promise<unknown>;
   resolveModelDefault?: (input: ResolveModelDefaultRequest) => Promise<unknown>;
+  selectApplicationSettingsFolder?: (input?: { title?: string; defaultPath?: string }) => Promise<unknown>;
   browseModels?: (input: DesktopModelBrowseRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   getModelDetails?: (input: DesktopModelDetailsRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   listModels?: (input?: DesktopModelListRequest, context?: DesktopBridgeRequestContext) => Promise<unknown>;

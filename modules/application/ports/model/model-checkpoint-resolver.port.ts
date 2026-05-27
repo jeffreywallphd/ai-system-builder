@@ -1,5 +1,6 @@
 export interface ResolveModelCheckpointRequest {
   selectedModel?: string;
+  workspaceId?: string;
   taskTag?: string;
 }
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ImageGenerationRequest } from "../../../../../../../modules/contracts/image-generation";
 import type { ModelInventoryRecord } from "../../../../../../../modules/contracts/model";
+import { createWorkspaceId } from "../../../../../../../modules/contracts/workspace";
 import type { RuntimeTaskRecord } from "../../../../../../../modules/contracts/runtime";
 import type { RuntimeInstallStatus } from "../../../../../../../modules/contracts/runtime-installer";
 import { createDesktopImageGenerationClient } from "../api";
@@ -28,8 +29,8 @@ const parsePositiveNumber = (value: string) => { if (value.trim() === "") return
 const parseSeed = (seed: string): number | undefined => { if (seed.trim() === "") return undefined; const parsed = Number(seed); if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) return undefined; return parsed; };
 function normalizeInstallStatus(status: unknown): RuntimeInstallStatus { return typeof status === "string" && INSTALL_STATUSES.includes(status as RuntimeInstallStatus) ? status as RuntimeInstallStatus : "unknown"; }
 export function isSelectableImageGenerationModel(model: Pick<ModelInventoryRecord, "artifactForm" | "inferenceMode" | "lifecycleStatus" | "taskTags">): boolean { if (!SELECTABLE_IMAGE_MODEL_LIFECYCLE_STATUSES.includes(model.lifecycleStatus as typeof SELECTABLE_IMAGE_MODEL_LIFECYCLE_STATUSES[number])) return false; if (!SELECTABLE_IMAGE_MODEL_ARTIFACT_FORMS.includes(model.artifactForm as typeof SELECTABLE_IMAGE_MODEL_ARTIFACT_FORMS[number])) return false; if (model.inferenceMode === "text-to-image") return true; return (model.taskTags ?? []).some((tag) => tag === "text-to-image"); }
-export function toImageGenerationModelDropdownValue(model: Pick<ModelInventoryRecord, "displayName" | "localPath" | "modelId" | "modelRecordId">): string | undefined { const candidates = [model.modelId, model.displayName, model.modelRecordId, model.localPath]; return candidates.find((value) => typeof value === "string" && value.trim().length > 0)?.trim(); }
-export function toImageGenerationModelDropdownOption(model: Pick<ModelInventoryRecord, "artifactForm" | "displayName" | "inferenceMode" | "lifecycleStatus" | "localPath" | "modelId" | "modelRecordId" | "source" | "taskTags">): ImageGenerationModelOption | undefined { if (!isSelectableImageGenerationModel(model)) return undefined; const value = toImageGenerationModelDropdownValue(model); if (!value) return undefined; return { value, modelRecordId: model.modelRecordId, label: `${model.displayName} - ${model.modelId ?? model.localPath ?? "n/a"} - ${model.source} - ${model.lifecycleStatus} - ${model.artifactForm} - inference: ${model.inferenceMode ?? "n/a"}` }; }
+export function toImageGenerationModelDropdownValue(model: Pick<ModelInventoryRecord, "displayName" | "localPath" | "modelId" | "modelRecordId">): string | undefined { const candidates = [model.modelRecordId, model.modelId, model.displayName, model.localPath]; return candidates.find((value) => typeof value === "string" && value.trim().length > 0)?.trim(); }
+export function toImageGenerationModelDropdownOption(model: Pick<ModelInventoryRecord, "artifactForm" | "displayName" | "inferenceMode" | "lifecycleStatus" | "localPath" | "modelId" | "modelRecordId" | "source" | "storageScope" | "taskTags">): ImageGenerationModelOption | undefined { if (!isSelectableImageGenerationModel(model)) return undefined; const value = toImageGenerationModelDropdownValue(model); if (!value) return undefined; const scope = model.storageScope === "shared" ? "shared" : "workspace"; return { value, modelRecordId: model.modelRecordId, label: `${model.displayName} - ${model.modelId ?? model.modelRecordId} - ${scope} - ${model.source} - ${model.lifecycleStatus} - ${model.artifactForm} - inference: ${model.inferenceMode ?? "n/a"}` }; }
 export function resolveModelForGeneration(model: string): string | undefined { const normalized = model.trim(); return normalized.length > 0 ? normalized : undefined; }
 export function normalizeImageGenerationOutputs(task: RuntimeTaskRecord): ImageGenerationOutputReference[] { const data = task.data as { outputs?: unknown; value?: { outputs?: unknown } } | undefined; const rawOutputs = Array.isArray(data?.outputs) ? data.outputs : Array.isArray(data?.value?.outputs) ? data.value.outputs : []; return rawOutputs.filter((o): o is Record<string, unknown> => typeof o === "object" && o !== null).map((o) => ({ fileName: typeof o.fileName === "string" ? o.fileName : undefined, subfolder: typeof o.subfolder === "string" ? o.subfolder : undefined, engine: typeof o.engine === "string" ? o.engine : undefined, promptId: typeof o.promptId === "string" ? o.promptId : undefined })); }
 const hasFinalizedAssets = (assets: ImageGenerationFinalizedAssetReference[]): boolean => assets.length > 0;
@@ -58,7 +59,7 @@ export function useImageGenerationFeature(client?: DesktopImageGenerationClient,
       setModelLoadStatus("loading");
       setModelLoadMessage("Loading model inventory...");
       try {
-        const models = await modelInventoryClient.listModels({});
+        const models = workspaceId ? await modelInventoryClient.listModels({ workspaceId: createWorkspaceId(workspaceId) }) : [];
         if (cancelled) return;
         const optionByValue = new Map<string, ImageGenerationModelOption>();
         for (const model of models) {
@@ -80,7 +81,7 @@ export function useImageGenerationFeature(client?: DesktopImageGenerationClient,
       }
     })();
     return () => { cancelled = true; };
-  }, [modelInventoryClient]);
+  }, [modelInventoryClient, workspaceId]);
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -90,7 +91,7 @@ export function useImageGenerationFeature(client?: DesktopImageGenerationClient,
           recordSectionLoadMilestone("renderer.section.load.skipped", { pageKey: "image-generation", sectionKey: "image-generation.gallery", trigger: "initial" });
           return;
         }
-        const items = await artifacts.browseArtifacts({ artifactFamily: "image" });
+        const items = workspaceId ? await artifacts.browseArtifacts({ artifactFamily: "image", workspaceId }) : [];
         if (cancelled) return;
         setAvailableImageArtifacts(items.filter((item) => item.artifactFamily === "image" || item.mediaType?.startsWith("image/")).map((item) => ({ value: item.storageKey, label: item.originalName ?? item.storageKey })));
         setArtifactLoadMessage(undefined);
@@ -104,7 +105,7 @@ export function useImageGenerationFeature(client?: DesktopImageGenerationClient,
       }
     })();
     return () => { cancelled = true; };
-  }, [artifacts]);
+  }, [artifacts, workspaceId]);
   const validationError = useMemo(() => { if (!form.prompt.trim()) return "Prompt is required."; if (!parsePositiveNumber(form.width) || !parsePositiveNumber(form.height) || !parsePositiveNumber(form.steps) || !parsePositiveNumber(form.numImages)) return "Width, height, steps, and number of images must be positive finite numbers."; if (form.seed.trim() && parseSeed(form.seed) === undefined) return "Seed must be a finite integer when provided."; const cfg = Number(form.cfg); if (!Number.isFinite(cfg) || cfg <= 0) return "CFG must be a positive number."; const denoise = Number(form.denoise); if (!Number.isFinite(denoise) || denoise < 0 || denoise > 1) return "Denoise must be between 0 and 1."; return undefined; }, [form]);
   const isStartDisabled = ACTIVE_STATUSES.includes(status);
 

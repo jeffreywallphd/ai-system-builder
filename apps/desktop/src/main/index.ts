@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
 
 import { composeDesktopHost } from "../../../../modules/hosts/desktop";
 import { recordDesktopMemorySnapshot } from "../../../../modules/hosts/desktop/diagnostics";
@@ -95,6 +95,16 @@ app.whenReady().then(async () => {
     artifactRepo: {
       huggingFaceAccessToken: process.env.HF_TOKEN ?? process.env.HUGGING_FACE_TOKEN,
       huggingFaceTokenConfigFilePath: path.join(storageRootDirectory, "config", "hugging-face-token.json"),
+    },
+    folderPicker: {
+      async selectFolder(options) {
+        const result = await dialog.showOpenDialog({
+          title: options?.title,
+          defaultPath: options?.defaultPath,
+          properties: ["openDirectory", "createDirectory"],
+        });
+        return { canceled: result.canceled, path: result.filePaths[0] };
+      },
     },
   });
   recordDesktopMemorySnapshot({

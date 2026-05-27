@@ -48,6 +48,7 @@ export class GenerateImageUseCase {
 
     const resolvedModel = await this.dependencies.modelCheckpointResolver?.resolveCheckpoint({
       selectedModel: request.model,
+      workspaceId: context.workspaceId,
       taskTag: "text-to-image",
     });
     const payload = resolvedModel?.checkpoint

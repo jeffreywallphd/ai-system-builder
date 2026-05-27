@@ -5,6 +5,7 @@ import type { DesktopModelInventoryRecord, DesktopModelTrainingResult } from "..
 import { createDesktopApplicationSettingsClient } from "../../settings";
 import type { DesktopModelsClient } from "../api/desktopModelsClient";
 import { useModelsClient } from "./useModelsClient";
+import { createWorkspaceId } from "../../../../../../../modules/contracts/workspace";
 
 type TrainingStatus = "idle" | "running" | "succeeded" | "failed";
 type PollableTrainingStatus = DesktopModelTrainingResult["status"];
@@ -51,7 +52,7 @@ function resolveHuggingFaceRepositoryInput(repository: string, defaultNamespace?
   return `${defaultNamespace}/${normalizedRepository}`;
 }
 
-export function useModelTrainingFeature(client?: DesktopModelsClient) {
+export function useModelTrainingFeature(client?: DesktopModelsClient, workspaceId?: string) {
   const modelClient = useModelsClient(client);
 
   const [models, setModels] = useState<DesktopModelInventoryRecord[]>([]);
@@ -95,7 +96,7 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
 
   useEffect(() => {
     const load = async () => {
-      const listed = await modelClient.listModels({});
+      const listed = workspaceId ? await modelClient.listModels({ workspaceId: createWorkspaceId(workspaceId) }) : [];
       let artifacts: DesktopArtifactBrowseItem[] = [];
       try {
         const { createDesktopArtifactBrowserClient } = await import("../../artifact-browser/api/desktopArtifactBrowserClient");
@@ -112,7 +113,7 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
       }
     };
     void load();
-  }, [modelClient, baseModelRecordId]);
+  }, [modelClient, baseModelRecordId, workspaceId]);
 
   useEffect(() => {
     try {
@@ -163,8 +164,14 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
     setResult(undefined);
 
     try {
+      if (!workspaceId) {
+        setStatus("failed");
+        setMessage("Select a workspace before training models.");
+        return;
+      }
       const targetModules = loraTargetModules.split(",").map((entry) => entry.trim()).filter((entry) => entry.length > 0);
       const trainingResult = await modelClient.trainModel({
+        workspaceId: createWorkspaceId(workspaceId),
         baseModel: { modelRecordId: baseModelRecordId },
         datasets: datasetArtifactIds.map((artifactId, index) => ({ artifactId, splitRole: index === 0 ? "train" : "validation" })),
         method,
@@ -236,7 +243,7 @@ export function useModelTrainingFeature(client?: DesktopModelsClient) {
       if (latestResult.status === "succeeded") {
         setStatus("succeeded");
         setMessage("Training completed.");
-        const refreshed = await modelClient.listModels({});
+        const refreshed = workspaceId ? await modelClient.listModels({ workspaceId: createWorkspaceId(workspaceId) }) : [];
         setModels(refreshed);
       } else {
         setStatus("failed");

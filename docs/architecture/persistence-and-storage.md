@@ -314,6 +314,8 @@ Runtime roots are neither persistence nor artifact-object storage roots. Runtime
 
 Artifact storage roots contain durable artifacts and catalog-backed content. ComfyUI `output/` should be treated as runtime/temp staging until generated outputs are finalized into artifact storage.
 
+Shared model storage is a configured host-local storage source for model discovery and reuse across workspaces. It is intentionally separate from workspace model inventory persistence: discovery produces read-only shared inventory entries at list/read time, while workspace downloads and generated models remain persisted workspace records. Model registry files must not persist discovered shared entries just because a workspace listed them.
+
 Server defaults should keep `SERVER_STORAGE_ROOT` and `SERVER_RUNTIME_ROOT` distinct. Desktop local mode should use desktop-owned runtime roots and desktop-owned artifact storage roots. Server/thin-client mode should use server-owned runtime roots and server-owned artifact storage roots. Future desktop-remote mode should not assume remote artifacts are local files.
 
 See ADR-0013 and ADR-0012.

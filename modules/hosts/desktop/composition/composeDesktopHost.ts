@@ -35,6 +35,7 @@ import { composeConversationExecutionServices } from "../../shared/composition/c
 import { registerElectronIpc } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
+import { SHARED_MODEL_STORAGE_DIRECTORY_SETTING_KEY } from "../../../contracts/settings";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 import type { DesktopPythonRuntimeLogEntry, DesktopPythonRuntimeStatusPayload } from "../../../contracts/ipc";
 import type { HuggingFaceFetchImplementation } from "../../../adapters/storage/huggingface";
@@ -112,6 +113,9 @@ export interface ComposeDesktopHostOptions {
     huggingFaceFetchImplementation?: HuggingFaceFetchImplementation;
   };
   settings?: { localSettingsFilePath?: string };
+  folderPicker?: {
+    selectFolder: (options?: { title?: string; defaultPath?: string }) => Promise<{ canceled: boolean; path?: string }>;
+  };
 }
 
 export interface RegisterDesktopArtifactUploadIpcOptions {
@@ -197,6 +201,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
     const value = (await applicationSettings.readValues({ keys: [key] }))[0]?.value;
     return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
   };
+  const readSharedModelStorageDirectory = () => readRuntimeSettingString(SHARED_MODEL_STORAGE_DIRECTORY_SETTING_KEY);
 
   let pythonRuntimeFoundationPromise: Promise<DesktopPythonRuntimeFeature> | undefined;
   const getPythonRuntimeFoundation = async () => {
@@ -310,7 +315,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
       }});
       const getAssetFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "asset-registry", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["asset-registry"], milestoneBase: "desktop.host.asset-features", importFeature: async () => {
         const module = await import("./composeDesktopAssetFeature");
-        return async () => module.composeDesktopAssetFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, artifacts: await getArtifactFeatures(), onInternalAssetRegistry: (registry) => { internalAssetRegistry = registry; } });
+        return async () => module.composeDesktopAssetFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, readSharedModelStorageDirectory, artifacts: await getArtifactFeatures(), onInternalAssetRegistry: (registry) => { internalAssetRegistry = registry; } });
       }});
       const getComfyUiInstallFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "comfyui-install", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["comfyui-install"], milestoneBase: "desktop.host.comfyui-install-features", importFeature: async () => {
         const module = await import("./composeDesktopComfyUiInstallFeature");
@@ -326,7 +331,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
       }});
       const getModelFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "model-registry", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["model-registry"], milestoneBase: "desktop.host.model-features", importFeature: async () => {
         const module = await import("./composeDesktopModelFeature");
-        return () => module.composeDesktopModelFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, tokenProvider: () => tokenConfigStore.getToken(), getArtifacts: getArtifactFeatures, getRuntimeTaskFeatures, getPythonRuntimeFoundation });
+        return () => module.composeDesktopModelFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, tokenProvider: () => tokenConfigStore.getToken(), readSharedModelStorageDirectory, getArtifacts: getArtifactFeatures, getRuntimeTaskFeatures, getPythonRuntimeFoundation });
       }});
       const getImageGenerationFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "image-generation", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["image-generation"], milestoneBase: "desktop.host.image-generation-features", importFeature: async () => {
         const module = await import("./composeDesktopImageGenerationFeature");
@@ -438,6 +443,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           executionPlans: { create: executionPlanServices.createPlan, validate: executionPlanServices.validatePlan, readModel: executionPlanServices.readModel },
           workspaceServices: startupWorkspaceShell,
           settingsUseCases,
+          selectFolder: options.folderPicker?.selectFolder,
           featureLifecycle: {
             getFeatureLifecycleState: featureLifecycle.getFeatureLifecycleState,
             disposeIdleFeatures: () => featureLifecycle.disposeIdleFeatures("explicit-dev-action"),

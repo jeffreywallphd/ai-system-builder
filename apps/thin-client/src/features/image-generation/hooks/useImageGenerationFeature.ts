@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ImageGenerationRequest } from "../../../../../../modules/contracts/image-generation";
 import type { ModelInventoryRecord } from "../../../../../../modules/contracts/model";
 import type { RuntimeTaskRecord, RuntimeTaskStatus } from "../../../../../../modules/contracts/runtime";
+import { createWorkspaceId } from "../../../../../../modules/contracts/workspace";
 import {
   isImageGenerationModelCandidate,
   isImageGenerationModelReady,
@@ -85,7 +86,7 @@ export function useImageGenerationFeature(
     setModelInventoryLoading(true);
     setModelInventoryError(undefined);
         try {
-      const result = workspaceId ? await modelClient.listModels({ workspaceId }) : { models: [] };
+      const result = workspaceId ? await modelClient.listModels({ workspaceId: createWorkspaceId(workspaceId) }) : { models: [] };
       if (!mountedRef.current || requestId !== modelInventoryRequestRef.current) return;
       const sorted = [...result.models].sort((a, b) => rankInventoryModel(a) - rankInventoryModel(b) || a.displayName.localeCompare(b.displayName));
       const downloadedImageModel = sorted.find((m) => isServerInventoryImageGenerationModel(m) && isImageGenerationModelReady(m));

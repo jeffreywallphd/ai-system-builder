@@ -322,16 +322,21 @@ import {
   DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_OPERATION,
   DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_RESPONSE_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_SELECT_FOLDER_OPERATION,
+  DESKTOP_APPLICATION_SETTINGS_SELECT_FOLDER_REQUEST_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_SELECT_FOLDER_RESPONSE_CHANNEL,
   createDesktopApplicationSettingsListDefinitionsRequest,
   createDesktopApplicationSettingsReadRequest,
   createDesktopApplicationSettingsUpdateRequest,
   createDesktopApplicationSettingsClearRequest,
   createDesktopApplicationSettingsResolveModelDefaultRequest,
+  createDesktopApplicationSettingsSelectFolderRequest,
   type DesktopApplicationSettingsListDefinitionsResponse,
   type DesktopApplicationSettingsReadResponse,
   type DesktopApplicationSettingsUpdateResponse,
   type DesktopApplicationSettingsClearResponse,
   type DesktopApplicationSettingsResolveModelDefaultResponse,
+  type DesktopApplicationSettingsSelectFolderResponse,
   DESKTOP_MODEL_BROWSE_OPERATION,
   DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
   DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL,
@@ -738,6 +743,10 @@ export interface DesktopPreloadApi {
     input: ResolveModelDefaultRequest,
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopApplicationSettingsResolveModelDefaultResponse>;
+  selectApplicationSettingsFolder: (
+    input?: { title?: string; defaultPath?: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopApplicationSettingsSelectFolderResponse>;
   browseModels: (
     input: Parameters<typeof createDesktopModelBrowseRequest>[0],
     context?: DesktopArtifactUploadBridgeContext,
@@ -1983,6 +1992,19 @@ export function createDesktopPreloadApi(
     },
     async resolveModelDefault(input, context = {}) {
       return this.resolveApplicationModelDefault(input, context);
+    },
+    async selectApplicationSettingsFolder(input = {}, context = {}) {
+      const request = createDesktopApplicationSettingsSelectFolderRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_APPLICATION_SETTINGS_SELECT_FOLDER_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopApplicationSettingsSelectFolderResponse>(response, {
+        operation: DESKTOP_APPLICATION_SETTINGS_SELECT_FOLDER_OPERATION,
+        channel: DESKTOP_APPLICATION_SETTINGS_SELECT_FOLDER_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop application settings select-folder IPC response envelope.",
+      });
     },
     async browseModels(input, context = {}) {
       const request = createDesktopModelBrowseRequest(input, context);

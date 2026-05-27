@@ -10,6 +10,7 @@ const definitions = [
   { key: "runtime.python.defaultDevice", category: "runtime", label: "Device", valueKind: "select", options: [{ value: "auto" }, { value: "cpu" }, { value: "cuda" }] },
   { key: "runtime.enableTelemetry", category: "runtime", label: "Enable telemetry", valueKind: "boolean" },
   { key: "huggingface.token", category: "huggingface", label: "Hugging Face token", valueKind: "secret", sensitive: true },
+  { key: "models.sharedStorageDirectory", category: "models", label: "Shared model storage folder", valueKind: "folder" },
   { key: "models.default", category: "models", label: "Global default model", valueKind: "object" },
 ] as const;
 
@@ -18,6 +19,7 @@ const baseValues = [
   { key: "runtime.python.defaultDevice", configured: true, value: "auto" },
   { key: "runtime.enableTelemetry", configured: true, value: true },
   { key: "huggingface.token", configured: true, masked: true, maskedValue: "********" },
+  { key: "models.sharedStorageDirectory", configured: true, value: "C:\\models" },
   {
     key: "models.default",
     configured: true,
@@ -32,6 +34,7 @@ let clearSetting: ReturnType<typeof vi.fn>;
 let listDefinitions: ReturnType<typeof vi.fn>;
 let readSettings: ReturnType<typeof vi.fn>;
 let resolveModelDefault: ReturnType<typeof vi.fn>;
+let selectFolder: ReturnType<typeof vi.fn>;
 
 vi.mock("../api/desktopApplicationSettingsClient", () => ({
   createDesktopApplicationSettingsClient: () => mockClient,
@@ -43,6 +46,7 @@ const mockClient: DesktopApplicationSettingsClient = {
   updateSetting: (...args) => updateSetting(...args),
   clearSetting: (...args) => clearSetting(...args),
   resolveModelDefault: (...args) => resolveModelDefault(...args),
+  selectFolder: (...args) => selectFolder(...args),
 };
 
 beforeEach(() => {
@@ -53,6 +57,7 @@ beforeEach(() => {
   resolveModelDefault = vi.fn().mockResolvedValue({
     resolved: { provider: "transformers", modelId: "google/flan-t5-base", inferenceMode: "text2text", source: "global", settingKey: "models.default" },
   });
+  selectFolder = vi.fn().mockResolvedValue({ canceled: false, path: "D:\\shared-models" });
 });
 
 afterEach(async () => {
@@ -144,6 +149,18 @@ describe("SettingsPanel", () => {
 
     expect(updateSetting).toHaveBeenCalledWith({ key: "huggingface.token", value: "hf_new" });
     expect(clearSetting).toHaveBeenCalledWith({ key: "huggingface.token" });
+  });
+
+  it("lets folder settings browse through the desktop bridge", async () => {
+    await renderPanel({ keys: ["models.sharedStorageDirectory"] as never });
+
+    await act(async () => {
+      (container?.querySelector('[data-testid="setting-models.sharedStorageDirectory-browse"]') as HTMLButtonElement).click();
+    });
+
+    const input = container?.querySelector('[data-testid="setting-models.sharedStorageDirectory-input"]') as HTMLInputElement;
+    expect(selectFolder).toHaveBeenCalledWith({ title: "Shared model storage folder", defaultPath: "C:\\models" });
+    expect(input.value).toBe("D:\\shared-models");
   });
 
   it("renders and saves model default with modelId and inferenceMode together", async () => {

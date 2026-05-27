@@ -23,6 +23,8 @@ export interface ModelPublishedSummary {
   publishedAt: string;
 }
 
+export type ModelStorageScope = "workspace" | "shared";
+
 export interface ModelInventoryRecord {
   workspaceId?: WorkspaceId;
   modelRecordId: string;
@@ -48,6 +50,7 @@ export interface ModelInventoryRecord {
   validationStatus?: ModelValidationStatus;
   validationReportPath?: string;
   published?: ModelPublishedSummary;
+  storageScope?: ModelStorageScope;
   metadata?: Record<string, unknown>;
 }
 
@@ -103,6 +106,14 @@ function normalizePublishedSummary(value: ModelPublishedSummary | undefined): Mo
   };
 }
 
+function normalizeModelStorageScope(value: ModelStorageScope | undefined): ModelStorageScope | undefined {
+  if (value === "workspace" || value === "shared") {
+    return value;
+  }
+
+  return undefined;
+}
+
 export function normalizeModelInventoryRecord(record: ModelInventoryRecord): ModelInventoryRecord {
   return {
     workspaceId: record.workspaceId,
@@ -138,6 +149,7 @@ export function normalizeModelInventoryRecord(record: ModelInventoryRecord): Mod
         : undefined,
     validationReportPath: normalizeOptionalText(record.validationReportPath),
     published: normalizePublishedSummary(record.published),
+    storageScope: normalizeModelStorageScope(record.storageScope),
     metadata: record.metadata,
   };
 }

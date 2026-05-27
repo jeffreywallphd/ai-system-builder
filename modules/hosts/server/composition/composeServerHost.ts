@@ -116,7 +116,7 @@ import {
   type ComfyUiPythonEnvironmentMode,
 } from "../../../adapters/runtime/comfyui/comfyUiPythonEnvironment";
 import type { ComfyUiRuntimeDeviceMode } from "../../../adapters/runtime/comfyui/createComfyUiRuntimeSupervisor";
-import { RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY } from "../../../contracts/settings";
+import { RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY, SHARED_MODEL_STORAGE_DIRECTORY_SETTING_KEY } from "../../../contracts/settings";
 import { RuntimeCapabilityGuardService } from "../../../application/services/runtime/runtime-capability-guard.service";
 import { createServerRuntimeReadinessService } from "./composeServerRuntimeReadiness";
 import { createServerImageGenerationRuntimeTaskRegistry } from "./composeServerImageGenerationRuntimeTaskRegistry";
@@ -798,7 +798,16 @@ export function composeServerHost(
         warn: (event: string, data: Record<string, unknown>) => { void loggingPort.log({ level:"warn", message:event, event, component:"model-management", subsystem:"api", timestamp:new Date().toISOString(), verbosity:"normal", data }); },
       };
 
-      const modelRegistry = createLocalModelRegistryAdapter({ filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`, now: options.now });
+      const modelRegistry = createLocalModelRegistryAdapter({
+        filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`,
+        now: options.now,
+        discovery: {
+          searchRoots: async () => {
+            const root = await readRuntimeSettingString(SHARED_MODEL_STORAGE_DIRECTORY_SETTING_KEY);
+            return root ? [root] : [];
+          },
+        },
+      });
       const imageAssetRegistry = createLocalImageAssetRegistryAdapter({
         filePath: joinHostPath(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
         now: options.now,

@@ -38,6 +38,14 @@ Workspace-owned resource records should carry workspace ownership in their own d
 
 Legacy global records are not silently assigned to a workspace, copied, migrated, or exposed as workspace-owned data. Any future migration/import must be explicit and user-visible.
 
+## Shared model storage
+
+Desktop and server hosts may configure one host-local shared model storage folder through application Settings. This folder is an additional read/discovery source for already downloaded models; it is not a workspace-owned model store and does not copy or migrate records into a workspace.
+
+When a workspace lists models, the model registry may include ephemeral shared entries discovered from the configured folder alongside persisted workspace model records. Those entries must carry explicit workspace request context for authorization and selection, and must be labeled with `storageScope: "shared"` so UI and downstream use cases do not present them as workspace-owned records. Persisted downloads, generated models, validation, publishing, and deletion remain workspace-scoped operations.
+
+Public model and image-generation read models must continue to omit raw local paths. The Settings page may display and edit the configured folder because that is an explicit host configuration action.
+
 ## Phase 7 reuse boundary
 
 Phase 7 introduces User Library and Cross-Workspace Asset Reuse as explicit reuse relationships only. Workspace isolation remains the default: workspace-local assets and resources stay visible only inside their owning workspace unless a later promote, link, copy, or import workflow creates a durable relationship. Direct workspace-to-workspace reuse begins as independent import/copy into the target workspace, not live linking.

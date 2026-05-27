@@ -885,6 +885,12 @@ it("maps application settings bridge calls to dedicated settings channels", asyn
       channel: "ipc.application-settings.resolve-model-default.response",
       value: { resolved: { provider: "transformers", modelId: "google/flan-t5-small", inferenceMode: "text2text", source: "builtin" } },
     },
+    {
+      ok: true,
+      operation: "application-settings.select-folder",
+      channel: "ipc.application-settings.select-folder.response",
+      value: { canceled: false, path: "C:\\models" },
+    },
   ];
   let index = 0;
   const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => {
@@ -897,11 +903,14 @@ it("maps application settings bridge calls to dedicated settings channels", asyn
   await api.listApplicationSettingDefinitions();
   const read = await api.readApplicationSettings({ keys: ["huggingface.token"] });
   const resolved = await api.resolveModelDefault({ taskKey: "qaGeneration" });
+  const selected = await api.selectApplicationSettingsFolder({ title: "Models" });
 
   expect(invoke.mock.calls[0]?.[0]).toBe("ipc.application-settings.list-definitions.request");
   expect(invoke.mock.calls[1]?.[0]).toBe("ipc.application-settings.read.request");
+  expect(invoke.mock.calls[3]?.[0]).toBe("ipc.application-settings.select-folder.request");
   expect(read.value.values[0]?.maskedValue).toBe("********");
   expect(resolved.value.resolved.inferenceMode).toBe("text2text");
+  expect(selected.value.path).toBe("C:\\models");
 });
 
 it("maps model management bridge calls to dedicated model channels", async () => {

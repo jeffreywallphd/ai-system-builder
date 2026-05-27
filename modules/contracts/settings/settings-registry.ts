@@ -28,6 +28,7 @@ const QA_TASK_MODEL_DEFAULT: ModelDefaultConfig = {
 
 export const IMAGE_GENERATION_GPU_TYPE_SETTING_KEY = "runtime.imageGeneration.gpuType" as const;
 export const RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY = "runtime.torch.cudaWheelIndexUrl" as const;
+export const SHARED_MODEL_STORAGE_DIRECTORY_SETTING_KEY = "models.sharedStorageDirectory" as const;
 
 export const INITIAL_APPLICATION_SETTING_DEFINITIONS: ApplicationSettingDefinition[] = [
   {
@@ -59,6 +60,15 @@ export const INITIAL_APPLICATION_SETTING_DEFINITIONS: ApplicationSettingDefiniti
     label: "Default QA generation model",
     valueKind: "object",
     defaultValue: QA_TASK_MODEL_DEFAULT,
+    scope: "application",
+  },
+  {
+    key: SHARED_MODEL_STORAGE_DIRECTORY_SETTING_KEY,
+    category: "models",
+    label: "Shared model storage folder",
+    description: "Host-local folder scanned for already downloaded models that can be reused across workspaces.",
+    instructions: "Choose a folder that this desktop app or server process can read. Models found here are listed alongside workspace models without being copied into the workspace.",
+    valueKind: "folder",
     scope: "application",
   },
   {

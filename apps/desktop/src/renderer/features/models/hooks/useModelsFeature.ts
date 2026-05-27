@@ -219,6 +219,7 @@ export function useModelsFeature(client?: DesktopModelsClient, workspaceId?: str
     saved: models.filter((item) => item.lifecycleStatus === "saved-reference").length,
     generated: models.filter((item) => item.lifecycleStatus === "generated").length,
     downloaded: models.filter((item) => item.lifecycleStatus === "downloaded").length,
+    shared: models.filter((item) => item.storageScope === "shared").length,
   }), [models]);
 
   const validateManagedModel = useCallback(async () => {
