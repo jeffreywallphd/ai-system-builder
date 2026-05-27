@@ -10,6 +10,11 @@ describe("api route security policy coverage", () => {
     const publicRoutes = [...API_ROUTE_POLICIES.entries()].filter(([, p]) => p.public).map(([route]) => route).sort();
     expect(publicRoutes).toContain("GET /api/security/status");
     expect(API_ROUTE_POLICIES.get("POST /api/security/token/revoke")?.public).toBe(false);
+    expect(API_ROUTE_POLICIES.get("GET /api/workspaces")).toMatchObject({ public: false, scopes: ["workspace:read"] });
+    expect(API_ROUTE_POLICIES.get("POST /api/workspaces")).toMatchObject({ public: false, scopes: ["workspace:write"] });
+    expect(API_ROUTE_POLICIES.get("GET /api/workspaces/active-selection")).toMatchObject({ public: false, scopes: ["workspace:read"] });
+    expect(API_ROUTE_POLICIES.get("POST /api/workspaces/active-selection")).toMatchObject({ public: false, scopes: ["workspace:write"] });
+    expect(API_ROUTE_POLICIES.get("POST /api/workspaces/active-selection/clear")).toMatchObject({ public: false, scopes: ["workspace:write"] });
   });
 
   it("denies unknown api routes", () => {
@@ -21,6 +26,13 @@ describe("security middleware", () => {
   it("disabled-dev allows missing token", async () => {
     const middleware = createExpressSecurityMiddleware({ httpsRequired: false, authRequired: false, mode: "disabled-dev", verifyToken: async () => ({ principal: { id: "p", scopes: ["model:read"] }, auth: { method: "bearer-token" } } as any) });
     const req:any = { method: "POST", path: "/api/model/browse", protocol: "http", headers: {} };
+    const res:any = { statusCode: 200, body: undefined, status(code:number){this.statusCode=code;return this;}, json(body:unknown){this.body=body;return this;} };
+    let nextCalled=false; await middleware(req,res,()=>{nextCalled=true;}); expect(nextCalled).toBe(true);
+  });
+
+  it("disabled-dev allows workspace creation route to reach the workspace API", async () => {
+    const middleware = createExpressSecurityMiddleware({ httpsRequired: false, authRequired: false, mode: "disabled-dev", verifyToken: async () => ({ principal: { id: "p", scopes: ["workspace:write"] }, auth: { method: "bearer-token" } } as any) });
+    const req:any = { method: "POST", path: "/api/workspaces", protocol: "http", headers: {} };
     const res:any = { statusCode: 200, body: undefined, status(code:number){this.statusCode=code;return this;}, json(body:unknown){this.body=body;return this;} };
     let nextCalled=false; await middleware(req,res,()=>{nextCalled=true;}); expect(nextCalled).toBe(true);
   });

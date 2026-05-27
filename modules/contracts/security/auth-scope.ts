@@ -1,6 +1,8 @@
 export const SECURITY_SCOPES = [
   "artifact:read",
   "artifact:write",
+  "workspace:read",
+  "workspace:write",
   "model:read",
   "model:write",
   "image-generation:read",

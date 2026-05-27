@@ -8,6 +8,12 @@ export const API_ROUTE_POLICIES: ReadonlyMap<string, ApiRoutePolicy> = new Map<s
   ["GET /api/security/dev-mode", { public: true }],
   ["POST /api/security/dev-mode", { public: true }],
 
+  ["GET /api/workspaces", { public: false, scopes: ["workspace:read"] }],
+  ["POST /api/workspaces", { public: false, scopes: ["workspace:write"] }],
+  ["GET /api/workspaces/active-selection", { public: false, scopes: ["workspace:read"] }],
+  ["POST /api/workspaces/active-selection", { public: false, scopes: ["workspace:write"] }],
+  ["POST /api/workspaces/active-selection/clear", { public: false, scopes: ["workspace:write"] }],
+
   ["POST /api/model/browse", { public: false, scopes: ["model:read"] }],
   ["POST /api/model/details", { public: false, scopes: ["model:read"] }],
   ["POST /api/model/list", { public: false, scopes: ["model:read"] }],
