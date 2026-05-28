@@ -141,7 +141,7 @@ describe("createLocalModelRegistryAdapter", () => {
 
     const listed = await adapter.listModels({
       workspaceId: "workspace-a" as never,  limit: 10 });
-    expect(listed.models).toHaveLength(1);
+    expect(listed.models.length).toBe(1);
     expect(listed.models[0]).toMatchObject({
       workspaceId: "workspace-a",
       modelId: "org/demo-model",
@@ -172,7 +172,7 @@ describe("createLocalModelRegistryAdapter", () => {
 
     const listed = await adapter.listModels({ workspaceId: "workspace-a" as never, limit: 10 });
 
-    expect(listed.models).toHaveLength(1);
+    expect(listed.models.length).toBe(1);
     expect(listed.models[0]).toMatchObject({
       displayName: "dream",
       artifactForm: "checkpoint",
@@ -216,6 +216,36 @@ describe("createLocalModelRegistryAdapter", () => {
     expect(listed.models.map((model) => model.modelId)).toEqual(["org/registered-image-model"]);
     const persisted = JSON.parse(await readFile(filePath, "utf8")) as { models?: Array<{ modelId?: string }> };
     expect(persisted.models?.map((model) => model.modelId)).toEqual(["org/registered-image-model"]);
+  });
+
+  it("can include configured shared storage while keeping general discovery disabled", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "model-registry-"));
+    const filePath = join(dir, "models.json");
+    const sharedRoot = join(dir, "shared-models");
+    await mkdir(sharedRoot, { recursive: true });
+    await writeFile(join(sharedRoot, "shared-dream.safetensors"), "checkpoint", "utf8");
+
+    const adapter = createLocalModelRegistryAdapter({
+      filePath,
+      now: () => "2026-04-27T00:00:00.000Z",
+      discovery: {
+        searchRoots: [sharedRoot],
+        env: {},
+        homeDirectory: join(dir, "home"),
+      },
+    });
+
+    const listed = await adapter.listModels({
+      workspaceId: "workspace-a" as never,
+      limit: 10,
+      includeDiscovered: false,
+      includeSharedStorage: true,
+    });
+
+    expect(listed.models.map((model) => model.displayName)).toEqual(["shared-dream"]);
+    expect(listed.models[0]?.storageScope).toBe("shared");
+    const persisted = JSON.parse(await readFile(filePath, "utf8").catch(() => "{}")) as { models?: Array<{ modelId?: string }> };
+    expect(persisted.models ?? []).toEqual([]);
   });
 
   it("does not auto-migrate legacy global records into workspace inventory", async () => {

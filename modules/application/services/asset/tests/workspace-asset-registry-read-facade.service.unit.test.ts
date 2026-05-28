@@ -8,18 +8,22 @@ import type { AssetRegistryDefinitionReadPort } from "../../../ports/asset";
 import type { WorkspaceRepository, WorkspaceSystemPackActivationRepository } from "../../../ports/workspace";
 import { ListWorkspaceSystemPackActivationsUseCase } from "../../../use-cases/workspace";
 import { SYSTEM_FOUNDATION_PACK_ID, SYSTEM_FOUNDATION_PACK_VERSION } from "../../asset-packs/system-packs/system-foundation-pack.constants";
+import { SYSTEM_FOUNDATION_PACK_MANIFEST } from "../../asset-packs/system-packs/system-foundation-pack.manifest";
 import { WorkspaceAssetRegistryReadFacade, WorkspaceAssetRegistryReadFacadeError } from "../workspace-asset-registry-read-facade.service";
-import type { AssetDefinitionCard, AssetDefinitionDetail, AssetRegistryListQuery } from "../asset-registry-read-facade.types";
+import type { AssetDefinitionCard, AssetDefinitionDetail, AssetRegistryListQuery, AssetRegistryResourceBackedViewCard, AssetRegistryResourceBackedViewDetail } from "../asset-registry-read-facade.types";
 
 const workspaceA = createWorkspaceId("workspace-a");
 const workspaceB = createWorkspaceId("workspace-b");
 const archivedWorkspace = createWorkspaceId("workspace-archived");
-const foundationRef: AssetReference = { kind: "asset-definition", id: "system.foundation.button", version: "1.0.0" } as AssetReference;
+const foundationRef: AssetReference = SYSTEM_FOUNDATION_PACK_MANIFEST.assets[0]!.definitionRef;
 
 class FakeReadPort implements AssetRegistryDefinitionReadPort {
   public listCalls: AssetRegistryListQuery[] = [];
   public detailCalls: AssetReference[] = [];
   public cards: AssetDefinitionCard[] = [foundationCard(), bareSourcePackCard(), wrongTrustCard(), customCard()];
+  public detailEnabled = true;
+  public resourceCards: AssetRegistryResourceBackedViewCard[] = [artifactResourceCard()];
+  public resourceDetail: AssetRegistryResourceBackedViewDetail | undefined = { view: { viewId: "global", viewKind: "artifact" } } as never;
 
   async listDefinitionCards(query: AssetRegistryListQuery = {}) {
     this.listCalls.push(query);
@@ -28,6 +32,7 @@ class FakeReadPort implements AssetRegistryDefinitionReadPort {
 
   async readDefinitionDetail(ref: AssetReference): Promise<AssetDefinitionDetail | undefined> {
     this.detailCalls.push(ref);
+    if (!this.detailEnabled) return undefined;
     if (String(ref.id) !== foundationRef.id) return undefined;
     return {
       definition: {
@@ -45,11 +50,11 @@ class FakeReadPort implements AssetRegistryDefinitionReadPort {
   }
 
   async listResourceBackedViewCards() {
-    return { items: [{ id: "global", viewId: "global", displayName: "Global leak", registrationStatusLabel: "Registered" }] } as never;
+    return { items: this.resourceCards } as never;
   }
 
   async readResourceBackedViewDetail() {
-    return { view: { viewId: "global", viewKind: "artifact" } } as never;
+    return this.resourceDetail as never;
   }
 }
 
@@ -121,7 +126,21 @@ test("Workspace A with active system.foundation@1.0.0 sees strict foundation car
   const { facade, activations } = setup();
   activations.activations.set(workspaceA, [activation(workspaceA, "active")]);
   const result = await facade.listDefinitionCards({ workspaceId: workspaceA });
-  assert.deepEqual(result.items.map((item) => item.definitionId), [foundationRef.id]);
+  assert.equal(result.items.some((item) => item.definitionId === foundationRef.id), true);
+  assert.equal(result.items.length >= SYSTEM_FOUNDATION_PACK_MANIFEST.assets.length, true);
+  assert.equal(result.items.every((item) => item.sourcePackId === SYSTEM_FOUNDATION_PACK_ID), true);
+});
+
+test("active workspaces see System Foundation from the manifest even when definitions were not installed", async () => {
+  const { facade, activations, readPort } = setup();
+  activations.activations.set(workspaceA, [activation(workspaceA, "active")]);
+  readPort.cards = [];
+  readPort.detailEnabled = false;
+  const list = await facade.listDefinitionCards({ workspaceId: workspaceA });
+  assert.equal(list.items.length, SYSTEM_FOUNDATION_PACK_MANIFEST.assets.length);
+  const detail = await facade.readDefinitionDetail(foundationRef, { workspaceId: workspaceA });
+  assert.equal(detail?.definition.definitionId, foundationRef.id);
+  assert.equal((detail?.definition.metadata as Record<string, unknown> | undefined)?.sourceKind, "system");
 });
 
 test("Workspace B without activation does not see foundation cards", async () => {
@@ -185,13 +204,20 @@ test("detail membership is deterministic for effective assets beyond arbitrary l
   assert.equal(readPort.listCalls.some((query) => query.limit === 250), false);
 });
 
-test("resource-backed descriptors are deferred and do not leak global records", async () => {
-  const { facade, activations } = setup();
+test("resource-backed descriptors expose workspace-scoped model views without leaking other families", async () => {
+  const { facade, activations, readPort } = setup();
   activations.activations.set(workspaceA, [activation(workspaceA, "active")]);
+  readPort.resourceCards = [artifactResourceCard(), modelResourceCard()];
+  readPort.resourceDetail = { view: { viewId: "asset-view.model.internal.model-1", viewKind: "model" } } as never;
   const list = await facade.listResourceBackedViewCards({ workspaceId: workspaceA });
-  assert.equal(list.items.length, 0);
-  assert.equal(list.diagnostics?.[0]?.code, "workspace-resource-backed-view-deferred");
-  await assert.rejects(() => facade.readResourceBackedViewDetail("global", { workspaceId: workspaceA }), /deferred/);
+  assert.deepEqual(list.items.map((item) => item.viewId), ["asset-view.model.internal.model-1"]);
+  const detail = await facade.readResourceBackedViewDetail("asset-view.model.internal.model-1", { workspaceId: workspaceA });
+  assert.equal(detail?.view.viewKind, "model");
+  readPort.resourceDetail = { view: { viewId: "global", viewKind: "artifact" } } as never;
+  assert.equal(await facade.readResourceBackedViewDetail("global", { workspaceId: workspaceA }), undefined);
+  const artifactOnly = await facade.listResourceBackedViewCards({ workspaceId: workspaceA, viewKinds: ["artifact"] });
+  assert.equal(artifactOnly.items.length, 0);
+  assert.equal(artifactOnly.diagnostics?.[0]?.code, "workspace-resource-backed-view-deferred");
 });
 
 test("results are deterministic and diagnostics are sanitized", async () => {
@@ -299,6 +325,26 @@ function wrongTrustCard(): AssetDefinitionCard {
 
 function customCard(): AssetDefinitionCard {
   return { ...foundationCard(), definitionId: "custom.global", displayName: "Custom", sourcePackId: undefined, sourcePackVersion: undefined, sourceKind: undefined, sourceLayer: undefined, trustStatus: undefined, systemDefault: undefined, builtIn: false };
+}
+
+function artifactResourceCard(): AssetRegistryResourceBackedViewCard {
+  return {
+    viewId: "global",
+    viewKind: "artifact",
+    displayName: "Global leak",
+    assetType: "artifact",
+    assetFamily: "resource-backed",
+  } as AssetRegistryResourceBackedViewCard;
+}
+
+function modelResourceCard(): AssetRegistryResourceBackedViewCard {
+  return {
+    viewId: "asset-view.model.internal.model-1",
+    viewKind: "model",
+    displayName: "Shared Model",
+    assetType: "model",
+    assetFamily: "resource-backed",
+  } as AssetRegistryResourceBackedViewCard;
 }
 
 function activation(workspaceId: WorkspaceId, status: "active" | "inactive" | "failed"): WorkspaceSystemPackActivation {

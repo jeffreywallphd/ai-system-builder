@@ -10,13 +10,14 @@ type Envelope<T> = EnvelopeSuccess<T> | EnvelopeFailure;
 type Api = {
   listAuthoredAssets?: (i: { workspaceId: string }) => Promise<unknown>;
   listAssetDrafts?: (i: { targetWorkspaceId: string }) => Promise<unknown>;
-  createAssetDraft?: (i: { targetWorkspaceId: string; draftEditableValues: { "display-name": string; summary?: string; description?: string } }) => Promise<unknown>;
-  updateAssetDraft?: (i: { targetWorkspaceId: string; draftId: string; draftEditablePatch: { "display-name"?: string; summary?: string; description?: string } }) => Promise<unknown>;
+  createAssetDraft?: (i: { targetWorkspaceId: string; draftEditableValues: EditableValues & { "display-name": string } }) => Promise<unknown>;
+  updateAssetDraft?: (i: { targetWorkspaceId: string; draftId: string; draftEditablePatch: EditableValues }) => Promise<unknown>;
   publishAssetDraft?: (i: { targetWorkspaceId: string; draftId: string }) => Promise<unknown>;
   listAssetOverrides?: (i: { targetWorkspaceId: string }) => Promise<unknown>;
   disableAssetOverride?: (i: { targetWorkspaceId: string; overrideId: string }) => Promise<unknown>;
   listAssetAuthoringEffectiveSummaries?: (i: { targetWorkspaceId: string }) => Promise<unknown>;
 };
+type EditableValues = Partial<Record<"display-name" | "summary" | "description" | "classification" | "tags", string | readonly string[]>>;
 
 const fail = (message: string, code: FailureCode = 'internal'): Result<never> => ({ ok: false, error: { code, message } });
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
@@ -50,13 +51,13 @@ export function createDesktopAssetAuthoringClient() {
       if (r.ok === true) return { ok: true, value: { items: r.value.drafts ?? [] } };
       return fail(r.error.message, r.error.code);
     },
-    async createDraft(input: { workspaceId: string; displayName: string; summary?: string; description?: string }): Promise<Result<unknown>> {
+    async createDraft(input: { workspaceId: string; displayName: string; summary?: string; description?: string; classification?: string; tags?: readonly string[] }): Promise<Result<unknown>> {
       if (typeof api.createAssetDraft !== 'function') return fail('Create draft is not available yet.', 'unavailable');
-      return parseEnvelope(await api.createAssetDraft({ targetWorkspaceId: input.workspaceId, draftEditableValues: { "display-name": input.displayName, summary: input.summary, description: input.description } }));
+      return parseEnvelope(await api.createAssetDraft({ targetWorkspaceId: input.workspaceId, draftEditableValues: { ...editableValues(input), "display-name": input.displayName } }));
     },
-    async updateDraft(input: { workspaceId: string; draftId: string; displayName?: string; summary?: string; description?: string }): Promise<Result<unknown>> {
+    async updateDraft(input: { workspaceId: string; draftId: string; displayName?: string; summary?: string; description?: string; classification?: string; tags?: readonly string[] }): Promise<Result<unknown>> {
       if (typeof api.updateAssetDraft !== 'function') return fail('Update draft is not available yet.', 'unavailable');
-      return parseEnvelope(await api.updateAssetDraft({ targetWorkspaceId: input.workspaceId, draftId: input.draftId, draftEditablePatch: { "display-name": input.displayName, summary: input.summary, description: input.description } }));
+      return parseEnvelope(await api.updateAssetDraft({ targetWorkspaceId: input.workspaceId, draftId: input.draftId, draftEditablePatch: editableValues(input) }));
     },
     async publishDraft(workspaceId: string, draftId: string): Promise<Result<unknown>> {
       if (typeof api.publishAssetDraft !== 'function') return fail('Publish draft is not available yet.', 'unavailable');
@@ -78,5 +79,15 @@ export function createDesktopAssetAuthoringClient() {
       if (r.ok === false) return fail(r.error.message, r.error.code);
       return { ok: true, value: { items: r.value.items ?? [] } };
     },
+  };
+}
+
+function editableValues(input: { displayName?: string; summary?: string; description?: string; classification?: string; tags?: readonly string[] }): EditableValues {
+  return {
+    ...(input.displayName ? { "display-name": input.displayName } : {}),
+    ...(input.summary ? { summary: input.summary } : {}),
+    ...(input.description ? { description: input.description } : {}),
+    ...(input.classification ? { classification: input.classification } : {}),
+    ...(input.tags?.length ? { tags: input.tags } : {}),
   };
 }

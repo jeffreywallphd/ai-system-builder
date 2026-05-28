@@ -15,10 +15,29 @@ describe("api route security policy coverage", () => {
     expect(API_ROUTE_POLICIES.get("GET /api/workspaces/active-selection")).toMatchObject({ public: false, scopes: ["workspace:read"] });
     expect(API_ROUTE_POLICIES.get("POST /api/workspaces/active-selection")).toMatchObject({ public: false, scopes: ["workspace:write"] });
     expect(API_ROUTE_POLICIES.get("POST /api/workspaces/active-selection/clear")).toMatchObject({ public: false, scopes: ["workspace:write"] });
+    expect(API_ROUTE_POLICIES.get("GET /api/assets/definitions")).toMatchObject({ public: false, scopes: ["asset:read"] });
+    expect(API_ROUTE_POLICIES.get("GET /api/assets/resource-backed-views")).toMatchObject({ public: false, scopes: ["asset:read"] });
+    expect(API_ROUTE_POLICIES.get("POST /api/assets/register-resource-backed-view")).toMatchObject({ public: false, scopes: ["asset:write"] });
+    expect(API_ROUTE_POLICIES.get("GET /api/asset-authoring/workspaces/:workspaceId/drafts")).toMatchObject({ public: false, scopes: ["asset:read"] });
+    expect(API_ROUTE_POLICIES.get("POST /api/asset-authoring/workspaces/:workspaceId/drafts")).toMatchObject({ public: false, scopes: ["asset:write"] });
+    expect(API_ROUTE_POLICIES.get("POST /api/asset-authoring/workspaces/:workspaceId/drafts/:draftId/publish")).toMatchObject({ public: false, scopes: ["asset:write"] });
   });
 
   it("denies unknown api routes", () => {
     expect(resolveApiRoutePolicy("GET", "/api/unknown")).toMatchObject({ deny: true, securityCode: "security.route-policy-missing" });
+  });
+
+  it("resolves concrete Asset Library read paths through registered route templates", () => {
+    expect(resolveApiRoutePolicy("GET", "/api/assets/definitions/builtin.document")).toMatchObject({ public: false, scopes: ["asset:read"] });
+    expect(resolveApiRoutePolicy("GET", "/api/assets/definitions/builtin.document/versions/1.0.0")).toMatchObject({ public: false, scopes: ["asset:read"] });
+    expect(resolveApiRoutePolicy("GET", "/api/assets/resource-backed-views/asset-view.generated-output.internal.1")).toMatchObject({ public: false, scopes: ["asset:read"] });
+  });
+
+  it("resolves concrete asset authoring paths through registered route templates", () => {
+    expect(resolveApiRoutePolicy("GET", "/api/asset-authoring/workspaces/workspace-a/drafts")).toMatchObject({ public: false, scopes: ["asset:read"] });
+    expect(resolveApiRoutePolicy("PATCH", "/api/asset-authoring/workspaces/workspace-a/drafts/draft-1")).toMatchObject({ public: false, scopes: ["asset:write"] });
+    expect(resolveApiRoutePolicy("POST", "/api/asset-authoring/workspaces/workspace-a/drafts/draft-1/publish")).toMatchObject({ public: false, scopes: ["asset:write"] });
+    expect(resolveApiRoutePolicy("GET", "/api/asset-authoring/workspaces/workspace-a/overrides/override-1")).toMatchObject({ public: false, scopes: ["asset:read"] });
   });
 });
 
@@ -33,6 +52,13 @@ describe("security middleware", () => {
   it("disabled-dev allows workspace creation route to reach the workspace API", async () => {
     const middleware = createExpressSecurityMiddleware({ httpsRequired: false, authRequired: false, mode: "disabled-dev", verifyToken: async () => ({ principal: { id: "p", scopes: ["workspace:write"] }, auth: { method: "bearer-token" } } as any) });
     const req:any = { method: "POST", path: "/api/workspaces", protocol: "http", headers: {} };
+    const res:any = { statusCode: 200, body: undefined, status(code:number){this.statusCode=code;return this;}, json(body:unknown){this.body=body;return this;} };
+    let nextCalled=false; await middleware(req,res,()=>{nextCalled=true;}); expect(nextCalled).toBe(true);
+  });
+
+  it("disabled-dev allows Asset Library read routes to reach the asset registry API", async () => {
+    const middleware = createExpressSecurityMiddleware({ httpsRequired: false, authRequired: false, mode: "disabled-dev", verifyToken: async () => ({ principal: { id: "p", scopes: ["asset:read"] }, auth: { method: "bearer-token" } } as any) });
+    const req:any = { method: "GET", path: "/api/assets/definitions/builtin.document", protocol: "http", headers: {} };
     const res:any = { statusCode: 200, body: undefined, status(code:number){this.statusCode=code;return this;}, json(body:unknown){this.body=body;return this;} };
     let nextCalled=false; await middleware(req,res,()=>{nextCalled=true;}); expect(nextCalled).toBe(true);
   });

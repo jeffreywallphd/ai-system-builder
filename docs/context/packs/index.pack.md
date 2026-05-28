@@ -4,167 +4,77 @@
 
 ## Purpose
 
-- Provide the always-included baseline context for all automation and implementation prompts.
-- Establish repository-wide guardrails while keeping context payloads minimal.
+- Provide the always-included baseline context for repository work.
+- Establish minimum-sufficient context assembly and repository-wide guardrails.
 
 ## Use When
 
-- Every automated prompt and implementation task in this repository.
-- Any task that needs baseline standards before adding specialized packs.
+- Include this pack first for every automated prompt and implementation task.
+- Add narrower packs only when the task materially involves their concern.
 
 ## Do Not Use When
 
-- Never omit for repository work.
-- Do not treat this as a replacement for canonical docs when a task needs deeper detail.
+- Never omit it for repository work.
+- Do not treat it as a replacement for canonical ADRs, architecture docs, or standards.
 
 ## Core Guidance
 
-- Respect architectural boundaries: keep domain/application free of host, transport, UI, and infrastructure leakage.
-- Prefer minimum-sufficient context: include only additional packs required for the current task.
-- Avoid speculative abstraction, package proliferation, and folder/package duplication without concrete need.
-- Use role-revealing names; avoid vague catch-all naming for files, folders, and symbols.
-- Use shared operation identity helpers/patterns for contract operations (lowercase dotted names) to prevent ad hoc drift.
-- Treat API and IPC contracts as specializations of shared transport contracts, not parallel response/error systems.
-- Use best practices in code commenting in all code files.
-- Keep IPC channels operation-derived (`ipc.<operation>.<kind>`) via shared helpers.
-- Update canonical docs in the same change when documented behavior/architecture/standards change.
-- Current roadmap: Phase 6 is Workspace Foundations; Phase 7 is User Library and Cross-Workspace Asset Reuse (finalized in Prompt 11; use `docs/context/packs/user-library.pack.md` plus canonical architecture/ADR docs for any reuse work); Phase 8 is Asset Authoring, Customization, and Override Management; Phase 9 is Materialized / Effective Asset Projections; Phase 10 is Asset Composition Planning; Phase 11 is Runtime Readiness Binding; Phase 12 is Execution Plan Preparation (execution-oriented planning handoff).
-- For workspace-owned operations, UI gating is not enough: carry explicit workspace context through contracts, clients, transports, use cases, ports, providers, and persistence; do not invent default/global workspace ids or add legacy global fallback.
-- Phase 9 closeout state: projections are readiness-for-planning surfaces only; do not describe them as execution-ready.
-Phase 9 effective projection work must include `docs/context/packs/effective-asset-projections.pack.md` and the canonical `docs/architecture/effective-asset-projections.md` + ADR-0019.
-- Phase 10 composition planning work must include `docs/context/packs/asset-composition-planning.pack.md` plus canonical `docs/architecture/asset-composition-planning.md` and ADR-0020.
+- Preserve clean architecture boundaries: domain/application stay free of host, transport, UI, runtime, filesystem, and infrastructure leakage.
+- Prefer the smallest useful context set. Do not include packs or canonical docs "just in case."
+- Keep contracts and transports aligned through shared operation identity helpers and family barrels.
+- Keep application orchestration behind explicit ports in `modules/application/ports/**`.
+- Use role-revealing names and avoid vague catch-all files, packages, or symbols.
+- Update canonical docs in the same change when behavior, architecture, standards, or boundaries change.
+- Add regression tests for meaningful bug fixes when practical; prioritize deterministic behavioral coverage.
+- Use structured logs with safe diagnostics for long-running or failure-prone operations.
+- Treat workspace context as explicit request/host/UI context, not global mutable state or display-name-derived identity.
+- Treat the Asset Kernel as the canonical vocabulary for composable assets; do not invent parallel asset/resource/workflow/UI/generated-output models.
 
-- Phase 11 runtime readiness binding work must include `docs/context/packs/runtime-readiness-binding.pack.md` plus canonical `docs/architecture/runtime-readiness-binding.md` and ADR-0021.
-- Use structured, meaningful logs with configurable verbosity and stage-level timing for long operations.
-- Keep runtime diagnostics as a strict specialization of shared structured logging contracts (`runtime.*` events, mechanical mapping).
-- Treat the Asset Kernel as the canonical platform guardrail for assets: assets are versioned, configurable, AI-readable, machine-composable semantic units for features, systems, subsystems, and systems composed of subsystems; Prompt 6 added descriptor-only machine-readable port, binding constraint, dependency, composition rule/cardinality, and composition validation summary contracts, the pre-Prompt 7 cleanup tightened JSON-safe metadata/details, first-class declarative requirements, safe semantic references, and shared validation summary statuses to the existing `modules/contracts/asset` family after Prompt 4 configuration and Prompt 5 AI-context contracts, Prompt 7 adds pure deterministic application validation services under `modules/application/services/asset`, and Prompt 8 adds application repository port interfaces under `modules/application/ports/asset` plus transport/UI-neutral use cases under `modules/application/use-cases/asset`, with the pre-Prompt 9 cleanup making `asset-binding` references and binding repository seams explicit and Prompt 9 adding minimal local JSON persistence adapters for definitions, instances, compositions, and bindings with value-based text filters, current manifest schema/kind checks, and JSON-compatible writes only, and Prompt 10 adding resource-backed asset mapping contracts plus pure application helpers for artifact/image/dataset/model/storage/repository/generated-output/preview backings with safe `asset-resource-backing` links and provider paths kept as metadata without durable registration, and Phase 2B Prompt 2 adding the shared internal `composeLocalAssetKernel` helper for local Asset Kernel repositories/use cases from a storage root under `<storageRoot>/asset-kernel/` as the local persistence base before final Phase 2B desktop/server internal host composition and adding no API/IPC/UI/seeding/resource-scan exposure, Phase 2B Prompt 3 adding an application-owned built-in asset definition seeding service that validates through Asset Kernel seams, saves missing valid definitions, is idempotent by seed ID + seed version + built-in fingerprint metadata, skips user/custom or seed-version/fingerprint conflicts without overwrite, with seed-version conflicts reported as `skipped-seed-version-mismatch`, and Phase 2B Prompt 4 adding the initial application-owned built-in catalog with stable `builtin.*` IDs, explicit `1.0.0` versions, concise AI context/configuration/ports, shared runtime-capability requirements, resource-backed descriptors including `builtin.artifact` as a generic `data-source` distinct from document-specific `builtin.document`, and Phase 2B Prompt 5 adding computed internal resource-backed read views for existing artifacts/images/datasets/models/documents/repository objects/generated outputs/previews without persistence, source-family refactors, UI/API/IPC/preload/thin-client/host exposure, runtime/filesystem/network/AI behavior, or treating generated outputs/external repository objects/previews as registered assets before explicit finalization/import/registration, and Phase 2B Prompt 6 adding a read-only transport/UI-neutral application Asset Registry read facade that forwards repository-supported filters before deterministic diagnostic facade-side filtering, aggregates repository reads, optional injected computed resource-backed views, exact version-aware built-in markers/catalog matches, and explicit opt-in validation without seeding, storage scans, host wiring, API/IPC/UI exposure, runtime readiness/task-registry calls, or save/update/delete behavior, and Phase 2B Prompt 7 adding shared host-level internal `composeInternalAssetRegistry` wiring for local Asset Kernel persistence/use cases plus that read facade, with optional injected resource-backed provider seam, path-safe diagnostics that omit seed catalog counts, no automatic seeding, and no public transport/UI exposure, and the final Phase 2B cleanup composing that internal registry during desktop/server host registration under `<storageRootDirectory>/asset-kernel/` with runtime roots excluded, host-internal getters only, explicit built-in seeding, no resource scans/bytes/provider calls unless a safe injected provider is supplied, and no API/IPC/preload/renderer/thin-client exposure, stabilizing this internal-only state for Phase 2C read-only transport wrappers and Asset Library UI work that must consume those wrappers rather than local persistence/host helpers; do not invent parallel models for artifacts/resources/UI/workflows/tools/generated outputs/previews/AI context.
-- Keep runtime readiness as transport-neutral shared vocabulary for host-owned capability availability; application readiness mapping reads host-composed, host-scoped provider signals but must not own task registry lifecycle, installer operations, supervisor process lifecycle, or UI/API/IPC payload design. Desktop IPC and server API transports wrap shared readiness contracts for host-scoped reads without redefining readiness shapes. Runtime task not-found status must remain an honest explicit `recordType: "not-found"` contract rather than a fake `TaskType`.
-- Phase 2C desktop Asset Registry IPC/preload exposure started definitions-only and remains read-only; the final Phase 3 cleanup adds matching read-only resource-backed view list/detail wrappers. It wraps the application read facade/read port and must not expose mutation, seeding, import/finalize/register, resource scanning, runtime/provider execution, direct persistence access, or provider objects.
-- Phase 2C Asset Library UI-client work started definitions-only and remains read-only; the final Phase 3 cleanup adds sanitized resource-backed view cards/details to the shared UI read models/mappers, desktop renderer client, thin-client API client, and Asset Library pages. Normal selection must not request validation automatically; validation details, when surfaced, are explicit read-only user-triggered diagnostics. Shared UI mappers must not recast invalid or missing type/family/status payloads into valid-looking Asset Kernel semantics. Mutations, seeding, import/finalize/register, scans, runtime/provider execution, byte reads, and direct application/host/persistence/route-handler/desktop IPC imports remain forbidden.
-- Phase 2C Prompt 7 refines the Asset Library read-only detail experience with shared advanced panels for AI context, configuration, ports, requirements, source/provenance, available-only validation, and safe metadata. Advanced technical panels stay collapsed by default, normal selection still does not request validation, and safe metadata rendering omits sensitive/path/blob/base64/raw values entirely.
-- Phase 2C Prompt 8 stabilizes the definition read-only Asset Library baseline; the final Phase 3 cleanup extends it with resource-backed view list/detail visibility. Validation is explicit/available-only; built-in seeding stays internal; resource-backed views stay computed, descriptor-only, non-persistent, and non-scanning; and mutation/execution/import/finalization/seeding is deferred.
-- Keep persistence and storage contract families mechanically distinct (record-aligned operations vs key-based artifact operations).
-- Use ingestion/staged-artifact contracts for inbound-content semantics; treat upload flows as specialized intake paths rather than isolated file-operation worlds.
-- Import contracts via family barrels (`modules/contracts/<family>`); avoid deep internal contract imports and flattened catch-all usage.
-- For non-contract modules, avoid root `modules/contracts` imports; consume contracts from specific family barrels.
-- Keep contract anti-drift tests explicit: family invariants in `modules/contracts/<family>/tests` and cross-family invariants in `modules/contracts/tests`.
-- Keep application orchestration on explicit port seams in `modules/application/ports/**`; do not bypass ports by coupling application code directly to adapters.
-- Keep application ports thin and role-revealing, with family seam tests in `modules/application/ports/<family>/tests` and minimal cross-family seam checks in `modules/application/ports/tests`.
-- Add regression tests for meaningful bug fixes when practical; prioritize behavioral value and deterministic tests.
+## Current Architecture Routing Notes
+
+- Workspace-owned operations must carry explicit workspace context through contracts, clients, transports, use cases, ports, providers, and persistence.
+- System Foundation is system-owned and made available to a workspace through a `system.foundation@1.0.0` activation reference.
+- Resource-backed Asset Registry views are computed, sanitized, descriptor-only, and read-only unless an explicit controlled mutation workflow is in scope.
+- Runtime readiness is host-owned capability availability; it does not start/install/repair runtimes during read operations.
+- Security is layered and adapter-based; use ADR-0015 and `security.pack.md` for auth, route policy, TLS, token, audit, and sanitization work.
+- Phase-oriented historical details belong in canonical architecture/ADR docs or the relevant narrow pack, not in this baseline.
 
 ## Key Constraints
 
 - This pack is a routing baseline, not a second source of truth.
-- Canonical rules remain in ADR, architecture, and standards docs.
+- Canonical docs win if this pack conflicts with ADRs, architecture docs, or standards.
 - This pack is never sufficient by itself for architecture-, standards-, structure-, or boundary-changing work.
-- If pack summaries conflict with ADRs/architecture/standards docs, canonical docs win.
-
-## Asset Kernel Phase 3 Provider Note
-
-- Phase 3 Prompt 2 places the canonical resource-backed view provider seam under `modules/application/ports/asset`, with structured provider list results, safe diagnostics, and a read-only aggregate provider foundation. Concrete artifact, image, model, dataset, and external repository providers remain deferred; do not add scans, byte reads, runtime calls, host wiring, or public API/IPC/UI exposure when working on the seam.
-- Phase 3 Prompt 3 adds only the artifact/document family provider in application services. It is computed and read-only, uses artifact browser metadata only, detects documents from safe metadata only, omits storage paths/secrets/raw/blob/base64 values, and must not read artifact bytes/content, create asset instances, persist mappings, or add host/API/IPC/preload/UI wiring.
-- Phase 3 Prompt 4 adds the image/generated-output family provider in application services. It is computed and read-only, uses only explicit descriptor-only finalized image asset list seams and injected already-known generated-output descriptors, reports safe unsupported diagnostics when seams are absent, hides prompts by default, never reads image bytes/base64/content/previews or runtime task state, and does not finalize/register/create/persist assets or add host/API/IPC/preload/UI wiring.
-- Phase 3 Review A tightens provider detail and pagination honesty before more families are added: image/generated-output providers use safe direct descriptor read seams where available, artifact/document detail remains an explicitly diagnosed bounded list fallback, aggregate routing preserves public view ids while using internal provider ownership or explicit scoped ids where safe, and no provider may expose prompt/workflow/base64/path/storage-key/request/task/raw payload data or read bytes/scan storage/call runtimes.
-- Phase 3 Prompt 5 adds the dataset/model family provider in application services. It computes dataset views only from injected safe descriptor sources, reports unsupported diagnostics when no safe dataset seam is wired, computes model views only from persisted model inventory records with `includeDiscovered: false`, and never discovers/scans local or Hugging Face model caches, prepares datasets, reads dataset/model files, validates/trains/publishes models, creates asset instances, persists mappings, or changes host/API/IPC/preload/UI behavior.
-- Phase 3 Prompt 6 adds the external repository object family provider in application services. It computes external-object views only from already-known injected descriptor metadata, artifact-repo/storage-binding metadata, or persisted model publishing summaries when safe seams are supplied, reports unsupported diagnostics when no seam is wired, and never browses Hugging Face/artifact repositories, calls provider clients, reads tokens/caches/object bytes, imports/localizes/publishes, creates asset instances, persists mappings, or changes host/API/IPC/preload/UI behavior.
-- Phase 3 Review B hardens the pre-host-wiring resource-backed provider baseline: aggregate output across implemented families is deterministic, bounded, duplicate public view IDs are diagnosed with first-provider-wins behavior, source failures and unsupported/deferred providers produce sanitized diagnostics, external provider labels are metadata only, repository object paths are omitted from public output by default, and descriptor-source seams remain provider-local unless later host wiring proves a shared port is needed.
-- Phase 3 Prompt 7 wires the safe resource-backed provider aggregate into desktop/server internal Asset Registry composition through `composeResourceBackedViewProviders`. Host wiring uses only already-composed descriptor/read seams, currently artifact metadata, finalized image descriptors, persisted model inventory, and persisted model publishing summaries; missing dataset/generated-output/artifact-repo/storage-binding list seams remain unsupported with safe diagnostics. Runtime roots are not used for Asset Kernel records or provider reads, built-in seeding remains explicit, and no public mutation/import/finalization/registration, storage scans, provider/network calls, runtime calls, or byte/content reads are added.
-- Phase 3 Prompt 8 stabilizes the provider baseline, and the final Phase 3 scope cleanup exposes those computed views through read-only public API/IPC/preload/Asset Library list/detail wrappers. Resource-backed views are computed, descriptor-only, sanitized, non-persistent read models visible through the Asset Registry read facade when a safe provider aggregate is composed. Generated outputs remain unfinalized/unregistered, external repository objects remain unimported/unregistered, model discovery remains disabled, unsupported families return safe diagnostics, and no scans, provider/network calls, runtime/task-registry calls, byte/content reads, seeding, registration, import, finalization, localization, publishing, or mutation workflows are introduced.
-- Phase 4 Prompt 2 adds the contracts-only foundation for later controlled asset mutations: narrow command operation names, approval/actor/request context, idempotency/source identity, provenance, and typed result/failure shapes for resource-backed registration, generated-output finalization, external-object import, and external-object localization. It still adds no runtime behavior, writes, provider/storage calls, host wiring, API/IPC/preload/UI mutation surface, or general asset editor operations.
-- Phase 4 Prompt 3 adds the first internal application-layer controlled mutation workflow for registering eligible resource-backed views as `AssetInstance` records. It remains unexposed publicly, re-reads and validates the source view and target definition before save, stores metadata/references only, derives sanitized source identity/provenance, handles duplicates at the use-case layer, and keeps generated-output finalization plus external import/localization deferred.
-- Phase 4 Prompt 4 adds the second internal application-layer controlled mutation workflow for generated image outputs: finalization through a narrow image/artifact application seam followed by Asset Kernel instance registration. It remains unexposed publicly, re-reads and validates the generated-output source, requires explicit approval including filesystem-write approval, stores Asset Kernel metadata/references only, preserves sanitized provenance, detects duplicates before and after finalization, returns retry-safe partial failures, and keeps external import/localization deferred.
-- Phase 4 Review A requires mutation command guards and safe ID-generator availability checks to run before meaningful mutation work. Finalization guard failures must not read sources, search duplicates, call finalization, or touch repositories; mutation IDs must be injected or centrally controlled, partial failures must stay sanitized/retry-safe, and public mutation exposure remained deferred at that checkpoint.
-- Phase 4 Prompt 5 adds internal application use cases for `asset.import-external-repository-object` and `asset.localize-external-repository-object`. They remain unexposed publicly, re-read the source external object view by id, require explicit network/credential/filesystem-write/partial-completion approval for localization and for both import modes (`remote-reference` and `catalog-registration`) during this conservative Phase 4 baseline, call only a narrow application import/localization port for provider/network/storage effects, require safe internal backing before Asset Kernel instance registration, store metadata/references only, detect duplicates before and after port results, and return sanitized retry-safe partial failures.
-- Phase 4 Prompt 6 centralizes operation-specific mutation guard requirements and hardens the shared guard/provenance/source-identity layer before public write exposure. Existing internal mutation use cases must guard before source reads, duplicate/definition lookups, side-effect ports, validation, ID generation, or saves; actor/initiation metadata, capability approvals, source identity, duplicate handling, provenance, and typed failures remain sanitized and consistent. No API/IPC/preload/UI/host mutation exposure is added, and this is not a full RBAC/policy engine.
-- Phase 4 Prompt 7 exposes only four approved controlled mutation workflows through thin API/IPC/preload wrappers: register resource-backed view, finalize generated output, import external repository object, and localize external repository object. Transports call only narrow application use cases, preserve safe request/correlation/idempotency metadata, map typed results/failures through existing envelopes, sanitize unexpected errors, and do not add arbitrary asset editor/create/update/delete/patch operations, built-in seeding, provider browse/download, runtime execution, or byte/content routes.
-- Phase 4 Prompt 8 adds controlled confirmation-driven Asset Library UI actions for exactly those four workflows. The UI calls only public API/preload clients, constructs narrow approved commands, refreshes read-only library data after successful mutations, sanitizes all result display, and still does not expose general editing, deleting, seeding, bulk mutation, composition/canvas/workflow execution, provider browsing, scans, runtime execution, dataset preparation, model training, image generation, or resource-byte/content reads.
-- Phase 5 Prompt 2 adds contract-only Asset Kernel vocabulary for versioned asset packs, source kind/layer metadata, trust/install status vocabulary, compatibility/dependency declarations, pack asset entries, non-destructive override rules, manifests, and future resolution request/result diagnostics. System defaults should be representable as system asset packs; override rules map references without mutating system-owned records. Resolver behavior, pack validation, foundational definitions, seeding/install/import/export/sharing, marketplace/package-registry behavior, persistence, host wiring, transport, and UI remain deferred.
-- Phase 5 Prompt 3 adds pure application pack catalog structure under `modules/application/services/asset-packs`: `system.foundation` placeholder manifest/category constants, manifest builder/validator, future asset quality gates, and resolver-planning fixtures. Real foundational definitions begin in Prompt 4; pack install/seeding/import/export/marketplace behavior and full resolver behavior remain deferred.
-- Phase 5 Prompt 4 adds semantic UI structural primitive definitions to the `system.foundation` pack: container, section, panel, card, stack, grid, tabs, and collapsible section. They are pack entries with configuration schemas, AI context, ports, and composition guidance, not renderer components, CSS, visual editor nodes, seeding/install behavior, resolver behavior, workflow execution, runtime/provider calls, public transport, or UI changes.
-- Phase 5 Prompt 5 adds semantic form and field primitive definitions to `system.foundation` under `forms-fields`: form, field group, text field, number field, text area, select field, checkbox field, radio group, validation message, submit action, and cancel action. They remain descriptor-only pack entries with configuration schemas, AI context, ports, and composition guidance, including compatibility with Prompt 4 UI structural primitives. They do not implement validation processing, submission handling, file transfer handling, storage writes, visual editing, runtime/provider/network behavior, seeding/install behavior, resolver behavior, public transport, or UI changes.
-- Phase 5 Prompt 6 adds semantic data display, state, and message primitive definitions to `system.foundation` under `data-display` and `state-messages`: table, list, detail view, key/value summary, status badge, progress indicator, image preview placeholder, resource preview placeholder, empty state, loading state, error state, and success message. They remain descriptor-only pack entries with configuration schemas, AI context, ports, and composition guidance, including compatibility with UI structural and form primitives. They do not implement renderer components, data-grid implementations, preview rendering, resource reading, storage reads, data fetching, API clients, runtime/provider/network behavior, workflow execution, seeding/install behavior, resolver behavior, public transport, or UI changes.
-- Phase 5 Prompt 7 adds semantic page, feature, workflow, and system shell primitive definitions to `system.foundation` under `page-feature-shells` and `workflow-system-shells`. They remain descriptor-only pack entries with configuration schemas, AI context, ports, and composition guidance connecting shells to lower-level primitives and declarative workflow/system check semantics. They do not implement renderer pages, routes, workflow engines, runtime tasks, executable systems, schedulers/queues, provider behavior, visual composition editors, AI-generated system composition, seeding/install behavior, resolver behavior, public transport, or UI changes. Review B should focus on composition boundaries, override semantics, and no-execution/no-editor drift.
-- Phase 5 Review B keeps Prompt 6-7 entries declarative and pack-only: preview primitives are placeholders with no resource reads/rendering/bytes/paths/URLs, page-region shells are distinguished by `metadata.shellKind` and are not concrete routes/pages, workflow/system/check shells are non-running declarations, and entries remain future resolver/override targets through stable versioned refs without adding seeding/install or resolver behavior.
-- Phase 5 Prompt 8 adds explicit internal application-side system pack install/seeding behavior for `system.foundation`. It validates the manifest, entries, definitions, and quality gates before saving, persists missing definitions through Asset Kernel seams with safe pack/source metadata, is idempotent, skips user/custom conflicts without overwrite, and adds no public API/IPC/preload/UI install surface, import/export/sharing, marketplace/package registry, durable active-pack registry, resolver behavior, override application, or host startup auto-seeding.
-- Phase 5 Asset Library/read-facade source labels are informational unless backed by trusted metadata: a bare `sourcePackId: "system.foundation"` cannot make a user/imported/custom definition a system default or built-in; classification requires full trusted system source metadata or a valid installer-managed marker.
-- Phase 5 Prompt 10 adds a narrow pure application asset resolver for explicit candidate definitions/manifests/override rules. Exact references resolve without overrides by default; semantic/default references can opt into non-destructive override selection; trace/diagnostics are sanitized; repository-backed resolution, active-pack persistence, public override editing, pack import/export/sharing, marketplace/package behavior, API/IPC/preload/UI exposure, storage scans, provider/network/runtime/filesystem calls, mutation, install/activation, composition authoring, and execution remain deferred.
-- Phase 5 Prompt 11 adds pure in-memory asset-pack manifest serialization and fingerprint helpers plus test-only fixtures. `system.foundation` is future-exportable as a deterministic safe manifest string, and user/imported override fixture packs demonstrate future sharing semantics through declarative dependencies and override rules. Actual public import/export UI/API/IPC/preload behavior, archives, signing, remote publishing, marketplace/package registries, user pack install/activation, override editing, filesystem reads/writes, storage/provider/runtime/network behavior, and package-manager behavior remain deferred.
-- Phase 5 Prompt 12 stabilizes the final Phase 5 baseline and hands off to Phase 6. `system.foundation` is the canonical versioned, system-trusted default system pack; defaults are pack entries proven by trusted metadata/installer markers, primitives are semantic/non-executing definitions, install/seeding is explicit/internal/idempotent/non-destructive, host startup does not auto-install packs, resolver behavior is pure and non-mutating, serialization/fingerprinting is pure in-memory readiness only, and Asset Library pack/source/category visibility is read-only. Phase 6 should focus on controlled asset authoring, non-destructive override management, resolver preview/conflict diagnostics, and composition planning without workflow/runtime execution or provider/network/storage side effects.
-- Prompt builders must add only targeted companion packs (not all packs by default).
-- For Phase 12 execution planning tasks, include `docs/context/packs/execution-plan-preparation.pack.md` with runtime-readiness and composition/projection packs as needed.
-
-- Phase 6 Prompt 2 adds the passive `modules/contracts/workspace` family for workspace identity/status/roles, actor/member placeholders, path-free storage descriptors, system-pack activation references, records, create commands, active selection, and explicit request context. Phase 6 Prompt 3 adds workspace application repository ports plus local file-backed persistence adapters for workspace records/indexes, active workspace selection preferences, and system-pack activation records under the local `workspaces/` namespace. Phase 6 Prompt 4 adds the application workspace creation use case with safe display-name validation, generated workspace IDs, workspace-record persistence, optional explicitly requested active-selection persistence, and default reference-only activation of `system.foundation@1.0.0` unless disabled. Workspace ID helper failures are sanitized and do not echo raw unsafe values. Workspace and activation repositories keep save/create-or-replace semantics distinct from existing-record-only update semantics. Active selection remains a persisted preference rather than global application-service state and is persisted only when explicitly requested. Activation persistence references system packs by id/version and does not use the Phase 5 installer, install/copy pack definitions, or embed manifests/assets; if workspace save succeeds but activation persistence fails, the current simple transaction policy leaves the workspace record persisted, returns a failed result with diagnostics saying the activation reference was not persisted, and persists no active selection. Workspace resource storage/scoping, Asset Library effective views, UI/page gating, API/IPC/preload/host wiring, permission engines, invites, sync, and remote auth remain later work.
+- Context packs should stay under 200 lines; split or summarize packs before they become prompt-history logs.
 
 ## Canonical Source Docs
 
-Only use these when needed. Do not overload the context window with uncessary information.
+Use only the docs needed for the current task:
 
-- `docs/adr/README.md` — ADR workflow and decision-record discipline.
-- `docs/architecture/module-dependency-rules.md` — boundary and dependency direction constraints.
-- `docs/architecture/system-overview.md` — repository shape and packaging restraint posture.
-- `docs/architecture/asset-kernel.md` — canonical Asset Kernel terminology, boundaries, and Phase 2A sequence.
-- `docs/standards/coding-standards.md` — implementation discipline and abstraction restraint.
-- `docs/standards/naming-standards.md` — role-revealing naming requirements.
-- `docs/standards/documentation-standards.md` — canonical documentation responsibilities and update rules.
-- `docs/standards/logging-standards.md` — structured logging, verbosity, and diagnostics expectations.
-- `docs/standards/testing-standards.md` — behavior-focused testing expectations and regression policy.
+- `docs/adr/README.md` - ADR workflow and decision-record discipline.
+- `docs/architecture/module-dependency-rules.md` - dependency direction and boundary constraints.
+- `docs/architecture/system-overview.md` - repository shape and packaging posture.
+- `docs/architecture/asset-kernel.md` - canonical Asset Kernel terminology and boundaries.
+- `docs/architecture/workspace-model.md` - workspace identity, selection, scoping, and activation semantics.
+- `docs/architecture/persistence-and-storage.md` - persistence/storage separation and artifact storage rules.
+- `docs/architecture/runtime-model.md` - runtime ownership, capability, and execution model.
+- `docs/architecture/host-model.md` - host composition and transport placement.
+- `docs/standards/coding-standards.md` - implementation discipline and abstraction restraint.
+- `docs/standards/naming-standards.md` - role-revealing naming requirements.
+- `docs/standards/documentation-standards.md` - canonical documentation update rules.
+- `docs/standards/logging-standards.md` - structured logging and safe diagnostics.
+- `docs/standards/testing-standards.md` - testing expectations and regression policy.
 
 ## Common Over-Inclusions to Avoid
 
-- Loading every architecture/standards doc for routine, narrow tasks.
-- Including host-specific packs for non-host work.
-- Copying full canonical docs into prompt payloads.
+- Loading every architecture or standards doc for narrow tasks.
+- Including both desktop and server packs when the task only touches one host.
+- Copying canonical docs into prompt payloads.
+- Keeping phase-by-phase implementation history in this baseline pack.
 
 ## Prompt Assembly Notes
 
 - Always include this pack first.
-- Add only the smallest set of specialized packs required by the task.
-- When a task affects canonical rules or boundaries, read and update the relevant canonical docs directly.
-- Typical order: `index` → task-specific pack(s) → targeted canonical doc links when needed.
-- For desktop renderer/main/preload implementation work, pair `desktop-host` with `desktop-implementation` instead of broad unrelated packs.
-- For debugging/error-fix prompts, pair this baseline with `debugging-error-handling` first, then add boundary-specific packs (`runtime`, `desktop-host`, `server-host`, `desktop-implementation`) as needed.
-- For desktop renderer styling tasks, pair `desktop-implementation` with `desktop-styling` and include only style-relevant canonical docs.
-
-- Treat runtime instances as host-owned: shared contracts/use cases define behavior, while host composition selects local or future remote execution placement; see ADR-0013 for cross-host runtime ownership.
-- Security is layered and adapter-based; use ADR-0015 and `security.pack.md` for authn/authz, transport encryption, storage security, credential handling, audit, and runtime security work.
-
-## Server readiness API baseline
-
-- Server API runtime readiness wraps shared host-scoped readiness contracts via the application readiness service; it remains separate from desktop IPC readiness and from feature-specific runtime execution endpoints.
-
-## Phase 5 final cleanup notes
-
-- Pack-backed `system.foundation` definitions are system defaults/built-ins for read-facade filtering and Asset Library display.
-- `workspace-pack` is a workspace pack source label, not a workspace override unless explicit override metadata exists.
-- User/custom system-pack install conflicts fail without overwrite; resolver full outputs remain internal; fingerprinting is not validation or import approval.
-
-## Phase 6 Prompt 5 workspace gating index note
-
-Active workspace context and workspace-required route/page gating now belong in desktop/thin-client prompt context. Treat active workspace as host/UI/request context, not application-service global mutable state. Gating prevents unscoped global resource display; Asset Library effective views and artifact/data/model/image persistence scoping remain later Phase 6 work.
-
-## Phase 6 Prompt 6 workspace activation availability index note
-
-Workspace system pack activation read/list/status behavior is now an internal application-layer capability. Active system pack availability is determined by workspace activation/reference records, currently recognizing only `system.foundation@1.0.0`; activation remains reference-only and does not copy/install system pack definitions or call the Phase 5 installer. Asset Library effective-view filtering remains Prompt 7, artifact/data/model/image persistence scoping remains Prompts 8-9, and public pack import/export/install/override management plus collaboration remain deferred.
-
-## Phase 6 Prompt 8 artifact workspace scoping
-
-Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.
-
-## Phase 7 architecture baseline note
-
-Phase 7 is User Library and Cross-Workspace Asset Reuse. Use `docs/context/packs/user-library.pack.md` for promote/link/copy/import/cross-workspace reuse/provenance/propagation tasks, then inspect `docs/architecture/user-library-and-cross-workspace-reuse.md` and ADR-0017 as canonical sources. This index pack remains a routing baseline and must not replace those canonical docs. User-library work must preserve workspace isolation, explicit workspace context, system-owned `system.foundation@1.0.0` semantics, no hidden/default workspaces, no legacy/global auto-migration, and no accidental propagation.
-
-## Phase 6 final stabilization / Phase 7 handoff
-
-Phase 6 final state: workspace is the normal boundary for user/project resources. No active workspace means workspace-scoped pages are gated and must not render underlying feature components or call workspace-scoped clients. Active workspace display uses the workspace display name. System Foundation remains system-owned and is made available only through a `system.foundation@1.0.0` workspace activation reference; workspace creation must not call the Phase 5 installer, copy pack definitions, create a hidden/default workspace, or perform startup seeding. Workspace-owned artifacts/uploads, image assets, generated outputs/finalization, dataset outputs, model records, and runtime task outputs require explicit workspace context where implemented, must not leak across Workspace A/B, and must not fall back to legacy global records. Global runtime readiness and system/provider diagnostics may remain global but must not masquerade as workspace-owned records. Collaboration fields are passive placeholders only.
-
-Phase 7 is User Library and Cross-Workspace Asset Reuse. It should define explicit promote/link/copy/import flows and provenance/resolver behavior without accidental propagation. Do not implement user-library, cross-workspace reuse, collaboration permissions, invites/sync/remote auth, asset authoring, override editing, pack import/export/install, marketplace, visual composition, workflow execution expansion, provider/network expansion, or automatic legacy migration as part of Phase 6 stabilization.
-
-## Phase 8 architecture baseline note
-
-Phase 8 is Asset Authoring, Customization, and Override Management. For Phase 8 prompts, include `docs/context/packs/asset-authoring.pack.md` and then read `docs/architecture/asset-authoring-customization-and-overrides.md` with ADR-0018. When a task combines Phase 7 reuse relationships with Phase 8 customization/override behavior, include both `user-library.pack.md` and `asset-authoring.pack.md`.
-
-- Phase 13 is Controlled Conversational System Execution; include `docs/context/packs/controlled-conversational-system-execution.pack.md` for conversational runnable-system execution/session/turn/run/adapter/approval work.
-
-
-- Phase 13 includes an **asset-first corrective step before Review A**: reusable conversational assets (composed from referenced `system.foundation` primitives) must precede controlled runtime execution records. Review A evaluates both Prompt 1–3 runtime-contract/persistence work and conversational asset-family/importability/lineage integration.
+- Use `docs/context/prompt-routing.md` to choose companion packs.
+- Typical order: `index` -> task-specific pack(s) -> targeted canonical docs.
+- For debugging, add `debugging-error-handling` first, then the affected host/runtime/storage/UI pack.
+- For Asset Kernel, workspace, user-library, authoring, projection, composition, readiness, execution-plan, or conversational-execution work, include only the relevant phase pack chain named by prompt routing.

@@ -349,9 +349,10 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
       const document = await readDocument();
       const limit = request.limit ?? 50;
       const normalizedModels = (document.models ?? []).map(normalizeModelInventoryRecord);
-      const sharedModels = request.includeDiscovered === false
-        ? []
-        : await discoverSharedModels(normalizedModels, request.workspaceId);
+      const includeSharedStorage = request.includeDiscovered !== false || request.includeSharedStorage === true;
+      const sharedModels = includeSharedStorage
+        ? await discoverSharedModels(normalizedModels, request.workspaceId)
+        : [];
       const allModels = [...normalizedModels, ...sharedModels];
 
       const filtered = allModels.filter((model) => matchesFilters(model, request));

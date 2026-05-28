@@ -108,7 +108,7 @@ class FakeModelRegistry implements Pick<ModelRegistryPort, "listModels" | "getMo
     return { models: [...this.records].slice(0, request.limit) };
   }
 
-  public async getModelRecord(modelRecordId: string) {
+  public async getModelRecord(_workspaceId: string, modelRecordId: string) {
     this.readCalls += 1;
     return this.records.find((record) => record.modelRecordId === modelRecordId);
   }
@@ -280,21 +280,22 @@ describe("composeResourceBackedViewProviders", () => {
       publishedModelRegistry: models,
     });
 
-    const result = await provider.listResourceBackedViews({ limit: 20 });
+    const result = await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, limit: 20 });
     const viewIds = result.items.map((item) => item.viewId);
 
     assert.equal(artifacts.listCalls, 1);
     assert.equal(images.listCalls, 1);
     assert.equal(models.listCalls, 2);
     assert.deepEqual(models.listRequests.map((request) => request.includeDiscovered), [false, false]);
+    assert.deepEqual(models.listRequests.map((request) => request.includeSharedStorage), [true, undefined]);
     assert.equal(viewIds.includes("asset-view.image.internal.image-1"), true);
     assert.equal(viewIds.includes("asset-view.model.internal.model-1"), true);
     assert.equal(new Set(viewIds).size, viewIds.length);
     assertSafe(result);
 
-    const imageDetail = await provider.readResourceBackedView("asset-view.image.internal.image-1");
+    const imageDetail = await provider.readResourceBackedView("asset-view.image.internal.image-1", { workspaceId: "workspace-a" as never });
     assert.equal(imageDetail?.viewKind, "image-asset");
-    const modelDetail = await provider.readResourceBackedView("asset-view.model.internal.model-1");
+    const modelDetail = await provider.readResourceBackedView("asset-view.model.internal.model-1", { workspaceId: "workspace-a" as never });
     assert.equal(modelDetail?.viewKind, "model");
     assertNoForbiddenSourceSideEffects(artifacts, images, models);
   });
@@ -306,12 +307,13 @@ describe("composeResourceBackedViewProviders", () => {
       publishedModelRegistry: models,
     });
 
-    const result = await provider.listResourceBackedViews({ limit: 20 });
+    const result = await provider.listResourceBackedViews({ workspaceId: "workspace-a" as never, limit: 20 });
     const modelViews = result.items.filter((item) => item.viewKind === "model");
     const externalViews = result.items.filter((item) => item.viewKind === "external-repository-object");
 
     assert.equal(models.listCalls, 2);
     assert.deepEqual(models.listRequests.map((request) => request.includeDiscovered), [false, false]);
+    assert.deepEqual(models.listRequests.map((request) => request.includeSharedStorage), [true, undefined]);
     assert.deepEqual(modelViews.map((item) => item.viewId), ["asset-view.model.internal.model-1"]);
     assert.equal(externalViews.length, 1);
     assert.notEqual(externalViews[0]?.viewId, modelViews[0]?.viewId);

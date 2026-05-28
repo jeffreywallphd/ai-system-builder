@@ -4,56 +4,64 @@
 
 ## Purpose
 
-- Guide Electron IPC contract and handler work while preserving shared transport envelope discipline.
+- Guide Electron IPC contract, handler, and preload work while preserving shared transport envelope discipline.
 
 ## Use When
 
-- Adding or changing `modules/contracts/ipc/**`, Electron IPC handler registration, or desktop preload methods.
+- Adding/changing `modules/contracts/ipc/**`, IPC handler registration, desktop preload methods, or renderer calls through preload.
+
+## Do Not Use When
+
+- Server API-only work.
+- Desktop renderer-only work that uses existing preload methods without changing IPC contracts.
 
 ## Core Guidance
 
-- IPC contracts are transport specializations: use shared operation identities, `createIpcChannel`, `createIpcRequest`, `createIpcSuccessResponse`, `createIpcFailureResponse`, and `createIpcError`.
-- Channels must stay operation-derived with `ipc.<operation>.<kind>` names and request/response kinds.
-- Handlers should depend on application ports/use cases rather than desktop internals, Electron objects, or renderer code.
+- IPC contracts are transport specializations over shared operation identities and envelopes.
+- Use shared helpers such as `createIpcChannel`, request/success/failure response builders, and IPC error builders.
+- Channels must stay operation-derived as `ipc.<operation>.<kind>` with request/response/event kinds only.
+- Handlers depend on application ports/use cases, not renderer code, Electron objects, host composition objects, or persistence adapters.
 - Preserve `requestId` and `correlationId` across success and failure responses.
-- Do not leak stack traces, local filesystem paths, process environment, secrets, or raw adapter protocol details through IPC errors; unexpected internal failures should use generic transport messages instead of raw exception messages.
-- Runtime-backed desktop start handlers should surface application runtime guard failures as IPC `unavailable` failures with safe capability details and preserved request/correlation ids; do not apply those guards to task read/cancel/finalize paths unless the operation contract explicitly requires it.
-- Desktop runtime readiness IPC wraps shared runtime readiness contracts from `modules/contracts/runtime`; it exposes host-scoped reads through the application `RuntimeReadinessPort` and must not start/stop/install/repair/probe runtimes merely to read readiness.
-- Python-specific runtime IPC remains a detailed control/diagnostic surface and is not the generic runtime readiness model.
-- Server API readiness routes are out of scope for desktop IPC work.
-- Asset Registry desktop IPC is read-only: list definitions, read definition detail, read definition version, list resource-backed views, and read resource-backed view detail. Handlers wrap `AssetRegistryDefinitionReadPort`/the read facade only and must not receive persistence adapters, host composition helpers, mutation use cases, seeding services, runtime/storage adapters, provider clients, provider objects, resource scans, or bytes.
-- Asset Registry IPC input parsing should stay in parity with the server API through shared transport-adapter normalization. Malformed asset type/family/status, built-in, boolean, expansion, limit, cursor, or definition/version input returns validation failure before the read facade is called. Unexpected facade failures return sanitized internal failures while preserving request/correlation ids.
-- Phase 2C Prompt 8 fixed the initial IPC/preload surface at definition list/read/version-read; the final Phase 3 cleanup adds read-only resource-backed view list/detail channels. Do not add asset create/update/delete/register/import/finalize/seed/publish/execute/run/scan/sync/repair/install/start/train channels or preload methods. Validation diagnostics remain read-side details requested through `includeValidation`, not runtime validation tasks.
-- Phase 3 Prompt 8 keeps resource-backed provider wiring internal. Public desktop IPC/preload resource-backed channels may only call the read facade; mutation/import/finalization/localization/publishing/seeding/scan/runtime/provider/byte-read channels remain forbidden.
-- Phase 4 Prompt 7 is the only exception to the prior mutation ban: desktop IPC/preload may expose exactly four approved Asset Kernel mutation operations, `asset.register-resource-backed-view`, `asset.finalize-generated-output`, `asset.import-external-repository-object`, and `asset.localize-external-repository-object`. Handlers must depend only on matching narrow application use cases, perform shallow command validation, preserve request/correlation/idempotency metadata, return existing IPC envelopes, sanitize thrown errors, and must not expose arbitrary asset editor, seed, provider browse/download, runtime execution, scan, byte/content, or UI action channels.
-- Phase 5 Prompt 9 does not add IPC channels. Pack/source/category discoverability should flow through existing read-only Asset Registry definition list/read/version-read payloads and shared UI mappers; `workspace-pack` is a workspace pack label, not an override label unless explicit override metadata exists. Do not add pack install/import/export/activate/disable channels, override edit channels, resolver activation channels, raw resolver result channels, asset editor channels, scan channels, provider/network/runtime channels, or byte/content channels.
+- Unexpected internal failures should return generic sanitized transport failures.
+- Runtime readiness IPC wraps shared runtime readiness contracts through `RuntimeReadinessPort` and must not start/stop/install/repair/probe runtimes.
+- Runtime-backed start handlers may map readiness guard failures to `unavailable`; do not apply start guards to read/cancel/finalize paths unless the operation contract requires it.
+
+## Asset And Workspace IPC Rules
+
+- Asset Registry IPC reads are workspace-aware list/detail/resource-backed reads through the read facade.
+- Missing/invalid workspace context must fail safely and must not call global fallback reads.
+- Read handlers must not receive repositories, host composition helpers, mutation use cases, seed services, runtime/storage adapters, provider clients, scan seams, or byte readers.
+- Approved Asset Kernel mutation IPC operations are limited to register resource-backed view, finalize generated output, import external repository object, and localize external repository object.
+- Workspace IPC/preload operations may cover list, create, active-selection read/save/clear, and passing workspace ids through workspace-owned feature requests.
+- Renderer code must not synthesize authoritative workspace ids, use display-name slugs as ids, or bypass preload for workspace selection.
+
+## Input And Error Rules
+
+- Normalize/validate IPC inputs before calling application facades/use cases.
+- Malformed asset type/family/status, booleans, expansion flags, limits, cursors, ids, versions, or workspace ids should fail validation at the boundary.
+- Do not leak stack traces, local paths, storage/runtime roots, env values, secrets, tokens, raw adapter payloads, provider-native errors, bytes, blobs, base64, prompts, or workflow payloads through IPC/preload.
+
+## Key Constraints
+
+- Do not add arbitrary asset create/update/delete/editor, seed, provider browse/download, runtime execution, scan, byte/content, pack import/export/install/activate, override edit, resolver, collaboration, or marketplace channels unless canonical scope changes.
+- Keep server API readiness routes separate from desktop IPC work.
+- Keep Python-specific runtime IPC separate from generic runtime readiness IPC.
 
 ## Canonical Source Docs
 
 - `docs/architecture/host-model.md`
 - `docs/architecture/module-dependency-rules.md`
 - `docs/architecture/runtime-model.md`
-- `docs/adr/ADR-0013-host-owned-runtime-execution-and-feature-placement.md`
+- `docs/adr/ADR-0013-cross-host-runtime-ownership.md`
 
-## Phase 6 Prompt 5 workspace boundary
+## Companion Packs
 
-Workspace UI gating may use host/renderer active selection state. If IPC/preload workspace operations are added, keep them workspace-only (list/create/read selection/save selection/clear selection), sanitize diagnostics, avoid raw paths, and do not expose system pack installer, pack import/export/install, collaboration, permission, or resource-scoping channels.
+- `desktop-host` for desktop host composition.
+- `desktop-implementation` for renderer/preload client usage.
+- `runtime`, `runtime-task-registry`, or `runtime-readiness-binding` for runtime-related channels.
+- `asset-kernel`, `security`, and `testing` for Asset Registry/Library and public payload work.
 
-## Phase 6 Prompt 6 workspace activation IPC boundary
+## Prompt Assembly Notes
 
-Workspace system pack activation availability does not add Electron IPC or preload surface in this checkpoint. Keep activation read/list/status behavior internal to application use cases until a later prompt explicitly scopes transport exposure.
-
-## Workspace-aware Asset Library reads
-
-Desktop Asset Registry IPC/preload read payloads carry `workspaceId` for Asset Library list/detail/resource-backed reads. Missing or invalid workspace context must fail safely and must not call a global fallback read. IPC remains read-only for Asset Registry reads and must not expose pack install/import/export, activation-management, override-editing, or system-pack installer behavior.
-
-
-## Phase 6 Prompt 8 artifact workspace scoping
-
-Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.
-
-## Phase 6 Prompt 10 workspace IPC/preload UI contract
-
-Desktop workspace UI uses the real preload/IPC workspace operations for list, create, active-selection read/save/clear, and passes the selected workspace id through workspace-owned feature requests. Renderer code must not synthesize authoritative ids, use display-name slugs as ids, or bypass preload for workspace selection. Create workspace may request System Foundation inclusion only as the existing `system.foundation@1.0.0` activation reference.
-
-Workspace-required renderer pages must remain gated before an active workspace exists, and unavailable/archived/missing selections must show safe user-facing unavailable copy rather than raw ids, paths, stack traces, or provider payloads.
+- Typical set: `index` + `desktop-host` + `ipc-electron`.
+- Add feature packs only when IPC changes expose that feature boundary.

@@ -12,6 +12,11 @@ describe("security contracts", () => {
     expect(SECURITY_SCOPES).toContain("workspace:write");
   });
 
+  it("declares asset read and write scopes", () => {
+    expect(SECURITY_SCOPES).toContain("asset:read");
+    expect(SECURITY_SCOPES).toContain("asset:write");
+  });
+
   it("creates anonymous auth context", () => {
     const context = createAnonymousAuthContext();
     expect(context.authenticated).toBe(false);
