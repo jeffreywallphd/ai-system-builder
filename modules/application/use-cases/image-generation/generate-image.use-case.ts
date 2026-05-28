@@ -12,6 +12,15 @@ import type { ModelCheckpointResolverPort } from "../../ports/model";
 
 import type { ApplicationRequestContext } from "../../ports";
 
+function toRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" ? value as Record<string, unknown> : undefined;
+}
+
+function resolveRuntimeDeviceModeHint(request: ImageGenerationRequest): string | undefined {
+  const value = toRecord(request.engineHints)?.runtimeDeviceMode;
+  return typeof value === "string" ? value : undefined;
+}
+
 function assertValidPrompt(request: ImageGenerationRequest): void {
   if (typeof request.prompt !== "string" || request.prompt.trim().length === 0) {
     throw new Error("Image generation requires a non-empty prompt.");
@@ -44,16 +53,18 @@ export class GenerateImageUseCase {
       throw new Error("Workspace id is required for image generation.");
     }
     assertValidPrompt(request);
-    await this.dependencies.runtimeCapabilityGuard?.requireCapabilityReady("image-generation");
 
     const resolvedModel = await this.dependencies.modelCheckpointResolver?.resolveCheckpoint({
       selectedModel: request.model,
       workspaceId: context.workspaceId,
       taskTag: "text-to-image",
+      runtimeDeviceMode: resolveRuntimeDeviceModeHint(request),
     });
     const payload = resolvedModel?.checkpoint
       ? { ...request, model: resolvedModel.checkpoint }
       : request;
+
+    await this.dependencies.runtimeCapabilityGuard?.requireCapabilityReady("image-generation");
 
     const result = await this.dependencies.runtimeTaskRegistry.startTask({
       taskType: TaskType.IMAGE_GENERATION,

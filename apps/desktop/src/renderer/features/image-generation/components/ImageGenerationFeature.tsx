@@ -54,6 +54,7 @@ export function ImageGenerationFeature(props: { workspaceId?: string; workspaceN
       <ImageGenerationResults
         outputs={feature.outputs}
         finalizedAssets={feature.finalizedAssets}
+        sessionGallery={feature.sessionGallery}
         status={feature.status}
         error={feature.error}
         previewWidth={hasPreviewDimensions ? previewWidth : undefined}

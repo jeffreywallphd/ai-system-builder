@@ -12,10 +12,12 @@
 @import "./components/panels.css";
 @import "./components/tabs.css";
 @import "./components/feedback.css";
+@import "./components/loading.css";
 @import "./components/python-runtime-footer.css";
 @import "./components/settings.css";
 @import "./components/asset-library.css";
 @import "./components/home.css";
+@import "./components/image-generation.css";
 
 #root {
   min-height: 100vh;

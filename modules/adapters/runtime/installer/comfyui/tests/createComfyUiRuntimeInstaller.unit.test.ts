@@ -324,7 +324,50 @@ describe("createComfyUiRuntimeInstaller", () => {
     const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never, readFile: readFile as never, writeFile: writeFile as never, runtimeDeviceMode: "directml" });
     await installer.ensureInstalled(baseRequest);
     expect(execFile).toHaveBeenCalledWith(managedPythonPath, ["-c", "import torchaudio"]);
-    expect(JSON.parse(finalizationMetadata).schemaVersion).toBe(3);
+    expect(JSON.parse(finalizationMetadata).schemaVersion).toBe(4);
+  });
+
+  it("recreates a managed Python environment when it was created with unsupported Python", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(),
+    };
+    const rm = testDouble.fn(async () => {});
+    const stat = testDouble.fn(async () => ({}));
+    const execFile = testDouble.fn(async (file: string, args: readonly string[] = []) => {
+      if (args[0] === "-c" && String(args[1]).includes("sys.version_info")) {
+        return { stdout: file === managedPythonPath ? "3.14.3\n" : "3.12.13\n", stderr: "" };
+      }
+      return { stdout: "", stderr: "" };
+    });
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never, rm: rm as never });
+
+    await installer.ensureInstalled(baseRequest);
+
+    expect(rm).toHaveBeenCalledWith(managedPythonEnvironmentRoot, { recursive: true, force: true });
+    expect(execFile).toHaveBeenCalledWith("python", ["-m", "venv", managedPythonEnvironmentRoot]);
+  });
+
+  it("fails before dependency installation when the base Python version is unsupported", async () => {
+    const gitInstaller = {
+      ensureInstalled: testDouble.fn(async (request) => ({ ...request, status: "installed" as const, warnings: [] })),
+      getInstallStatus: testDouble.fn(),
+    };
+    const stat = testDouble.fn(async (targetPath: string) => {
+      if (targetPath === managedPythonPath) throw new Error("missing");
+      return {};
+    });
+    const execFile = testDouble.fn(async (_file: string, args: readonly string[] = []) => {
+      if (args[0] === "-c" && String(args[1]).includes("sys.version_info")) return { stdout: "3.14.3\n", stderr: "" };
+      return { stdout: "", stderr: "" };
+    });
+    const installer = createComfyUiRuntimeInstaller({ gitInstaller, execFile, stat: stat as never });
+
+    const result = await installer.ensureInstalled(baseRequest);
+
+    expect(result.status).toBe("failed");
+    expect(result.error?.code).toBe("unsupported-python-version");
+    expect(execFile).not.toHaveBeenCalledWith(managedPythonPath, ["-m", "pip", "install", "-r", requirementsPath]);
   });
 
   it("installs torch and torchvision from the configured CUDA wheel index", async () => {
@@ -349,6 +392,7 @@ describe("createComfyUiRuntimeInstaller", () => {
       "pip",
       "install",
       "--upgrade",
+      "--no-cache-dir",
       "torch",
       "torchvision",
       "--index-url",

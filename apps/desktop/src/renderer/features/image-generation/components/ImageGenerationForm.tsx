@@ -1,5 +1,6 @@
 import type { ChangeEvent } from "react";
 import type { ImageGenerationArtifactOption, ImageGenerationFormValues, ImageGenerationModelLoadStatus, ImageGenerationModelOption } from "../hooks/useImageGenerationFeature";
+import { LoadingSpinner } from "../../../components/ui/LoadingSpinner";
 
 export function ImageGenerationForm({ form, setForm, validationError, isStartDisabled, onSubmit, availableModels, availableImageArtifacts = [], artifactLoadMessage, modelLoadStatus, modelLoadMessage }: { form: ImageGenerationFormValues; setForm: (v: ImageGenerationFormValues) => void; validationError?: string; isStartDisabled: boolean; onSubmit: () => void; availableModels: ImageGenerationModelOption[]; availableImageArtifacts?: ImageGenerationArtifactOption[]; artifactLoadMessage?: string; modelLoadStatus: ImageGenerationModelLoadStatus; modelLoadMessage?: string; }) {
   const bindText = (key: keyof ImageGenerationFormValues) => ({ value: form[key] as string, onChange: (e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: e.target.value }) });
@@ -23,7 +24,7 @@ export function ImageGenerationForm({ form, setForm, validationError, isStartDis
           {availableModels.map((model) => <option key={model.modelRecordId} value={model.value}>{model.label}</option>)}
         </select>
       </label>
-      {modelLoadMessage ? <p role={modelLoadStatus === "error" ? "alert" : "status"} className={modelLoadStatus === "error" ? "ui-feedback ui-feedback--error" : undefined}>{modelLoadMessage}</p> : null}
+      {modelLoadMessage ? <p role={modelLoadStatus === "error" ? "alert" : "status"} className={modelLoadStatus === "error" ? "ui-feedback ui-feedback--error" : undefined}>{modelLoadStatus === "loading" ? <LoadingSpinner label="Loading model inventory" /> : null} {modelLoadMessage}</p> : null}
       <label className="ui-stack ui-stack--sm">
         <span>Latent Source</span>
         <select className="ui-input" value={form.latentSourceArtifactId} onChange={(event) => setForm({ ...form, latentSourceArtifactId: event.target.value })}>
@@ -45,7 +46,7 @@ export function ImageGenerationForm({ form, setForm, validationError, isStartDis
 
       <label className="ui-stack ui-stack--sm"><span>Number of Images</span><input className="ui-input" type="number" {...bindText("numImages")} /></label>
       {validationError ? <p className="ui-feedback ui-feedback--error">{validationError}</p> : null}
-      <button type="button" className="ui-button" onClick={onSubmit} disabled={isStartDisabled}>Start Generation</button>
+      <button type="button" className="ui-button" onClick={onSubmit} disabled={isStartDisabled}>{isStartDisabled ? <><LoadingSpinner label="Generating image" /> Generating...</> : "Start Generation"}</button>
     </section>
   );
 }

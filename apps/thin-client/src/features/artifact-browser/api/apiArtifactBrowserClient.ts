@@ -130,8 +130,8 @@ export interface ArtifactBrowserApiClient {
   browseArtifacts: (input?: { artifactFamily?: ThinClientArtifactFamily; workspaceId?: string }) => Promise<ThinClientArtifactBrowseItem[]>;
   readArtifactDetail: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<ThinClientArtifactDetail>;
   readArtifactContent: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<ThinClientArtifactContentDescriptor>;
-  deleteRegisteredArtifact: (locator: ArtifactBrowserLocator) => Promise<{ storageKey: string }>;
-  createArtifactMediaViewUrl: (locator: ArtifactBrowserLocator) => string;
+  deleteRegisteredArtifact: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<{ storageKey: string }>;
+  createArtifactMediaViewUrl: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => string;
   publishArtifactToHuggingFace: (input: {
     artifactId: string;
     repository: string;
@@ -306,13 +306,13 @@ export function createApiArtifactBrowserClient(
       });
     },
 
-    async deleteRegisteredArtifact(locator: ArtifactBrowserLocator): Promise<{ storageKey: string }> {
+    async deleteRegisteredArtifact(locator: ArtifactBrowserLocator, input = {}): Promise<{ storageKey: string }> {
       const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/delete"), {
         method: "POST",
         headers: {
           "content-type": "application/json",
         },
-        body: JSON.stringify({ locator, source }),
+        body: JSON.stringify({ locator, workspaceId: input.workspaceId, source }),
       });
 
       const envelope = ensureEnvelope((await response.json()) as unknown);
@@ -326,8 +326,11 @@ export function createApiArtifactBrowserClient(
       });
     },
 
-    createArtifactMediaViewUrl(locator: ArtifactBrowserLocator): string {
+    createArtifactMediaViewUrl(locator: ArtifactBrowserLocator, input = {}): string {
       const query = new URLSearchParams({ storageKey: locator.storageKey });
+      if (input.workspaceId) {
+        query.set("workspaceId", input.workspaceId);
+      }
       return createApiUrl(apiBaseUrl, `/artifact/media/view?${query.toString()}`);
     },
 

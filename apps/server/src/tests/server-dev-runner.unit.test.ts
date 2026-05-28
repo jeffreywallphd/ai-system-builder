@@ -37,6 +37,12 @@ describe("server dev runner", () => {
     expect(source).not.toContain("RequestInfo");
   });
 
+  it("does not override an explicit ComfyUI Python command in the dev runner", async () => {
+    const { resolveBundledDevPythonCommand } = await import("../../../../dev-tools/scripts/server/dev-server.mjs");
+    expect(resolveBundledDevPythonCommand({ USERPROFILE: "C:/Users/example", COMFYUI_PYTHON_COMMAND: "python3.12" } as NodeJS.ProcessEnv)).toBeUndefined();
+    expect(resolveBundledDevPythonCommand({} as NodeJS.ProcessEnv)).toBeUndefined();
+  });
+
   it("awaits the compiled async server factory before creating the listener", async () => {
     const { startCompiledServer } = await import("../../../../dev-tools/scripts/server/dev-server.mjs");
     const env = { PORT: "43110" };
@@ -46,6 +52,7 @@ describe("server dev runner", () => {
         port: 43110,
         storageRootDirectory: "storage-root",
         runtimeRootDirectory: "runtime-root",
+        security: { httpsEnabled: true },
       },
       loggingPort: {
         log: testDouble.fn(),
@@ -100,12 +107,13 @@ describe("server dev runner", () => {
       timestamp: expect.any(String),
       level: "info",
       verbosity: "normal",
-      event: "server.http.listening",
+      event: "server.https.listening",
       host: "server",
       component: "server-host",
-      message: "Server HTTP listener started.",
+      message: "Server HTTPS listener started.",
       data: {
         port: 43110,
+        transport: "https",
         storageRootDirectory: "storage-root",
         runtimeRootDirectory: "runtime-root",
       },

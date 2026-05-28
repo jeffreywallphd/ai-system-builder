@@ -6,6 +6,7 @@ import type {
 
 export interface RuntimePreparationPort {
   start(): Promise<void>;
+  startWithRuntimeDeviceMode?(request: { runtimeDeviceMode?: string }): Promise<void>;
 }
 
 export function createRuntimePreparedModelCheckpointResolver(input: {
@@ -14,7 +15,11 @@ export function createRuntimePreparedModelCheckpointResolver(input: {
 }): ModelCheckpointResolverPort {
   return {
     async resolveCheckpoint(request: ResolveModelCheckpointRequest): Promise<ResolveModelCheckpointResult> {
-      await input.runtime.start();
+      if (input.runtime.startWithRuntimeDeviceMode) {
+        await input.runtime.startWithRuntimeDeviceMode({ runtimeDeviceMode: request.runtimeDeviceMode });
+      } else {
+        await input.runtime.start();
+      }
       return input.modelCheckpointResolver.resolveCheckpoint(request);
     },
   };

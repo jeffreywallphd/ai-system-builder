@@ -206,7 +206,7 @@ export function useArtifactBrowserFeature(
         const contentDescriptor = await artifactClient.readArtifactContent(locator, { workspaceId });
         setContent(contentDescriptor);
         if (contentDescriptor.mediaType?.startsWith("image/")) {
-          setImageViewUrl(artifactClient.createArtifactMediaViewUrl(locator));
+          setImageViewUrl(artifactClient.createArtifactMediaViewUrl(locator, { workspaceId }));
         } else {
           setImageViewUrl(undefined);
         }
@@ -246,6 +246,10 @@ export function useArtifactBrowserFeature(
     if (!pendingDeleteStorageKey) {
       return;
     }
+    if (!workspaceId) {
+      setViewState({ status: "error", message: "Select a workspace before deleting artifacts." });
+      return;
+    }
     if (deleteConfirmationInput !== "Delete") {
       setViewState({ status: "error", message: "Type Delete to confirm artifact deletion." });
       return;
@@ -254,7 +258,7 @@ export function useArtifactBrowserFeature(
     const storageKey = pendingDeleteStorageKey;
     setViewState({ status: "loading", message: `Deleting ${storageKey}...` });
     try {
-      await artifactClient.deleteRegisteredArtifact({ storageKey });
+      await artifactClient.deleteRegisteredArtifact({ storageKey }, { workspaceId });
       setPendingDeleteStorageKey(undefined);
       setDeleteConfirmationInput("");
       if (selectedStorageKey === storageKey) {
@@ -296,13 +300,17 @@ export function useArtifactBrowserFeature(
 
   async function deleteSelectedArtifacts(): Promise<void> {
     if (selectedArtifactKeys.length === 0) return;
+    if (!workspaceId) {
+      setViewState({ status: "error", message: "Select a workspace before deleting artifacts." });
+      return;
+    }
     if (bulkDeleteConfirmationInput !== "Delete All") {
       setViewState({ status: "error", message: "Type Delete All to confirm bulk artifact deletion." });
       return;
     }
     setViewState({ status: "loading", message: `Deleting ${selectedArtifactKeys.length} artifact(s)...` });
     try {
-      await Promise.all(selectedArtifactKeys.map(async (storageKey) => artifactClient.deleteRegisteredArtifact({ storageKey })));
+      await Promise.all(selectedArtifactKeys.map(async (storageKey) => artifactClient.deleteRegisteredArtifact({ storageKey }, { workspaceId })));
       if (selectedStorageKey && selectedArtifactKeys.includes(selectedStorageKey)) {
         setSelectedStorageKey(undefined);
         setDetail(undefined);

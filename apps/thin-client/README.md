@@ -63,6 +63,7 @@ case path rather than desktop preload wiring.
 From the repository root:
 
 - `npm run dev:thin-client`
+- `npm run dev:secure-thin-client`
 - `npm run build:thin-client`
 - `npm run preview:thin-client`
 
@@ -83,6 +84,18 @@ npm run dev:thin-client
 
 UI origin: `http://localhost:5173`
 
+### HTTPS thin-client only
+
+```bash
+npm run dev:secure-thin-client
+```
+
+- UI origin becomes `https://localhost:5173`.
+- The command enables `AI_SYSTEM_BUILDER_THIN_CLIENT_HTTPS_ENABLED=true` and defaults
+  `AI_SYSTEM_BUILDER_HTTPS_ENABLED=true` and `AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed`
+  when those values are not already set.
+- The `/api` proxy target is `https://127.0.0.1:3010` by default for this command.
+
 ### HTTPS server API, HTTP thin-client
 
 ```bash
@@ -101,6 +114,12 @@ AI_SYSTEM_BUILDER_THIN_CLIENT_HTTPS_ENABLED=true \
 AI_SYSTEM_BUILDER_HTTPS_ENABLED=true \
 AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed \
 npm run dev:thin-client
+```
+
+Equivalent single-command thin-client listener command:
+
+```bash
+npm run dev:secure-thin-client
 ```
 
 - UI origin becomes `https://localhost:5173`.

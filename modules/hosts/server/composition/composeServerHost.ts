@@ -246,6 +246,11 @@ function normalizeServerImageGenerationRuntimeMode(value: string | undefined): C
   return normalizeComfyUiRuntimeDeviceMode(normalized);
 }
 
+function isRecoverableCudaTorchInstallFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /cuda torch|cuda-torch|no space left on device|errno 28/i.test(message);
+}
+
 function parseBooleanEnvFlag(value: string | undefined): boolean {
   const normalized = value?.trim().toLowerCase();
   return normalized === "1" || normalized === "true" || normalized === "yes";
@@ -683,47 +688,80 @@ export function composeServerHost(
         const cudaTorchWheelIndexUrl = await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY);
         const envOverride = normalizeComfyUiRuntimeDeviceMode(env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR);
         const requestedMode = normalizeServerImageGenerationRuntimeMode(request.runtimeDeviceMode);
+        const autoSelectedCuda = !envOverride && (requestedMode === undefined || requestedMode === "auto") && Boolean(cudaTorchWheelIndexUrl);
         const resolvedRequestMode = envOverride
           ?? (requestedMode === undefined || requestedMode === "auto"
             ? (cudaTorchWheelIndexUrl ? "cuda" : "cpu")
             : resolveServerComfyUiRuntimeDeviceMode(env, request.runtimeDeviceMode));
-        const modeChanged = activeRuntimeDeviceMode !== undefined && activeRuntimeDeviceMode !== resolvedRequestMode;
-        if (modeChanged && comfyUiSupervisor) {
-          await comfyUiSupervisor.stop();
-          comfyUiSupervisor = undefined;
-        }
-        if (!comfyUiSupervisor) {
-          comfyUiSupervisor = createComfyUiRuntimeSupervisor({
-            workingDirectory: comfyUiInstallRoot,
-            pythonExecutable: launchPythonResolution.launchPythonExecutable,
-            installer: await createComfyUiInstallerForMode(resolvedRequestMode),
-            installRoot: comfyUiInstallRoot,
-            host: comfyUiHost,
-            port: comfyUiPort,
-            runtimeDeviceMode: resolvedRequestMode,
-            autoInstall: true,
-            installSourceRef: env.COMFYUI_INSTALL_REF,
-            logging: loggingPort,
+        const startMode = async (mode: ComfyUiRuntimeDeviceMode, fallbackReason?: string) => {
+          const modeChanged = activeRuntimeDeviceMode !== undefined && activeRuntimeDeviceMode !== mode;
+          if (modeChanged && comfyUiSupervisor) {
+            await comfyUiSupervisor.stop();
+            comfyUiSupervisor = undefined;
+          }
+          if (!comfyUiSupervisor) {
+            comfyUiSupervisor = createComfyUiRuntimeSupervisor({
+              workingDirectory: comfyUiInstallRoot,
+              pythonExecutable: launchPythonResolution.launchPythonExecutable,
+              installer: await createComfyUiInstallerForMode(mode),
+              installRoot: comfyUiInstallRoot,
+              host: comfyUiHost,
+              port: comfyUiPort,
+              runtimeDeviceMode: mode,
+              autoInstall: true,
+              installSourceRef: env.COMFYUI_INSTALL_REF,
+              logging: loggingPort,
+            });
+            activeRuntimeDeviceMode = mode;
+          }
+          await loggingPort.log({
+            level: "info",
+            message: "Resolved server ComfyUI runtime mode before start.",
+            timestamp: new Date().toISOString(),
+            verbosity: "normal",
+            event: "runtime.comfyui.mode.resolution",
+            component: "server-host",
+            subsystem: "runtime",
+            data: {
+              requestedRuntimeDeviceMode: request.runtimeDeviceMode,
+              cudaTorchWheelIndexConfigured: Boolean(cudaTorchWheelIndexUrl),
+              envOverrideWon: Boolean(envOverride),
+              runtimeDeviceMode: mode,
+              processReuse: modeChanged ? "restarted_mode_changed" : "reused_or_started",
+              fallbackReason,
+            },
           });
-          activeRuntimeDeviceMode = resolvedRequestMode;
+          await comfyUiSupervisor.start();
+        };
+        try {
+          await startMode(resolvedRequestMode);
+        } catch (error) {
+          if (!autoSelectedCuda || resolvedRequestMode !== "cuda" || !isRecoverableCudaTorchInstallFailure(error)) {
+            throw error;
+          }
+          await loggingPort.log({
+            level: "warn",
+            message: "Automatic CUDA ComfyUI setup failed; falling back to CPU runtime mode.",
+            timestamp: new Date().toISOString(),
+            verbosity: "normal",
+            event: "runtime.comfyui.mode.fallback",
+            component: "server-host",
+            subsystem: "runtime",
+            data: {
+              requestedRuntimeDeviceMode: request.runtimeDeviceMode,
+              failedRuntimeDeviceMode: "cuda",
+              fallbackRuntimeDeviceMode: "cpu",
+              cudaTorchWheelIndexConfigured: true,
+              reason: error instanceof Error ? error.message : String(error),
+            },
+          });
+          if (comfyUiSupervisor) {
+            await comfyUiSupervisor.stop();
+          }
+          comfyUiSupervisor = undefined;
+          activeRuntimeDeviceMode = undefined;
+          await startMode("cpu", "auto-cuda-install-failed");
         }
-        await loggingPort.log({
-          level: "info",
-          message: "Resolved server ComfyUI runtime mode before start.",
-          timestamp: new Date().toISOString(),
-          verbosity: "normal",
-          event: "runtime.comfyui.mode.resolution",
-          component: "server-host",
-          subsystem: "runtime",
-          data: {
-            requestedRuntimeDeviceMode: request.runtimeDeviceMode,
-            cudaTorchWheelIndexConfigured: Boolean(cudaTorchWheelIndexUrl),
-            envOverrideWon: Boolean(envOverride),
-            runtimeDeviceMode: resolvedRequestMode,
-            processReuse: modeChanged ? "restarted_mode_changed" : "reused_or_started",
-          },
-        });
-        await comfyUiSupervisor.start();
       };
       const comfyUiSupervisorPort = {
         async start() {
@@ -796,6 +834,10 @@ export function composeServerHost(
       const modelManagementLogger = {
         info: (event: string, data: Record<string, unknown>) => { void loggingPort.log({ level:"info", message:event, event, component:"model-management", subsystem:"api", timestamp:new Date().toISOString(), verbosity:"normal", data }); },
         warn: (event: string, data: Record<string, unknown>) => { void loggingPort.log({ level:"warn", message:event, event, component:"model-management", subsystem:"api", timestamp:new Date().toISOString(), verbosity:"normal", data }); },
+      };
+      const imageGenerationLogger = {
+        info: (event: string, data: Record<string, unknown>) => { void loggingPort.log({ level:"info", message:event, event, component:"image-generation", subsystem:"api", timestamp:new Date().toISOString(), verbosity:"normal", data }); },
+        warn: (event: string, data: Record<string, unknown>) => { void loggingPort.log({ level:"warn", message:event, event, component:"image-generation", subsystem:"api", timestamp:new Date().toISOString(), verbosity:"normal", data }); },
       };
 
       const modelRegistry = createLocalModelRegistryAdapter({
@@ -1060,6 +1102,7 @@ export function composeServerHost(
         generateImageUseCase,
         imageGenerationFinalizationOrchestrator,
         imageGenerationRuntimeControl,
+        imageGenerationLogger,
         listSettingsDefinitionsUseCase,
         readSettingsUseCase,
         updateSettingUseCase,

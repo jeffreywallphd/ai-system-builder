@@ -128,3 +128,16 @@ Future desktop-remote image generation (not yet implemented) should return serve
 - ComfyUI may be auto-installed through the Runtime Installer abstraction before runtime startup, based on host/runtime configuration.
 - ComfyUI supervisor integration with installer pre-start checks is deferred to a later prompt.
 - Installation concerns remain separate from image generation contracts and use-case orchestration.
+
+## UI Result Presentation
+
+- Desktop and thin-client image-generation UI must keep the last finalized artifact-backed result visible while a later generation request is queued, running, or finalizing.
+- The visible current result is swapped only after the replacement generation has completed and its preview media has been resolved.
+- Session galleries are UI/session state only. They may list previous artifact-backed generations from the current working session, but they must not become a second persistence source or expose runtime/temp filesystem paths.
+- Desktop may provide scrollable galleries and maximized previews over artifact/media URLs. Thin-client galleries should remain responsive, single-column, and media-reference based, with no dependency on local server paths.
+- Loading indicators are presentation state over the existing task lifecycle and must not create alternate execution semantics.
+- Runtime-not-ready responses should surface as actionable readiness/setup guidance in UI rather than as completed generation failures when no runtime task was started.
+- API routes should emit structured received/succeeded/failed events for image-generation operations so server/thin-client failures are observable without exposing raw runtime paths, prompts, secrets, or sidecar payloads.
+- If a submitted ComfyUI task crashes the runtime before queue/history can be read, task status reads should return a terminal failed image-generation task with sanitized recent runtime evidence instead of surfacing a generic transport/API failure.
+- Managed ComfyUI Python environments must reject unsupported Python versions before dependency installation or sampling. Python versions that can install packages but are not supported by Torch/ComfyUI should be treated as setup failures and, for managed venvs, stale unsupported environments may be recreated non-destructively without deleting models or the ComfyUI checkout.
+- Server-side CUDA startup selected only because a CUDA wheel index is configured is a best-effort acceleration path. If CUDA Torch setup fails during automatic selection, the server may fall back to CPU mode so generation remains available; explicit CUDA/runtime-device overrides should still fail loudly when their requested setup cannot be completed.
