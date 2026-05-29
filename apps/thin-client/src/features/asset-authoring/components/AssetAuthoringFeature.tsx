@@ -1,41 +1,144 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { AssetAuthoringEffectiveSourceSummary, AssetOverrideRecord, AuthoredAssetDraftRecord, AuthoredAssetRecord } from '../../../../../modules/contracts/asset-authoring';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import type { AssetAuthoringEffectiveSourceSummary, AssetOverrideRecord, AuthoredAssetDraftRecord, AuthoredAssetRecord } from '../../../../../../modules/contracts/asset-authoring';
 import { createThinClientAssetAuthoringClient } from '../api/thinClientAssetAuthoringClient';
 
-type RowVm = { id: string; label: string; statusLabel: string };
-const safe = (value: unknown, fallback: string) => typeof value === 'string' && value.trim() ? value.trim() : fallback;
-const authoredVm = (x: AuthoredAssetRecord): RowVm => ({ id: x.authoredAssetId, label: safe(x.editableFields?.displayName, 'Authored asset'), statusLabel: safe(x.status, 'Active') });
-const draftVm = (x: AuthoredAssetDraftRecord): RowVm => ({ id: x.draftId, label: safe(x.editableFields?.displayName, 'Draft'), statusLabel: safe(x.status, 'Draft') });
-const overrideVm = (x: AssetOverrideRecord): RowVm => ({ id: x.overrideId, label: safe(x.displayLabel, 'Customization'), statusLabel: safe(x.status, 'Active') });
-const summaryVm = (x: AssetAuthoringEffectiveSourceSummary, i: number): RowVm => ({ id: `${x.assetId ?? 'summary'}-${i}`, label: safe(x.effectiveSourceKind, 'Workspace usage'), statusLabel: x.hasConflict ? 'Needs attention' : x.disabled ? 'Disabled' : 'Active' });
+type RowVm = { id: string; label: string; statusLabel: string; summary?: string; typeLabel?: string; tags?: readonly string[] };
+type Section = 'create' | 'drafts' | 'customizations';
 
-export function AssetAuthoringFeature({ workspaceId }: { workspaceId: string; initialSection?: 'create' | 'drafts' | 'customizations' }) {
-  const c = useMemo(() => createThinClientAssetAuthoringClient('/api'), []);
+const ASSET_TYPES = [
+  { value: 'workflow-asset', label: 'Workflow' },
+  { value: 'system-asset', label: 'System' },
+  { value: 'component-asset', label: 'Component' },
+  { value: 'data-asset', label: 'Data' },
+  { value: 'model-asset', label: 'Model' },
+  { value: 'tool-asset', label: 'Tool' },
+] as const;
+
+const safe = (value: unknown, fallback: string) => typeof value === 'string' && value.trim() ? value.trim() : fallback;
+const stringList = (value: unknown): readonly string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
+const authoredVm = (x: AuthoredAssetRecord): RowVm => ({ id: x.authoredAssetId, label: safe(x.editableValues?.['display-name'], 'Custom asset'), statusLabel: safe(x.status, 'Active'), summary: safe(x.editableValues?.summary, ''), typeLabel: safe(x.editableValues?.classification, ''), tags: stringList(x.editableValues?.tags) });
+const draftVm = (x: AuthoredAssetDraftRecord): RowVm => ({ id: x.draftId, label: safe(x.draftEditableValues?.['display-name'], 'Draft'), statusLabel: safe(x.status, 'Draft'), summary: safe(x.draftEditableValues?.summary, ''), typeLabel: safe(x.draftEditableValues?.classification, ''), tags: stringList(x.draftEditableValues?.tags) });
+const overrideVm = (x: AssetOverrideRecord): RowVm => ({ id: x.overrideId, label: safe(x.overrideValues?.['display-name'], 'Customization'), statusLabel: safe(x.status, 'Active'), summary: safe(x.overrideValues?.summary, ''), typeLabel: safe(x.overrideValues?.classification, ''), tags: stringList(x.overrideValues?.tags) });
+const summaryVm = (x: AssetAuthoringEffectiveSourceSummary, i: number): RowVm => ({ id: `${x.effectiveAssetReference?.id ?? x.assetReference?.id ?? 'summary'}-${i}`, label: safe(x.effectiveSourceKind, 'Workspace usage'), statusLabel: x.conflictStatus === 'open' ? 'Needs attention' : x.overrideStatus === 'disabled' ? 'Disabled' : 'Active' });
+
+export function AssetAuthoringFeature({ workspaceId, initialSection = 'create' }: { workspaceId: string; initialSection?: Section }) {
+  const client = useMemo(() => createThinClientAssetAuthoringClient('/api'), []);
   const [authored, setAuthored] = useState<RowVm[]>([]);
   const [drafts, setDrafts] = useState<RowVm[]>([]);
   const [overrides, setOverrides] = useState<RowVm[]>([]);
   const [summaries, setSummaries] = useState<RowVm[]>([]);
   const [summariesUnavailable, setSummariesUnavailable] = useState(false);
-  const [msg, setMsg] = useState('');
-  const [name, setName] = useState('');
+  const [message, setMessage] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [summary, setSummary] = useState('');
+  const [description, setDescription] = useState('');
+  const [classification, setClassification] = useState<string>(ASSET_TYPES[0].value);
+  const [tags, setTags] = useState('');
 
   const refresh = async () => {
-    const [a, d, o, s] = await Promise.all([c.listAuthoredAssets(workspaceId), c.listDrafts(workspaceId), c.listOverrides(workspaceId), c.listEffectiveSummaries(workspaceId)]);
-    if (a.ok) setAuthored(a.value.items.map(authoredVm));
-    if (d.ok) setDrafts(d.value.items.map(draftVm));
-    if (o.ok) setOverrides(o.value.items.map(overrideVm));
-    if (s.ok) {
-      setSummaries(s.value.items.map(summaryVm));
+    const [authoredResult, draftsResult, overridesResult, summariesResult] = await Promise.all([
+      client.listAuthoredAssets(workspaceId),
+      client.listDrafts(workspaceId),
+      client.listOverrides(workspaceId),
+      client.listEffectiveSummaries(workspaceId),
+    ]);
+    if (authoredResult.ok) setAuthored(authoredResult.value.items.map(authoredVm));
+    if (draftsResult.ok) setDrafts(draftsResult.value.items.map(draftVm));
+    if (overridesResult.ok) setOverrides(overridesResult.value.items.map(overrideVm));
+    if (summariesResult.ok) {
+      setSummaries(summariesResult.value.items.map(summaryVm));
       setSummariesUnavailable(false);
-    } else if (s.error.code === 'unavailable') {
+    } else if (summariesResult.error.code === 'unavailable') {
       setSummaries([]);
       setSummariesUnavailable(true);
     }
+    if (!authoredResult.ok || !draftsResult.ok || !overridesResult.ok) setMessage('Some asset records are unavailable.');
   };
 
   useEffect(() => {
     void refresh();
   }, [workspaceId]);
 
-  return <section><h2>Create and manage workspace assets</h2><h3>Created assets</h3><ul>{authored.length ? authored.map((a) => <li key={a.id}>{a.label} — {a.statusLabel}</li>) : <li>No created assets yet.</li>}</ul><h3>Drafts</h3><ul>{drafts.length ? drafts.map((d) => <li key={d.id}>{d.label} — {d.statusLabel} <button onClick={async () => { const r = await c.publishDraft(workspaceId, d.id); setMsg(r.ok ? 'Draft published.' : r.error.message); if (r.ok) await refresh(); }}>Publish</button> <button onClick={async () => { const r = await c.updateDraft({ workspaceId, draftId: d.id, summary: 'Updated in workspace' }); setMsg(r.ok ? 'Draft changes saved.' : r.error.message); if (r.ok) await refresh(); }}>Save changes</button></li>) : <li>No drafts yet.</li>}</ul><form onSubmit={async (e) => { e.preventDefault(); if (!name.trim()) { setMsg('Name is required.'); return; } const r = await c.createDraft({ workspaceId, displayName: name }); if (r.ok) { setMsg('Saved as draft.'); setName(''); await refresh(); } else setMsg(r.error.message); }}><input aria-label='Name' value={name} onChange={(e) => setName(e.target.value)} /><button>Create asset draft</button></form><h3>Customizations</h3><p><small>Creating new customizations is not available yet.</small></p><ul>{overrides.length ? overrides.map((o) => <li key={o.id}>{o.label} — {o.statusLabel} <button onClick={async () => { const r = await c.disableOverride(workspaceId, o.id); setMsg(r.ok ? 'Customization turned off.' : r.error.message); if (r.ok) await refresh(); }}>Disable customization</button></li>) : <li>No customizations yet.</li>}</ul><h3>Readiness and status</h3>{summariesUnavailable ? <p>Workspace usage summaries are not available yet.</p> : <ul>{summaries.length ? summaries.map((s) => <li key={s.id}>{s.label} — {s.statusLabel}</li>) : <li>No workspace usage summaries yet.</li>}</ul>}{msg ? <p>{msg}</p> : null}</section>;
+  const createDraft = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!displayName.trim()) {
+      setMessage('Display name is required.');
+      return;
+    }
+    const result = await client.createDraft({
+      workspaceId,
+      displayName,
+      summary,
+      description,
+      classification,
+      tags: tagList(tags),
+    });
+    if (!result.ok) {
+      setMessage(result.error.message);
+      return;
+    }
+    setDisplayName('');
+    setSummary('');
+    setDescription('');
+    setTags('');
+    setMessage('Draft created.');
+    await refresh();
+  };
+
+  return (
+    <section className="ui-stack">
+      <header>
+        <h2>Workspace Assets</h2>
+      </header>
+
+      {initialSection === 'create' ? (
+        <section className="ui-panel ui-stack">
+          <h3>Create Asset</h3>
+          <form className="ui-stack" onSubmit={createDraft}>
+            <label>Display name <input aria-label="Display name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
+            <label>Asset type <select aria-label="Asset type" value={classification} onChange={(event) => setClassification(event.target.value)}>{ASSET_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+            <label>Summary <input aria-label="Summary" value={summary} onChange={(event) => setSummary(event.target.value)} /></label>
+            <label>Description <textarea aria-label="Description" value={description} onChange={(event) => setDescription(event.target.value)} /></label>
+            <label>Tags <input aria-label="Tags" value={tags} onChange={(event) => setTags(event.target.value)} /></label>
+            <button type="submit">Save draft</button>
+          </form>
+          <AssetList title="Created Assets" emptyLabel="No custom assets yet." rows={authored} />
+        </section>
+      ) : null}
+
+      {initialSection === 'drafts' ? (
+        <section className="ui-panel ui-stack">
+          <h3>Drafts</h3>
+          <ul>{drafts.length ? drafts.map((draft) => <li key={draft.id}><AssetRow row={draft} /> <button onClick={async () => { const result = await client.publishDraft(workspaceId, draft.id); setMessage(result.ok ? 'Draft published.' : result.error.message); if (result.ok) await refresh(); }}>Publish</button> <button onClick={async () => { const result = await client.updateDraft({ workspaceId, draftId: draft.id, summary: draft.summary || 'Updated in workspace' }); setMessage(result.ok ? 'Draft saved.' : result.error.message); if (result.ok) await refresh(); }}>Save</button></li>) : <li>No drafts yet.</li>}</ul>
+        </section>
+      ) : null}
+
+      {initialSection === 'customizations' ? (
+        <section className="ui-panel ui-stack">
+          <h3>Customizations</h3>
+          <p><small>Creating new customizations is not available yet.</small></p>
+          <ul>{overrides.length ? overrides.map((override) => <li key={override.id}><AssetRow row={override} /> <button onClick={async () => { const result = await client.disableOverride(workspaceId, override.id); setMessage(result.ok ? 'Customization disabled.' : result.error.message); if (result.ok) await refresh(); }}>Disable</button></li>) : <li>No customizations yet.</li>}</ul>
+        </section>
+      ) : null}
+
+      <section className="ui-panel">
+        <h3>Readiness</h3>
+        {summariesUnavailable ? <p>Workspace usage summaries are not available yet.</p> : <ul>{summaries.length ? summaries.map((item) => <li key={item.id}><AssetRow row={item} /></li>) : <li>No workspace usage summaries yet.</li>}</ul>}
+      </section>
+
+      {message ? <p role="status">{message}</p> : null}
+    </section>
+  );
+}
+
+function AssetList({ title, rows, emptyLabel }: { title: string; rows: readonly RowVm[]; emptyLabel: string }) {
+  return <section><h3>{title}</h3><ul>{rows.length ? rows.map((row) => <li key={row.id}><AssetRow row={row} /></li>) : <li>{emptyLabel}</li>}</ul></section>;
+}
+
+function AssetRow({ row }: { row: RowVm }) {
+  return <span><strong>{row.label}</strong> - {row.statusLabel}{row.typeLabel ? ` - ${row.typeLabel}` : ''}{row.summary ? ` - ${row.summary}` : ''}{row.tags?.length ? ` - ${row.tags.join(', ')}` : ''}</span>;
+}
+
+function tagList(value: string): readonly string[] {
+  return value.split(',').map((item) => item.trim()).filter(Boolean);
 }

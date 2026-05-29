@@ -50,6 +50,13 @@ export interface ExpressRequestLike {
   headers?: Record<string, string | string[] | undefined>;
 }
 
+function isArtifactReadApiRequestBody(value: unknown): value is ArtifactReadApiRequestBody {
+  if (!value || typeof value !== "object") return false;
+  const body = value as { locator?: unknown };
+  if (!body.locator || typeof body.locator !== "object") return false;
+  return typeof (body.locator as { storageKey?: unknown }).storageKey === "string";
+}
+
 export interface ExpressResponseLike {
   status: (statusCode: number) => ExpressResponseLike;
   json: (
@@ -204,6 +211,13 @@ export function mapArtifactRegisteredDeleteApiRequestToCommand(
   requestBody: ArtifactReadApiRequestBody,
   context: { requestId?: string; correlationId?: string; workspaceId?: string },
 ): DeleteRegisteredArtifactCommand {
+  if (!isArtifactReadApiRequestBody(requestBody)) {
+    throw new Error("locator.storageKey is required.");
+  }
+  if (typeof requestBody.workspaceId !== "string") {
+    throw new Error("workspaceId is required.");
+  }
+
   const apiRequest = createApiArtifactRegisteredDeleteRequest(
     {
       storageKey: requestBody.locator.storageKey,
@@ -224,13 +238,15 @@ export function mapArtifactMediaViewApiRequest(
   request: ExpressRequestLike,
 ): {
   storageKey: string;
+  workspaceId?: string;
 } {
   const storageKey = getQueryValue(request.query, "storageKey")?.trim();
   if (!storageKey) {
     throw new Error("storageKey query parameter is required.");
   }
 
-  return { storageKey };
+  const workspaceId = getQueryValue(request.query, "workspaceId")?.trim();
+  return workspaceId ? { storageKey, workspaceId } : { storageKey };
 }
 
 export function mapBrowseArtifactsResultToApiResponse(
@@ -425,9 +441,10 @@ export function registerArtifactBrowserApiRoutes(
 
   dependencies.app.get("/api/artifact/media/view", async (request, response) => {
     const context = mapArtifactBrowserApiRequestContext(request);
-    let mediaViewRequest: { storageKey: string };
+    let mediaViewRequest: { storageKey: string; workspaceId?: string };
     try {
       mediaViewRequest = mapArtifactMediaViewApiRequest(request);
+      context.workspaceId = mediaViewRequest.workspaceId;
     } catch (error) {
       response.status(400).json(
         createApiArtifactContentReadFailureResponse(
@@ -440,7 +457,7 @@ export function registerArtifactBrowserApiRoutes(
     }
 
     const retrievalResult = await dependencies.artifactMediaViewRetrieval.retrieveArtifactViewerMediaByStorageKey(
-      mediaViewRequest,
+      { storageKey: mediaViewRequest.storageKey },
       context,
     );
 

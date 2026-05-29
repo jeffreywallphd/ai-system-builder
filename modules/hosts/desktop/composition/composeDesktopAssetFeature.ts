@@ -14,12 +14,22 @@ import { composeResourceBackedViewProviders } from "../../shared/composition/com
 export interface ComposeDesktopAssetFeatureOptions {
   storageRootDirectory: string;
   now: () => string;
+  readSharedModelStorageDirectory?: () => Promise<string | undefined>;
   artifacts: any;
   onInternalAssetRegistry?: (registry: InternalAssetRegistryComposition) => void;
 }
 
 export function composeDesktopAssetFeature(options: ComposeDesktopAssetFeatureOptions): any {
-  const modelRegistry = createLocalModelRegistryAdapter({ filePath: `${options.storageRootDirectory}/model-registry/models.json`, now: options.now });
+  const modelRegistry = createLocalModelRegistryAdapter({
+    filePath: `${options.storageRootDirectory}/model-registry/models.json`,
+    now: options.now,
+    discovery: {
+      searchRoots: async () => {
+        const root = await options.readSharedModelStorageDirectory?.();
+        return root ? [root] : [];
+      },
+    },
+  });
   const imageAssetRegistry = createLocalImageAssetRegistryAdapter({ filePath: join(options.storageRootDirectory, ".catalog", "image-assets.json"), now: options.now });
   const internalAssetRegistry = composeInternalAssetRegistry({
     rootDirectory: options.storageRootDirectory,

@@ -28,6 +28,10 @@ import {
 } from "../../../adapters/persistence/asset-authoring";
 import { createLocalEffectiveAssetProjectionRepositoryAdapter } from "../../../adapters/persistence/effective-asset-projections";
 import { createLocalAssetCompositionPlanRepositoryAdapter } from "../../../adapters/persistence/asset-composition";
+import { createLocalRuntimeReadinessBindingRepositoryAdapter } from "../../../adapters/persistence/runtime-readiness";
+import { createLocalExecutionPlanRepositoryAdapter } from "../../../adapters/persistence/execution-plans";
+import { createLocalConversationRepositoryAdapters } from "../../../adapters/persistence/conversations";
+import { createLocalExecutionRunRepositoryAdapters } from "../../../adapters/persistence/execution-runs";
 import { LinkUserLibraryAssetToWorkspaceUseCase } from "../../../application/use-cases/user-library";
 import type { LoggingPort } from "../../../application/ports/logging";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
@@ -112,7 +116,7 @@ import {
   type ComfyUiPythonEnvironmentMode,
 } from "../../../adapters/runtime/comfyui/comfyUiPythonEnvironment";
 import type { ComfyUiRuntimeDeviceMode } from "../../../adapters/runtime/comfyui/createComfyUiRuntimeSupervisor";
-import { RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY } from "../../../contracts/settings";
+import { RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY, SHARED_MODEL_STORAGE_DIRECTORY_SETTING_KEY } from "../../../contracts/settings";
 import { RuntimeCapabilityGuardService } from "../../../application/services/runtime/runtime-capability-guard.service";
 import { createServerRuntimeReadinessService } from "./composeServerRuntimeReadiness";
 import { createServerImageGenerationRuntimeTaskRegistry } from "./composeServerImageGenerationRuntimeTaskRegistry";
@@ -124,6 +128,9 @@ import { composeResourceBackedViewProviders } from "../../shared/composition/com
 import type { AssetCustomizationTargetReaderPort } from "../../../application/ports/asset-authoring";
 import { WorkspaceAssetAuthoringReadModelService } from "../../../application/services/asset/workspace-asset-authoring-read-model.service";
 import { WorkspaceAssetCompositionReadModelService } from "../../../application/services/asset/workspace-asset-composition-read-model.service";
+import { composeExecutionPlanServices } from "../../shared/composition/composeExecutionPlanServices";
+import { composeConversationExecutionServices } from "../../shared/composition/composeConversationExecutionServices";
+import { createPythonConversationalRuntimeAdapterCatalog, createPythonConversationalRuntimeGuard, createPythonConversationalTextGenerationInvocationAdapter } from "../../../adapters/runtime/conversational-text-generation";
 
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
 const execFile = promisify(nodeExecFile);
@@ -237,6 +244,11 @@ function normalizeServerImageGenerationRuntimeMode(value: string | undefined): C
   if (normalized === "nvidia") return "cuda";
   if (normalized === "amd" || normalized === "intel") return "directml";
   return normalizeComfyUiRuntimeDeviceMode(normalized);
+}
+
+function isRecoverableCudaTorchInstallFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /cuda torch|cuda-torch|no space left on device|errno 28/i.test(message);
 }
 
 function parseBooleanEnvFlag(value: string | undefined): boolean {
@@ -676,47 +688,80 @@ export function composeServerHost(
         const cudaTorchWheelIndexUrl = await readRuntimeSettingString(RUNTIME_TORCH_CUDA_WHEEL_INDEX_URL_SETTING_KEY);
         const envOverride = normalizeComfyUiRuntimeDeviceMode(env.COMFYUI_RUNTIME_DEVICE_MODE ?? env.COMFYUI_ACCELERATOR);
         const requestedMode = normalizeServerImageGenerationRuntimeMode(request.runtimeDeviceMode);
+        const autoSelectedCuda = !envOverride && (requestedMode === undefined || requestedMode === "auto") && Boolean(cudaTorchWheelIndexUrl);
         const resolvedRequestMode = envOverride
           ?? (requestedMode === undefined || requestedMode === "auto"
             ? (cudaTorchWheelIndexUrl ? "cuda" : "cpu")
             : resolveServerComfyUiRuntimeDeviceMode(env, request.runtimeDeviceMode));
-        const modeChanged = activeRuntimeDeviceMode !== undefined && activeRuntimeDeviceMode !== resolvedRequestMode;
-        if (modeChanged && comfyUiSupervisor) {
-          await comfyUiSupervisor.stop();
-          comfyUiSupervisor = undefined;
-        }
-        if (!comfyUiSupervisor) {
-          comfyUiSupervisor = createComfyUiRuntimeSupervisor({
-            workingDirectory: comfyUiInstallRoot,
-            pythonExecutable: launchPythonResolution.launchPythonExecutable,
-            installer: await createComfyUiInstallerForMode(resolvedRequestMode),
-            installRoot: comfyUiInstallRoot,
-            host: comfyUiHost,
-            port: comfyUiPort,
-            runtimeDeviceMode: resolvedRequestMode,
-            autoInstall: true,
-            installSourceRef: env.COMFYUI_INSTALL_REF,
-            logging: loggingPort,
+        const startMode = async (mode: ComfyUiRuntimeDeviceMode, fallbackReason?: string) => {
+          const modeChanged = activeRuntimeDeviceMode !== undefined && activeRuntimeDeviceMode !== mode;
+          if (modeChanged && comfyUiSupervisor) {
+            await comfyUiSupervisor.stop();
+            comfyUiSupervisor = undefined;
+          }
+          if (!comfyUiSupervisor) {
+            comfyUiSupervisor = createComfyUiRuntimeSupervisor({
+              workingDirectory: comfyUiInstallRoot,
+              pythonExecutable: launchPythonResolution.launchPythonExecutable,
+              installer: await createComfyUiInstallerForMode(mode),
+              installRoot: comfyUiInstallRoot,
+              host: comfyUiHost,
+              port: comfyUiPort,
+              runtimeDeviceMode: mode,
+              autoInstall: true,
+              installSourceRef: env.COMFYUI_INSTALL_REF,
+              logging: loggingPort,
+            });
+            activeRuntimeDeviceMode = mode;
+          }
+          await loggingPort.log({
+            level: "info",
+            message: "Resolved server ComfyUI runtime mode before start.",
+            timestamp: new Date().toISOString(),
+            verbosity: "normal",
+            event: "runtime.comfyui.mode.resolution",
+            component: "server-host",
+            subsystem: "runtime",
+            data: {
+              requestedRuntimeDeviceMode: request.runtimeDeviceMode,
+              cudaTorchWheelIndexConfigured: Boolean(cudaTorchWheelIndexUrl),
+              envOverrideWon: Boolean(envOverride),
+              runtimeDeviceMode: mode,
+              processReuse: modeChanged ? "restarted_mode_changed" : "reused_or_started",
+              fallbackReason,
+            },
           });
-          activeRuntimeDeviceMode = resolvedRequestMode;
+          await comfyUiSupervisor.start();
+        };
+        try {
+          await startMode(resolvedRequestMode);
+        } catch (error) {
+          if (!autoSelectedCuda || resolvedRequestMode !== "cuda" || !isRecoverableCudaTorchInstallFailure(error)) {
+            throw error;
+          }
+          await loggingPort.log({
+            level: "warn",
+            message: "Automatic CUDA ComfyUI setup failed; falling back to CPU runtime mode.",
+            timestamp: new Date().toISOString(),
+            verbosity: "normal",
+            event: "runtime.comfyui.mode.fallback",
+            component: "server-host",
+            subsystem: "runtime",
+            data: {
+              requestedRuntimeDeviceMode: request.runtimeDeviceMode,
+              failedRuntimeDeviceMode: "cuda",
+              fallbackRuntimeDeviceMode: "cpu",
+              cudaTorchWheelIndexConfigured: true,
+              reason: error instanceof Error ? error.message : String(error),
+            },
+          });
+          if (comfyUiSupervisor) {
+            await comfyUiSupervisor.stop();
+          }
+          comfyUiSupervisor = undefined;
+          activeRuntimeDeviceMode = undefined;
+          await startMode("cpu", "auto-cuda-install-failed");
         }
-        await loggingPort.log({
-          level: "info",
-          message: "Resolved server ComfyUI runtime mode before start.",
-          timestamp: new Date().toISOString(),
-          verbosity: "normal",
-          event: "runtime.comfyui.mode.resolution",
-          component: "server-host",
-          subsystem: "runtime",
-          data: {
-            requestedRuntimeDeviceMode: request.runtimeDeviceMode,
-            cudaTorchWheelIndexConfigured: Boolean(cudaTorchWheelIndexUrl),
-            envOverrideWon: Boolean(envOverride),
-            runtimeDeviceMode: resolvedRequestMode,
-            processReuse: modeChanged ? "restarted_mode_changed" : "reused_or_started",
-          },
-        });
-        await comfyUiSupervisor.start();
       };
       const comfyUiSupervisorPort = {
         async start() {
@@ -790,8 +835,21 @@ export function composeServerHost(
         info: (event: string, data: Record<string, unknown>) => { void loggingPort.log({ level:"info", message:event, event, component:"model-management", subsystem:"api", timestamp:new Date().toISOString(), verbosity:"normal", data }); },
         warn: (event: string, data: Record<string, unknown>) => { void loggingPort.log({ level:"warn", message:event, event, component:"model-management", subsystem:"api", timestamp:new Date().toISOString(), verbosity:"normal", data }); },
       };
+      const imageGenerationLogger = {
+        info: (event: string, data: Record<string, unknown>) => { void loggingPort.log({ level:"info", message:event, event, component:"image-generation", subsystem:"api", timestamp:new Date().toISOString(), verbosity:"normal", data }); },
+        warn: (event: string, data: Record<string, unknown>) => { void loggingPort.log({ level:"warn", message:event, event, component:"image-generation", subsystem:"api", timestamp:new Date().toISOString(), verbosity:"normal", data }); },
+      };
 
-      const modelRegistry = createLocalModelRegistryAdapter({ filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`, now: options.now });
+      const modelRegistry = createLocalModelRegistryAdapter({
+        filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`,
+        now: options.now,
+        discovery: {
+          searchRoots: async () => {
+            const root = await readRuntimeSettingString(SHARED_MODEL_STORAGE_DIRECTORY_SETTING_KEY);
+            return root ? [root] : [];
+          },
+        },
+      });
       const imageAssetRegistry = createLocalImageAssetRegistryAdapter({
         filePath: joinHostPath(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
         now: options.now,
@@ -986,6 +1044,33 @@ export function composeServerHost(
         }),
       });
 
+      const assetCompositionPlanRepository = createLocalAssetCompositionPlanRepositoryAdapter({
+        rootDir: registerOptions.storageRootDirectory,
+        now: options.now,
+      });
+      const runtimeReadinessBindingRepository = createLocalRuntimeReadinessBindingRepositoryAdapter({
+        rootDir: registerOptions.storageRootDirectory,
+        now: options.now,
+      });
+      const executionPlanRepository = createLocalExecutionPlanRepositoryAdapter({
+        rootDir: registerOptions.storageRootDirectory,
+        now: options.now,
+      });
+      const executionPlanServices = composeExecutionPlanServices({ executionPlanRepository, runtimeReadinessBindingRepository, compositionPlanRepository: assetCompositionPlanRepository, now: options.now });
+      const conversationRepositories = createLocalConversationRepositoryAdapters({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const executionRunRepositories = createLocalExecutionRunRepositoryAdapters({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const conversationExecutionServices = composeConversationExecutionServices({
+        ...conversationRepositories,
+        ...executionRunRepositories,
+        executionPlanRepository,
+        runtimeReadinessBindingRepository,
+        assetCompositionPlanRepository,
+        adapterCatalog: createPythonConversationalRuntimeAdapterCatalog(),
+        runtimeGuard: createPythonConversationalRuntimeGuard(pythonRuntimeFoundation.runtimePort),
+        invocationPort: createPythonConversationalTextGenerationInvocationAdapter(pythonRuntimeFoundation.runtimePort),
+        hostCapabilities: { submitTurn: "supported", cancelTurn: "unsupported", retryTurn: "unsupported", streaming: false },
+        now: options.now,
+      });
 
       registerExpressApi({
         app: registerOptions.app,
@@ -1017,6 +1102,7 @@ export function composeServerHost(
         generateImageUseCase,
         imageGenerationFinalizationOrchestrator,
         imageGenerationRuntimeControl,
+        imageGenerationLogger,
         listSettingsDefinitionsUseCase,
         readSettingsUseCase,
         updateSettingUseCase,
@@ -1115,28 +1201,26 @@ export function composeServerHost(
           };
         })(),
         assetCompositionServices: (() => {
-          const compositionPlanRepository = createLocalAssetCompositionPlanRepositoryAdapter({
-            rootDir: registerOptions.storageRootDirectory,
-            now: options.now,
-          });
           const effectiveProjectionRepository = createLocalEffectiveAssetProjectionRepositoryAdapter({
             rootDir: registerOptions.storageRootDirectory,
             now: options.now,
           });
           return {
-            createPlan: new CreateAssetCompositionPlanUseCase({ repository: compositionPlanRepository, generatePlanId: () => `plan.${randomUUID()}`, now: options.now }),
-            updatePlan: new UpdateAssetCompositionPlanUseCase({ repository: compositionPlanRepository, now: options.now }),
-            readPlan: new ReadAssetCompositionPlanUseCase({ repository: compositionPlanRepository }),
-            listPlans: new ListAssetCompositionPlansUseCase({ repository: compositionPlanRepository }),
-            archivePlan: new ArchiveAssetCompositionPlanUseCase({ repository: compositionPlanRepository, now: options.now }),
-            addProjection: new AddProjectionToCompositionPlanUseCase({ repository: compositionPlanRepository, projectionRepository: effectiveProjectionRepository, generateNodeId: () => `node.${randomUUID()}`, now: options.now }),
-            removeProjection: new RemoveProjectionFromCompositionPlanUseCase({ repository: compositionPlanRepository, now: options.now }),
-            connectNodes: new ConnectCompositionNodesUseCase({ repository: compositionPlanRepository, generateRelationshipId: () => `rel.${randomUUID()}`, now: options.now }),
-            disconnectNodes: new DisconnectCompositionNodesUseCase({ repository: compositionPlanRepository, now: options.now }),
-            validatePlan: new ValidateAssetCompositionPlanUseCase({ repository: compositionPlanRepository, projectionRepository: effectiveProjectionRepository, now: options.now }),
-            readModel: new WorkspaceAssetCompositionReadModelService({ compositionPlanRepository }),
+            createPlan: new CreateAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository, generatePlanId: () => `plan.${randomUUID()}`, now: options.now }),
+            updatePlan: new UpdateAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository, now: options.now }),
+            readPlan: new ReadAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository }),
+            listPlans: new ListAssetCompositionPlansUseCase({ repository: assetCompositionPlanRepository }),
+            archivePlan: new ArchiveAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository, now: options.now }),
+            addProjection: new AddProjectionToCompositionPlanUseCase({ repository: assetCompositionPlanRepository, projectionRepository: effectiveProjectionRepository, generateNodeId: () => `node.${randomUUID()}`, now: options.now }),
+            removeProjection: new RemoveProjectionFromCompositionPlanUseCase({ repository: assetCompositionPlanRepository, now: options.now }),
+            connectNodes: new ConnectCompositionNodesUseCase({ repository: assetCompositionPlanRepository, generateRelationshipId: () => `rel.${randomUUID()}`, now: options.now }),
+            disconnectNodes: new DisconnectCompositionNodesUseCase({ repository: assetCompositionPlanRepository, now: options.now }),
+            validatePlan: new ValidateAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository, projectionRepository: effectiveProjectionRepository, now: options.now }),
+            readModel: new WorkspaceAssetCompositionReadModelService({ compositionPlanRepository: assetCompositionPlanRepository }),
           };
         })(),
+        executionPlanServices: { executionPlans: { create: executionPlanServices.createPlan, validate: executionPlanServices.validatePlan, readModel: executionPlanServices.readModel } },
+        conversationExecutionServices: { conversations: conversationExecutionServices },
       });
     },
   };

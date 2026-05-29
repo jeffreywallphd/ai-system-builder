@@ -22,6 +22,8 @@ import { registerUserLibraryApiRoutes, type RegisterUserLibraryApiRoutesDependen
 import { registerAssetAuthoringApiRoutes, type RegisterAssetAuthoringApiRoutesDependencies } from "./asset-authoring/registerAssetAuthoringApiRoutes";
 import { registerEffectiveAssetProjectionApiRoutes, type RegisterEffectiveAssetProjectionApiRoutesDependencies } from "./effective-asset-projections/registerEffectiveAssetProjectionApiRoutes";
 import { registerAssetCompositionApiRoutes, type RegisterAssetCompositionApiRoutesDependencies } from "./asset-composition/registerAssetCompositionApiRoutes";
+import { registerExecutionPlanApiRoutes, type RegisterExecutionPlanApiRoutesDependencies } from "./execution-plans/registerExecutionPlanApiRoutes";
+import { registerConversationExecutionApiRoutes, type RegisterConversationExecutionApiRoutesDependencies } from "./conversations/registerConversationExecutionApiRoutes";
 
 export interface RegisterExpressApiDependencies {
   app: RegisterArtifactUploadApiRouteDependencies["app"]
@@ -38,7 +40,9 @@ export interface RegisterExpressApiDependencies {
     & RegisterUserLibraryApiRoutesDependencies["app"]
     & RegisterAssetAuthoringApiRoutesDependencies["app"]
     & RegisterEffectiveAssetProjectionApiRoutesDependencies["app"]
-    & RegisterAssetCompositionApiRoutesDependencies["app"];
+    & RegisterAssetCompositionApiRoutesDependencies["app"]
+    & RegisterExecutionPlanApiRoutesDependencies["app"]
+    & RegisterConversationExecutionApiRoutesDependencies["app"];
   getHuggingFaceTokenStatus: RegisterArtifactRepoApiRoutesDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];
@@ -60,6 +64,7 @@ export interface RegisterExpressApiDependencies {
   generateImageUseCase: RegisterImageGenerationApiRoutesDependencies["generateImageUseCase"];
   imageGenerationFinalizationOrchestrator?: RegisterImageGenerationApiRoutesDependencies["imageGenerationFinalizationOrchestrator"];
   imageGenerationRuntimeControl?: RegisterImageGenerationApiRoutesDependencies["imageGenerationRuntimeControl"];
+  imageGenerationLogger?: RegisterImageGenerationApiRoutesDependencies["logger"];
   browseModelsUseCase: RegisterModelManagementApiRoutesDependencies["browseModelsUseCase"];
   getModelDetailsUseCase: RegisterModelManagementApiRoutesDependencies["getModelDetailsUseCase"];
   listModelsUseCase: RegisterModelManagementApiRoutesDependencies["listModelsUseCase"];
@@ -83,6 +88,8 @@ export interface RegisterExpressApiDependencies {
   assetAuthoringServices?: Omit<RegisterAssetAuthoringApiRoutesDependencies, "app">;
   effectiveAssetProjectionServices?: Omit<RegisterEffectiveAssetProjectionApiRoutesDependencies, "app">;
   assetCompositionServices?: Omit<RegisterAssetCompositionApiRoutesDependencies, "app">;
+  executionPlanServices?: Omit<RegisterExecutionPlanApiRoutesDependencies, "app">;
+  conversationExecutionServices?: Omit<RegisterConversationExecutionApiRoutesDependencies, "app">;
 }
 
 export function registerExpressApi(
@@ -137,6 +144,7 @@ export function registerExpressApi(
     generateImageUseCase: dependencies.generateImageUseCase,
     imageGenerationFinalizationOrchestrator: dependencies.imageGenerationFinalizationOrchestrator,
     imageGenerationRuntimeControl: dependencies.imageGenerationRuntimeControl,
+    logger: dependencies.imageGenerationLogger,
   });
 
   if (
@@ -171,6 +179,12 @@ export function registerExpressApi(
   }
   if (dependencies.assetCompositionServices) {
     registerAssetCompositionApiRoutes({ app: dependencies.app, ...dependencies.assetCompositionServices });
+  }
+  if (dependencies.executionPlanServices) {
+    registerExecutionPlanApiRoutes({ app: dependencies.app, ...dependencies.executionPlanServices });
+  }
+  if (dependencies.conversationExecutionServices) {
+    registerConversationExecutionApiRoutes({ app: dependencies.app, ...dependencies.conversationExecutionServices });
   }
 
   if (dependencies.assetRegistryRead) {

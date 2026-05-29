@@ -19,6 +19,7 @@ export type ImageGenerationModelDropdownCandidate = Pick<
   | "modelRecordId"
   | "provider"
   | "source"
+  | "storageScope"
   | "taskTags"
 >;
 
@@ -60,15 +61,16 @@ export function toImageGenerationModelDropdownValue(
 export function formatImageGenerationModelDropdownLabel(
   model: Pick<
     ModelInventoryRecord,
-    "artifactForm" | "displayName" | "inferenceMode" | "lifecycleStatus" | "modelId" | "provider" | "source"
+    "artifactForm" | "displayName" | "inferenceMode" | "lifecycleStatus" | "modelId" | "provider" | "source" | "storageScope"
   >,
   referenceOnly = false,
 ): string {
   const identity = model.modelId ? ` (${model.modelId})` : "";
   const inferenceMode = model.inferenceMode ? ` - ${model.inferenceMode}` : "";
   const provider = model.provider ?? model.source;
+  const storageScope = model.storageScope === "shared" ? " - shared" : " - workspace";
   const suffix = referenceOnly ? " - reference only" : "";
-  return `${model.displayName}${identity} - ${provider} - ${model.lifecycleStatus} - ${model.artifactForm}${inferenceMode}${suffix}`;
+  return `${model.displayName}${identity}${storageScope} - ${provider} - ${model.lifecycleStatus} - ${model.artifactForm}${inferenceMode}${suffix}`;
 }
 
 export function toImageGenerationModelDropdownOption(

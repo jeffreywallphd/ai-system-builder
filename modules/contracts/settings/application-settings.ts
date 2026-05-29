@@ -20,6 +20,7 @@ export const APPLICATION_SETTING_VALUE_KINDS = [
   "boolean",
   "secret",
   "select",
+  "folder",
   "object",
 ] as const;
 

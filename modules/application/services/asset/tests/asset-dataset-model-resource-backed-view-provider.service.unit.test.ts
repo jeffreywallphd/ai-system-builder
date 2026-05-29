@@ -184,6 +184,7 @@ describe("AssetDatasetModelResourceBackedViewProvider", () => {
     assert.equal(view.metadata?.parameterCount, 7000000000);
     assert.deepEqual(view.metadata?.backingArtifactIds, ["artifact-model-1"]);
     assert.equal(registry.lastListRequest?.includeDiscovered, false);
+    assert.equal(registry.lastListRequest?.includeSharedStorage, true);
     assert.equal(registry.discoveryCalls, 0);
     assertSafe(result);
   });

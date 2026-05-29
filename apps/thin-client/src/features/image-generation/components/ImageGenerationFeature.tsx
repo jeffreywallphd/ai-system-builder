@@ -1,5 +1,49 @@
+import { useEffect, useState } from "react";
 import { formatImageGenerationModelDropdownLabel } from "../../../../../../modules/ui/shared";
+import { LoadingSpinner } from "../../../components/ui/LoadingSpinner";
+import { secureFetch } from "../../../security/secureFetch";
 import { useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
+
+function GeneratedImagePreview({ src, alt }: { src: string; alt: string }) {
+  const [objectUrl, setObjectUrl] = useState<string | undefined>();
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let nextObjectUrl: string | undefined;
+    setObjectUrl(undefined);
+    setFailed(false);
+
+    void secureFetch(src, { method: "GET", headers: { "x-client-source": "thin-client.image-generation.preview" } })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Image preview request failed with HTTP ${response.status}.`);
+        }
+        const blob = await response.blob();
+        if (cancelled) return;
+        nextObjectUrl = URL.createObjectURL(blob);
+        setObjectUrl(nextObjectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+
+    return () => {
+      cancelled = true;
+      if (nextObjectUrl) URL.revokeObjectURL(nextObjectUrl);
+    };
+  }, [src]);
+
+  if (failed) {
+    return <p role="alert">Image preview could not be loaded.</p>;
+  }
+
+  if (!objectUrl) {
+    return <p role="status"><LoadingSpinner label="Loading image preview" /> Loading image preview...</p>;
+  }
+
+  return <img src={objectUrl} alt={alt} />;
+}
 
 export function ImageGenerationFeature({
   onGenerated,
@@ -61,7 +105,7 @@ export function ImageGenerationFeature({
               Refresh Models
             </button>
           </div>
-          {feature.modelInventoryLoading ? <p className="ui-text-muted">Loading model inventory...</p> : null}
+          {feature.modelInventoryLoading ? <p className="ui-text-muted" role="status"><LoadingSpinner label="Loading model inventory" /> Loading model inventory...</p> : null}
           {feature.modelInventoryError ? <p role="alert">{feature.modelInventoryError}</p> : null}
           {feature.downloadedImageGenerationModels.length === 0 ? (
             <p className="ui-text-muted" role="note">
@@ -217,7 +261,7 @@ export function ImageGenerationFeature({
 
       <div className="ui-grid ui-grid--two">
         <button className="ui-button" type="button" onClick={() => void feature.start()} disabled={feature.isGenerateDisabled}>
-          Generate
+          {feature.isGenerateDisabled ? <><LoadingSpinner label="Generating image" /> Generating...</> : "Generate"}
         </button>{" "}
         <button className="ui-button" type="button" onClick={() => void feature.cancel()} disabled={feature.isCancelDisabled}>
           Cancel
@@ -234,8 +278,8 @@ export function ImageGenerationFeature({
       ) : null}
 
       <h3>Status</h3>
-      <p>
-        <strong>{feature.status}</strong>
+      <p role={["starting", "queued", "running", "finalizing"].includes(feature.status) ? "status" : undefined}>
+        {["starting", "queued", "running", "finalizing"].includes(feature.status) ? <LoadingSpinner label="Image generation in progress" /> : null} <strong>{feature.status}</strong>
       </p>
       <ul>
         <li>Memory: <strong>{feature.runtimeResources.memoryUsagePercent.toFixed(1)}%</strong></li>
@@ -246,14 +290,28 @@ export function ImageGenerationFeature({
       {feature.error ? <p role="alert">{feature.error}</p> : null}
 
       <h3>Generated Images</h3>
-      <div className="ui-stack ui-stack--sm">
+      <div className="image-generation-current-result ui-stack ui-stack--sm">
         {feature.results.map((asset) => (
           <article key={asset.assetId} className="ui-stack ui-stack--xs">
-            <img src={feature.createPreviewUrl(asset.storageKey)} alt={`Generated image ${asset.assetId}`} />
+            <GeneratedImagePreview src={feature.createPreviewUrl(asset.storageKey)} alt={`Generated image ${asset.assetId}`} />
             <p>{asset.assetId}</p>
           </article>
         ))}
       </div>
+      <section className="ui-stack ui-stack--sm" aria-label="Session gallery">
+        <h3>Session Gallery</h3>
+        {feature.sessionGallery.length > 0 ? (
+          <div className="image-generation-session-gallery image-generation-session-gallery--single">
+            {feature.sessionGallery.map((generation) => (
+              <article key={generation.id} className="ui-stack ui-stack--xs">
+                {generation.assets.map((asset) => (
+                  <GeneratedImagePreview key={`${generation.id}-${asset.assetId}`} src={feature.createPreviewUrl(asset.storageKey)} alt={`Previous generated image ${asset.assetId}`} />
+                ))}
+              </article>
+            ))}
+          </div>
+        ) : <p className="ui-text-muted">Previous generations from this session will appear here.</p>}
+      </section>
     </section>
   );
 }

@@ -19,13 +19,23 @@ export interface ComposeDesktopModelFeatureOptions {
   storageRootDirectory: string;
   now: () => string;
   tokenProvider: () => string | undefined;
+  readSharedModelStorageDirectory?: () => Promise<string | undefined>;
   getArtifacts: () => Promise<any>;
   getRuntimeTaskFeatures: () => Promise<any>;
   getPythonRuntimeFoundation: () => Promise<any>;
 }
 
 export function composeDesktopModelFeature(options: ComposeDesktopModelFeatureOptions): any {
-  const modelRegistry = createLocalModelRegistryAdapter({ filePath: `${options.storageRootDirectory}/model-registry/models.json`, now: options.now });
+  const modelRegistry = createLocalModelRegistryAdapter({
+    filePath: `${options.storageRootDirectory}/model-registry/models.json`,
+    now: options.now,
+    discovery: {
+      searchRoots: async () => {
+        const root = await options.readSharedModelStorageDirectory?.();
+        return root ? [root] : [];
+      },
+    },
+  });
   const huggingFaceModelBrowseDetails = createHuggingFaceModelBrowseDetailsAdapter({ accessTokenProvider: options.tokenProvider });
   const modelPublisher = createHuggingFaceModelPublisherAdapter({
     tokenProvider: options.tokenProvider,

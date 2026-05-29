@@ -1,4 +1,4 @@
-import { readFile as nodeReadFile, stat as nodeStat, writeFile as nodeWriteFile } from "node:fs/promises";
+import { readFile as nodeReadFile, rm as nodeRm, stat as nodeStat, writeFile as nodeWriteFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { RuntimeInstallerPort } from "../../../../application/ports/runtime-installer/runtime-installer.port";
@@ -36,6 +36,7 @@ export interface CreateComfyUiRuntimeInstallerOptions {
   directMlTorchVisionVersion?: string;
   requirementsFileName?: string;
   stat?: typeof nodeStat;
+  rm?: typeof nodeRm;
   readFile?: typeof nodeReadFile;
   writeFile?: typeof nodeWriteFile;
   logging?: LoggingPort;
@@ -77,10 +78,11 @@ interface ComfyUiFinalizationMetadata {
   cudaTorchDependenciesInstalledAt?: string;
   cudaTorchWheelIndexUrl?: string;
   pythonEnvironmentCreatedAt?: string;
+  pythonVersion?: string;
   validationCheckedAt?: string;
   finalizedAt: string;
 }
-export const COMFYUI_FINALIZATION_SCHEMA_VERSION = 3;
+export const COMFYUI_FINALIZATION_SCHEMA_VERSION = 4;
 export const DEFAULT_DIRECTML_TORCH_VERSION = "2.3.1";
 export const DEFAULT_DIRECTML_TORCHAUDIO_VERSION = "2.3.1";
 export const DEFAULT_DIRECTML_TORCHVISION_VERSION = "0.18.1";
@@ -136,6 +138,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
   const directMlTorchVersion = options.directMlTorchVersion ?? DEFAULT_DIRECTML_TORCH_VERSION;
   const pythonEnvironmentMode = options.pythonEnvironmentMode ?? "managed-venv";
   const stat = options.stat ?? nodeStat;
+  const rm = options.rm ?? nodeRm;
   const readFile = options.readFile ?? nodeReadFile;
   const writeFile = options.writeFile ?? nodeWriteFile;
   const finalizationMetadataFileName = options.metadataFileName ?? ".ai-system-builder-comfyui-finalization.json";
@@ -275,18 +278,85 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     }
   }
 
+  function parsePythonVersion(stdout: string): { version: string; major: number; minor: number; patch: number } | undefined {
+    const match = stdout.trim().match(/(\d+)\.(\d+)\.(\d+)/);
+    if (!match) return undefined;
+    return {
+      version: `${match[1]}.${match[2]}.${match[3]}`,
+      major: Number(match[1]),
+      minor: Number(match[2]),
+      patch: Number(match[3]),
+    };
+  }
+
+  function isSupportedComfyUiPythonVersion(version: { major: number; minor: number }): boolean {
+    return version.major === 3 && version.minor >= 10 && version.minor <= 12;
+  }
+
+  async function probePythonVersion(pythonExecutable: string): Promise<{
+    version?: string;
+    unsupported?: boolean;
+    error?: RuntimeInstallResult["error"];
+  }> {
+    if (!options.execFile) return {};
+    try {
+      const result = await runCommandStage({
+        stage: "python-version-check",
+        file: pythonExecutable,
+        args: ["-c", "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')"],
+      });
+      const parsed = parsePythonVersion(result.stdout);
+      if (!parsed) return {};
+      if (!isSupportedComfyUiPythonVersion(parsed)) {
+        return {
+          version: parsed.version,
+          unsupported: true,
+          error: makeError(
+            "unsupported-python-version",
+            "ComfyUI managed runtime requires Python 3.10, 3.11, or 3.12. Python 3.13+ can install but may crash native torch execution.",
+            { pythonVersion: parsed.version, pythonExecutable },
+          ),
+        };
+      }
+      return { version: parsed.version };
+    } catch (error) {
+      const err = error as { stdout?: string; stderr?: string; message?: string };
+      return {
+        error: makeError("python-version-check-failed", "Failed to check ComfyUI Python version", {
+          stdout: err?.stdout,
+          stderr: err?.stderr,
+          message: err?.message,
+          pythonExecutable,
+        }),
+      };
+    }
+  }
+
   async function ensurePythonEnvironment(installRoot: string): Promise<{
     pythonCommand: string;
+    pythonVersion?: string;
     createdAt?: string;
     error?: RuntimeInstallResult["error"];
   }> {
     if (pythonEnvironmentMode === "ambient") {
-      return { pythonCommand };
+      const version = await probePythonVersion(pythonCommand);
+      return { pythonCommand, pythonVersion: version.version, error: version.error };
     }
 
     const managedPythonCommand = buildComfyUiManagedPythonExecutablePath({ installRoot });
     if (await pathExists(managedPythonCommand)) {
-      return { pythonCommand: managedPythonCommand };
+      const managedVersion = await probePythonVersion(managedPythonCommand);
+      if (!managedVersion.unsupported) {
+        return { pythonCommand: managedPythonCommand, pythonVersion: managedVersion.version, error: managedVersion.error };
+      }
+      const environmentRoot = buildComfyUiManagedPythonEnvironmentRoot(installRoot);
+      log("error", "ComfyUI managed Python environment uses an unsupported Python version; recreating managed environment.", {
+        installRoot,
+        environmentRoot,
+        pythonExecutable: managedPythonCommand,
+        pythonVersion: managedVersion.version,
+      });
+      await rm(environmentRoot, { recursive: true, force: true });
     }
 
     if (!options.execFile) {
@@ -306,15 +376,30 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
     const environmentRoot = buildComfyUiManagedPythonEnvironmentRoot(installRoot);
     const stageStartedAt = Date.now();
     log("info", "Creating ComfyUI managed Python environment.", { installRoot, environmentRoot, pythonCommand });
+    const baseVersion = await probePythonVersion(pythonCommand);
+    if (baseVersion.error) {
+      log("error", "ComfyUI managed Python environment creation blocked by unsupported base Python.", {
+        installRoot,
+        environmentRoot,
+        pythonCommand,
+        error: baseVersion.error,
+      });
+      return { pythonCommand, pythonVersion: baseVersion.version, error: baseVersion.error };
+    }
 
     try {
       await runCommandStage({ stage: "python-environment", file: pythonCommand, args: ["-m", "venv", environmentRoot], installRoot });
+      const managedVersion = await probePythonVersion(managedPythonCommand);
+      if (managedVersion.error) {
+        return { pythonCommand: managedPythonCommand, pythonVersion: managedVersion.version, error: managedVersion.error };
+      }
       log("info", "ComfyUI managed Python environment created.", {
         installRoot,
         environmentRoot,
         durationMs: elapsed(stageStartedAt),
+        pythonVersion: managedVersion.version,
       });
-      return { pythonCommand: managedPythonCommand, createdAt: now() };
+      return { pythonCommand: managedPythonCommand, pythonVersion: managedVersion.version, createdAt: now() };
     } catch (error) {
       const err = error as { stdout?: string; stderr?: string; message?: string };
       log("error", "ComfyUI managed Python environment creation failed.", {
@@ -508,7 +593,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       await runCommandStage({
         stage: "cuda-torch-dependency",
         file: dependencyPythonCommand,
-        args: ["-m", "pip", "install", "--upgrade", "torch", "torchvision", "--index-url", cudaTorchWheelIndexUrl],
+        args: ["-m", "pip", "install", "--upgrade", "--no-cache-dir", "torch", "torchvision", "--index-url", cudaTorchWheelIndexUrl],
       });
       log("info", "ComfyUI CUDA torch dependency install completed.", {
         cudaTorchWheelIndexUrl,
@@ -781,6 +866,7 @@ export function createComfyUiRuntimeInstaller(options: CreateComfyUiRuntimeInsta
       cudaTorchDependenciesInstalledAt,
       cudaTorchWheelIndexUrl,
       pythonEnvironmentCreatedAt: pythonEnvironment.createdAt,
+      pythonVersion: pythonEnvironment.pythonVersion,
       validationCheckedAt: validation.checkedAt,
       finalizedAt: now(),
     };

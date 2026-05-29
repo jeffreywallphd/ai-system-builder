@@ -27,9 +27,15 @@ import { createLocalAssetDraftRepositoryAdapter, createLocalAssetOverrideReposit
 import { createLocalEffectiveAssetProjectionRepositoryAdapter } from "../../../adapters/persistence/effective-asset-projections";
 import { createLocalAssetCompositionPlanRepositoryAdapter } from "../../../adapters/persistence/asset-composition";
 import { createLocalRuntimeInventoryRepositoryAdapter, createLocalRuntimeReadinessBindingRepositoryAdapter } from "../../../adapters/persistence/runtime-readiness";
+import { createLocalExecutionPlanRepositoryAdapter } from "../../../adapters/persistence/execution-plans";
+import { createLocalConversationRepositoryAdapters } from "../../../adapters/persistence/conversations";
+import { createLocalExecutionRunRepositoryAdapters } from "../../../adapters/persistence/execution-runs";
+import { composeExecutionPlanServices } from "../../shared/composition/composeExecutionPlanServices";
+import { composeConversationExecutionServices } from "../../shared/composition/composeConversationExecutionServices";
 import { registerElectronIpc } from "../../../adapters/transport/ipc-electron/registerElectronIpc";
 import type { IpcMainHandlePort } from "../../../adapters/transport/ipc-electron/ipcMainHandlePort";
 import { createLoggingConfig, type LoggingConfig } from "../../../contracts/config";
+import { SHARED_MODEL_STORAGE_DIRECTORY_SETTING_KEY } from "../../../contracts/settings";
 import type { LogLevel, LogVerbosity } from "../../../contracts/logging";
 import type { DesktopPythonRuntimeLogEntry, DesktopPythonRuntimeStatusPayload } from "../../../contracts/ipc";
 import type { HuggingFaceFetchImplementation } from "../../../adapters/storage/huggingface";
@@ -39,6 +45,7 @@ import { recordDesktopMemorySnapshot } from "../diagnostics";
 import { createDesktopRuntimeReadinessService } from "./composeDesktopRuntimeReadiness";
 import { createDesktopFeatureLifecycleRegistry, type DesktopFeatureDisposeReason, type DesktopFeatureDisposeResult, type DesktopFeatureLifecyclePolicy, type DesktopFeatureLifecycleStateEntry } from "./featureLifecycle";
 import { createUnavailablePythonRuntimeStatus, resolvePythonRuntimeBaseUrl, type DesktopPythonRuntimeFeature } from "./desktopPythonRuntimeHelpers";
+import { createPythonConversationalRuntimeAdapterCatalog, createPythonConversationalRuntimeGuard, createPythonConversationalTextGenerationInvocationAdapter } from "../../../adapters/runtime/conversational-text-generation";
 export { createDesktopRuntimeReadinessService, type CreateDesktopRuntimeReadinessServiceOptions } from "./composeDesktopRuntimeReadiness";
 
 const HUGGING_FACE_TOKEN_SETTING_KEY = "huggingface.token" as const;
@@ -106,6 +113,9 @@ export interface ComposeDesktopHostOptions {
     huggingFaceFetchImplementation?: HuggingFaceFetchImplementation;
   };
   settings?: { localSettingsFilePath?: string };
+  folderPicker?: {
+    selectFolder: (options?: { title?: string; defaultPath?: string }) => Promise<{ canceled: boolean; path?: string }>;
+  };
 }
 
 export interface RegisterDesktopArtifactUploadIpcOptions {
@@ -191,6 +201,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
     const value = (await applicationSettings.readValues({ keys: [key] }))[0]?.value;
     return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
   };
+  const readSharedModelStorageDirectory = () => readRuntimeSettingString(SHARED_MODEL_STORAGE_DIRECTORY_SETTING_KEY);
 
   let pythonRuntimeFoundationPromise: Promise<DesktopPythonRuntimeFeature> | undefined;
   const getPythonRuntimeFoundation = async () => {
@@ -304,7 +315,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
       }});
       const getAssetFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "asset-registry", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["asset-registry"], milestoneBase: "desktop.host.asset-features", importFeature: async () => {
         const module = await import("./composeDesktopAssetFeature");
-        return async () => module.composeDesktopAssetFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, artifacts: await getArtifactFeatures(), onInternalAssetRegistry: (registry) => { internalAssetRegistry = registry; } });
+        return async () => module.composeDesktopAssetFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, readSharedModelStorageDirectory, artifacts: await getArtifactFeatures(), onInternalAssetRegistry: (registry) => { internalAssetRegistry = registry; } });
       }});
       const getComfyUiInstallFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "comfyui-install", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["comfyui-install"], milestoneBase: "desktop.host.comfyui-install-features", importFeature: async () => {
         const module = await import("./composeDesktopComfyUiInstallFeature");
@@ -320,7 +331,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
       }});
       const getModelFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "model-registry", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["model-registry"], milestoneBase: "desktop.host.model-features", importFeature: async () => {
         const module = await import("./composeDesktopModelFeature");
-        return () => module.composeDesktopModelFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, tokenProvider: () => tokenConfigStore.getToken(), getArtifacts: getArtifactFeatures, getRuntimeTaskFeatures, getPythonRuntimeFoundation });
+        return () => module.composeDesktopModelFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, tokenProvider: () => tokenConfigStore.getToken(), readSharedModelStorageDirectory, getArtifacts: getArtifactFeatures, getRuntimeTaskFeatures, getPythonRuntimeFoundation });
       }});
       const getImageGenerationFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "image-generation", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["image-generation"], milestoneBase: "desktop.host.image-generation-features", importFeature: async () => {
         const module = await import("./composeDesktopImageGenerationFeature");
@@ -362,6 +373,22 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
 
       const runtimeInventoryRepository = createLocalRuntimeInventoryRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
       const runtimeReadinessBindingRepository = createLocalRuntimeReadinessBindingRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const executionPlanRepository = createLocalExecutionPlanRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const executionPlanServices = composeExecutionPlanServices({ executionPlanRepository, runtimeReadinessBindingRepository, compositionPlanRepository: assetCompositionPlanRepository, now: options.now });
+      const conversationRepositories = createLocalConversationRepositoryAdapters({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const executionRunRepositories = createLocalExecutionRunRepositoryAdapters({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const conversationExecutionServices = composeConversationExecutionServices({
+        ...conversationRepositories,
+        ...executionRunRepositories,
+        executionPlanRepository,
+        runtimeReadinessBindingRepository,
+        assetCompositionPlanRepository,
+        adapterCatalog: createPythonConversationalRuntimeAdapterCatalog(),
+        runtimeGuard: { async getRuntimeStatus(adapterId) { return createPythonConversationalRuntimeGuard((await getPythonRuntimeFoundation()).runtimePort).getRuntimeStatus(adapterId); } },
+        invocationPort: { async invokeConversationTurn(request) { return createPythonConversationalTextGenerationInvocationAdapter((await getPythonRuntimeFoundation()).runtimePort).invokeConversationTurn(request); } },
+        hostCapabilities: { submitTurn: "supported", cancelTurn: "unsupported", retryTurn: "unsupported", streaming: false },
+        now: options.now,
+      });
       const runtimeReadinessV2 = {
         inventory: new RuntimeCapabilityInventoryService(runtimeInventoryRepository, [], now),
         inventorySummary: new RuntimeCapabilityInventorySummaryService(runtimeInventoryRepository),
@@ -413,8 +440,10 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           },
           runtimeReadiness,
           runtimeReadinessV2,
+          executionPlans: { create: executionPlanServices.createPlan, validate: executionPlanServices.validatePlan, readModel: executionPlanServices.readModel },
           workspaceServices: startupWorkspaceShell,
           settingsUseCases,
+          selectFolder: options.folderPicker?.selectFolder,
           featureLifecycle: {
             getFeatureLifecycleState: featureLifecycle.getFeatureLifecycleState,
             disposeIdleFeatures: () => featureLifecycle.disposeIdleFeatures("explicit-dev-action"),
@@ -477,6 +506,10 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           disconnectNodes: new DisconnectCompositionNodesUseCase({ repository: assetCompositionPlanRepository, now: options.now }),
           validatePlan: new ValidateAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository, projectionRepository: effectiveAssetProjectionRepository, now: options.now }),
           readModel: assetCompositionReadModel,
+        },
+        conversations: {
+          ipcMain: registerOptions.ipcMain,
+          conversations: conversationExecutionServices,
         },
       });
       recordHostMemorySnapshot("desktop.host.ipc-registration.lazy-handlers.after");

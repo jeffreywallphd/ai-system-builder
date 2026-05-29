@@ -3,6 +3,7 @@ import { describe, expect, it, testDouble } from "../../../../testing/node-test"
 import {
   mapArtifactBrowseApiRequestToCommand,
   mapArtifactMediaViewApiRequest,
+  mapArtifactRegisteredDeleteApiRequestToCommand,
   mapReadArtifactContentResultToApiResponse,
   registerArtifactBrowserApiRoutes,
   type ExpressRoutePort,
@@ -92,11 +93,11 @@ describe("registerArtifactBrowserApiRoutes", () => {
       response,
     );
     await postHandlers.get("/api/artifact/delete")?.(
-      { body: { locator: { storageKey: "uploads/a.png" }, source: "thin-client" }, headers: {} },
+      { body: { locator: { storageKey: "uploads/a.png" }, workspaceId: "workspace-a", source: "thin-client" }, headers: {} },
       response,
     );
     await getHandlers.get("/api/artifact/media/view")?.(
-      { query: { storageKey: "uploads/a.png" }, headers: {} },
+      { query: { storageKey: "uploads/a.png", workspaceId: "workspace-a" }, headers: {} },
       response,
     );
 
@@ -114,11 +115,11 @@ describe("registerArtifactBrowserApiRoutes", () => {
     );
     expect(dependencies.deleteRegisteredArtifactUseCase.execute).toHaveBeenCalledWith(
       { storageKey: "uploads/a.png" },
-      { requestId: undefined, correlationId: undefined },
+      { requestId: undefined, correlationId: undefined, workspaceId: "workspace-a" },
     );
     expect(dependencies.artifactMediaViewRetrieval.retrieveArtifactViewerMediaByStorageKey).toHaveBeenCalledWith(
       { storageKey: "uploads/a.png" },
-      { requestId: undefined, correlationId: undefined },
+      { requestId: undefined, correlationId: undefined, workspaceId: "workspace-a" },
     );
     expect(response.send).toHaveBeenCalled();
   });
@@ -154,9 +155,23 @@ describe("registerArtifactBrowserApiRoutes", () => {
 
     expect(
       mapArtifactMediaViewApiRequest({
-        query: { storageKey: " uploads/image.png " },
+        query: { storageKey: " uploads/image.png ", workspaceId: " workspace-a " },
       }),
-    ).toEqual({ storageKey: "uploads/image.png" });
+    ).toEqual({ storageKey: "uploads/image.png", workspaceId: "workspace-a" });
+
+    expect(() =>
+      mapArtifactRegisteredDeleteApiRequestToCommand(
+        {} as never,
+        { requestId: "req-3", correlationId: "corr-3" },
+      ),
+    ).toThrow("locator.storageKey is required.");
+
+    expect(() =>
+      mapArtifactRegisteredDeleteApiRequestToCommand(
+        { locator: { storageKey: "uploads/image.png" } } as never,
+        { requestId: "req-4", correlationId: "corr-4" },
+      ),
+    ).toThrow("workspaceId is required.");
   });
 
   it("keeps media-view retrieval on separate path and bypasses artifact.content.read use case", async () => {
@@ -181,14 +196,14 @@ describe("registerArtifactBrowserApiRoutes", () => {
     };
 
     await getHandlers.get("/api/artifact/media/view")?.(
-      { query: { storageKey: "uploads/view.png" }, headers: {} },
+      { query: { storageKey: "uploads/view.png", workspaceId: "workspace-a" }, headers: {} },
       response,
     );
 
     expect(dependencies.readArtifactContentUseCase.execute).not.toHaveBeenCalled();
     expect(dependencies.artifactMediaViewRetrieval.retrieveArtifactViewerMediaByStorageKey).toHaveBeenCalledWith(
       { storageKey: "uploads/view.png" },
-      { requestId: undefined, correlationId: undefined },
+      { requestId: undefined, correlationId: undefined, workspaceId: "workspace-a" },
     );
     expect(response.send).toHaveBeenCalled();
   });

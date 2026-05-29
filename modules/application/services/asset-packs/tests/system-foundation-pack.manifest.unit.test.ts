@@ -13,6 +13,7 @@ import {
   SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
   FORM_PRIMITIVE_ENTRIES,
   SHELL_PRIMITIVE_ENTRIES,
+  CONVERSATION_ASSET_ENTRIES,
   UI_STRUCTURAL_PRIMITIVE_ENTRIES,
 } from "../system-packs";
 
@@ -27,6 +28,7 @@ const expectedCategoryGroups = [
   "state-messages",
   "page-feature-shells",
   "workflow-system-shells",
+  "conversational-systems",
 ] as const;
 
 describe("system foundation pack manifest", () => {
@@ -51,6 +53,7 @@ describe("system foundation pack manifest", () => {
         ...FORM_PRIMITIVE_ENTRIES,
         ...DISPLAY_PRIMITIVE_ENTRIES,
         ...SHELL_PRIMITIVE_ENTRIES,
+        ...CONVERSATION_ASSET_ENTRIES,
       ].map((entry) => entry.entryId),
     );
     assert.equal(
@@ -73,6 +76,12 @@ describe("system foundation pack manifest", () => {
     );
     assert.equal(
       SHELL_PRIMITIVE_ENTRIES.every((entry) =>
+        SYSTEM_FOUNDATION_PACK_MANIFEST.assets.includes(entry),
+      ),
+      true,
+    );
+    assert.equal(
+      CONVERSATION_ASSET_ENTRIES.every((entry) =>
         SYSTEM_FOUNDATION_PACK_MANIFEST.assets.includes(entry),
       ),
       true,

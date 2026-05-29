@@ -328,3 +328,14 @@ After Phase 10 composition planning, Phase 11 introduces runtime readiness bindi
 ## Execution Plan Preparation (Phase 12)
 
 Execution plan preparation is the non-executing planning layer between runtime readiness and later execution orchestration. See `docs/architecture/execution-plan-preparation.md` and ADR-0022 for boundaries and handoff semantics.
+
+
+## Phase 13 controlled conversational execution handoff
+
+After Phase 12 execution-plan preparation, the first runnable-system proof is controlled conversational execution (not image-generation-first). This remains part of the general composed-system architecture and requires explicit approval before invocation. See `docs/architecture/controlled-conversational-system-execution.md` and ADR-0023.
+
+
+Phase 13 Review A includes an asset-first corrective requirement: the first conversational proof must originate from reusable conversational assets composed from referenced `system.foundation` primitives where relevant, then execute through controlled runtime session/run records.
+
+- Assets now includes a Run & Test tab for conversational composed-system proof flows (plan-derived session creation, approval, transcript, and safe message submission via existing clients).
+- Review C Cleanup C1 repairs the non-UI boundary under that tab: conversational read models use verified source evidence and current application availability, API/IPC/preload/client session creation no longer accepts renderer/browser display identity claims, server and desktop host composition now provide the conversational service family, and cancel/retry/streaming are represented as unsupported/deferred unless a real application/runtime path supports them. Run & Test UI behavior remains scheduled for C2.

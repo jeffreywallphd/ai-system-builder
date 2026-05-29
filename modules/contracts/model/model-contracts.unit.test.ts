@@ -281,11 +281,13 @@ describe("model contracts", () => {
       search: " demo ",
       limit: 999,
       includeDiscovered: false,
+      includeSharedStorage: true,
     });
 
     expect(list.limit).toBe(MAX_LIST_MODELS_LIMIT);
     expect(list.search).toBe("demo");
     expect(list.includeDiscovered).toBe(false);
+    expect(list.includeSharedStorage).toBe(true);
 
     const del = normalizeDeleteModelRecordRequest({
       workspaceId: "workspace-a" as never,

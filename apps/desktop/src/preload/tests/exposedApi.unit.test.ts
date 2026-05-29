@@ -97,6 +97,15 @@ import {
   createDesktopModelRecordDeleteSuccessResponse,
   createDesktopModelTrainSuccessResponse,
   createDesktopModelTrainStatusSuccessResponse,
+  DESKTOP_CONVERSATION_EXECUTION_V2_CREATE_SESSION_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_APPROVE_SESSION_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_LIST_SESSIONS_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_READ_SESSION_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_READ_TRANSCRIPT_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_READ_TURN_ACTIVITY_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_SUBMIT_TURN_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_CANCEL_TURN_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_RETRY_TURN_REQUEST_CHANNEL,
 } from "../../../../../modules/contracts/ipc";
 import {
   DESKTOP_USER_LIBRARY_PROMOTE_REQUEST_CHANNEL,
@@ -122,6 +131,31 @@ import {
 import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedApi";
 
 describe("desktop preload exposedApi bridge", () => {
+
+  it("maps conversation execution bridge calls to conversation IPC channels", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue({ ok: true, value: {} });
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    await api.createConversationExecutionSessionFromPlan({ workspaceId: 'ws.1', sourceExecutionPlanId: 'ep.1' });
+    await api.approveConversationSession({ workspaceId: 'ws.1', conversationSessionId: 's.1', executionApprovalId: 'ea.1' });
+    await api.listConversationSessions({ workspaceId: 'ws.1' });
+    await api.readConversationSession({ workspaceId: 'ws.1', conversationSessionId: 's.1' });
+    await api.readConversationTranscript({ workspaceId: 'ws.1', conversationSessionId: 's.1' });
+    await api.readConversationTurnActivity({ workspaceId: 'ws.1', conversationSessionId: 's.1', conversationTurnId: 't.1' });
+    await api.submitConversationTurn({ workspaceId: 'ws.1', conversationSessionId: 's.1', text: 'hello', operationId: 'op.1' });
+    await api.cancelConversationTurn({ workspaceId: 'ws.1', conversationSessionId: 's.1', conversationTurnId: 't.1', operationId: 'op.2' });
+    await api.retryConversationTurn({ workspaceId: 'ws.1', conversationSessionId: 's.1', conversationTurnId: 't.1', operationId: 'op.3' });
+    expect(invoke.mock.calls.map((call) => call[0])).toEqual([
+      DESKTOP_CONVERSATION_EXECUTION_V2_CREATE_SESSION_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_APPROVE_SESSION_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_LIST_SESSIONS_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_READ_SESSION_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_READ_TRANSCRIPT_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_READ_TURN_ACTIVITY_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_SUBMIT_TURN_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_CANCEL_TURN_REQUEST_CHANNEL.value,
+      DESKTOP_CONVERSATION_EXECUTION_V2_RETRY_TURN_REQUEST_CHANNEL.value,
+    ]);
+  });
   it("maps runtime readiness reads to dedicated request channel", async () => {
     const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue(
       createDesktopRuntimeReadinessReadSuccessResponse({
@@ -851,6 +885,12 @@ it("maps application settings bridge calls to dedicated settings channels", asyn
       channel: "ipc.application-settings.resolve-model-default.response",
       value: { resolved: { provider: "transformers", modelId: "google/flan-t5-small", inferenceMode: "text2text", source: "builtin" } },
     },
+    {
+      ok: true,
+      operation: "application-settings.select-folder",
+      channel: "ipc.application-settings.select-folder.response",
+      value: { canceled: false, path: "C:\\models" },
+    },
   ];
   let index = 0;
   const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => {
@@ -863,11 +903,14 @@ it("maps application settings bridge calls to dedicated settings channels", asyn
   await api.listApplicationSettingDefinitions();
   const read = await api.readApplicationSettings({ keys: ["huggingface.token"] });
   const resolved = await api.resolveModelDefault({ taskKey: "qaGeneration" });
+  const selected = await api.selectApplicationSettingsFolder({ title: "Models" });
 
   expect(invoke.mock.calls[0]?.[0]).toBe("ipc.application-settings.list-definitions.request");
   expect(invoke.mock.calls[1]?.[0]).toBe("ipc.application-settings.read.request");
+  expect(invoke.mock.calls[3]?.[0]).toBe("ipc.application-settings.select-folder.request");
   expect(read.value.values[0]?.maskedValue).toBe("********");
   expect(resolved.value.resolved.inferenceMode).toBe("text2text");
+  expect(selected.value.path).toBe("C:\\models");
 });
 
 it("maps model management bridge calls to dedicated model channels", async () => {
@@ -1003,5 +1046,38 @@ describe("desktop preload user-library bridge", () => {
     ]);
     expect(Object.keys(api)).not.toContain("invoke");
     expect(Object.keys(api)).not.toContain("userLibraryAssetRepository");
+  });
+});
+
+
+describe("desktop preload execution-plan bridge", () => {
+  it("uses execution-plan IPC contract channels", async () => {
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue({ ok: true, value: {} });
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    await api.createExecutionPlan({ workspaceId: "ws.1", runtimeReadinessBindingId: "rrb.1" });
+    await api.validateExecutionPlan({ workspaceId: "ws.1", executionPlanId: "ep.1" });
+    await api.archiveExecutionPlan({ workspaceId: "ws.1", executionPlanId: "ep.1" });
+    await api.listExecutionPlanSummaries({ workspaceId: "ws.1" });
+    await api.readExecutionPlanDetail({ workspaceId: "ws.1", executionPlanId: "ep.1" });
+    await api.listExecutionPlansForCompositionPlan({ workspaceId: "ws.1", compositionPlanId: "cp.1" });
+    await api.readLatestExecutionPlanForCompositionPlan({ workspaceId: "ws.1", compositionPlanId: "cp.1" });
+    await api.listExecutionPlansForRuntimeReadinessBinding({ workspaceId: "ws.1", runtimeReadinessBindingId: "rrb.1" });
+    await api.readLatestExecutionPlanForRuntimeReadinessBinding({ workspaceId: "ws.1", runtimeReadinessBindingId: "rrb.1" });
+    await api.listExecutionPlansNeedingAttention({ workspaceId: "ws.1" });
+    await api.summarizeWorkspaceExecutionPlans({ workspaceId: "ws.1" });
+
+    expect(invoke.mock.calls.map((call) => call[0])).toEqual([
+      "ipc.execution-plans.create-plan.request",
+      "ipc.execution-plans.validate-plan.request",
+      "ipc.execution-plans.archive-plan.request",
+      "ipc.execution-plans.list-summaries.request",
+      "ipc.execution-plans.read-detail.request",
+      "ipc.execution-plans.list-for-composition-plan.request",
+      "ipc.execution-plans.read-latest-for-composition-plan.request",
+      "ipc.execution-plans.list-for-runtime-readiness-binding.request",
+      "ipc.execution-plans.read-latest-for-runtime-readiness-binding.request",
+      "ipc.execution-plans.list-needing-attention.request",
+      "ipc.execution-plans.summarize-workspace.request",
+    ]);
   });
 });

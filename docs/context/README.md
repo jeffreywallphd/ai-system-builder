@@ -20,6 +20,7 @@ If a context pack/template conflicts with ADRs, architecture docs, or standards 
 - `docs/context/packs/`
   - Reusable context modules used to assemble task-specific prompt context.
   - Packs are compact summaries and routing aids tied back to canonical docs.
+  - Each context pack must stay at or below 200 physical lines. If a pack grows past that limit, summarize duplicated/history-only detail or split it into focused companion packs with updated routing links.
 - `docs/context/templates/`
   - Optional scaffolds for feature, epic, and story context artifacts when structured work-item context is useful.
   - Not every task or feature needs feature/epic/story context files.

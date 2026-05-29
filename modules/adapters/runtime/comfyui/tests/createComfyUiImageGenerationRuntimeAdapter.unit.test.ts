@@ -173,6 +173,29 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
     expect(record.error).toEqual({ code: "comfyui_task_missing", message: "ComfyUI prompt was not found in queue or history." });
   });
 
+  it("returns a failed task record when ComfyUI crashes before status can be read", async () => {
+    const adapter = createComfyUiImageGenerationRuntimeAdapter({
+      supervisor: {
+        ...baseSupervisor,
+        getRecentRuntimeOutput: testDouble.fn(() => ["Windows fatal exception: code 0xc0000374", "File \"torch/_tensor.py\", line 1120 in __rdiv__"]),
+        getRuntimeDeviceMode: testDouble.fn(() => "cpu"),
+      },
+      client: {
+        submitPrompt: testDouble.fn(async () => ({ prompt_id: "p1" })),
+        getQueue: testDouble.fn(async () => { throw new Error("fetch failed"); }),
+        getHistory: testDouble.fn(async () => ({})),
+      },
+      mapperOptions: { defaultCheckpoint: "sdxl" },
+    });
+
+    await adapter.startTask({ taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
+    const record = await adapter.getTaskStatus("r1");
+
+    expect(record.status).toBe("failed");
+    expect(record.error?.code).toBe("comfyui_runtime_crashed");
+    expect(record.error?.message).toContain("ComfyUI crashed while generating the image");
+  });
+
   it("rejects non-image runtime task types", async () => {
     const adapter = createComfyUiImageGenerationRuntimeAdapter({
       supervisor: baseSupervisor,

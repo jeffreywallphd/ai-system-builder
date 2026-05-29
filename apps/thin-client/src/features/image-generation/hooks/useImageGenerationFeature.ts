@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ImageGenerationRequest } from "../../../../../../modules/contracts/image-generation";
 import type { ModelInventoryRecord } from "../../../../../../modules/contracts/model";
 import type { RuntimeTaskRecord, RuntimeTaskStatus } from "../../../../../../modules/contracts/runtime";
+import { createWorkspaceId } from "../../../../../../modules/contracts/workspace";
 import {
   isImageGenerationModelCandidate,
   isImageGenerationModelReady,
@@ -24,7 +25,8 @@ const defaultImageGenerationClient = createApiImageGenerationClient();
 const defaultModelManagementClient = createApiModelManagementClient();
 const defaultArtifactBrowserClient = createApiArtifactBrowserClient();
 
-interface PersistedImageGenerationState { form: ImageGenerationFormState; runtimeMode: ImageGenerationRuntimeMode; status: UiStatus; requestId?: string; error?: string; results: FinalizedImageAsset[]; }
+export interface ThinClientImageGenerationSessionGeneration { id: string; requestId?: string; createdAt: string; assets: FinalizedImageAsset[]; }
+interface PersistedImageGenerationState { form: ImageGenerationFormState; runtimeMode: ImageGenerationRuntimeMode; status: UiStatus; requestId?: string; error?: string; results: FinalizedImageAsset[]; sessionGallery: ThinClientImageGenerationSessionGeneration[]; }
 let persistedState: PersistedImageGenerationState | undefined;
 
 export function isServerInventoryImageGenerationModel(model: ModelInventoryRecord): boolean {
@@ -47,6 +49,32 @@ const parseSeed = (v: string) => { if (!v.trim()) return undefined; const n = Nu
 const randomSeed = () => Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
 const hasFinalizedAssets = (assets: FinalizedImageAsset[] | undefined): assets is FinalizedImageAsset[] => Array.isArray(assets) && assets.length > 0;
 
+function isUnavailableApiError(error: unknown): error is Error & { code: string; status?: number; details?: Record<string, unknown> } {
+  return error instanceof Error && (error as { code?: string }).code === "unavailable";
+}
+
+function runtimeUnavailableMessage(error: Error & { details?: Record<string, unknown> }): string {
+  const status = typeof error.details?.status === "string" ? error.details.status : undefined;
+  const reason = error.details?.reason;
+  const reasonCode = typeof reason === "object" && reason !== null && typeof (reason as { code?: unknown }).code === "string"
+    ? (reason as { code: string }).code
+    : undefined;
+  if (status === "starting" || reasonCode?.includes("starting")) {
+    return "ComfyUI is starting. Wait a moment, then generate again.";
+  }
+  if (status === "installing" || reasonCode?.includes("install")) {
+    return "ComfyUI is setting up its runtime. Wait for setup to finish, then generate again.";
+  }
+  if (status === "failed") {
+    return "ComfyUI is not ready. Check the server logs for the image-generation readiness failure, then try again.";
+  }
+  return error.message || "ComfyUI is not ready yet.";
+}
+
+function taskFailureMessage(task: RuntimeTaskRecord): string {
+  return task.error?.message ?? "Image generation task failed.";
+}
+
 export function useImageGenerationFeature(
   client: ImageGenerationApiClient = defaultImageGenerationClient,
   onGenerated?: (assets: FinalizedImageAsset[]) => void,
@@ -67,6 +95,7 @@ export function useImageGenerationFeature(
   const [requestId, setRequestId] = useState<string | undefined>(persistedState?.requestId);
   const [error, setError] = useState<string | undefined>(persistedState?.error);
   const [results, setResults] = useState<FinalizedImageAsset[]>(persistedState?.results ?? []);
+  const [sessionGallery, setSessionGallery] = useState<ThinClientImageGenerationSessionGeneration[]>(persistedState?.sessionGallery ?? []);
   const [hasAttemptedGeneration, setHasAttemptedGeneration] = useState(false);
   const [unloadModelState, setUnloadModelState] = useState<{ status: "idle" | "loading" | "success" | "error"; message?: string }>({ status: "idle" });
   const [runtimeResources, setRuntimeResources] = useState<{ memoryUsagePercent: number; cpuUsagePercent: number; gpuUsagePercent: number }>({ memoryUsagePercent: 0, cpuUsagePercent: 0, gpuUsagePercent: 0 });
@@ -85,7 +114,7 @@ export function useImageGenerationFeature(
     setModelInventoryLoading(true);
     setModelInventoryError(undefined);
         try {
-      const result = workspaceId ? await modelClient.listModels({ workspaceId }) : { models: [] };
+      const result = workspaceId ? await modelClient.listModels({ workspaceId: createWorkspaceId(workspaceId) }) : { models: [] };
       if (!mountedRef.current || requestId !== modelInventoryRequestRef.current) return;
       const sorted = [...result.models].sort((a, b) => rankInventoryModel(a) - rankInventoryModel(b) || a.displayName.localeCompare(b.displayName));
       const downloadedImageModel = sorted.find((m) => isServerInventoryImageGenerationModel(m) && isImageGenerationModelReady(m));
@@ -102,7 +131,7 @@ export function useImageGenerationFeature(
     } finally {
       if (mountedRef.current && requestId === modelInventoryRequestRef.current) setModelInventoryLoading(false);
     }
-  }, [modelClient]);
+  }, [modelClient, workspaceId]);
 
   useEffect(() => { void refreshModelInventory(); }, [refreshModelInventory]);
 
@@ -120,7 +149,7 @@ export function useImageGenerationFeature(
     } finally {
       if (mountedRef.current && requestId === imageArtifactsRequestRef.current) setImageArtifactsLoading(false);
     }
-  }, [artifactClient]);
+  }, [artifactClient, workspaceId]);
 
   useEffect(() => { void refreshImageArtifacts(); }, [refreshImageArtifacts]);
   useEffect(() => {
@@ -139,7 +168,7 @@ export function useImageGenerationFeature(
       cancelled = true;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [client]);
+  }, [client, workspaceId]);
 
   const validationError = useMemo(() => {
     if (!form.prompt.trim()) return "Prompt is required.";
@@ -156,16 +185,16 @@ export function useImageGenerationFeature(
   const selectedModelRecord = useMemo(() => modelInventory.find((m) => m.modelRecordId === selectedModelRecordId), [modelInventory, selectedModelRecordId]);
 
   const pollUntilTerminal = useCallback(async (id: string, runId: number): Promise<RuntimeTaskRecord | undefined> => {
-    let latest = await client.readImageGeneration({ requestId: id, workspaceId } as never);
+    let latest = await client.readImageGeneration({ requestId: id, workspaceId });
     while (mountedRef.current && pollRunIdRef.current === runId) {
       setStatus(toUiStatus(latest.status));
       if (["succeeded", "failed", "cancelled"].includes(latest.status)) return latest;
       await sleep(POLL_INTERVAL_MS);
       if (!mountedRef.current || pollRunIdRef.current !== runId) return undefined;
-      latest = await client.readImageGeneration({ requestId: id, workspaceId } as never);
+      latest = await client.readImageGeneration({ requestId: id, workspaceId });
     }
     return undefined;
-  }, [client]);
+  }, [client, workspaceId]);
 
   const start = useCallback(async () => {
     setHasAttemptedGeneration(true);
@@ -187,7 +216,7 @@ export function useImageGenerationFeature(
     activeRequestRef.current = undefined;
 
     try {
-      setError(undefined); setResults([]); setRequestId(undefined); setStatus("starting");
+      setError(undefined); setRequestId(undefined); setStatus("starting");
       const payload: ImageGenerationRequest = {
         prompt: form.prompt.trim(), width: parsePositiveInt(form.width)!, height: parsePositiveInt(form.height)!, steps: parsePositiveInt(form.steps)!, numImages: parsePositiveInt(form.numImages)!,
         cfg: Number(form.cfg), denoise: Number(form.denoise),
@@ -218,15 +247,19 @@ export function useImageGenerationFeature(
         }
       }
 
-      if (!workspaceId) { setError("Select a workspace before generating images."); setStatus("failed"); return; } const started = await client.startImageGeneration({ ...payload, workspaceId } as never);
+      if (!workspaceId) { setError("Select a workspace before generating images."); setStatus("failed"); return; } const started = await client.startImageGeneration({ ...payload, workspaceId });
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;
       setRequestId(started.requestId); activeRequestRef.current = started.requestId; setStatus("queued");
 
       const finalTask = await pollUntilTerminal(started.requestId, runId);
       if (!finalTask || !mountedRef.current || pollRunIdRef.current !== runId) return;
-      if (finalTask.status !== "succeeded") return;
+      if (finalTask.status !== "succeeded") {
+        setStatus(toUiStatus(finalTask.status));
+        if (finalTask.status === "failed") setError(taskFailureMessage(finalTask));
+        return;
+      }
       setStatus("finalizing");
-      const finalized = await client.finalizeImageGenerationIfCompleted({ requestId: started.requestId, workspaceId } as never);
+      const finalized = await client.finalizeImageGenerationIfCompleted({ requestId: started.requestId, workspaceId });
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;
       if (!finalized.finalized) {
         setStatus("failed");
@@ -240,15 +273,23 @@ export function useImageGenerationFeature(
         setError("Image generation finalized but did not register any generated image artifacts.");
         return;
       }
+      if (results.length > 0) {
+        setSessionGallery((history) => [{ id: `${started.requestId}-${Date.now()}`, requestId: started.requestId, createdAt: new Date().toISOString(), assets: results }, ...history]);
+      }
       setResults(assets);
       setStatus("finalized");
       onGenerated?.(assets);
     } catch (cause) {
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;
+      if (isUnavailableApiError(cause)) {
+        setStatus("idle");
+        setError(runtimeUnavailableMessage(cause));
+        return;
+      }
       setStatus("failed");
       setError(cause instanceof Error ? cause.message : "Image generation failed.");
     }
-  }, [client, form, onGenerated, pollUntilTerminal, runtimeMode, selectedModelRecord, selectedModelRecordId, status, validationError]);
+  }, [client, form, onGenerated, pollUntilTerminal, results, runtimeMode, selectedModelRecord, selectedModelRecordId, status, validationError, workspaceId]);
 
   const cancel = useCallback(async () => {
     pollRunIdRef.current += 1;
@@ -256,8 +297,8 @@ export function useImageGenerationFeature(
     activeRequestRef.current = undefined;
     setStatus("cancelled");
     if (!id) return;
-    try { await client.cancelImageGeneration({ requestId: id }); } catch { }
-  }, [client, requestId]);
+    try { await client.cancelImageGeneration({ requestId: id, workspaceId }); } catch { }
+  }, [client, requestId, workspaceId]);
 
 
 
@@ -286,8 +327,8 @@ export function useImageGenerationFeature(
 
 
   useEffect(() => {
-    persistedState = { form, runtimeMode, status, requestId, error, results };
-  }, [form, runtimeMode, status, requestId, error, results]);
+    persistedState = { form, runtimeMode, status, requestId, error, results, sessionGallery };
+  }, [form, runtimeMode, status, requestId, error, results, sessionGallery]);
 
   useEffect(() => {
     if (!requestId || !["starting", "queued", "running", "finalizing"].includes(status)) return;
@@ -299,6 +340,7 @@ export function useImageGenerationFeature(
       if (!task || !mountedRef.current || pollRunIdRef.current !== runId) return;
       if (task.status !== "succeeded") {
         setStatus(toUiStatus(task.status));
+        if (task.status === "failed") setError(taskFailureMessage(task));
         return;
       }
       if (finalizedByRequestRef.current.has(requestId)) {
@@ -306,7 +348,7 @@ export function useImageGenerationFeature(
         return;
       }
       setStatus("finalizing");
-      const finalized = await client.finalizeImageGenerationIfCompleted({ requestId, workspaceId } as never);
+      const finalized = await client.finalizeImageGenerationIfCompleted({ requestId, workspaceId });
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;
       if (!finalized.finalized) {
         setStatus("failed");
@@ -320,15 +362,23 @@ export function useImageGenerationFeature(
         setError("Image generation finalized but did not register any generated image artifacts.");
         return;
       }
+      if (results.length > 0) {
+        setSessionGallery((history) => [{ id: `${requestId}-${Date.now()}`, requestId, createdAt: new Date().toISOString(), assets: results }, ...history]);
+      }
       setResults(assets);
       setStatus("finalized");
       onGenerated?.(assets);
     }).catch((cause) => {
       if (!mountedRef.current || pollRunIdRef.current !== runId) return;
+      if (isUnavailableApiError(cause)) {
+        setStatus("idle");
+        setError(runtimeUnavailableMessage(cause));
+        return;
+      }
       setStatus("failed");
       setError(cause instanceof Error ? cause.message : "Image generation failed.");
     });
-  }, [client, onGenerated, pollUntilTerminal, requestId, status]);
+  }, [client, onGenerated, pollUntilTerminal, requestId, results, status, workspaceId]);
 
   const qualityNote = useMemo(() => {
     const width = Number(form.width); const height = Number(form.height); const steps = Number(form.steps);
@@ -340,6 +390,10 @@ export function useImageGenerationFeature(
   const downloadedImageGenerationModels = useMemo(() => imageGenerationModels.filter(isImageGenerationModelReady), [imageGenerationModels]);
   const referenceOnlyImageGenerationModels = useMemo(() => imageGenerationModels.filter((m) => !isImageGenerationModelReady(m)), [imageGenerationModels]);
   const imageGenerationModelOptions = useMemo(() => imageGenerationModels.map(toImageGenerationModelDropdownOption).filter((option): option is NonNullable<typeof option> => Boolean(option)), [imageGenerationModels]);
+  const createPreviewUrl = useCallback(
+    (storageKey: string) => client.createArtifactMediaViewUrl(storageKey, { workspaceId }),
+    [client, workspaceId],
+  );
 
-  return { form, setForm, runtimeMode, setRuntimeMode, status, error, requestId, results, start, cancel, unloadModel, unloadModelState, runtimeResources, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), isUnloadModelDisabled: ACTIVE_STATUSES.includes(status) || unloadModelState.status === "loading", createPreviewUrl: client.createArtifactMediaViewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions, imageArtifacts, imageArtifactsLoading, imageArtifactsError, refreshImageArtifacts };
+  return { form, setForm, runtimeMode, setRuntimeMode, status, error, requestId, results, sessionGallery, start, cancel, unloadModel, unloadModelState, runtimeResources, qualityNote, validationError: hasAttemptedGeneration ? validationError : undefined, isGenerateDisabled: ACTIVE_STATUSES.includes(status), isCancelDisabled: !(requestId && ["queued", "running", "starting", "finalizing"].includes(status)), isUnloadModelDisabled: ACTIVE_STATUSES.includes(status) || unloadModelState.status === "loading", createPreviewUrl, modelInventory, modelInventoryLoading, modelInventoryError, refreshModelInventory, selectedModelRecordId, setSelectedModelRecordId, selectedModelRecord, imageGenerationModels, downloadedImageGenerationModels, referenceOnlyImageGenerationModels, imageGenerationModelOptions, imageArtifacts, imageArtifactsLoading, imageArtifactsError, refreshImageArtifacts };
 }

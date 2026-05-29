@@ -19,6 +19,7 @@
     "test": "node --preserve-symlinks --preserve-symlinks-main dev-tools/scripts/testing/run-non-browser-tests.mjs",
     "test:non-browser": "node --preserve-symlinks --preserve-symlinks-main dev-tools/scripts/testing/run-non-browser-tests.mjs",
     "dev:thin-client": "npm run dev -w @ai-system-builder/thin-client",
+    "dev:secure-thin-client": "node --preserve-symlinks --preserve-symlinks-main dev-tools/scripts/thin-client/dev-secure-thin-client.mjs",
     "build:thin-client": "npm run build -w @ai-system-builder/thin-client",
     "preview:thin-client": "npm run preview -w @ai-system-builder/thin-client",
     "dev:server": "npm run dev -w @ai-system-builder/server",

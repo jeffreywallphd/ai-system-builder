@@ -5,6 +5,8 @@
 > Packs are concise routing aids. They summarize and point to canonical docs; they do not replace canonical docs.
 >
 > **Authoring rule:** remove irrelevant sections. Keep packs short and reusable.
+>
+> **Line budget:** each context pack must be no more than 200 physical lines. If the pack needs more room, split it into a focused companion pack or replace historical detail with links to canonical docs.
 
 ## Pack Title
 
@@ -25,7 +27,7 @@
 
 ## Core Guidance
 
-- 3–7 high-signal guidance bullets.
+- 3-7 high-signal guidance bullets.
 - Keep actionable and boundary-aware.
 
 ## Key Constraints

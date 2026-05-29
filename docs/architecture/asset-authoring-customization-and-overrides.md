@@ -189,6 +189,19 @@ Override records must **not** contain:
 - explicitly allowlisted user-facing configuration fields;
 - safe metadata keys that satisfy sanitization rules.
 
+### Custom asset type classification
+
+The Phase 8 creation UI uses the allowlisted `classification` editable field to capture the user's intended custom asset type without expanding the Asset Kernel contract surface. Supported UI classifications are:
+
+- `workflow-asset`: reusable workflow or process building block.
+- `system-asset`: reusable system or subsystem building block.
+- `component-asset`: reusable interface/component building block.
+- `data-asset`: reusable data or dataset-oriented building block.
+- `model-asset`: reusable model-oriented building block.
+- `tool-asset`: reusable tool/action building block.
+
+These classifications are user-facing authoring metadata on workspace-local drafts and authored records. They do not grant runtime execution capability, mutate system-owned assets, or replace the canonical `AssetType`/`AssetFamily` vocabulary.
+
 ### Deferred/higher-risk fields
 
 - raw prompt text;

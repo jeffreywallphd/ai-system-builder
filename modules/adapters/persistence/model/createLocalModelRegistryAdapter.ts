@@ -1,8 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Dirent } from "node:fs";
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 
 import {
   normalizeModelInventoryRecord,
@@ -30,17 +29,20 @@ interface ModelRegistryFileShape {
 }
 
 type DirectoryEntry = Dirent<string>;
+type SharedModelDiscoveryRootProvider = string[] | (() => string[] | Promise<string[]>);
 
 export interface LocalModelRegistryAdapterOptions {
   filePath: string;
   now?: () => string;
   discovery?: {
     enabled?: boolean;
-    searchRoots?: string[];
+    searchRoots?: SharedModelDiscoveryRootProvider;
     env?: NodeJS.ProcessEnv;
     homeDirectory?: string;
   };
 }
+
+const CHECKPOINT_EXTENSIONS = new Set([".safetensors", ".ckpt"]);
 
 function toTrimmedText(value: string | undefined): string | undefined {
   if (typeof value !== "string") {
@@ -64,8 +66,6 @@ function normalizeOptionalPath(value: string | undefined): string | undefined {
 export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapterOptions): ModelRegistryPort {
   const now = options.now ?? (() => new Date().toISOString());
   const discoveryEnabled = options.discovery?.enabled !== false;
-  const environment = options.discovery?.env ?? process.env;
-  const homeDirectory = options.discovery?.homeDirectory ?? homedir();
   let registryWriteQueue: Promise<void> = Promise.resolve();
 
   async function readDocument(): Promise<ModelRegistryFileShape> {
@@ -162,30 +162,17 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     return next;
   }
 
-  function resolveDiscoveryRoots(): string[] {
+  async function resolveDiscoveryRoots(): Promise<string[]> {
     const roots = new Set<string>();
-    for (const configuredRoot of options.discovery?.searchRoots ?? []) {
+    const configuredRoots = typeof options.discovery?.searchRoots === "function"
+      ? await options.discovery.searchRoots()
+      : options.discovery?.searchRoots ?? [];
+    for (const configuredRoot of configuredRoots) {
       const normalized = normalizeOptionalPath(configuredRoot);
       if (normalized) {
         roots.add(normalized);
       }
     }
-
-    for (const variableName of ["HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE", "TRANSFORMERS_CACHE"] as const) {
-      const value = normalizeOptionalPath(environment[variableName]);
-      if (value) {
-        roots.add(value);
-      }
-    }
-
-    const hfHome = normalizeOptionalPath(environment.HF_HOME);
-    if (hfHome) {
-      roots.add(join(hfHome, "hub"));
-      roots.add(join(hfHome, "models"));
-    }
-
-    roots.add(join(homeDirectory, ".cache", "huggingface", "hub"));
-    roots.add(join(homeDirectory, ".cache", "huggingface", "models"));
     return [...roots];
   }
 
@@ -234,7 +221,57 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     return newest?.path;
   }
 
-  async function discoverCachedModels(existing: ModelInventoryRecord[]): Promise<ModelInventoryRecord[]> {
+  function isCheckpointFile(fileName: string): boolean {
+    return CHECKPOINT_EXTENSIONS.has(extname(fileName).toLowerCase());
+  }
+
+  async function firstCheckpointFile(path: string): Promise<string | undefined> {
+    let entries: DirectoryEntry[];
+    try {
+      entries = await readdir(path, { withFileTypes: true });
+    } catch {
+      return undefined;
+    }
+
+    return entries
+      .filter((entry) => entry.isFile() && isCheckpointFile(entry.name))
+      .map((entry) => entry.name)
+      .sort((a, b) => a.localeCompare(b))[0];
+  }
+
+  function createSharedModelRecord(input: {
+    workspaceId: WorkspaceId;
+    localPath: string;
+    recordSeedPath?: string;
+    displayName: string;
+    modelId?: string;
+    artifactForm: ModelInventoryRecord["artifactForm"];
+    checkpointFile?: string;
+  }): ModelInventoryRecord {
+    const timestamp = now();
+    return normalizeModelInventoryRecord({
+      workspaceId: input.workspaceId,
+      modelRecordId: buildStableModelRecordId(`shared:${input.recordSeedPath ?? input.localPath}`),
+      displayName: input.displayName,
+      source: "local",
+      lifecycleStatus: "downloaded",
+      artifactForm: input.artifactForm,
+      provider: input.modelId ? "huggingface" : "unknown",
+      modelId: input.modelId,
+      localPath: input.localPath,
+      createdAt: timestamp,
+      inferenceMode: input.artifactForm === "checkpoint" ? "text-to-image" : undefined,
+      taskTags: input.artifactForm === "checkpoint" ? ["text-to-image"] : undefined,
+      storageScope: "shared",
+      metadata: {
+        discovery: input.modelId ? "huggingface-cache" : "shared-model-directory",
+        storageScope: "shared",
+        checkpointFile: input.checkpointFile,
+      },
+    });
+  }
+
+  async function discoverSharedModels(existing: ModelInventoryRecord[], workspaceId: WorkspaceId): Promise<ModelInventoryRecord[]> {
     if (!discoveryEnabled) {
       return [];
     }
@@ -244,7 +281,7 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     const discovered: ModelInventoryRecord[] = [];
     const seenDiscoveredPaths = new Set<string>();
 
-    for (const cacheRoot of resolveDiscoveryRoots()) {
+    for (const cacheRoot of await resolveDiscoveryRoots()) {
       let rootEntries: DirectoryEntry[];
       try {
         rootEntries = await readdir(cacheRoot, { withFileTypes: true });
@@ -258,38 +295,46 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
       }
 
       for (const entry of rootEntries) {
-        if (!entry.isDirectory()) {
+        if (entry.isFile() && isCheckpointFile(entry.name)) {
+          const localPath = cacheRoot;
+          const seedPath = join(cacheRoot, entry.name);
+          if (knownPaths.has(localPath) || seenDiscoveredPaths.has(seedPath)) {
+            continue;
+          }
+          discovered.push(createSharedModelRecord({
+            workspaceId,
+            localPath,
+            recordSeedPath: seedPath,
+            displayName: basename(entry.name, extname(entry.name)),
+            artifactForm: "checkpoint",
+            checkpointFile: entry.name,
+          }));
+          seenDiscoveredPaths.add(seedPath);
           continue;
         }
 
-        const modelId = toModelIdFromRepoDirectoryName(entry.name);
-        if (!modelId || knownModelIds.has(modelId)) {
-          continue;
-        }
+        if (!entry.isDirectory()) continue;
 
         const repoRoot = join(cacheRoot, entry.name);
-        const snapshotRoot = await newestDirectory(join(repoRoot, "snapshots"));
+        const modelId = toModelIdFromRepoDirectoryName(entry.name);
+        const snapshotRoot = modelId ? await newestDirectory(join(repoRoot, "snapshots")) : undefined;
         const localPath = snapshotRoot ?? repoRoot;
+        const checkpoint = await firstCheckpointFile(localPath);
+        const artifactForm = checkpoint ? "checkpoint" : "full-model";
+        const displayName = modelId ?? entry.name;
+        if (modelId && knownModelIds.has(modelId)) {
+          continue;
+        }
         if (knownPaths.has(localPath) || seenDiscoveredPaths.has(localPath)) {
           continue;
         }
 
-        const timestamp = now();
-        discovered.push(normalizeModelInventoryRecord({
-          workspaceId: existing[0]?.workspaceId as WorkspaceId,
-          modelRecordId: buildStableModelRecordId(`discovered:${localPath}`),
-          displayName: modelId,
-          source: "local",
-          lifecycleStatus: "downloaded",
-          artifactForm: "full-model",
-          provider: "huggingface",
-          modelId,
+        discovered.push(createSharedModelRecord({
+          workspaceId,
           localPath,
-          createdAt: timestamp,
-          metadata: {
-            discoveredFrom: cacheRoot,
-            discovery: "huggingface-cache",
-          },
+          displayName,
+          modelId,
+          artifactForm,
         }));
         seenDiscoveredPaths.add(localPath);
       }
@@ -304,9 +349,11 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
       const document = await readDocument();
       const limit = request.limit ?? 50;
       const normalizedModels = (document.models ?? []).map(normalizeModelInventoryRecord);
-      // Workspace model inventory must not masquerade global cache discovery as
-      // workspace-owned records. Explicit import/download can create scoped records later.
-      const allModels = normalizedModels;
+      const includeSharedStorage = request.includeDiscovered !== false || request.includeSharedStorage === true;
+      const sharedModels = includeSharedStorage
+        ? await discoverSharedModels(normalizedModels, request.workspaceId)
+        : [];
+      const allModels = [...normalizedModels, ...sharedModels];
 
       const filtered = allModels.filter((model) => matchesFilters(model, request));
       return {
@@ -318,7 +365,9 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     async getModelRecord(workspaceId: WorkspaceId, modelRecordId: string): Promise<ModelInventoryRecord | undefined> {
       assertWorkspaceId(workspaceId);
       const document = await readDocument();
-      return (document.models ?? []).map(normalizeModelInventoryRecord).find((record) => record.workspaceId === workspaceId && record.modelRecordId === modelRecordId);
+      const persisted = (document.models ?? []).map(normalizeModelInventoryRecord).find((record) => record.workspaceId === workspaceId && record.modelRecordId === modelRecordId);
+      if (persisted) return persisted;
+      return (await discoverSharedModels((document.models ?? []).map(normalizeModelInventoryRecord), workspaceId)).find((record) => record.modelRecordId === modelRecordId);
     },
 
     async saveModelReference(request: SaveModelReferenceRequest): Promise<SaveModelReferenceResult> {
@@ -339,6 +388,7 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
         taskTags: request.taskTags,
         createdAt: timestamp,
         metadata: request.metadata,
+        storageScope: "workspace",
       });
 
       await updateDocument((document) => ({
@@ -376,6 +426,7 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
         sizeBytes: request.sizeBytes,
         createdAt: timestamp,
         metadata: request.metadata,
+        storageScope: "workspace",
       });
 
       await updateDocument((document) => ({
@@ -411,6 +462,7 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
         sizeBytes: request.sizeBytes,
         createdAt: timestamp,
         metadata: request.metadata,
+        storageScope: "workspace",
       });
 
       await updateDocument((document) => ({

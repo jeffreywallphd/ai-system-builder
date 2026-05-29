@@ -41,3 +41,7 @@ export * from "./desktop-user-library-contract";
 export * from "./desktop-asset-authoring-contract";
 
 export * from "./desktop-runtime-readiness-v2-contract";
+
+export * from "./desktop-execution-plans-contract";
+
+export * from './desktop-conversation-execution-v2-contract';
