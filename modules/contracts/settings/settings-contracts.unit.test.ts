@@ -20,6 +20,7 @@ describe("settings contracts", () => {
     expect(keys.has("huggingface.defaultNamespace")).toBe(true);
     expect(keys.has(GLOBAL_MODEL_DEFAULT_SETTING_KEY)).toBe(true);
     expect(keys.has(createTaskModelDefaultSettingKey("qaGeneration"))).toBe(true);
+    expect(keys.has("models.sharedStorageDirectory")).toBe(true);
     expect(keys.has(createFeatureModelDefaultSettingKey("datasetPreparation", "qaGeneration"))).toBe(true);
     expect(keys.has("runtime.imageGeneration.gpuType")).toBe(true);
     expect(keys.has("runtime.torch.cudaWheelIndexUrl")).toBe(true);
@@ -106,6 +107,7 @@ describe("settings contracts", () => {
     expect(findApplicationSettingDefinition("huggingface.token")?.valueKind).toBe("secret");
     expect(findApplicationSettingDefinition(GLOBAL_MODEL_DEFAULT_SETTING_KEY)?.valueKind).toBe("object");
     expect(findApplicationSettingDefinition(createTaskModelDefaultSettingKey("qaGeneration"))?.valueKind).toBe("object");
+    expect(findApplicationSettingDefinition("models.sharedStorageDirectory")?.valueKind).toBe("folder");
     expect(
       findApplicationSettingDefinition(createFeatureModelDefaultSettingKey("datasetPreparation", "qaGeneration"))?.valueKind,
     ).toBe("object");
@@ -150,6 +152,13 @@ describe("settings contracts", () => {
       "runtime.python.defaultDevice",
       "runtime.python.defaultTorchDtype",
       "runtime.torch.cudaWheelIndexUrl",
+    ]);
+
+    const modelDefinitions = listApplicationSettingDefinitionsByCategory("models");
+    expect(modelDefinitions.map((definition) => definition.key).sort()).toEqual([
+      "models.default",
+      "models.sharedStorageDirectory",
+      "models.tasks.qaGeneration.default",
     ]);
   });
 });

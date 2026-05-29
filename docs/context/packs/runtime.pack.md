@@ -4,114 +4,91 @@
 
 ## Purpose
 
-- Guide runtime-related implementation while preserving the repository’s TypeScript-first, adapter-driven model.
+- Guide runtime-related implementation while preserving the TypeScript-first, adapter-driven architecture.
+- Keep runtime execution, readiness, diagnostics, and task lifecycle responsibilities distinct.
 
 ## Use When
 
-- Implementing runtime execution flow or runtime contracts.
-- Integrating Python/runtime adapters.
-- Designing runtime boundary error/timing/translation behavior.
+- Implementing runtime execution flow, runtime contracts, Python/ComfyUI adapters, runtime task behavior, runtime readiness, or runtime diagnostics.
+- Diagnosing runtime-backed feature failures.
+- Changing runtime root, sidecar, installer, or capability-provider behavior.
 
 ## Do Not Use When
 
-- Tasks that do not touch runtime execution or runtime contracts.
-- Pure UI, documentation-only, or host wiring changes with no runtime impact.
+- Pure UI/docs work with no runtime execution or capability impact.
+- Host wiring work that only passes through existing runtime seams and does not change runtime behavior.
 
 ## Core Guidance
 
-- Node.js + TypeScript is the default runtime path for core architecture.
-- Use one orchestration model centered in application/domain design.
-- Use one runtime contract model for boundary consistency.
-- Support multiple runtimes through adapters (`modules/adapters/runtime/`), not feature-by-feature patterns.
-- Keep shared runtime vocabulary in `modules/contracts/runtime/` and keep adapter protocol specifics out of core contracts.
-- Use runtime readiness contracts for transport-neutral host-owned capability availability; do not use them as Python/ComfyUI protocol payloads or task lifecycle records.
-- Keep runtime diagnostics as a strict specialization of shared logging vocabulary (not a parallel runtime-only diagnostics schema).
-- Keep runtime operation identity helper-driven (`lowercase.dot.segments`) to prevent per-adapter naming drift.
-- Keep runtime diagnostic mapping to `StructuredLogEvent` mechanical and stable across adapters.
-- Keep runtime-specific mechanics out of domain/application logic.
-- Treat Python as an adapter path, not a co-equal architecture center.
-- Define or update runtime contracts before adding runtime-specific behavior.
-- Runtime readiness describes capability availability before/around execution; the Runtime Task Registry remains the lifecycle authority for accepted long-running tasks. Runtime-backed feature starts should guard the derived feature capability when available, reject non-ready statuses as unavailable before task creation, and leave task read/cancel/list/status semantics to the registry. Rejected starts should not return pollable task ids. Model publishing has a composed readiness capability today, but desktop/server intentionally report it as unavailable/not implemented until a runtime task implementation exists.
+- Node.js + TypeScript is the default core runtime path.
+- Python/ComfyUI and other runtimes are adapter paths under `modules/adapters/runtime`.
+- Shared runtime vocabulary belongs in `modules/contracts/runtime`.
+- Runtime-specific protocol details stay out of core contracts and application/domain logic.
+- Runtime operation identity should be helper-driven and transport-neutral.
+- Runtime diagnostics specialize shared structured logging; do not invent parallel runtime-only diagnostics.
+- Runtime readiness describes host-owned capability availability; it is not a runtime protocol payload or task lifecycle record.
+- Runtime Task Registry is the lifecycle authority for accepted long-running tasks.
+- Feature starts should guard required readiness before task creation and should not return pollable task ids when rejected as unavailable.
 
-## Runtime readiness vocabulary
+## Runtime Readiness Rules
 
-- Shared readiness contracts live under `modules/contracts/runtime/` and are exported from the runtime family barrel.
-- Capability ids currently cover Python runtime, ComfyUI runtime, image generation, dataset preparation, model training, model validation, and model publishing; model publishing is explicitly unavailable/not implemented in current desktop/server composition.
-- Readiness status/action values are shared vocabulary for host/API/IPC/UI mapping; transports wrap these contracts rather than redefining them.
-- The application runtime readiness service translates composed host-owned provider signals (for example supervisor health or installer status readers) into readiness snapshots using this vocabulary.
-- A single readiness snapshot should use snapshot-scoped capability resolution: each top-level capability provider is read at most once, and derived feature dependency statuses should match the capability statuses resolved for that same snapshot.
-- Snapshot scope is host-composed; default snapshots include composed provider capabilities only, while all known capabilities are reported only when a host explicitly chooses that scope.
-- Missing-provider statuses are for direct capability reads or explicitly requested snapshot capabilities without providers, not for every capability a host intentionally does not support.
-- Host composition provides concrete signal readers/providers and may combine multiple same-capability signals into one capability status; desktop IPC exposes the desktop host-scoped snapshot, while server API exposure remains deferred to a server prompt.
-- Runtime-specific protocol details, filesystem paths, temp paths, secrets, tokens, raw exception messages, command lines, HTTP internals, and raw process data stay in adapters or diagnostics, not readiness fields; provider exceptions become sanitized `runtime.readiness.provider-failed` statuses with retry/view-logs actions and safe `failureKind`/`capabilityId` details only.
-- The readiness service does not own process lifecycle, installation/discovery/repair/update status, or runtime task execution; supervisors, installer ports, and Runtime Task Registry remain the respective authorities. Readiness reads and task status/cancel/list reads must not start, stop, install, repair, or unboundedly probe runtimes. Provider-level failures should be isolated into sanitized readiness/status objects where possible.
+- Capability ids cover Python runtime, ComfyUI runtime, image generation, dataset preparation, model training, model validation, and model publishing.
+- Model publishing may be composed as a readiness capability while still reporting unavailable/not implemented until a task implementation exists.
+- Readiness snapshots are host-scoped and should read each top-level provider at most once per snapshot.
+- Missing-provider statuses are for direct or explicitly requested capabilities, not every unsupported future capability.
+- Readiness reads, task status reads, task cancel reads, and task list reads must not start, stop, install, repair, or unboundedly probe runtimes.
+- Provider failures become sanitized readiness/status objects with safe codes/details.
 
 ## Key Constraints
 
-- No runtime-specific leakage into core use-case or domain design.
+- No runtime-specific leakage into domain/application logic.
 - Avoid ad hoc per-feature protocols and speculative runtime plugin frameworks.
-- Runtime protocol details that are not finalized must remain isolated and easy to evolve.
-- Maintain runtime contract invariant tests for operation identity and runtime/logging diagnostic alignment.
-
-## Canonical Source Docs
-
-- `docs/adr/ADR-0002-typescript-first-runtime-model.md` — core runtime decision and alternatives rejected.
-- `docs/architecture/runtime-model.md` — runtime responsibilities, boundaries, and open areas.
-- `docs/architecture/module-dependency-rules.md` — dependency constraints for adapter integration.
-- `docs/standards/coding-standards.md` — boundary-safe implementation requirements.
-- `docs/standards/testing-standards.md` — testing approach for runtime adapters and boundaries.
-
-## Common Over-Inclusions to Avoid
-
-- Full host model details when runtime work is host-agnostic.
-- Transport adapter specifics unless runtime invocation crosses transport boundaries.
-- Unnecessary architecture background unrelated to runtime execution.
-
-## Prompt Assembly Notes
-
-## Host-owned runtime instances
-
-- Runtime contracts are shared; runtime instances are host-owned.
-- Desktop and server runtime roots/processes are independent by default.
-- Future per-feature remote/local routing belongs in host composition.
-- ADR-0013 is the canonical source for cross-host runtime ownership.
-
-
-- Typical set: `index` + `runtime`.
-- Add `architecture` for cross-layer decisions.
-- Add `logging` for diagnosability-heavy runtime work and `testing` for bug fixes/refactors.
-
-- Runtime env vars and logs must be redacted for secrets.
-- Runtime temp paths should not be exposed to clients/contracts.
-- Runtime/model/plugin downloads are supply-chain security concerns.
-
-## Server API readiness note
-
-- Server API readiness is now a server transport wrapper over the application `RuntimeReadinessService` and shared runtime readiness contracts. Reads are host-scoped and must remain no-start/no-install/no-repair; do not use image-generation/model endpoints as general readiness probes.
+- Keep filesystem paths, temp paths, env values, secrets, tokens, raw exception messages, command lines, HTTP internals, process internals, and raw adapter payloads out of public readiness/task payloads.
+- Runtime/model/plugin downloads are supply-chain concerns and should route through installer/security/storage guidance when touched.
+- Runtime roots are not Asset Kernel record roots or resource-backed view discovery roots.
 
 ## Asset Kernel Notes
 
-- Include `asset-kernel.pack.md` when assets declare runtime requirements or bind tools/workflows/models to runtime capabilities.
-- Asset requirements should reference shared `RuntimeCapabilityId` values and must not duplicate runtime readiness or task-registry contracts.
-- Asset validation may structurally check declared requirements, but it must not execute runtimes or probe heavy sidecars.
-- Phase 3 image/generated-output resource-backed views are read-side descriptor projections only. They must not query runtime readiness, task status/list delegates, ComfyUI, or image-generation execution paths to discover outputs; already-known generated-output descriptors must be supplied through a safe descriptor source.
-- Detail reads for generated-output views should use the injected generated-output descriptor read seam when available and must not fall back to Runtime Task Registry discovery. Generated outputs remain unfinalized/unregistered until a separate finalization/registration path runs elsewhere.
-- Phase 4 Prompt 4 implements that separate internal finalization/registration path without making the Asset Kernel use case a runtime or task-registry reader. It re-reads only a safe generated-output descriptor/view by id and delegates resource persistence to a narrow image/artifact application port; it must not query Runtime Task Registry, runtime readiness, ComfyUI, Python runtimes, task lifecycle operations, runtime roots, or execution adapters.
-- Dataset/model resource-backed views must not use runtime readiness, Runtime Task Registry, dataset preparation, model training, model validation, model publishing, or runtime/provider clients to discover or enrich records. Dataset views are descriptor-only, and model views read persisted inventory only with model discovery disabled.
-- External repository object resource-backed views must not use runtime readiness, Runtime Task Registry, model publishing tasks, provider clients, or repository/cache/file reads to discover or refresh external objects. Persisted model publishing summaries may be projected only as already-known metadata and must not trigger publish status checks or runtime work.
-- Phase 3 Review B preserves that boundary across aggregate reads: external provider labels are descriptor metadata only, repository object paths are omitted from public output by default, and cross-family aggregation must not call runtime readiness, Runtime Task Registry, provider clients, discovery, import/localize/publish, or byte/content reads.
-- Phase 3 Prompt 7 desktop/server host wiring keeps that no-runtime boundary: the resource-backed provider aggregate is built from safe descriptor/read seams and is passed to the internal Asset Registry only. Runtime roots are not provider input, and provider construction/list/read paths must not call runtime readiness, Runtime Task Registry, ComfyUI, Python runtime, generation, finalization, dataset preparation, model training/validation/publishing, or runtime install/probe/start behavior.
-- Phase 3 Prompt 8 confirms stabilization only: resource-backed Asset Registry reads remain descriptor projections and must not become runtime readiness probes, runtime task discovery, image generation/finalization, dataset preparation, model training/validation/publishing, workflow execution, install/repair/start behavior, or runtime-root scans.
+- Include `asset-kernel` when assets declare runtime requirements or bind tools/workflows/models to runtime capabilities.
+- Asset requirements may reference shared `RuntimeCapabilityId` values but must not duplicate readiness or task-registry contracts.
+- Asset validation may structurally check requirements but must not execute or probe runtimes.
+- Resource-backed Asset Registry reads must not use runtime readiness, Runtime Task Registry, ComfyUI, Python runtimes, generation, finalization, dataset preparation, model training/validation/publishing, or runtime install/probe/start behavior to discover records.
+- Generated-output finalization is a separate controlled workflow and must not make Asset Kernel reads query runtime/task state.
 
-## Asset Kernel built-in catalog note
+## Workspace Notes
 
-- Phase 2B Prompt 4 built-in Asset Kernel definitions may declare `runtime-capability` requirements using shared `RuntimeCapabilityId` values (`image-generation`, `dataset-preparation`, `model-training`, `model-validation`, and `model-publishing`). These definitions do not query readiness, start runtimes, create runtime tasks, or imply executable/ready status. The `model-publishing` built-in explicitly remains unavailable/not implemented until a runtime publishing path exists.
+- Runtime task outputs created from workspace actions require explicit workspace context where implemented.
+- Missing workspace context must fail safely for workspace-owned runtime outputs and must not fall back to global records.
+- Global runtime readiness and provider diagnostics may remain global but must not masquerade as workspace-owned resources.
 
+## Canonical Source Docs
 
-Phase 6 Prompt 9 update: User/workspace-owned image asset records, generated-output descriptors/finalization, dataset preparation outputs, model inventory records, and runtime task outputs created from workspace actions require an explicit workspace id. Missing workspace context must fail safely and must not fall back to global records. Workspace-owned records from one workspace must not be listed or read as another workspace. Generated-output finalization validates source workspace ownership before writing finalized image assets or Asset Kernel instances, and finalized provenance/metadata carries workspace context. Legacy global image/model/dataset/generated-output records are not silently assigned to a hidden/default workspace and are not auto-migrated; a future explicit import/migration flow may be needed. Global runtime readiness, installed-runtime/model diagnostics, and provider configuration diagnostics may remain global, but they must not be presented as workspace-owned resource records. User-library and cross-workspace reuse remain later work.
+- `docs/adr/ADR-0002-typescript-first-runtime-model.md` - core runtime decision.
+- `docs/adr/ADR-0013-cross-host-runtime-ownership.md` - desktop/server runtime ownership.
+- `docs/architecture/runtime-model.md` - runtime responsibilities and boundaries.
+- `docs/architecture/runtime-readiness-binding.md` - readiness/capability handoff.
+- `docs/architecture/module-dependency-rules.md` - adapter dependency constraints.
+- `docs/standards/logging-standards.md` - runtime diagnostics and redaction.
+- `docs/standards/testing-standards.md` - runtime adapter and boundary testing.
 
-## Phase 6 final stabilization / Phase 7 handoff
+## Companion Packs
 
-Phase 6 final state: workspace is the normal boundary for user/project resources. No active workspace means workspace-scoped pages are gated and must not render underlying feature components or call workspace-scoped clients. Active workspace display uses the workspace display name. System Foundation remains system-owned and is made available only through a `system.foundation@1.0.0` workspace activation reference; workspace creation must not call the Phase 5 installer, copy pack definitions, create a hidden/default workspace, or perform startup seeding. Workspace-owned artifacts/uploads, image assets, generated outputs/finalization, dataset outputs, model records, and runtime task outputs require explicit workspace context where implemented, must not leak across Workspace A/B, and must not fall back to legacy global records. Global runtime readiness and system/provider diagnostics may remain global but must not masquerade as workspace-owned records. Collaboration fields are passive placeholders only.
+- `runtime-task-registry` for start/read/cancel/list lifecycle behavior.
+- `runtime-installer` for installation, dependency setup, and installer state.
+- `image-generation` for ComfyUI/image generation feature behavior.
+- `server-host` or `desktop-host` when host-owned runtime composition changes.
+- `security` for process, dependency, env, credential, and diagnostic hardening.
+- `testing` for runtime regressions and adapter behavior.
 
-Phase 7 is User Library and Cross-Workspace Asset Reuse. It should define explicit promote/link/copy/import flows and provenance/resolver behavior without accidental propagation. Do not implement user-library, cross-workspace reuse, collaboration permissions, invites/sync/remote auth, asset authoring, override editing, pack import/export/install, marketplace, visual composition, workflow execution expansion, provider/network expansion, or automatic legacy migration as part of Phase 6 stabilization.
+## Common Over-Inclusions To Avoid
+
+- Full host model detail for host-agnostic runtime contract work.
+- Transport adapter specifics unless invocation crosses API/IPC boundaries.
+- Treating readiness reads as health probes that start or repair sidecars.
+- Keeping phase history in runtime prompt context.
+
+## Prompt Assembly Notes
+
+- Typical set: `index` + `runtime`.
+- Add `runtime-task-registry`, `runtime-installer`, or feature packs only when those responsibilities are directly touched.
+- Add `logging` for diagnosability-heavy runtime work and `testing` for fixes/refactors.

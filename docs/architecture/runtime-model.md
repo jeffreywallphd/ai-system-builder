@@ -126,6 +126,8 @@ Runtime contracts and adapters are shared; runtime instances are owned by the ex
 
 Desktop and server may both use ComfyUI adapters, but each host owns its own process/install/cache state by default. Runtime roots store sidecar installs, managed Python environments, dependency state, caches, and temp outputs. Artifact storage stores durable user/system artifacts.
 
+Configured shared model storage is host-owned runtime-adjacent input, not a runtime install root and not workspace persistence. The model registry/checkpoint resolver may scan the configured host-local folder for Hugging Face cache directories and checkpoint files, then resolve selected shared models for the executing host's ComfyUI/Python runtime. Desktop uses the desktop machine's configured folder; server/thin-client mode uses a folder readable by the server process. Thin clients must not assume the browser's local filesystem path is usable by the server.
+
 `SERVER_RUNTIME_ROOT` and `SERVER_STORAGE_ROOT` should be separate. Remote execution placement should be implemented in host composition through adapter/client substitution, not by changing application/domain logic.
 
 ADR-0013 is the canonical cross-host runtime ownership ADR.
@@ -152,3 +154,7 @@ Phase 7 user-library/cross-workspace reuse should not change runtime readiness i
 ## Phase 12 execution plan preparation boundary
 
 Phase 12 introduces a non-executing planning layer that depends on runtime readiness outputs and produces safe execution plan candidates/previews. Runtime/provider invocation remains deferred to later execution orchestration work.
+
+## Phase 13 note
+
+Phase 13 introduces controlled conversational-system execution as the first runnable slice, gated by explicit approval and supported text-generation adapters; Phase 12 remains non-executing.

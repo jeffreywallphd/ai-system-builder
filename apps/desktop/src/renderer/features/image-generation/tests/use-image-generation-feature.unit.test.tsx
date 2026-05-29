@@ -14,7 +14,7 @@ vi.mock("../../models/api/desktopModelsClient", () => ({
   createDesktopModelsClient: () => ({ listModels: listModelsMock }),
 }));
 
-function Harness({ client, artifactClient, onReady }: { client: ReturnType<typeof makeClient>; artifactClient?: { createArtifactMediaViewUrl: (locator: { storageKey: string }) => Promise<string> }; onReady: (h: ReturnType<typeof useImageGenerationFeature>) => void }) { onReady(useImageGenerationFeature(client as never, undefined, artifactClient as never)); return null; }
+function Harness({ client, artifactClient, onReady }: { client: ReturnType<typeof makeClient>; artifactClient?: { createArtifactMediaViewUrl: (locator: { storageKey: string }) => Promise<string> }; onReady: (h: ReturnType<typeof useImageGenerationFeature>) => void }) { onReady(useImageGenerationFeature(client as never, undefined, artifactClient as never, "workspace-a")); return null; }
 const makeClient = () => ({ startImageGeneration: vi.fn(), readImageGeneration: vi.fn(), finalizeImageGenerationIfCompleted: vi.fn(), cancelImageGeneration: vi.fn(), readComfyUiInstallStatus: vi.fn().mockResolvedValue({ ok: true, value: { status: "installed" } }), repairComfyUiInstall: vi.fn().mockResolvedValue({ ok: true, value: { status: "installed" } }) });
 
 describe("useImageGenerationFeature", () => {
@@ -245,6 +245,30 @@ describe("useImageGenerationFeature", () => {
     expect(hook.finalizedAssets[0]?.storageKey).toBe("generated/images/asset-1/out.png");
     expect(hook.finalizedAssets[0]?.previewUrl).toBe("blob:preview-1");
     expect(artifactClient.createArtifactMediaViewUrl).toHaveBeenCalledWith({ storageKey: "generated/images/asset-1/out.png" });
+    await act(async () => root.unmount());
+  });
+
+  it("keeps the previous finalized preview visible until a later generation is ready", async () => {
+    const client = makeClient();
+    client.startImageGeneration
+      .mockResolvedValueOnce({ ok: true, value: { requestId: "r-old" } })
+      .mockResolvedValueOnce({ ok: true, value: { requestId: "r-new" } });
+    client.readImageGeneration.mockResolvedValue({ ok: true, value: { status: "succeeded", requestId: "r", taskType: "image-generation", concurrencyClass: "image-generation", data: { outputs: [{ fileName: "temp.png" }] } } });
+    client.finalizeImageGenerationIfCompleted
+      .mockResolvedValueOnce({ ok: true, value: { assets: [{ assetId: "asset-old", artifactId: "artifact-old", storageKey: "generated/images/old.png" }] } })
+      .mockResolvedValueOnce({ ok: true, value: { assets: [{ assetId: "asset-new", artifactId: "artifact-new", storageKey: "generated/images/new.png" }] } });
+    const artifactClient = { createArtifactMediaViewUrl: vi.fn(async ({ storageKey }: { storageKey: string }) => `blob:${storageKey}`) };
+    let hook!: ReturnType<typeof useImageGenerationFeature>;
+    const c = document.createElement("div");
+    const root = createRoot(c);
+
+    await act(async () => root.render(<Harness client={client} artifactClient={artifactClient} onReady={(h) => { hook = h; }} />));
+    await act(async () => { hook.setForm({ ...hook.form, prompt: "cat" }); await hook.start(); });
+    expect(hook.finalizedAssets[0]?.assetId).toBe("asset-old");
+
+    await act(async () => { await hook.start(); });
+    expect(hook.finalizedAssets[0]?.assetId).toBe("asset-new");
+    expect(hook.sessionGallery[0]?.assets[0]?.assetId).toBe("asset-old");
     await act(async () => root.unmount());
   });
 

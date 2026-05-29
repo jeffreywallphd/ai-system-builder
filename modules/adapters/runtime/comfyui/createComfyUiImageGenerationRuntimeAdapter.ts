@@ -153,6 +153,45 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
     },
   });
 
+  const failedRuntimeReadRecord = (
+    requestId: string,
+    tracked: { promptId: string; request: ImageGenerationRequest; submittedAt: string; workspaceId: string },
+    error: unknown,
+  ): RuntimeTaskRecord => {
+    const runtimeOutput = deps.supervisor.getRecentRuntimeOutput?.() ?? [];
+    const nativeCrash = runtimeOutput.some((line) => /windows fatal exception|0xc0000374|heap/i.test(line));
+    const message = nativeCrash
+      ? "ComfyUI crashed while generating the image. The server runtime likely needs a supported Python/Torch environment; check the ComfyUI runtime logs and retry after repair."
+      : "ComfyUI stopped responding while image generation was running. Check the server runtime logs and retry.";
+    return {
+      requestId,
+      workspaceId: tracked.workspaceId as never,
+      taskType: TaskType.IMAGE_GENERATION,
+      status: "failed",
+      concurrencyClass: "gpu-exclusive",
+      error: {
+        code: nativeCrash ? "comfyui_runtime_crashed" : "comfyui_status_read_failed",
+        message,
+        details: {
+          comfyUiPromptId: tracked.promptId,
+          runtimeDeviceMode: deps.supervisor.getRuntimeDeviceMode?.(),
+          recentRuntimeOutput: runtimeOutput.slice(-5),
+          statusReadError: error instanceof Error ? error.message : String(error),
+        },
+        retryable: true,
+      },
+      startedAt: tracked.submittedAt,
+      completedAt: now(),
+      updatedAt: now(),
+      metadata: {
+        workspaceId: tracked.workspaceId,
+        engine: "comfyui",
+        comfyUiPromptId: tracked.promptId,
+        runtimeDeviceMode: deps.supervisor.getRuntimeDeviceMode?.(),
+      },
+    };
+  };
+
   return {
     async startTask(request: StartRuntimeTaskRequest) {
       if (request.taskType !== TaskType.IMAGE_GENERATION) {
@@ -222,7 +261,15 @@ export function createComfyUiImageGenerationRuntimeAdapter(deps: Deps): RuntimeT
       const tracked = byRequest.get(requestId);
       if (!tracked) return unknown(requestId);
 
-      const [queue, history] = await Promise.all([deps.client.getQueue(), deps.client.getHistory()]);
+      let queue: Awaited<ReturnType<ComfyUiHttpClient["getQueue"]>>;
+      let history: Awaited<ReturnType<ComfyUiHttpClient["getHistory"]>>;
+      try {
+        [queue, history] = await Promise.all([deps.client.getQueue(), deps.client.getHistory()]);
+      } catch (error) {
+        const record = failedRuntimeReadRecord(requestId, tracked, error);
+        finalResults.set(requestId, record);
+        return record;
+      }
       const historyRecord = history[tracked.promptId] as Record<string, unknown> | undefined;
       if (historyRecord) {
         const outputsRecord = (historyRecord.outputs ?? {}) as Record<string, { images?: Array<Record<string, unknown>> }>;

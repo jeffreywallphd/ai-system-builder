@@ -1,17 +1,25 @@
 import { parseApiEnvelope } from '../../../security/apiErrorEnvelope';
 import { secureFetch } from '../../../security/secureFetch';
-import type { AssetAuthoringEffectiveSourceSummary, AssetOverrideRecord, AuthoredAssetDraftRecord, AuthoredAssetRecord } from '../../../../../modules/contracts/asset-authoring';
+import type { AssetAuthoringEffectiveSourceSummary, AssetOverrideRecord, AuthoredAssetDraftRecord, AuthoredAssetRecord } from '../../../../../../modules/contracts/asset-authoring';
 
 type Result<T> = { ok: true; value: T } | { ok: false; error: { code: string; message: string } };
 type FailureCode = 'unavailable' | 'conflict' | 'not-found' | 'validation' | 'internal';
 type EnvelopeSuccess<T> = { status: 'success'; payload: T };
 type EnvelopeFailure = { status: 'error'; error?: { code?: string; message?: string } };
+type ContractSuccess<T> = { ok: true; value: T };
+type ContractFailure = { ok: false; error?: { code?: string; message?: string } };
 
-type Envelope<T> = EnvelopeSuccess<T> | EnvelopeFailure;
+type Envelope<T> = EnvelopeSuccess<T> | EnvelopeFailure | ContractSuccess<T> | ContractFailure;
+type EditableValues = Partial<Record<'display-name' | 'summary' | 'description' | 'classification' | 'tags', string | readonly string[]>>;
 const fail = (message: string, code: FailureCode = 'internal'): Result<never> => ({ ok: false, error: { code, message } });
 const isFailureCode = (value: unknown): value is FailureCode => ['unavailable', 'conflict', 'not-found', 'validation', 'internal'].includes(String(value));
 const unwrap = <T,>(response: unknown): Result<T> => {
   const envelope = response as Envelope<T>;
+  if ('ok' in envelope) {
+    if (envelope.ok === true) return { ok: true, value: envelope.value };
+    const code = isFailureCode(envelope.error?.code) ? envelope.error.code : 'internal';
+    return fail(typeof envelope.error?.message === 'string' ? envelope.error.message : 'Unable to complete request.', code);
+  }
   if (envelope?.status === 'success') return { ok: true, value: envelope.payload };
   const code = isFailureCode(envelope?.error?.code) ? envelope.error.code : 'internal';
   return fail(typeof envelope?.error?.message === 'string' ? envelope.error.message : 'Unable to complete request.', code);
@@ -36,11 +44,13 @@ export function createThinClientAssetAuthoringClient(base = '/api') {
         return r.ok ? { ok: true, value: { items: r.value.drafts ?? [] } } : r;
       } catch { return fail('Unable to load drafts.'); }
     },
-    async createDraft(i: { workspaceId: string; displayName: string; summary?: string; description?: string }) {
-      try { return unwrap(await request(`${b}/asset-authoring/workspaces/${encodeURIComponent(i.workspaceId)}/drafts`, { editableFields: { displayName: i.displayName, summary: i.summary, description: i.description } })); } catch { return fail('Unable to create draft.'); }
+    async createDraft(i: { workspaceId: string; displayName: string; summary?: string; description?: string; classification?: string; tags?: readonly string[] }) {
+      const draftEditableValues = editableValues(i);
+      try { return unwrap(await request(`${b}/asset-authoring/workspaces/${encodeURIComponent(i.workspaceId)}/drafts`, { draftEditableValues })); } catch { return fail('Unable to create draft.'); }
     },
-    async updateDraft(i: { workspaceId: string; draftId: string; displayName?: string; summary?: string; description?: string }) {
-      try { return unwrap(await request(`${b}/asset-authoring/workspaces/${encodeURIComponent(i.workspaceId)}/drafts/${encodeURIComponent(i.draftId)}`, { editableFieldsPatch: { displayName: i.displayName, summary: i.summary, description: i.description } }, 'PATCH')); } catch { return fail('Unable to update draft.'); }
+    async updateDraft(i: { workspaceId: string; draftId: string; displayName?: string; summary?: string; description?: string; classification?: string; tags?: readonly string[] }) {
+      const draftEditablePatch = editableValues(i);
+      try { return unwrap(await request(`${b}/asset-authoring/workspaces/${encodeURIComponent(i.workspaceId)}/drafts/${encodeURIComponent(i.draftId)}`, { draftEditablePatch }, 'PATCH')); } catch { return fail('Unable to update draft.'); }
     },
     async publishDraft(workspaceId: string, draftId: string) {
       try { return unwrap(await request(`${b}/asset-authoring/workspaces/${encodeURIComponent(workspaceId)}/drafts/${encodeURIComponent(draftId)}/publish`, {})); } catch { return fail('Unable to publish draft.'); }
@@ -61,5 +71,15 @@ export function createThinClientAssetAuthoringClient(base = '/api') {
         return { ok: true, value: { items: r.value.items ?? r.value.summaries ?? [] } };
       } catch { return fail('Workspace usage summaries are not available yet.', 'unavailable'); }
     },
+  };
+}
+
+function editableValues(input: { displayName?: string; summary?: string; description?: string; classification?: string; tags?: readonly string[] }): EditableValues {
+  return {
+    ...(input.displayName ? { 'display-name': input.displayName } : {}),
+    ...(input.summary ? { summary: input.summary } : {}),
+    ...(input.description ? { description: input.description } : {}),
+    ...(input.classification ? { classification: input.classification } : {}),
+    ...(input.tags?.length ? { tags: input.tags } : {}),
   };
 }

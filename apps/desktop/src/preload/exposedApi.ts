@@ -143,6 +143,35 @@ import {
   DESKTOP_RUNTIME_READINESS_SUMMARIZE_INVENTORY_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_READINESS_CREATE_BINDING_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_CREATE_PLAN_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_VALIDATE_PLAN_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_ARCHIVE_PLAN_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_LIST_SUMMARIES_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_READ_DETAIL_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_LIST_FOR_COMPOSITION_PLAN_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_READ_LATEST_FOR_COMPOSITION_PLAN_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_LIST_FOR_RUNTIME_READINESS_BINDING_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_READ_LATEST_FOR_RUNTIME_READINESS_BINDING_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_LIST_NEEDING_ATTENTION_REQUEST_CHANNEL,
+  DESKTOP_EXECUTION_PLANS_SUMMARIZE_WORKSPACE_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_RETRY_TURN_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_CANCEL_TURN_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_SUBMIT_TURN_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_READ_TURN_ACTIVITY_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_READ_TRANSCRIPT_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_READ_SESSION_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_LIST_SESSIONS_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_APPROVE_SESSION_REQUEST_CHANNEL,
+  DESKTOP_CONVERSATION_EXECUTION_V2_CREATE_SESSION_REQUEST_CHANNEL,
+  type DesktopConversationApproveSessionResponsePayload,
+  type DesktopConversationCancelTurnResponsePayload,
+  type DesktopConversationCreateSessionResponsePayload,
+  type DesktopConversationListSessionsResponsePayload,
+  type DesktopConversationReadSessionResponsePayload,
+  type DesktopConversationReadTranscriptResponsePayload,
+  type DesktopConversationReadTurnActivityResponsePayload,
+  type DesktopConversationRetryTurnResponsePayload,
+  type DesktopConversationSubmitTurnResponsePayload,
 
   DESKTOP_WORKSPACE_LIST_OPERATION,
   DESKTOP_WORKSPACE_LIST_REQUEST_CHANNEL,
@@ -293,16 +322,21 @@ import {
   DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_OPERATION,
   DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_REQUEST_CHANNEL,
   DESKTOP_APPLICATION_SETTINGS_RESOLVE_MODEL_DEFAULT_RESPONSE_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_SELECT_FOLDER_OPERATION,
+  DESKTOP_APPLICATION_SETTINGS_SELECT_FOLDER_REQUEST_CHANNEL,
+  DESKTOP_APPLICATION_SETTINGS_SELECT_FOLDER_RESPONSE_CHANNEL,
   createDesktopApplicationSettingsListDefinitionsRequest,
   createDesktopApplicationSettingsReadRequest,
   createDesktopApplicationSettingsUpdateRequest,
   createDesktopApplicationSettingsClearRequest,
   createDesktopApplicationSettingsResolveModelDefaultRequest,
+  createDesktopApplicationSettingsSelectFolderRequest,
   type DesktopApplicationSettingsListDefinitionsResponse,
   type DesktopApplicationSettingsReadResponse,
   type DesktopApplicationSettingsUpdateResponse,
   type DesktopApplicationSettingsClearResponse,
   type DesktopApplicationSettingsResolveModelDefaultResponse,
+  type DesktopApplicationSettingsSelectFolderResponse,
   DESKTOP_MODEL_BROWSE_OPERATION,
   DESKTOP_MODEL_BROWSE_REQUEST_CHANNEL,
   DESKTOP_MODEL_BROWSE_RESPONSE_CHANNEL,
@@ -485,6 +519,26 @@ export interface DesktopPreloadApi {
   summarizeRuntimeReadinessInventory: (input: { targetWorkspaceId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
   createRuntimeReadinessBinding: (input: { targetWorkspaceId: string; compositionPlanId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
   validateRuntimeReadinessBinding: (input: { targetWorkspaceId: string; readinessBindingId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  createExecutionPlan: (input: { workspaceId: string; runtimeReadinessBindingId: string; compositionPlanId?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  validateExecutionPlan: (input: { workspaceId: string; executionPlanId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  archiveExecutionPlan: (input: { workspaceId: string; executionPlanId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  listExecutionPlanSummaries: (input: { workspaceId: string; includeArchived?: boolean; limit?: number; cursor?: string; status?: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  readExecutionPlanDetail: (input: { workspaceId: string; executionPlanId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  listExecutionPlansForCompositionPlan: (input: { workspaceId: string; compositionPlanId: string; includeArchived?: boolean }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  readLatestExecutionPlanForCompositionPlan: (input: { workspaceId: string; compositionPlanId: string; includeArchived?: boolean }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  listExecutionPlansForRuntimeReadinessBinding: (input: { workspaceId: string; runtimeReadinessBindingId: string; includeArchived?: boolean }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  readLatestExecutionPlanForRuntimeReadinessBinding: (input: { workspaceId: string; runtimeReadinessBindingId: string; includeArchived?: boolean }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  listExecutionPlansNeedingAttention: (input: { workspaceId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  summarizeWorkspaceExecutionPlans: (input: { workspaceId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  createConversationExecutionSessionFromPlan: (input: { workspaceId: string; sourceExecutionPlanId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopConversationCreateSessionResponsePayload>;
+  approveConversationSession: (input: { workspaceId: string; conversationSessionId: string; executionApprovalId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopConversationApproveSessionResponsePayload>;
+  listConversationSessions: (input: { workspaceId: string; status?: string; includeArchived?: boolean; sourceExecutionPlanId?: string; cursor?: string; limit?: number }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopConversationListSessionsResponsePayload>;
+  readConversationSession: (input: { workspaceId: string; conversationSessionId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopConversationReadSessionResponsePayload>;
+  readConversationTranscript: (input: { workspaceId: string; conversationSessionId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopConversationReadTranscriptResponsePayload>;
+  readConversationTurnActivity: (input: { workspaceId: string; conversationSessionId: string; conversationTurnId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopConversationReadTurnActivityResponsePayload>;
+  submitConversationTurn: (input: { workspaceId: string; conversationSessionId: string; text: string; operationId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopConversationSubmitTurnResponsePayload>;
+  cancelConversationTurn: (input: { workspaceId: string; conversationSessionId: string; conversationTurnId: string; operationId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopConversationCancelTurnResponsePayload>;
+  retryConversationTurn: (input: { workspaceId: string; conversationSessionId: string; conversationTurnId: string; operationId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopConversationRetryTurnResponsePayload>;
   readFeatureLifecycleState: (
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopFeatureLifecycleStateReadResponse>;
@@ -689,6 +743,10 @@ export interface DesktopPreloadApi {
     input: ResolveModelDefaultRequest,
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopApplicationSettingsResolveModelDefaultResponse>;
+  selectApplicationSettingsFolder: (
+    input?: { title?: string; defaultPath?: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopApplicationSettingsSelectFolderResponse>;
   browseModels: (
     input: Parameters<typeof createDesktopModelBrowseRequest>[0],
     context?: DesktopArtifactUploadBridgeContext,
@@ -1111,6 +1169,27 @@ export function createDesktopPreloadApi(
       return dependencies.ipcRenderer.invoke(DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input });
     },
 
+
+    async createExecutionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_CREATE_PLAN_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async validateExecutionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_VALIDATE_PLAN_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async archiveExecutionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_ARCHIVE_PLAN_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async listExecutionPlanSummaries(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_LIST_SUMMARIES_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async readExecutionPlanDetail(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_READ_DETAIL_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async listExecutionPlansForCompositionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_LIST_FOR_COMPOSITION_PLAN_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async readLatestExecutionPlanForCompositionPlan(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_READ_LATEST_FOR_COMPOSITION_PLAN_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async listExecutionPlansForRuntimeReadinessBinding(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_LIST_FOR_RUNTIME_READINESS_BINDING_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async readLatestExecutionPlanForRuntimeReadinessBinding(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_READ_LATEST_FOR_RUNTIME_READINESS_BINDING_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async listExecutionPlansNeedingAttention(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_LIST_NEEDING_ATTENTION_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async summarizeWorkspaceExecutionPlans(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_EXECUTION_PLANS_SUMMARIZE_WORKSPACE_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }); },
+    async createConversationExecutionSessionFromPlan(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_CONVERSATION_EXECUTION_V2_CREATE_SESSION_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }) as Promise<DesktopConversationCreateSessionResponsePayload>; },
+    async approveConversationSession(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_CONVERSATION_EXECUTION_V2_APPROVE_SESSION_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }) as Promise<DesktopConversationApproveSessionResponsePayload>; },
+    async listConversationSessions(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_CONVERSATION_EXECUTION_V2_LIST_SESSIONS_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }) as Promise<DesktopConversationListSessionsResponsePayload>; },
+    async readConversationSession(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_CONVERSATION_EXECUTION_V2_READ_SESSION_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }) as Promise<DesktopConversationReadSessionResponsePayload>; },
+    async readConversationTranscript(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_CONVERSATION_EXECUTION_V2_READ_TRANSCRIPT_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }) as Promise<DesktopConversationReadTranscriptResponsePayload>; },
+    async readConversationTurnActivity(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_CONVERSATION_EXECUTION_V2_READ_TURN_ACTIVITY_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }) as Promise<DesktopConversationReadTurnActivityResponsePayload>; },
+    async submitConversationTurn(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_CONVERSATION_EXECUTION_V2_SUBMIT_TURN_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }) as Promise<DesktopConversationSubmitTurnResponsePayload>; },
+    async cancelConversationTurn(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_CONVERSATION_EXECUTION_V2_CANCEL_TURN_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }) as Promise<DesktopConversationCancelTurnResponsePayload>; },
+    async retryConversationTurn(input, context = {}) { return dependencies.ipcRenderer.invoke(DESKTOP_CONVERSATION_EXECUTION_V2_RETRY_TURN_REQUEST_CHANNEL.value, { requestId: context.requestId, correlationId: context.correlationId, payload: input }) as Promise<DesktopConversationRetryTurnResponsePayload>; },
     async readFeatureLifecycleState(context = {}) {
       const request = createDesktopFeatureLifecycleStateReadRequest(
         {
@@ -1913,6 +1992,19 @@ export function createDesktopPreloadApi(
     },
     async resolveModelDefault(input, context = {}) {
       return this.resolveApplicationModelDefault(input, context);
+    },
+    async selectApplicationSettingsFolder(input = {}, context = {}) {
+      const request = createDesktopApplicationSettingsSelectFolderRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_APPLICATION_SETTINGS_SELECT_FOLDER_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopApplicationSettingsSelectFolderResponse>(response, {
+        operation: DESKTOP_APPLICATION_SETTINGS_SELECT_FOLDER_OPERATION,
+        channel: DESKTOP_APPLICATION_SETTINGS_SELECT_FOLDER_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop application settings select-folder IPC response envelope.",
+      });
     },
     async browseModels(input, context = {}) {
       const request = createDesktopModelBrowseRequest(input, context);

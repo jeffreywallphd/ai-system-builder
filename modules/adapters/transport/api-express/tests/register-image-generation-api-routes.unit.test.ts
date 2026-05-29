@@ -40,6 +40,7 @@ describe("registerImageGenerationApiRoutes", () => {
   it("maps runtime capability unavailable start failures to sanitized 503 details", async () => {
     const handlers = new Map<string, any>();
     const app: ExpressRoutePort = { post: testDouble.fn((p, h) => handlers.set(p, h)) };
+    const logger = { info: testDouble.fn(), warn: testDouble.fn() };
     const unavailable = new RuntimeCapabilityUnavailableError(createRuntimeCapabilityStatus({
       capabilityId: "image-generation",
       status: "failed",
@@ -49,6 +50,7 @@ describe("registerImageGenerationApiRoutes", () => {
     }));
     registerImageGenerationApiRoutes({
       app,
+      logger,
       generateImageUseCase: { startImageGeneration: testDouble.fn(async () => { throw unavailable; }), readImageGeneration: testDouble.fn(), cancelImageGeneration: testDouble.fn() } as any,
     });
 
@@ -63,12 +65,14 @@ describe("registerImageGenerationApiRoutes", () => {
       correlationId: "corr-1",
       error: {
         code: "unavailable",
-        message: "Required runtime capability is not ready.",
+        message: "ComfyUI runtime is not ready.",
         details: { capabilityId: "image-generation", status: "failed", reason: { code: "runtime.comfyui.failed", category: "startup" }, recommendedActions: ["retry", "view-logs"] },
       },
     });
     expect(JSON.stringify(payload)).not.toContain("/tmp/secret");
     expect(JSON.stringify(payload)).not.toContain("PATH=abc");
+    expect(logger.info).toHaveBeenCalledWith("api.image-generation.request.received", expect.objectContaining({ operation: "image-generation.start", clientSource: undefined }));
+    expect(logger.warn).toHaveBeenCalledWith("api.image-generation.request.failed", expect.objectContaining({ operation: "image-generation.start", code: "unavailable", details: expect.objectContaining({ capabilityId: "image-generation" }) }));
   });
 
   it("sanitizes internal image-generation API failures while keeping validation actionable", async () => {

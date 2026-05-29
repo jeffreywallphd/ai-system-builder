@@ -7,8 +7,6 @@ import type {
 } from "../../../../modules/contracts/settings";
 import { createApiApplicationSettingsClient } from "../features/settings/api/apiApplicationSettingsClient";
 
-const RUNTIME_SETTINGS_CATEGORY = "runtime";
-
 export function SettingsPage() {
   const client = useMemo(() => createApiApplicationSettingsClient(), []);
   const [definitions, setDefinitions] = useState<ApplicationSettingDefinition[]>([]);
@@ -25,8 +23,8 @@ export function SettingsPage() {
     setErrorMessage(undefined);
     try {
       const [definitionResult, valueResult] = await Promise.all([
-        client.listDefinitions({ category: RUNTIME_SETTINGS_CATEGORY }),
-        client.readSettings({ category: RUNTIME_SETTINGS_CATEGORY }),
+        client.listDefinitions(),
+        client.readSettings(),
       ]);
       const nextValuesByKey = new Map(valueResult.values.map((value) => [value.key, value]));
       setDefinitions(definitionResult.definitions);

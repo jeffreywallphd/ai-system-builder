@@ -9,110 +9,71 @@
 ## Use When
 
 - Implementation tasks with meaningful behavior changes.
-- Bug-fix tasks.
+- Bug fixes and regressions.
 - Refactors that risk behavior drift.
-- Adapter/host/runtime/transport changes needing targeted integration confidence.
+- Adapter, host, runtime, transport, persistence, storage, or UI-client boundary changes.
 
 ## Do Not Use When
 
-- Tasks that cannot affect runtime behavior (for example pure wording-only docs edits).
-- Requests limited to architecture discussion with no code/test impact.
+- Wording-only docs edits.
+- Architecture discussion with no implementation or test impact.
 
 ## Core Guidance
 
-- Test meaningful behavior, not implementation trivia.
-- Treat Node's built-in test runner (`node:test`) as the canonical default for non-browser tests.
-- Use root `npm test` / `npm run test:non-browser` as the canonical non-browser execution path.
-- Test domain logic directly with unit-level isolation.
-- Test application use cases with controlled boundaries (ports/test doubles).
-- Give adapters focused integration coverage for real boundary translation/behavior.
-- Add targeted host/transport integration tests for wiring, composition, and delegation correctness.
-- Add cross-family contract invariant tests (in `tests` folders) for major contract systems where drift risk is high.
-  Focus these on boundary relationships such as transport/API/IPC specialization, runtime/logging alignment, and persistence/storage separation.
-- Place contract invariants predictably: family tests in `modules/contracts/<family>/tests` and cross-family anti-drift tests in `modules/contracts/tests`.
-- For application seam families with drift risk (for example logging ports), keep narrow anti-drift tests in `modules/application/ports/<family>/tests`.
-- For application seams that drift across families, keep a minimal cross-family invariant layer in `modules/application/ports/tests`.
-- Keep application-port anti-drift tests inside `tests` folders only; avoid ad hoc placement that hides seam guarantees.
-- Resource-backed Asset Registry provider seam tests belong under `modules/application/ports/asset/tests`, while aggregate provider behavior belongs under `modules/application/services/asset/tests`; cover structured diagnostics, no-provider/unsupported behavior, sanitized partial failures, bounded limits, and no outer-layer dependencies.
-- Concrete artifact/document resource-backed provider tests belong under `modules/application/services/asset/tests`; cover metadata-only mapping, document-like detection, storage-path/secret/raw/blob/base64 omission, safe filters/limits/cursor diagnostics, aggregate/facade composition, no content reads, no storage scans, and no asset-instance or durable-mapping creation.
-- Concrete image/generated-output resource-backed provider tests belong under `modules/application/services/asset/tests`; cover descriptor-only finalized image mapping when a safe seam is injected, safe unsupported diagnostics when missing, injected already-known generated outputs, unfinalized/unregistered labeling, prompt/raw workflow/blob/base64/path/secret omission, safe filters/limits/cursor diagnostics, aggregate/facade composition, no bytes/previews/storage scans, no runtime task reads, no generation/finalization calls, and no asset-instance or durable-mapping creation.
-- Phase 3 Review A tests should also prove direct descriptor detail reads are used when safe image/generated-output read seams are available, list-fallback detail reads are bounded and diagnosed when direct lookup is unavailable, aggregate provider routing avoids unnecessary fan-out after safe ownership is known, cursor limitations are diagnostic rather than silent, and provider/facade output omits request/task ids, prompts, workflow payloads, paths/storage keys, raw payloads, bytes/blob/base64/data URLs, secrets/auth values, command lines, and stack traces.
-- Concrete dataset/model resource-backed provider tests belong under `modules/application/services/asset/tests`; cover injected safe dataset descriptors, unsupported missing dataset seams, persisted model inventory mapping through `includeDiscovered: false`, no local/Hugging Face cache discovery, no dataset preparation/file reads/storage scans, no model validation/training/publishing/loading, safe filters/limits/cursor diagnostics, aggregate/facade composition, sanitized paths/raw/logs/bytes/secrets/request ids, and no asset-instance or durable-mapping creation.
-- Concrete external repository object resource-backed provider tests belong under `modules/application/services/asset/tests`; cover injected already-known descriptors, Hugging Face-style and artifact-repo metadata without provider calls, optional storage binding/model publishing metadata only when already persisted, safe unsupported diagnostics when no descriptor seam is wired, safe filters/limits/cursor diagnostics, aggregate/facade composition, sanitized auth/signed URL/path/raw/bytes/object-content fields, and no browse/list/retrieve/store/localize/publish/token/cache/runtime/file reads, asset-instance creation, or durable-mapping persistence.
-- Phase 3 Review B tests should cover all implemented resource-backed families together, deterministic provider and item ordering, bounded aggregate limits, duplicate public view ID diagnostics with first-provider-wins behavior, deterministic aggregate detail reads, descriptor-only `local`/`http`/`custom` external provider labels, omitted repository object paths, provider-local descriptor-source seams, and non-exposure/import-boundary checks for every family provider.
-- Phase 3 Prompt 7 host composition tests should verify the shared provider helper is side-effect free during construction, desktop/server pass a provider aggregate into `composeInternalAssetRegistry`, runtime roots are not used for Asset Kernel records or provider reads, unavailable safe seams return sanitized diagnostics, and host registration does not call source list/read methods, scans, provider/network clients, runtimes, or byte/content readers. The final Phase 3 cleanup allows only read-only resource-backed public route/channel additions.
-- Phase 3 Prompt 8 regression should sweep provider port/family/aggregate/facade tests, host composition tests, API/IPC/preload/UI read-only tests, and non-exposure/import-boundary tests. Stabilization fixes should stay limited to Phase 3 provider/read-surface regressions and docs/context alignment; do not add mutation behavior to make tests pass.
-- Phase 4 Prompt 2 controlled mutation contract tests belong under `modules/contracts/asset/tests`; cover the narrow operation union, no arbitrary editor/create/update/delete/patch operations, serializable command/result/failure fixtures, required approval/actor/context fields, safe source identity/deduplication, sanitized provenance/failure/result shapes, command-specific payload limits, unsafe fixture omission, and no imports from adapters/hosts/API/IPC/preload/UI/runtime/storage/persistence/provider clients. If later prompts add application skeletons, use-case boundary tests should prove they return safe unavailable results and do not write repositories or call providers/storage/runtime/external clients.
-- Phase 5 Prompt 2 asset pack contract tests belong under `modules/contracts/asset/tests`; cover manifest serializability, full `AssetDefinition` pack entries, namespaced pack IDs, source kind/layer/trust/install vocabularies, declarative compatibility/dependency shapes, non-destructive override reference mappings, exact versus semantic resolution request intent, trace/diagnostic/conflict result shapes, unsafe fixture omission, and no imports from application services, adapters, hosts, API, IPC, preload, UI, runtime, storage, persistence, provider clients, filesystem, or network modules.
-- Phase 5 Prompt 3 application pack catalog tests belong under `modules/application/services/asset-packs/tests`; cover the empty `system.foundation` manifest, category uniqueness/safety, manifest builder serialization, manifest validation failures for unsafe metadata/duplicates/ref mismatches/invalid overrides, future asset quality gates using fixture definitions only, resolver-planning semantics without a resolver, and continued non-exposure of install/seeding/import/export/marketplace/persistence/UI/transport/provider/runtime/filesystem behavior.
-- Phase 5 Prompt 4 UI structural primitive tests belong under `modules/application/services/asset-packs/tests`; cover stable `builtin.ui.*` IDs, full definitions, `ui-structure` entries, non-empty semantic configuration schemas, AI context, ports, composition rules, manifest validation, quality gates, JSON serializability, and continued non-exposure of renderer implementation details, runtime/provider/network/storage behavior, resource payloads, seeding/install, resolver execution, public transport, and UI editing behavior.
-- Phase 5 Prompt 5 form and field primitive tests belong under `modules/application/services/asset-packs/tests`; cover stable `builtin.form.*` IDs, full definitions, `forms-fields` entries, semantic configuration schemas, AI context, ports, composition rules including UI structural primitive compatibility, manifest validation, quality gates, JSON serializability, deferred date/time and file-upload primitives, and continued non-exposure of renderer details, validation engine behavior, submission execution, file-transfer/storage behavior, runtime/provider/network behavior, resource payloads, seeding/install, resolver execution, public transport, and visual editing behavior.
-- Phase 5 Prompt 6 display/state/message primitive tests belong under `modules/application/services/asset-packs/tests`; cover stable `builtin.display.*` and `builtin.state.*` IDs, full definitions, `data-display` and `state-messages` entries, semantic configuration schemas, AI context, ports, composition rules including UI structural/form compatibility, manifest validation, quality gates, JSON serializability, preview placeholders as placeholders only, and continued non-exposure of renderer details, data-grid implementation, preview rendering, resource reading, data fetching, API-client behavior, runtime/provider/network/storage behavior, resource payloads, seeding/install, resolver execution, public transport, workflow execution, and visual editing behavior.
-- Phase 5 Review A tests should prove context-aware validation accepts explanatory non-goal language while rejecting unsafe payload/path/token/provider/content fields, stable manifest metadata excludes prompt/review labels, manifest category IDs are backed by catalog-side descriptors, option-based form fields declare semantic option descriptor metadata with richer item-schema enforcement deferred, and quality gates reject actual execution requirements or renderer path/library details.
-- Phase 5 Prompt 8 pack install tests belong under `modules/application/services/asset-packs/tests`; cover validate-only behavior, manifest-before-save ordering, definition and quality-gate failures blocking writes, explicit `system.foundation` install, safe source-pack metadata, idempotent reinstalls, duplicate prevention, user/custom conflict failure without overwrite or later-entry saves, optional same-pack refresh only when requested, sanitized diagnostics, no resolver/override behavior, and no imports from adapters/hosts/UI/API/IPC/preload/runtime/provider/filesystem modules. Host composition tests should prove any installer seam is internal and not invoked during desktop/server startup.
-- Phase 5 Prompt 9 Asset Library discoverability tests should cover shared UI mapper/helper pack/source/category fields, `system.foundation` as `System default` from `System Foundation`, read-facade built-in filtering for installed foundation records, category labels, pack/category/source-layer grouping and filtering, `workspace-pack` as `Workspace pack` unless explicit override metadata exists, sanitized informational override/resolution references, desktop and thin-client card/detail/filter behavior, collapsed advanced metadata, safe empty states, and continued non-exposure of pack install/import/export/activate/disable UI, override editing, resolver activation, asset editing, composition authoring, scans, provider/network/runtime calls, and byte/content reads.
-- Phase 5 Prompt 10 resolver tests belong under `modules/application/services/asset-packs/tests`; cover exact resolution without overrides by default, semantic/default resolution from explicit candidate definitions, optional enabled override application, priority/source-layer tie-break behavior, deterministic conflicts, missing replacements, sanitized trace/diagnostics, internal-only `resolvedDefinition` result boundaries, non-mutation of supplied definitions/rules, `system.foundation` candidate compatibility, and continued non-exposure of persistence, host, API/IPC/preload/UI, provider/network/runtime/storage/filesystem, install/activation, public override editing, import/export, marketplace, composition authoring, and execution behavior.
-- Phase 5 Prompt 11 serialization/readiness tests belong under `modules/application/services/asset-packs/tests`; cover deterministic JSON serialization/parse/validate round trips, system.foundation export-ready manifest strings, manifest and entry fingerprints, safe user/imported override-pack fixtures, unsafe metadata rejection, fingerprinting not being validation/import approval, no resource bytes/local paths/tokens/provider payloads/workflow payloads, and continued non-exposure of public import/export API/IPC/preload/UI, archives, signing, marketplace/registry, install/activation, filesystem, provider/network/runtime/storage, and override editing behavior.
-- Phase 5 final stabilization should rerun the focused asset-pack contract/service/primitive/resolver/serialization/install/Asset-Library/host-non-exposure suite and update only Phase 5 regressions. Tests should prove `system.foundation` remains valid, serializable, system-trusted, pack-compatible, semantic, non-executing, override-ready, and safe; install/seeding remains explicit/internal/idempotent/non-destructive; the resolver remains pure and non-mutating; serialization remains in-memory; Asset Library pack/source/category display remains read-only; and no public pack import/export/install/activate/disable, override editing, marketplace/package registry, active-pack registry, asset editor, visual composition/canvas/wizard authoring, workflow execution, runtime execution, filesystem import/export, provider/network/storage side effects, scans, or byte/content reads have leaked in.
-- Phase 4 Prompt 3 registration tests should cover eligible artifact/document, finalized image, dataset, and persisted model views; missing/deferred/unsupported views; approval/access-flag guards; target-definition validation and safe built-in inference; duplicate source identity handling; validation-before-save; sanitized source identity/provenance/metadata/failures; and boundary checks proving no public transport/UI/host/runtime/storage/provider exposure.
-- Phase 4 Prompt 4 finalization tests should cover guard-first ordering with no source/repository/finalization calls on guard failures, generated-output re-read, eligibility rejection for failed/incomplete/cancelled/preview/finalized sources, approval/access-flag guards, target image definition validation and inference, finalization seam invocation, duplicate/idempotent existing results before and after finalization, already-finalized seam results with missing Asset Kernel registration, validation-before-save, required safe instance ID generation, retry-safe partial failure after finalization, sanitization of source identity/provenance/metadata/failures, and boundary checks proving no public transport/UI/host/runtime/storage/provider exposure.
-- Phase 4 Prompt 5 import/localization tests should cover guard-first ordering with no source/repository/port calls on guard failures, external-object re-read by id, unsafe/repository-level/preview/unsupported/missing source rejection, approval requirements for network/credential/partial completion and localization filesystem writes, target definition validation/inference, safe port request shape, duplicate checks before and after import/localization, existing durable state retries, validation-before-save, required safe instance ID generation, retry-safe partial failures after durable import/localization, sanitization, and non-exposure boundaries.
-- Phase 4 Prompt 6 mutation guard tests should cover the centralized operation requirements table, confirmation kind and capability flag enforcement, AI-assisted and system actor rules, safe actor/request metadata, sanitized guard failures, guard-first use-case ordering with no source reads/identity/repository/port/validation/ID/save calls, source identity consistency across view/result families, duplicate/idempotency behavior based on `deduplicationKey`, sanitized provenance, typed failure codes, and continued public non-exposure.
-- Phase 4 Prompt 7 transport wrapper tests should cover the four approved API/IPC/preload mutation operations, route/channel/method operation derivation, shallow malformed-command rejection without use-case calls, safe request/correlation/idempotency context merging, typed result/failure status mapping, sanitized thrown errors and unsafe failure details, host wiring through narrow use-case dependencies only, no startup side effects, and continued non-exposure of arbitrary create/update/delete/patch/editor, seed, provider browse/download, runtime execution, scan, and byte/content surfaces.
-- Phase 4 Prompt 8 UI tests should cover view-kind action eligibility, confirmation before mutation calls, safe command construction without full view payloads, desktop preload-client use, thin-client API-client use, sanitized success/failure display, refresh after successful mutations, and continued non-exposure of arbitrary editor/seed/bulk/composition/runtime/provider-browse/dataset/model/image-generation actions.
-- Add regression tests for bug fixes when practical in the layer where defect should be caught.
-- For runtime task registry changes, cover start correlation, unknown request ids, delegate recovery, list aggregation/unsupported metadata, cancellation, and no-start behavior on status/list/cancel reads.
-- Keep tests deterministic, CI-suitable, and non-flaky; avoid performative coverage-only tests.
+- Test observable behavior and boundary contracts, not implementation trivia.
+- Use Node's built-in test runner (`node:test`) as the default for non-browser tests.
+- Use root `npm test` / `npm run test:non-browser` as canonical non-browser execution paths.
+- Test domain logic directly and application use cases through controlled ports/test doubles.
+- Give adapters focused integration coverage for real translation and boundary behavior.
+- Add host/transport integration tests for wiring, composition, delegation, and safe error mapping.
+- Keep tests deterministic, CI-suitable, and non-flaky.
+- Add regression tests for bug fixes when practical in the layer where the defect should be caught.
+- If regression coverage is not added, document the reason.
+
+## Placement Rules
+
+- Contract family tests belong in `modules/contracts/<family>/tests`.
+- Cross-family contract invariants belong in `modules/contracts/tests`.
+- Application port family tests belong in `modules/application/ports/<family>/tests`.
+- Cross-family application seam invariants belong in `modules/application/ports/tests`.
+- Application service/use-case tests belong near the owning service/use-case family.
+- UI shared mapper/component tests belong near the shared UI package; host-specific client/page tests stay host-specific.
+
+## High-Value Coverage Areas
+
+- Operation identity and transport/API/IPC specialization invariants.
+- Persistence/storage separation, storage-key/path containment, and workspace scoping.
+- Runtime readiness no-start/no-install/no-repair reads and Runtime Task Registry lifecycle behavior.
+- Resource-backed Asset Registry providers: descriptor-only reads, bounded diagnostics, unsupported seams, deterministic ordering, duplicate handling, and no scans/byte reads/provider/runtime calls.
+- Asset mutation workflows: guard-first ordering, approval/capability checks, duplicate/idempotency handling, sanitized failures, and no side effects on guard failure.
+- System Foundation and asset-pack behavior: valid manifests/entries, safe metadata, explicit/internal install, pure resolver behavior, and no public import/export/install leaks.
+- Workspace behavior: safe IDs, active selection as preference/context, `system.foundation@1.0.0` reference activation, workspace A/B isolation, no hidden/default workspace fallback.
+- Desktop/thin-client workspace UI: page gating, no feature-client calls without active workspace, display name labels, create/select/switch controls, and refetch on workspace switch.
+- Public API/IPC/preload/UI payloads: no raw paths, storage roots, tokens, env values, command lines, stacks, bytes/base64, prompts, workflow payloads, or provider-native raw payloads.
 
 ## Key Constraints
 
 - Do not use broad end-to-end suites as substitutes for layered testing.
-- Avoid over-mocking internal details; mock boundaries deliberately.
-- If regression coverage is not added for a bug fix, document clear rationale.
-
-- Phase 6 Prompt 2 workspace contract tests belong under `modules/contracts/workspace/tests`; cover workspace ID unsafe/path/URL rejection, status/role vocabularies, passive actor/member metadata, path-free storage descriptors, `system.foundation@1.0.0` activation by reference only, serializable records/create/selection/context fixtures, barrel exports, and no permission/invite/sync/remote-auth behavior.
+- Avoid over-mocking internals; mock explicit boundaries deliberately.
+- Do not add production behavior solely to make a test easier.
+- Stabilization tests should not introduce deferred features such as mutation, provider browse/download, workflow execution, marketplace behavior, collaboration, or automatic migration.
 
 ## Canonical Source Docs
 
-- `docs/standards/testing-standards.md` — repository-wide testing strategy and anti-patterns.
-- `docs/standards/naming-standards.md` — test file naming and behavior-oriented naming guidance.
-- `docs/standards/coding-standards.md` — boundary-safe design that drives test layering.
-- `docs/architecture/module-dependency-rules.md` — layer boundaries that testing should reinforce.
+- `docs/standards/testing-standards.md` - repository-wide testing strategy and anti-patterns.
+- `docs/standards/naming-standards.md` - behavior-oriented test naming.
+- `docs/standards/coding-standards.md` - boundary-safe implementation that drives test layering.
+- `docs/architecture/module-dependency-rules.md` - dependency boundaries that tests should reinforce.
 
-## Common Over-Inclusions to Avoid
+## Common Over-Inclusions To Avoid
 
-- Pulling detailed host/runtime packs when not needed for current test scope.
+- Pulling detailed host/runtime packs when not needed for the current test scope.
 - Requiring exhaustive integration coverage for simple domain-only changes.
 - Asserting framework internals instead of observable behavior.
+- Keeping phase-by-phase historical test instructions in prompt context.
 
 ## Prompt Assembly Notes
 
 - Typical set: `index` + `testing`.
-- Add one scope-specific pack (`runtime`, `desktop-host`, `server-host`, or `architecture`) based on impacted boundaries.
-- Phase 6 Prompt 3 workspace persistence tests belong under `modules/application/ports/workspace/tests` and `modules/adapters/persistence/workspace/tests`; cover record/index save-read-update-archive behavior, active selection preference save/read/clear without existence checks, system-pack activation reference persistence for `system.foundation@1.0.0`, workspace A/B isolation, deterministic sorting, unsafe ID rejection before path construction, display names not used as paths, sanitized corrupt/invalid JSON errors, no artifact/image/model/data directory creation, and boundaries excluding UI/API/IPC/preload/host/runtime/provider/system-pack-installer imports. Phase 6 Prompt 4 create-workspace tests belong under `modules/application/use-cases/workspace/tests`; cover validation/normalization, safe generated IDs, duplicate-ID handling, duplicate display-name policy, reference-only default `system.foundation@1.0.0` activation, disabled activation, explicit active selection persistence, sanitized diagnostics, activation/selection failure policy that leaves the workspace record when already saved, no Phase 5 installer import/call, and no UI/API/IPC/preload/host/resource-scoping behavior.
-
-## Phase 6 Prompt 5 workspace gating tests
-
-Tests for workspace-gated UI should prove route metadata marks resource-backed pages as workspace-required, gated pages do not render feature components or call feature clients without an active workspace, global-safe pages remain accessible, active workspace labels use display names rather than raw ids/paths, and create/select workspace CTAs are present. Tests must not claim Asset Library effective-view filtering or artifact/data/model/image persistence scoping before later prompts implement those behaviors.
-
-## Phase 6 Prompt 6 workspace activation tests
-
-Workspace activation tests should cover active `system.foundation@1.0.0`, no activations, inactive/failed records, unknown id/version, invalid source/layer/trust metadata, deterministic ordering, duplicates, sanitized diagnostics, repository failure safety, reference-only helper behavior, status updates for existing known records only, no missing-record creation, no Phase 5 installer calls, and boundaries excluding adapters/hosts/apps/UI/API/IPC/preload/runtime/provider/filesystem/resource-scoping imports.
-
-## Phase 6 Prompt 8 artifact workspace scoping
-
-Artifacts and uploads are workspace-scoped. Artifact browse/upload/read operations require explicit workspace context and must not fall back to global artifact records. Uploaded bytes use a workspace-scoped storage keyspace; legacy global artifacts are not auto-migrated. Artifact-backed resource views require workspace context. Image assets, generated outputs, datasets, models, runtime task outputs, user-library behavior, and cross-workspace reuse remain deferred.
-
-Phase 6 Prompt 9 update: User/workspace-owned image asset records, generated-output descriptors/finalization, dataset preparation outputs, model inventory records, and runtime task outputs created from workspace actions require an explicit workspace id. Missing workspace context must fail safely and must not fall back to global records. Workspace-owned records from one workspace must not be listed or read as another workspace. Generated-output finalization validates source workspace ownership before writing finalized image assets or Asset Kernel instances, and finalized provenance/metadata carries workspace context. Legacy global image/model/dataset/generated-output records are not silently assigned to a hidden/default workspace and are not auto-migrated; a future explicit import/migration flow may be needed. Global runtime readiness, installed-runtime/model diagnostics, and provider configuration diagnostics may remain global, but they must not be presented as workspace-owned resource records. User-library and cross-workspace reuse remain later work.
-
-## Phase 6 Prompt 10 workspace UI testing expectations
-
-Desktop and thin-client UI tests should cover visible workspace create/select/switch controls, first-run Home guidance, create-workspace System Foundation checkbox defaults, no renderer-local id generation, active workspace display by display name, safe unavailable workspace states, and global-safe Settings/System/Security access without a workspace.
-
-Workspace-gated page tests should prove underlying feature clients are not called without an active workspace. Workspace-scoped client tests should prove calls include the active workspace id, switching workspaces refetches with the new id and clears stale details, missing workspace context prevents requests, and no global fallback records render. User-library/cross-workspace reuse and collaboration remain future test areas.
-
-## Phase 6 final stabilization / Phase 7 handoff
-
-Phase 6 final state: workspace is the normal boundary for user/project resources. No active workspace means workspace-scoped pages are gated and must not render underlying feature components or call workspace-scoped clients. Active workspace display uses the workspace display name. System Foundation remains system-owned and is made available only through a `system.foundation@1.0.0` workspace activation reference; workspace creation must not call the Phase 5 installer, copy pack definitions, create a hidden/default workspace, or perform startup seeding. Workspace-owned artifacts/uploads, image assets, generated outputs/finalization, dataset outputs, model records, and runtime task outputs require explicit workspace context where implemented, must not leak across Workspace A/B, and must not fall back to legacy global records. Artifact byte-read tests should prove catalog/workspace ownership is checked before storage retrieval; storage/catalog/generated-image tests should prove raw paths and raw filesystem messages are not exposed; catalog tests should distinguish missing files from non-`ENOENT` read failures; model UI/API tests should prove normal read models omit raw local paths; upload client tests should prove workspace id is required and missing workspace blocks transport while backend rejection remains defense in depth. Global runtime readiness and system/provider diagnostics may remain global but must not masquerade as workspace-owned records. Collaboration fields are passive placeholders only.
-
-Phase 7 is User Library and Cross-Workspace Asset Reuse. It should define explicit promote/link/copy/import flows and provenance/resolver behavior without accidental propagation. Do not implement user-library, cross-workspace reuse, collaboration permissions, invites/sync/remote auth, asset authoring, override editing, pack import/export/install, marketplace, visual composition, workflow execution expansion, provider/network expansion, or automatic legacy migration as part of Phase 6 stabilization.
+- Add one or two scope-specific packs based on impacted boundaries.
+- For bug fixes, include `debugging-error-handling` and the feature/host/runtime/storage pack where the bug lives.

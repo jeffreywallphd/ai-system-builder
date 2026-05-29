@@ -32,11 +32,23 @@ This applies to implemented workspace-owned resources such as artifacts/uploads,
 
 Asset Library effective views may show System Foundation definitions only when the workspace has the active trusted reference and the definitions retain strict system-default provenance. A bare `sourcePackId` is informational and is not authority to expose system defaults.
 
+Because activation is reference-only, Asset Library reads may project the canonical `system.foundation@1.0.0` manifest into the workspace effective view without copying or installing those definitions into workspace storage. The projection is read-only and must still require an active trusted workspace activation record.
+
 ## Workspace resource ownership and legacy records
 
 Workspace-owned resource records should carry workspace ownership in their own domain metadata or storage keyspace and should be queried through workspace-aware ports/providers. Until deeper storage layout work exists for a resource family, adapters may use safe metadata/source ownership filtering, but they must not expose raw paths, storage roots, prompts, workflow JSON, provider payloads, or other unsafe diagnostics.
 
 Legacy global records are not silently assigned to a workspace, copied, migrated, or exposed as workspace-owned data. Any future migration/import must be explicit and user-visible.
+
+## Shared model storage
+
+Desktop and server hosts may configure one host-local shared model storage folder through application Settings. This folder is an additional read/discovery source for already downloaded models; it is not a workspace-owned model store and does not copy or migrate records into a workspace.
+
+When a workspace lists models, the model registry may include ephemeral shared entries discovered from the configured folder alongside persisted workspace model records. Those entries must carry explicit workspace request context for authorization and selection, and must be labeled with `storageScope: "shared"` so UI and downstream use cases do not present them as workspace-owned records. Persisted downloads, generated models, validation, publishing, and deletion remain workspace-scoped operations.
+
+Asset Library model resource-backed views may show those shared model entries as sanitized descriptor-only assets for the active workspace. They must not expose local paths, read model files, or persist shared-folder entries into the workspace inventory.
+
+Public model and image-generation read models must continue to omit raw local paths. The Settings page may display and edit the configured folder because that is an explicit host configuration action.
 
 ## Phase 7 reuse boundary
 

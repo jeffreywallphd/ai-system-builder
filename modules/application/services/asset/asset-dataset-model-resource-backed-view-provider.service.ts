@@ -214,6 +214,7 @@ export class AssetDatasetModelResourceBackedViewProvider implements AssetResourc
         limit,
         cursor,
         includeDiscovered: false,
+        includeSharedStorage: true,
       });
       records = result.models;
       nextCursor = sanitizeAssetStringValue(result.nextCursor);

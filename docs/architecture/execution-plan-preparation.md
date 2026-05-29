@@ -133,6 +133,7 @@ Allowed statuses:
 Clarifications:
 
 - `ready-for-review` does **not** mean executable or ready-to-run.
+- `ready-for-review` does **not** mean execution can start.
 - `needs-setup` means setup/readiness metadata is insufficient.
 - `missing-inputs` means required inputs cannot be safely planned.
 - `missing-outputs` means safe output destination planning is incomplete.
@@ -272,3 +273,16 @@ No runtime/workflow/model/ComfyUI execution, provider invocation, dependency ins
 13. Review C — Final Phase 12 closeout review.
 
 Prompt 8 may later split into 8a/8b/8c if transport scope grows.
+
+
+## Phase 12 handoff exclusions
+
+Phase 12 handoff excludes credentials, secrets, raw env values, shell commands, command output, local paths, storage roots, raw workflow/provider payloads, runnable graph JSON, executable payloads, bytes/blobs/base64, and signed URLs.
+
+
+## Phase 13 handoff note
+
+Phase 12 remains preview-only and non-executing. The next phase is controlled conversational-system execution with explicit approval and supported runtime invocation boundaries; see `docs/architecture/controlled-conversational-system-execution.md` and ADR-0023.
+
+
+Phase 13 handoff correction: execution plans that feed conversational execution must originate from asset-derived conversational system composition (foundation-referenced reusable assets), not from ad hoc runtime session structures.

@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Define and protect the non-executing execution-plan-preparation layer that turns runtime-readiness-backed composition context into safe execution plan candidates/previews.
+Define and protect the non-executing execution-plan-preparation layer that turns runtime-readiness-backed composition context into safe execution plan candidates/previews shown inside Assets / Plans / Setup.
 
 ## Use When
 
@@ -73,3 +73,13 @@ No runtime/provider/workflow/model execution, no executable payload generation, 
 ## Phase 13 handoff
 
 Phase 12 hands off prepared execution plan metadata to Phase 13 execution orchestration and controlled runtime/provider invocation.
+
+
+## Phase 13 handoff routing
+
+When tasks derive runnable conversational execution behavior from Phase 12 plans, include this pack **and** `docs/context/packs/controlled-conversational-system-execution.pack.md`.
+
+Phase 12 status remains non-executing; `ready-for-review` does not invoke runtime behavior.
+
+
+- Phase 13 handoff reminder: execution-plan preparation remains upstream of controlled conversational execution; conversational runs must come from asset-derived conversational system composition (reusable/foundation-referenced), not runtime-record-only constructs.

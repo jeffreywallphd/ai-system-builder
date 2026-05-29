@@ -37,13 +37,13 @@ export interface UnloadImageGenerationModelResult {
 }
 
 export interface ImageGenerationApiClient {
-  startImageGeneration: (input: ImageGenerationRequest, context?: { source?: string }) => Promise<{ requestId: string }>;
-  readImageGeneration: (input: { requestId: string }, context?: { source?: string }) => Promise<RuntimeTaskRecord>;
-  cancelImageGeneration: (input: { requestId: string }, context?: { source?: string }) => Promise<CancelImageGenerationResult>;
-  finalizeImageGenerationIfCompleted: (input: { requestId: string }, context?: { source?: string }) => Promise<FinalizeImageGenerationResult>;
+  startImageGeneration: (input: ImageGenerationRequest & { workspaceId?: string }, context?: { source?: string }) => Promise<{ requestId: string }>;
+  readImageGeneration: (input: { requestId: string; workspaceId?: string }, context?: { source?: string }) => Promise<RuntimeTaskRecord>;
+  cancelImageGeneration: (input: { requestId: string; workspaceId?: string }, context?: { source?: string }) => Promise<CancelImageGenerationResult>;
+  finalizeImageGenerationIfCompleted: (input: { requestId: string; workspaceId?: string }, context?: { source?: string }) => Promise<FinalizeImageGenerationResult>;
   unloadModel: (context?: { source?: string }) => Promise<UnloadImageGenerationModelResult>;
   readRuntimeResources: (context?: { source?: string }) => Promise<{ memoryUsagePercent: number; cpuUsagePercent: number; gpuUsagePercent: number }>;
-  createArtifactMediaViewUrl: (storageKey: string) => string;
+  createArtifactMediaViewUrl: (storageKey: string, context?: { workspaceId?: string }) => string;
 }
 
 const createApiUrl = (baseUrl: string, suffix: string): string => `${baseUrl.trim().replace(/\/+$/, "") || "/api"}${suffix}`;
@@ -157,8 +157,12 @@ export function createApiImageGenerationClient(options: { apiBaseUrl?: string; s
       const { envelope, status, endpoint } = await postJson(apiBaseUrl, "/image-generation/runtime-resources", {}, context?.source ?? source);
       return ensureSuccess(envelope, status, endpoint, expectRuntimeResources);
     },
-    createArtifactMediaViewUrl(storageKey) {
-      return `${createApiUrl(apiBaseUrl, "/artifact/media/view")}?storageKey=${encodeURIComponent(storageKey)}`;
+    createArtifactMediaViewUrl(storageKey, context) {
+      const query = new URLSearchParams({ storageKey });
+      if (context?.workspaceId) {
+        query.set("workspaceId", context.workspaceId);
+      }
+      return createApiUrl(apiBaseUrl, `/artifact/media/view?${query.toString()}`);
     },
   };
 }

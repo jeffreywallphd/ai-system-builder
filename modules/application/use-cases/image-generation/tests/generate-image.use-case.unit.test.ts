@@ -26,20 +26,32 @@ describe("GenerateImageUseCase", () => {
 
 
 
-  it("checks image-generation readiness before starting runtime task", async () => {
+  it("prepares the runtime and checks image-generation readiness before starting runtime task", async () => {
+    const calls: string[] = [];
     const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
     const runtimeCapabilityGuard = {
-      requireCapabilityReady: testDouble.fn(async () => createRuntimeCapabilityStatus({ capabilityId: "image-generation", status: "ready" })),
+      requireCapabilityReady: testDouble.fn(async () => {
+        calls.push("guard.ready");
+        return createRuntimeCapabilityStatus({ capabilityId: "image-generation", status: "ready" });
+      }),
     };
-    const useCase = new GenerateImageUseCase({ runtimeTaskRegistry, runtimeCapabilityGuard });
+    const modelCheckpointResolver = {
+      resolveCheckpoint: testDouble.fn(async () => {
+        calls.push("runtime.prepare");
+        return {};
+      }),
+    };
+    const useCase = new GenerateImageUseCase({ runtimeTaskRegistry, runtimeCapabilityGuard, modelCheckpointResolver });
 
     await useCase.startImageGeneration(validRequest, { workspaceId: "workspace-a" });
 
     expect(runtimeCapabilityGuard.requireCapabilityReady).toHaveBeenCalledWith("image-generation");
     expect(runtimeTaskRegistry.startTask).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual(["runtime.prepare", "guard.ready"]);
   });
 
-  it("does not start image-generation runtime task when readiness is unavailable", async () => {
+  it("prepares the runtime before reporting unavailable readiness and does not submit a task", async () => {
+    const calls: string[] = [];
     const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
     const unavailable = new Error("Runtime capability 'image-generation' is starting.") as Error & { code: "unavailable"; details: Record<string, unknown> };
     unavailable.code = "unavailable";
@@ -47,11 +59,13 @@ describe("GenerateImageUseCase", () => {
     unavailable.details = { capabilityId: "image-generation", status: "starting", recommendedActions: ["wait"] };
     const useCase = new GenerateImageUseCase({
       runtimeTaskRegistry,
-      runtimeCapabilityGuard: { requireCapabilityReady: testDouble.fn(async () => { throw unavailable; }) },
+      modelCheckpointResolver: { resolveCheckpoint: testDouble.fn(async () => { calls.push("runtime.prepare"); return {}; }) },
+      runtimeCapabilityGuard: { requireCapabilityReady: testDouble.fn(async () => { calls.push("guard.unavailable"); throw unavailable; }) },
     });
 
     await useCase.startImageGeneration(validRequest, { workspaceId: "workspace-a" }).catch((error) => expect(error).toMatchObject({ code: "unavailable" }));
     expect(runtimeTaskRegistry.startTask).not.toHaveBeenCalled();
+    expect(calls).toEqual(["runtime.prepare", "guard.unavailable"]);
   });
 
   it("resolves selected model into checkpoint before runtime submission", async () => {
@@ -65,6 +79,25 @@ describe("GenerateImageUseCase", () => {
 
     await useCase.startImageGeneration({ ...validRequest, model: "record-123" }, { workspaceId: "workspace-a" });
     expect((runtimeTaskRegistry.startTask as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0]).toMatchObject({ payload: { model: "sdxl.safetensors" } });
+  });
+
+  it("passes runtime device mode hints into runtime-backed checkpoint preparation", async () => {
+    const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
+    const resolveCheckpoint = testDouble.fn(async () => ({ checkpoint: "sdxl.safetensors" }));
+    const useCase = new GenerateImageUseCase({
+      runtimeTaskRegistry,
+      modelCheckpointResolver: { resolveCheckpoint },
+      runtimeCapabilityGuard: { requireCapabilityReady: testDouble.fn(async () => createRuntimeCapabilityStatus({ capabilityId: "image-generation", status: "ready" })) },
+    });
+
+    await useCase.startImageGeneration({ ...validRequest, model: "record-123", engineHints: { runtimeDeviceMode: "directml" } }, { workspaceId: "workspace-a" });
+
+    expect(resolveCheckpoint).toHaveBeenCalledWith({
+      selectedModel: "record-123",
+      workspaceId: "workspace-a",
+      taskTag: "text-to-image",
+      runtimeDeviceMode: "directml",
+    });
   });
 
   it("passes through already-valid checkpoint filenames", async () => {

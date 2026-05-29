@@ -13,19 +13,33 @@ type RowVm = {
   statusLabel: string;
   description?: string;
   diagnosticLabel?: string;
+  typeLabel?: string;
+  tags?: readonly string[];
   canPublish?: boolean;
   canUpdate?: boolean;
   canDisable?: boolean;
 };
 
+const ASSET_TYPES = [
+  { value: 'workflow-asset', label: 'Workflow' },
+  { value: 'system-asset', label: 'System' },
+  { value: 'component-asset', label: 'Component' },
+  { value: 'data-asset', label: 'Data' },
+  { value: 'model-asset', label: 'Model' },
+  { value: 'tool-asset', label: 'Tool' },
+] as const;
+
 const safe = (value: unknown, fallback: string) =>
   typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
+const stringList = (value: unknown): readonly string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
 
 const mapAuthored = (record: AuthoredAssetRecord): RowVm => ({
   id: record.authoredAssetId,
   label: safe(record.editableValues['display-name'], record.assetReference.label ?? 'Authored asset'),
   statusLabel: safe(record.status, 'Active'),
   description: safe(record.editableValues.summary, '') || undefined,
+  typeLabel: safe(record.editableValues.classification, '') || undefined,
+  tags: stringList(record.editableValues.tags),
 });
 
 const mapDraft = (record: AuthoredAssetDraftRecord): RowVm => ({
@@ -33,6 +47,8 @@ const mapDraft = (record: AuthoredAssetDraftRecord): RowVm => ({
   label: safe(record.draftEditableValues['display-name'], record.baseAssetReference?.label ?? 'Draft'),
   statusLabel: safe(record.status, 'Draft'),
   description: safe(record.draftEditableValues.summary, '') || undefined,
+  typeLabel: safe(record.draftEditableValues.classification, '') || undefined,
+  tags: stringList(record.draftEditableValues.tags),
   canPublish: true,
   canUpdate: true,
 });
@@ -41,6 +57,8 @@ const mapOverride = (record: AssetOverrideRecord): RowVm => ({
   id: record.overrideId,
   label: safe(record.overrideValues['display-name'], record.baseAssetReference.label ?? 'Customization'),
   statusLabel: safe(record.status, 'Active'),
+  typeLabel: safe(record.overrideValues.classification, '') || undefined,
+  tags: stringList(record.overrideValues.tags),
   canDisable: record.status !== 'disabled',
 });
 
@@ -72,6 +90,9 @@ export function AssetAuthoringFeature({ workspaceId, initialSection = "create" }
   const [message, setMessage] = useState('');
   const [name, setName] = useState('');
   const [summary, setSummary] = useState('');
+  const [description, setDescription] = useState('');
+  const [classification, setClassification] = useState<string>(ASSET_TYPES[0].value);
+  const [tags, setTags] = useState('');
   const sectionMatches = {
     create: initialSection === "create",
     drafts: initialSection === "drafts",
@@ -114,6 +135,8 @@ export function AssetAuthoringFeature({ workspaceId, initialSection = "create" }
           authored.map((asset) => (
             <li key={asset.id}>
               <strong>{asset.label}</strong> - {asset.statusLabel}
+              {asset.typeLabel ? ` - ${asset.typeLabel}` : ''}
+              {asset.tags?.length ? ` - ${asset.tags.join(', ')}` : ''}
             </li>
           ))
         ) : (
@@ -146,7 +169,7 @@ export function AssetAuthoringFeature({ workspaceId, initialSection = "create" }
                   if (result.ok === true) await refresh();
                 }}
               >
-                Save changes
+                Save safe edit
               </button>
             </li>
           ))
@@ -162,10 +185,12 @@ export function AssetAuthoringFeature({ workspaceId, initialSection = "create" }
             setMessage('Name is required.');
             return;
           }
-          const result = await client.createDraft({ workspaceId, displayName: name, summary });
+          const result = await client.createDraft({ workspaceId, displayName: name, summary, description, classification, tags: tagList(tags) });
           if (result.ok === true) {
             setName('');
             setSummary('');
+            setDescription('');
+            setTags('');
             setMessage('Saved as draft.');
             await refresh();
           } else {
@@ -174,7 +199,12 @@ export function AssetAuthoringFeature({ workspaceId, initialSection = "create" }
         }}
       >
         <input aria-label="Name" value={name} onChange={(event) => setName(event.target.value)} />
+        <select aria-label="Asset type" value={classification} onChange={(event) => setClassification(event.target.value)}>
+          {ASSET_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+        </select>
         <input aria-label="Short summary" value={summary} onChange={(event) => setSummary(event.target.value)} />
+        <textarea aria-label="Description" value={description} onChange={(event) => setDescription(event.target.value)} />
+        <input aria-label="Tags" value={tags} onChange={(event) => setTags(event.target.value)} />
         <button type="submit">Create asset draft</button>
       </form>
       {sectionMatches.customizations ? <h3>Customizations</h3> : null}
@@ -222,4 +252,8 @@ export function AssetAuthoringFeature({ workspaceId, initialSection = "create" }
       {message ? <p>{message}</p> : null}
     </section>
   );
+}
+
+function tagList(value: string): readonly string[] {
+  return value.split(',').map((item) => item.trim()).filter(Boolean);
 }

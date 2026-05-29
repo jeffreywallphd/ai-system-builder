@@ -161,7 +161,7 @@ describe("api artifact browser client", () => {
     const browse = await client.browseArtifacts();
     const detail = await client.readArtifactDetail({ storageKey: "uploads/a.png" });
     const content = await client.readArtifactContent({ storageKey: "uploads/a.png" });
-    const deleted = await client.deleteRegisteredArtifact({ storageKey: "uploads/a.png" });
+    const deleted = await client.deleteRegisteredArtifact({ storageKey: "uploads/a.png" }, { workspaceId: "workspace-a" });
     const imageViewUrl = client.createArtifactMediaViewUrl({ storageKey: "uploads/a.png" });
     const publish = await client.publishArtifactToHuggingFace({
       artifactId: "uploads/a.png",
@@ -214,7 +214,10 @@ describe("api artifact browser client", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       7,
       "/api/artifact/delete",
-      expect.objectContaining({ method: "POST" }),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ locator: { storageKey: "uploads/a.png" }, workspaceId: "workspace-a", source: "thin-client.artifact-browser" }),
+      }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       8,
@@ -246,6 +249,7 @@ describe("api artifact browser client", () => {
     expect(deleted.storageKey).toBe("uploads/a.png");
     expect((content as unknown as { bytes?: unknown }).bytes).toBeUndefined();
     expect(imageViewUrl).toBe("/api/artifact/media/view?storageKey=uploads%2Fa.png");
+    expect(client.createArtifactMediaViewUrl({ storageKey: "uploads/a.png" }, { workspaceId: "workspace-a" })).toBe("/api/artifact/media/view?storageKey=uploads%2Fa.png&workspaceId=workspace-a");
     expect(publish.verification.exists).toBe(true);
     expect(verified.verification.exists).toBe(true);
     expect(sourceVerified.verification.exists).toBe(false);

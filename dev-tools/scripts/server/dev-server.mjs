@@ -19,6 +19,33 @@ export function createServerDevPaths(repositoryRootDirectory = getRepositoryRoot
   };
 }
 
+export function resolveBundledDevPythonCommand(env = process.env) {
+  if (env.COMFYUI_PYTHON_COMMAND?.trim()) {
+    return undefined;
+  }
+  const homeDirectory = env.USERPROFILE?.trim() || env.HOME?.trim();
+  if (!homeDirectory) {
+    return undefined;
+  }
+  const bundledPython = path.join(
+    homeDirectory,
+    ".cache",
+    "codex-runtimes",
+    "codex-primary-runtime",
+    "dependencies",
+    "python",
+    process.platform === "win32" ? "python.exe" : "bin/python",
+  );
+  return existsSync(bundledPython) ? bundledPython : undefined;
+}
+
+function createServerDevEnvironment(env) {
+  const bundledPython = resolveBundledDevPythonCommand(env);
+  return bundledPython
+    ? { ...env, COMFYUI_PYTHON_COMMAND: bundledPython }
+    : env;
+}
+
 function assertRequiredPathExists(filePath, label) {
   if (!existsSync(filePath)) {
     throw new Error(`Unable to start server dev runner. Missing ${label}: ${filePath}`);
@@ -86,16 +113,18 @@ export async function startCompiledServer(options) {
     listener.once("error", handleListenError);
     listener.listen(createdServer.config.port, () => {
       listener.off("error", handleListenError);
+      const transport = createdServer.config.security?.httpsEnabled ? "https" : "http";
       void createdServer.loggingPort.log({
         timestamp: new Date().toISOString(),
         level: "info",
         verbosity: "normal",
-        event: "server.http.listening",
+        event: `server.${transport}.listening`,
         host: "server",
         component: "server-host",
-        message: "Server HTTP listener started.",
+        message: `Server ${transport.toUpperCase()} listener started.`,
         data: {
           port: createdServer.config.port,
+          transport,
           storageRootDirectory: createdServer.config.storageRootDirectory,
           runtimeRootDirectory: createdServer.config.runtimeRootDirectory,
         },
@@ -109,7 +138,7 @@ export async function startCompiledServer(options) {
 
 export function startServerDevRunner(options = {}) {
   const paths = options.paths ?? createServerDevPaths();
-  const env = options.env ?? process.env;
+  const env = createServerDevEnvironment(options.env ?? process.env);
   const stdout = options.stdout ?? process.stdout;
   const stderr = options.stderr ?? process.stderr;
   const requireFromRoot = createRequire(path.join(paths.repositoryRootDirectory, "package.json"));

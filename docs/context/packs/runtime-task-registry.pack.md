@@ -1,70 +1,83 @@
-# Runtime Task Registry Pack
+# Context Pack: Runtime Task Registry
 
-Use this pack when prompt scope includes long-running runtime-backed tasks (dataset preparation, model training, validation, publishing, or future runtime handlers).
+- Pack name: `runtime-task-registry`
+
+## Purpose
+
+- Route work involving accepted long-running runtime tasks through the shared async task lifecycle.
+- Keep task lifecycle/progress separate from runtime readiness and feature-specific runtime protocols.
+
+## Use When
+
+- Dataset preparation, model training, model validation, model publishing, image/runtime handlers, or future runtime-backed long-running tasks are in scope.
+- Start/read/cancel/list task behavior, polling, progress, retention, cancellation, or task aggregation changes.
+
+## Do Not Use When
+
+- Readiness-only work that does not create or inspect accepted tasks.
+- Synchronous domain/application work with no long-running runtime lifecycle.
 
 ## Required Lifecycle
 
-- Long-running work must use Runtime Task Registry async lifecycle: **start / read(status) / cancel / list**.
-- UI and callers must poll status by `requestId` only after a start operation accepts work and returns a task request id; readiness-guard-rejected starts must not create pollable task ids.
+- Long-running work must use Runtime Task Registry async lifecycle: start, read status, cancel, and list.
+- UI/callers poll by `requestId` only after start accepts work and returns a task request id.
+- Readiness-guard-rejected starts must not create pollable task ids.
 - Do not use long-held HTTP/IPC requests to wait for completion.
 - Do not solve timeout/disconnect issues by stretching fetch/IPC timeouts.
 
-## Shared vs Feature-Specific Responsibilities
+## Shared Vs Feature-Specific Responsibilities
 
-- Registry lifecycle/state/progress/retention concerns are shared across runtime tasks.
-- Runtime readiness contracts are adjacent shared vocabulary for capability availability and do not replace registry task records or registry lifecycle operations.
-- Task handlers remain feature-specific.
-- Do not introduce feature-specific task queues for dataset/model/etc.
+- Registry lifecycle, state, progress, correlation, cancellation, list aggregation, and retention are shared.
+- Runtime readiness describes capability availability and does not replace task records or task lifecycle operations.
+- Task handlers remain feature-specific but must map into generic registry contracts.
+- Do not introduce feature-specific task queues for dataset/model/image/runtime features.
 
-## Progress + Status Source of Truth
+## Status And Progress Rules
 
-- Use structured task status/progress from registry contracts.
-- Unknown `requestId` reads/cancels must be explicit not-found/unknown results with structured reason metadata or task errors, using `recordType: "not-found"` when no valid task family is known; do not return synthetic records that imply accepted work, and do not cast `"unknown"` into `TaskType` when the task family is not known.
-- Registry routers may recover missing in-process correlation by asking safe delegates, but status/cancel/list reads must not start, install, repair, or heavy-probe runtimes.
-- `listTasks` should aggregate delegates that can list current-process records and report unsupported or failed delegate families as warnings/metadata instead of failing the whole aggregate read generically. Delegate list-failure warnings must use safe metadata such as delegate name, requested task types, and `failureKind`; never include raw exception text, paths, env, command lines, tokens, or runtime payloads.
-- Logs remain useful diagnostics but should not be primary UI state source.
-
-## Power Lifecycle
-
-- Power suspension blockers should attach to runtime task lifecycle activity.
-- Power blockers complement but do not replace async task lifecycle polling.
+- Use structured registry status/progress as the UI state source; logs are diagnostics only.
+- Unknown `requestId` reads/cancels must return explicit not-found/unknown results with safe metadata.
+- Use `recordType: "not-found"` when no valid task family is known; do not cast unknown values into a task type.
+- Registry routers may recover missing in-process correlation through safe delegates.
+- Status/cancel/list reads must not start, install, repair, or heavy-probe runtimes.
+- List aggregation should return unsupported/failed delegate families as safe warnings instead of failing the whole read generically.
 
 ## Contract Boundaries
 
-- Generic runtime registry contracts must not depend on Python-specific contract types.
-- Python-prefixed async task contracts (for example `StartPythonRuntimeTaskRequest`, `PythonRuntimeTaskStatusResult`, and `CancelPythonRuntimeTaskResult`) are adapter-boundary types only, limited to Python HTTP/protocol implementation details.
-- Python runtime adapters must map Python status/error payloads to generic runtime task registry contracts at the application boundary.
+- Generic registry contracts must not depend on Python-specific protocol types.
+- Python-prefixed task contracts are adapter-boundary protocol details only.
+- Python runtime adapters map protocol payloads to generic registry contracts at the application boundary.
 - Do not create domain aliases that merely re-export runtime contracts.
-
-
-## Dataset Preparation Migration Status
-
-- Dataset preparation now uses only `RuntimeTaskRegistryPort` with Python `/tasks/start` + `/tasks/{requestId}` lifecycle polling.
-- Legacy `PythonDatasetPreparationPort` and its adapter path are retired.
-- Legacy dataset-preparation synchronous `/tasks/execute` path is removed from dataset-preparation production flows.
-- Model training/validation/publishing use Runtime Task Registry start/read/cancel lifecycle APIs.
-- No new long-running runtime-backed feature should use legacy `/tasks/execute`; use Runtime Task Registry lifecycle APIs.
 
 ## Readiness Boundary
 
-- Runtime readiness guards may prevent starting new runtime-backed work when a required derived feature capability is not ready, but they do not replace task registry reads, cancellation, status records, or retention.
-- Runtime readiness answers whether a host-owned capability is available, degraded, installing, failed, or otherwise unavailable before/around task execution. The application readiness service may derive feature capability status from runtime dependencies but must not start tasks or own task progress.
-- Runtime Task Registry remains the source of truth for accepted long-running task `startTask` / `getTaskStatus` / `cancelTask` / `listTasks` lifecycle and progress, but only after a start has passed readiness guards and been accepted.
-- If a readiness guard rejects a start before task creation, no registry record should be created and later status reads for that caller correlation id should remain explicit unknown/not-found results.
-- Do not encode task progress, Python protocol status payloads, or ComfyUI runtime internals as generic readiness fields.
-- Asset Registry image/generated-output resource-backed views must not use task registry status/list/cancel reads to discover image outputs. They may only project already-known generated-output descriptors supplied through a safe descriptor source, and those views remain unfinalized/unregistered until separate finalization/registration behavior runs elsewhere.
-- Phase 4 Prompt 4 adds that separate internal finalization/registration behavior without using the Runtime Task Registry as a discovery or status source. The Asset Kernel use case re-reads safe generated-output descriptors/views by id and calls a narrow application-layer finalization seam; task lifecycle ownership remains outside the use case.
-- Provider detail reads for generated-output views must use the generated-output descriptor read seam when available, or an explicitly bounded list fallback. They must not query task status, task list delegates, runtime readiness, ComfyUI, or image-generation execution paths to discover outputs.
-- Dataset/model resource-backed views must not query Runtime Task Registry status/list/cancel/start paths. Existing persisted model validation status may be displayed as metadata only, but validation/training/publishing task lifecycle operations must not be invoked by Asset Registry view reads.
-- External repository object resource-backed views must not query Runtime Task Registry status/list/cancel/start paths, model publishing tasks, or runtime readiness. Existing persisted external/published metadata can be displayed only after sanitization; repository existence, publication status, and localization/import state must not be refreshed through runtime tasks.
-- Phase 3 Review B cross-family aggregate reads preserve this no-task-registry behavior for all resource-backed providers. Unsupported/deferred sources and source failures are represented as sanitized diagnostics, not task lifecycle reads or runtime/provider probes.
-- Phase 3 Prompt 7 host composition does not change Runtime Task Registry ownership. Desktop/server resource-backed provider wiring must not inject task registries or use task start/read/list/cancel delegates to discover generated outputs, datasets, models, or external objects.
-- Phase 3 Prompt 8 keeps this unchanged for final review: missing generated-output, dataset/model, or external-object seams must return safe Asset Registry diagnostics rather than querying task status/list/cancel/start paths or treating task records as resource-backed provider inventory.
+- Readiness guards may prevent starting work but do not own task progress, records, cancellation, or retention.
+- If a guard rejects before task creation, later status reads for that caller correlation id remain explicit unknown/not-found.
+- Do not encode task progress, Python protocol status, ComfyUI internals, or provider payloads as readiness fields.
 
-Phase 6 Prompt 9 update: User/workspace-owned image asset records, generated-output descriptors/finalization, dataset preparation outputs, model inventory records, and runtime task outputs created from workspace actions require an explicit workspace id. Missing workspace context must fail safely and must not fall back to global records. Workspace-owned records from one workspace must not be listed or read as another workspace. Generated-output finalization validates source workspace ownership before writing finalized image assets or Asset Kernel instances, and finalized provenance/metadata carries workspace context. Legacy global image/model/dataset/generated-output records are not silently assigned to a hidden/default workspace and are not auto-migrated; a future explicit import/migration flow may be needed. Global runtime readiness, installed-runtime/model diagnostics, and provider configuration diagnostics may remain global, but they must not be presented as workspace-owned resource records. User-library and cross-workspace reuse remain later work.
+## Asset And Workspace Notes
 
-## Phase 6 final stabilization / Phase 7 handoff
+- Asset Registry resource-backed reads must not use task status/list/cancel/start paths to discover generated outputs, datasets, models, external objects, or publication state.
+- Existing persisted model validation/publishing status may be displayed as sanitized metadata only; reads must not invoke tasks.
+- Runtime task outputs created from workspace actions require explicit workspace context where implemented.
+- Missing workspace context for workspace-owned task outputs must fail safely and must not fall back to global records.
 
-Phase 6 final state: workspace is the normal boundary for user/project resources. No active workspace means workspace-scoped pages are gated and must not render underlying feature components or call workspace-scoped clients. Active workspace display uses the workspace display name. System Foundation remains system-owned and is made available only through a `system.foundation@1.0.0` workspace activation reference; workspace creation must not call the Phase 5 installer, copy pack definitions, create a hidden/default workspace, or perform startup seeding. Workspace-owned artifacts/uploads, image assets, generated outputs/finalization, dataset outputs, model records, and runtime task outputs require explicit workspace context where implemented, must not leak across Workspace A/B, and must not fall back to legacy global records. Global runtime readiness and system/provider diagnostics may remain global but must not masquerade as workspace-owned records. Collaboration fields are passive placeholders only.
+## Canonical Source Docs
 
-Phase 7 is User Library and Cross-Workspace Asset Reuse. It should define explicit promote/link/copy/import flows and provenance/resolver behavior without accidental propagation. Do not implement user-library, cross-workspace reuse, collaboration permissions, invites/sync/remote auth, asset authoring, override editing, pack import/export/install, marketplace, visual composition, workflow execution expansion, provider/network expansion, or automatic legacy migration as part of Phase 6 stabilization.
+- `docs/architecture/runtime-model.md` - runtime execution and adapter boundaries.
+- `docs/architecture/runtime-readiness-binding.md` - readiness/capability boundary.
+- `docs/architecture/module-dependency-rules.md` - dependency constraints.
+- `docs/standards/testing-standards.md` - runtime task lifecycle testing.
+- `docs/standards/logging-standards.md` - structured task diagnostics.
+
+## Companion Packs
+
+- `runtime` for runtime adapter/contracts work.
+- `runtime-readiness-binding` for capability readiness guards.
+- `runtime-installer` for install/dependency state.
+- `image-generation` for ComfyUI/image task flows.
+- `persistence-storage`, `asset-kernel`, `security`, and `testing` when resource/task outputs cross those boundaries.
+
+## Prompt Assembly Notes
+
+- Typical set: `index` + `runtime-task-registry`.
+- Add feature/runtime/host packs only for boundaries directly touched.

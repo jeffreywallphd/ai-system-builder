@@ -1,4 +1,4 @@
-import type { AssetReference } from "../../../contracts/asset";
+import type { AssetDefinition, AssetMetadata, AssetPackManifest, AssetReference } from "../../../contracts/asset";
 import type { WorkspaceId } from "../../../contracts/workspace";
 import { isWorkspaceId } from "../../../contracts/workspace";
 import type { AssetRegistryDefinitionReadPort } from "../../ports/asset";
@@ -16,6 +16,16 @@ import type {
   AssetRegistryResourceBackedViewCard,
   AssetRegistryResourceBackedViewDetail,
 } from "./asset-registry-read-facade.types";
+import {
+  SYSTEM_FOUNDATION_PACK_DISPLAY_NAME,
+  SYSTEM_FOUNDATION_PACK_ID,
+  SYSTEM_FOUNDATION_PACK_SOURCE_KIND,
+  SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
+  SYSTEM_FOUNDATION_PACK_TRUST_STATUS,
+  SYSTEM_FOUNDATION_PACK_VERSION,
+} from "../asset-packs/system-packs/system-foundation-pack.constants";
+import { SYSTEM_FOUNDATION_PACK_CATEGORIES } from "../asset-packs/system-packs/system-foundation-pack.categories";
+import { SYSTEM_FOUNDATION_PACK_MANIFEST } from "../asset-packs/system-packs/system-foundation-pack.manifest";
 import { WorkspaceEffectiveAssetSourceResolver } from "./workspace-effective-asset-source-resolver.service";
 import { WorkspaceAssetAuthoringReadModelService } from "./workspace-asset-authoring-read-model.service";
 
@@ -89,12 +99,20 @@ export class WorkspaceAssetRegistryReadFacade implements AssetRegistryDefinition
 
     const globalResult = await this.dependencies.assetRegistryRead.listDefinitionCards(query);
     const activeSystemPacks = activations.activeSystemPacks;
-    const resolvedItems = await Promise.all(globalResult.items.map(async (card) => ({
+    const manifestCards = systemFoundationIsActive(activeSystemPacks)
+      ? systemFoundationCards(query).filter((card) => !globalResult.items.some((item) => definitionKey(item) === definitionKey(card)))
+      : [];
+    const candidateItems = [...globalResult.items, ...manifestCards];
+    const resolvedItems = await Promise.all(candidateItems.map(async (card) => ({
       ...card,
       effectiveSourceSummary: await this.sourceResolver.resolve(context.workspaceId, card),
       assetAuthoringEffectiveSourceSummary: await this.authoringReadModel.readEffectiveSourceSummary(context.workspaceId, card.definitionRef),
     } as AssetDefinitionCard)));
-    const items = resolvedItems.filter((card) => isInWorkspaceEffectiveView(card, activeSystemPacks) || isUserLibraryOrWorkspaceReuseSource(card.effectiveSourceSummary?.effectiveSourceKind));
+    const items = resolvedItems.filter((card) => (
+      isInWorkspaceEffectiveView(card, activeSystemPacks) ||
+      isUserLibraryOrWorkspaceReuseSource(card.effectiveSourceSummary?.effectiveSourceKind) ||
+      isWorkspaceAuthoringSource(card.assetAuthoringEffectiveSourceSummary?.effectiveSourceKind)
+    ));
     items.sort(compareDefinitionCards);
 
     return {
@@ -113,7 +131,8 @@ export class WorkspaceAssetRegistryReadFacade implements AssetRegistryDefinition
     const activations = await this.readActiveSystemPacks(context.workspaceId);
     if (!activations.ok) throw new WorkspaceAssetRegistryReadFacadeError(activations.diagnostic.code as WorkspaceAssetRegistryReadFailureCode, activations.diagnostic.message);
 
-    const detail = await this.dependencies.assetRegistryRead.readDefinitionDetail(ref, { ...options, includeMetadata: true });
+    const detail = await this.dependencies.assetRegistryRead.readDefinitionDetail(ref, { ...options, includeMetadata: true })
+      ?? systemFoundationDetail(ref);
     if (!detail) return undefined;
 
     if (!isDetailInWorkspaceEffectiveView(detail, activations.activeSystemPacks)) {
@@ -141,16 +160,38 @@ export class WorkspaceAssetRegistryReadFacade implements AssetRegistryDefinition
   public async listResourceBackedViewCards(query: AssetRegistryListQuery = {}): Promise<AssetRegistryListResult<AssetRegistryResourceBackedViewCard>> {
     const context = await this.resolveWorkspaceContext(query.workspaceId);
     if (!context.ok) throw new WorkspaceAssetRegistryReadFacadeError(context.diagnostic.code as WorkspaceAssetRegistryReadFailureCode, context.diagnostic.message);
-    return emptyList(diagnostic("workspace-resource-backed-view-deferred", "info", "Workspace resource-backed view descriptors are deferred until workspace resource scoping is implemented."));
+    if (!queryAllowsModelResourceViews(query)) {
+      return emptyList(diagnostic("workspace-resource-backed-view-deferred", "info", "Workspace resource-backed view descriptors are currently limited to model inventory views."));
+    }
+    if (!this.dependencies.assetRegistryRead.listResourceBackedViewCards) {
+      return emptyList(diagnostic("workspace-resource-backed-view-deferred", "info", "Workspace model resource-backed view descriptors are unavailable."));
+    }
+    const result = await this.dependencies.assetRegistryRead.listResourceBackedViewCards({
+      ...query,
+      workspaceId: context.workspaceId,
+      viewKinds: ["model"],
+    });
+    return {
+      items: result.items.filter((item) => item.viewKind === "model"),
+      ...(result.nextCursor ? { nextCursor: result.nextCursor } : {}),
+      ...(result.diagnostics?.length ? { diagnostics: result.diagnostics } : {}),
+    };
   }
 
-  public async readResourceBackedViewDetail(_viewId: string, options: AssetRegistryReadOptions = {}): Promise<AssetRegistryResourceBackedViewDetail | undefined> {
+  public async readResourceBackedViewDetail(viewId: string, options: AssetRegistryReadOptions = {}): Promise<AssetRegistryResourceBackedViewDetail | undefined> {
     const context = await this.resolveWorkspaceContext(options.workspaceId);
     if (!context.ok) throw new WorkspaceAssetRegistryReadFacadeError(context.diagnostic.code as WorkspaceAssetRegistryReadFailureCode, context.diagnostic.message);
-    throw new WorkspaceAssetRegistryReadFacadeError(
-      "workspace-resource-backed-view-deferred",
-      "Workspace resource-backed view descriptors are deferred until workspace resource scoping is implemented.",
-    );
+    if (!this.dependencies.assetRegistryRead.readResourceBackedViewDetail) {
+      throw new WorkspaceAssetRegistryReadFacadeError(
+        "workspace-resource-backed-view-deferred",
+        "Workspace model resource-backed view descriptors are unavailable.",
+      );
+    }
+    const detail = await this.dependencies.assetRegistryRead.readResourceBackedViewDetail(viewId, {
+      ...options,
+      workspaceId: context.workspaceId,
+    });
+    return detail?.view.viewKind === "model" ? detail : undefined;
   }
 
   private async resolveWorkspaceContext(workspaceId: unknown): Promise<
@@ -198,6 +239,141 @@ export class WorkspaceAssetRegistryReadFacade implements AssetRegistryDefinition
 
 function isUserLibraryOrWorkspaceReuseSource(kind: string | undefined): boolean {
   return kind === "user-library-linked" || kind === "user-library-copied" || kind === "workspace-imported";
+}
+
+function isWorkspaceAuthoringSource(kind: string | undefined): boolean {
+  return kind === "workspace-authored" || kind === "workspace-override" || kind === "linked-with-workspace-override";
+}
+
+function systemFoundationIsActive(activeSystemPacks: readonly ActiveSystemPackKey[]): boolean {
+  return activeSystemPacks.some((pack) => pack.packId === SYSTEM_FOUNDATION_PACK_ID && pack.packVersion === SYSTEM_FOUNDATION_PACK_VERSION);
+}
+
+function systemFoundationCards(query: AssetRegistryListQuery): readonly AssetDefinitionCard[] {
+  return SYSTEM_FOUNDATION_PACK_MANIFEST.assets
+    .map((entry) => systemFoundationCard(entry, query.includeMetadata === true))
+    .filter((card) => matchesDefinitionQuery(card, query));
+}
+
+function systemFoundationCard(entry: AssetPackManifest["assets"][number], includeMetadata: boolean): AssetDefinitionCard {
+  const definition = entry.definition;
+  const category = SYSTEM_FOUNDATION_PACK_CATEGORIES.find((item) => item.categoryId === entry.category);
+  return {
+    definitionRef: entry.definitionRef,
+    definitionId: String(definition.definitionId),
+    version: definition.version,
+    assetType: definition.assetType,
+    assetFamily: definition.assetFamily,
+    displayName: definition.displayName,
+    summary: definition.description,
+    lifecycleStatus: definition.lifecycleStatus,
+    builtIn: true,
+    sourcePackId: SYSTEM_FOUNDATION_PACK_ID,
+    sourcePackVersion: SYSTEM_FOUNDATION_PACK_VERSION,
+    sourcePackDisplayName: SYSTEM_FOUNDATION_PACK_DISPLAY_NAME,
+    sourceKind: SYSTEM_FOUNDATION_PACK_SOURCE_KIND,
+    sourceLayer: SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
+    trustStatus: SYSTEM_FOUNDATION_PACK_TRUST_STATUS,
+    packCategoryId: entry.category,
+    ...(category ? { packCategoryDisplayName: category.displayName } : {}),
+    ...(entry.tags?.length ? { packTags: entry.tags } : {}),
+    systemDefault: true,
+    installedPack: true,
+    ...(includeMetadata ? { metadata: systemFoundationMetadata(entry) } : {}),
+  };
+}
+
+function systemFoundationDetail(ref: AssetReference): AssetDefinitionDetail | undefined {
+  const entry = SYSTEM_FOUNDATION_PACK_MANIFEST.assets.find((candidate) => {
+    const requestedVersion = typeof ref.version === "string" ? ref.version : undefined;
+    return String(candidate.definition.definitionId) === String(ref.id) && (!requestedVersion || candidate.definition.version === requestedVersion);
+  });
+  if (!entry) return undefined;
+  return {
+    definition: withSystemFoundationMetadata(entry.definition, entry),
+    builtIn: true,
+  };
+}
+
+function withSystemFoundationMetadata(definition: AssetDefinition, entry: AssetPackManifest["assets"][number]): AssetDefinition {
+  return {
+    ...definition,
+    metadata: {
+      ...(definition.metadata ?? {}),
+      ...systemFoundationMetadata(entry),
+    },
+    provenance: {
+      ...definition.provenance,
+      metadata: {
+        ...(definition.provenance.metadata ?? {}),
+        sourcePackId: SYSTEM_FOUNDATION_PACK_ID,
+        sourcePackVersion: SYSTEM_FOUNDATION_PACK_VERSION,
+        sourceLayer: SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
+        sourcePackEntryId: entry.entryId,
+      },
+    },
+  };
+}
+
+function systemFoundationMetadata(entry: AssetPackManifest["assets"][number]): AssetMetadata {
+  return {
+    sourcePackId: SYSTEM_FOUNDATION_PACK_ID,
+    sourcePackVersion: SYSTEM_FOUNDATION_PACK_VERSION,
+    sourceKind: SYSTEM_FOUNDATION_PACK_SOURCE_KIND,
+    sourceLayer: SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
+    sourcePackEntryId: entry.entryId,
+    sourcePackFingerprint: entry.fingerprint,
+    trustStatus: SYSTEM_FOUNDATION_PACK_TRUST_STATUS,
+    systemDefault: true,
+    assetPackInstall: {
+      packId: SYSTEM_FOUNDATION_PACK_ID,
+      packVersion: SYSTEM_FOUNDATION_PACK_VERSION,
+      entryId: entry.entryId,
+      fingerprint: entry.fingerprint,
+      sourceKind: SYSTEM_FOUNDATION_PACK_SOURCE_KIND,
+      sourceLayer: SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
+      trustStatus: SYSTEM_FOUNDATION_PACK_TRUST_STATUS,
+      managedBy: "asset-kernel",
+      installedAt: "system-foundation-manifest",
+    },
+  };
+}
+
+function matchesDefinitionQuery(card: AssetDefinitionCard, query: AssetRegistryListQuery): boolean {
+  return (
+    (!query.assetTypes?.length || query.assetTypes.includes(card.assetType)) &&
+    (!query.assetFamilies?.length || query.assetFamilies.includes(card.assetFamily)) &&
+    (!query.lifecycleStatuses?.length || query.lifecycleStatuses.includes(card.lifecycleStatus)) &&
+    (query.includeBuiltIns !== false || card.builtIn !== true) &&
+    (query.includeCustom !== false || card.builtIn === true) &&
+    matchesSearchText(query.searchText, [
+      card.definitionId,
+      card.displayName,
+      card.summary,
+      card.assetType,
+      card.assetFamily,
+      card.sourcePackDisplayName,
+      card.packCategoryDisplayName,
+    ])
+  );
+}
+
+function matchesSearchText(searchText: string | undefined, values: readonly (string | undefined)[]): boolean {
+  const needle = searchText?.trim().toLowerCase();
+  if (!needle) return true;
+  return values.some((value) => value?.toLowerCase().includes(needle));
+}
+
+function definitionKey(card: AssetDefinitionCard): string {
+  return `${card.definitionId}@${card.version}`;
+}
+
+function queryAllowsModelResourceViews(query: AssetRegistryListQuery): boolean {
+  return (
+    (!query.viewKinds?.length || query.viewKinds.includes("model")) &&
+    (!query.assetTypes?.length || query.assetTypes.includes("model")) &&
+    (!query.assetFamilies?.length || query.assetFamilies.includes("resource-backed"))
+  );
 }
 
 function isInWorkspaceEffectiveView(card: AssetDefinitionCard, activeSystemPacks: readonly ActiveSystemPackKey[]): boolean {

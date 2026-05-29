@@ -1,10 +1,20 @@
 import { describe, expect, it } from "../../testing/node-test";
-import { createAnonymousAuthContext, createSecurityError, missingSecurityScopes } from "./index";
+import { createAnonymousAuthContext, createSecurityError, missingSecurityScopes, SECURITY_SCOPES } from "./index";
 
 describe("security contracts", () => {
   it("identifies missing scopes", () => {
     const missing = missingSecurityScopes(["artifact:read"], ["artifact:read", "runtime:admin"]);
     expect(missing).toEqual(["runtime:admin"]);
+  });
+
+  it("declares workspace read and write scopes", () => {
+    expect(SECURITY_SCOPES).toContain("workspace:read");
+    expect(SECURITY_SCOPES).toContain("workspace:write");
+  });
+
+  it("declares asset read and write scopes", () => {
+    expect(SECURITY_SCOPES).toContain("asset:read");
+    expect(SECURITY_SCOPES).toContain("asset:write");
   });
 
   it("creates anonymous auth context", () => {

@@ -105,7 +105,7 @@ describe("ArtifactBrowserFeature", () => {
     mountedContainer = container;
 
     await act(async () => {
-      root.render(<ArtifactBrowserFeature client={client} />);
+      root.render(<ArtifactBrowserFeature client={client} workspaceId="workspace-a" />);
     });
 
     const artifactButton = Array.from(container.querySelectorAll("button"))
@@ -156,7 +156,7 @@ describe("ArtifactBrowserFeature", () => {
     mountedContainer = container;
 
     await act(async () => {
-      root.render(<ArtifactBrowserFeature client={client} />);
+      root.render(<ArtifactBrowserFeature client={client} workspaceId="workspace-a" />);
     });
 
     const artifactButton = Array.from(container.querySelectorAll("button"))
@@ -180,7 +180,7 @@ describe("ArtifactBrowserFeature", () => {
       confirmButton.click();
     });
 
-    expect(client.deleteRegisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/cat.png" });
+    expect(client.deleteRegisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/cat.png" }, { workspaceId: "workspace-a" });
     expect(container.textContent).toContain("Deleted uploads/cat.png.");
   });
 
@@ -207,15 +207,15 @@ describe("ArtifactBrowserFeature", () => {
     const root = createRoot(container);
     mountedRoot = root;
     mountedContainer = container;
-    await act(async () => { root.render(<ArtifactBrowserFeature client={client} />); });
+    await act(async () => { root.render(<ArtifactBrowserFeature client={client} workspaceId="workspace-a" />); });
     const artifactCheckboxes = Array.from(container.querySelectorAll("li:not(:first-child) input[type='checkbox']")) as HTMLInputElement[];
     await act(async () => { artifactCheckboxes[0]?.click(); artifactCheckboxes[1]?.click(); });
     const deleteAllInput = Array.from(container.querySelectorAll("input")).find((input) => input.getAttribute("placeholder") === "Delete All") as HTMLInputElement;
     setInputValue(deleteAllInput, "Delete All");
     const deleteSelected = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Delete Selected")) as HTMLButtonElement;
     await act(async () => { deleteSelected.click(); });
-    expect(client.deleteRegisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/a.png" });
-    expect(client.deleteRegisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/b.png" });
+    expect(client.deleteRegisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/a.png" }, { workspaceId: "workspace-a" });
+    expect(client.deleteRegisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/b.png" }, { workspaceId: "workspace-a" });
   });
 
   it("selects and deselects every listed artifact from the bulk checkbox", async () => {

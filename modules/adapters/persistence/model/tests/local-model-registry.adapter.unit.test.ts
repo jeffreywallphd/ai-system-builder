@@ -120,7 +120,7 @@ describe("createLocalModelRegistryAdapter", () => {
     expect(serialized).not.toContain("unlink");
   });
 
-  it("discovers unregistered local Hugging Face cache models and persists them", async () => {
+  it("lists configured shared Hugging Face cache models without persisting them into workspace inventory", async () => {
     const dir = await mkdtemp(join(tmpdir(), "model-registry-"));
     const filePath = join(dir, "models.json");
     const cacheRoot = join(dir, "hf-cache");
@@ -141,10 +141,44 @@ describe("createLocalModelRegistryAdapter", () => {
 
     const listed = await adapter.listModels({
       workspaceId: "workspace-a" as never,  limit: 10 });
-    expect(listed.models.length).toBe(0);
+    expect(listed.models.length).toBe(1);
+    expect(listed.models[0]).toMatchObject({
+      workspaceId: "workspace-a",
+      modelId: "org/demo-model",
+      displayName: "org/demo-model",
+      storageScope: "shared",
+      lifecycleStatus: "downloaded",
+      artifactForm: "full-model",
+    });
 
     const persisted = JSON.parse(await readFile(filePath, "utf8").catch(() => "{}")) as { models?: Array<{ modelId?: string }> };
     expect(persisted.models ?? []).toEqual([]);
+  });
+
+  it("lists checkpoint files from the configured shared model directory", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "model-registry-"));
+    const filePath = join(dir, "models.json");
+    const sharedRoot = join(dir, "shared-models");
+    await mkdir(sharedRoot, { recursive: true });
+    await writeFile(join(sharedRoot, "dream.safetensors"), "checkpoint", "utf8");
+
+    const adapter = createLocalModelRegistryAdapter({
+      filePath,
+      now: () => "2026-04-27T00:00:00.000Z",
+      discovery: {
+        searchRoots: async () => [sharedRoot],
+      },
+    });
+
+    const listed = await adapter.listModels({ workspaceId: "workspace-a" as never, limit: 10 });
+
+    expect(listed.models.length).toBe(1);
+    expect(listed.models[0]).toMatchObject({
+      displayName: "dream",
+      artifactForm: "checkpoint",
+      provider: "unknown",
+      storageScope: "shared",
+    });
   });
 
   it("can list persisted registry records without cache discovery", async () => {
@@ -184,6 +218,36 @@ describe("createLocalModelRegistryAdapter", () => {
     expect(persisted.models?.map((model) => model.modelId)).toEqual(["org/registered-image-model"]);
   });
 
+  it("can include configured shared storage while keeping general discovery disabled", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "model-registry-"));
+    const filePath = join(dir, "models.json");
+    const sharedRoot = join(dir, "shared-models");
+    await mkdir(sharedRoot, { recursive: true });
+    await writeFile(join(sharedRoot, "shared-dream.safetensors"), "checkpoint", "utf8");
+
+    const adapter = createLocalModelRegistryAdapter({
+      filePath,
+      now: () => "2026-04-27T00:00:00.000Z",
+      discovery: {
+        searchRoots: [sharedRoot],
+        env: {},
+        homeDirectory: join(dir, "home"),
+      },
+    });
+
+    const listed = await adapter.listModels({
+      workspaceId: "workspace-a" as never,
+      limit: 10,
+      includeDiscovered: false,
+      includeSharedStorage: true,
+    });
+
+    expect(listed.models.map((model) => model.displayName)).toEqual(["shared-dream"]);
+    expect(listed.models[0]?.storageScope).toBe("shared");
+    const persisted = JSON.parse(await readFile(filePath, "utf8").catch(() => "{}")) as { models?: Array<{ modelId?: string }> };
+    expect(persisted.models ?? []).toEqual([]);
+  });
+
   it("does not auto-migrate legacy global records into workspace inventory", async () => {
     const dir = await mkdtemp(join(tmpdir(), "model-registry-"));
     const filePath = join(dir, "models.json");
@@ -215,7 +279,7 @@ describe("createLocalModelRegistryAdapter", () => {
       workspaceId: "workspace-a" as never,  limit: 10 })),
     );
 
-    expect(listed.every((result) => result.models.length === 0)).toBe(true);
+    expect(listed.every((result) => result.models.length === 1)).toBe(true);
 
     const persisted = JSON.parse(await readFile(filePath, "utf8").catch(() => "{}")) as { models?: Array<{ modelId?: string }> };
     expect(persisted.models ?? []).toEqual([]);

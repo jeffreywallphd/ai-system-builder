@@ -32,7 +32,7 @@ export function ModelsFeature(props: { client?: DesktopModelsClient; workspaceId
           {
             id: "train-model",
             label: "Train Model",
-            content: <DeferredTrainModelTab client={props.client} />,
+            content: <DeferredTrainModelTab client={props.client} workspaceId={props.workspaceId} />,
           },
         ]}
       />
@@ -41,7 +41,7 @@ export function ModelsFeature(props: { client?: DesktopModelsClient; workspaceId
   );
 }
 
-function DeferredTrainModelTab({ client }: { client?: DesktopModelsClient }) {
-  const trainingState = useModelTrainingFeature(client);
+function DeferredTrainModelTab({ client, workspaceId }: { client?: DesktopModelsClient; workspaceId?: string }) {
+  const trainingState = useModelTrainingFeature(client, workspaceId);
   return <TrainModelTab state={trainingState} />;
 }

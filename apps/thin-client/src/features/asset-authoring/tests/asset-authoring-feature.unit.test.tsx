@@ -21,12 +21,15 @@ describe('AssetAuthoringFeature thin', () => {
     const c = document.createElement('div'); document.body.appendChild(c); const root = createRoot(c);
     await act(async () => { root.render(<AssetAuthoringFeature workspaceId='w1' />); });
     const input = c.querySelector('input[aria-label="Display name"]') as HTMLInputElement;
-    await act(async () => { input.value = 'X'; input.dispatchEvent(new Event('input', { bubbles: true })); });
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, 'X');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
     const form = c.querySelector('form')!;
     await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
     expect(c.textContent).toContain('invalid');
     expect(c.textContent).not.toContain('Draft created.');
-    expect(c.textContent).toContain('Creating new customizations is not available yet.');
+    expect(c.textContent).toContain('Asset type');
     root.unmount(); c.remove();
   });
 });

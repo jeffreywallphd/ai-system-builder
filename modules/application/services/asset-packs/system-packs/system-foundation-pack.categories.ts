@@ -42,6 +42,12 @@ export const SYSTEM_FOUNDATION_PACK_CATEGORIES = [
     description: "Foundational workflow and system container semantics for larger compositions.",
     sortOrder: 60,
   },
+  {
+    categoryId: "conversational-systems",
+    displayName: "Conversational Systems",
+    description: "Reusable conversational composite assets that preserve lineage to foundational primitives.",
+    sortOrder: 70,
+  },
 ] as const satisfies readonly SystemFoundationPackCategory[];
 
 export const SYSTEM_FOUNDATION_PACK_CATEGORY_IDS =

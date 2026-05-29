@@ -28,6 +28,7 @@ export interface ListModelsRequest {
   limit?: number;
   cursor?: string;
   includeDiscovered?: boolean;
+  includeSharedStorage?: boolean;
 }
 
 export interface ListModelsResult {
@@ -208,6 +209,7 @@ export function normalizeListModelsRequest(request: ListModelsRequest): ListMode
     limit: normalizeListLimit(request.limit),
     cursor: normalizeOptionalText(request.cursor),
     includeDiscovered: request.includeDiscovered === false ? false : undefined,
+    includeSharedStorage: request.includeSharedStorage === true ? true : undefined,
   };
 }
 
