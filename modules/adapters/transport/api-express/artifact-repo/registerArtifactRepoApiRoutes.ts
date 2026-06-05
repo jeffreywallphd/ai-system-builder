@@ -6,6 +6,7 @@ import type {
   BrowseHuggingFaceNamespaceDatasetsUseCase,
   BrowseHuggingFaceDatasetParquetFilesUseCase,
   VerifyImportedArtifactSourceBackingUseCase,
+  ImportHuggingFaceFilesUseCase,
   StoreArtifactInRepoCommand,
   StoreArtifactInRepoUseCasePort,
   VerifyPublishedArtifactBackingUseCase,
@@ -36,6 +37,9 @@ import {
   createApiHuggingFaceDatasetParquetFilesBrowseFailureResponse,
   createApiHuggingFaceDatasetParquetFilesBrowseRequest,
   createApiHuggingFaceDatasetParquetFilesBrowseSuccessResponse,
+  createApiHuggingFaceFilesImportFailureResponse,
+  createApiHuggingFaceFilesImportRequest,
+  createApiHuggingFaceFilesImportSuccessResponse,
   createApiHuggingFaceNamespaceDatasetsBrowseFailureResponse,
   createApiHuggingFaceNamespaceDatasetsBrowseRequest,
   createApiHuggingFaceNamespaceDatasetsBrowseSuccessResponse,
@@ -47,6 +51,7 @@ import {
   type ApiArtifactRepoHasResponse,
   type ApiArtifactRepoStoreResponse,
   type ApiHuggingFaceDatasetParquetFilesBrowseResponse,
+  type ApiHuggingFaceFilesImportResponse,
   type ApiHuggingFaceNamespaceDatasetsBrowseResponse,
 } from "../../../../contracts/api";
 
@@ -106,6 +111,20 @@ interface ArtifactRegisterFromRepoApiRequestBody {
   source?: string;
 }
 
+interface HuggingFaceFilesImportApiRequestBody {
+  repositories?: Array<{
+    repository: string;
+    revision?: string;
+  }>;
+  files?: Array<{
+    repository: string;
+    path: string;
+    revision?: string;
+    mediaType?: string;
+  }>;
+  source?: string;
+}
+
 export interface ArtifactRepoExpressRequestLike {
   body?: unknown;
   headers?: Record<string, string | string[] | undefined>;
@@ -123,6 +142,7 @@ export interface ArtifactRepoExpressResponseLike {
     | ApiArtifactRegisterFromRepoResponse
     | ApiHuggingFaceNamespaceDatasetsBrowseResponse
     | ApiHuggingFaceDatasetParquetFilesBrowseResponse
+    | ApiHuggingFaceFilesImportResponse
     | HuggingFaceTokenConfigApiResponse
   ) => void;
 }
@@ -171,6 +191,7 @@ export interface RegisterArtifactRepoApiRoutesDependencies {
   hasArtifactInRepoUseCase: HasArtifactInRepoUseCasePort;
   browseHuggingFaceNamespaceDatasetsUseCase: Pick<BrowseHuggingFaceNamespaceDatasetsUseCase, "execute">;
   browseHuggingFaceDatasetParquetFilesUseCase: Pick<BrowseHuggingFaceDatasetParquetFilesUseCase, "execute">;
+  importHuggingFaceFilesUseCase: Pick<ImportHuggingFaceFilesUseCase, "execute">;
   storeArtifactInRepoUseCase: StoreArtifactInRepoUseCasePort;
   publishArtifactToRepoUseCase: Pick<PublishArtifactToRepoUseCase, "execute">;
   verifyPublishedArtifactBackingUseCase: Pick<VerifyPublishedArtifactBackingUseCase, "execute">;
@@ -289,7 +310,7 @@ function mapPublishStatusCode(
 }
 
 function mapBrowseStatusCode(
-  response: ApiHuggingFaceNamespaceDatasetsBrowseResponse | ApiHuggingFaceDatasetParquetFilesBrowseResponse,
+  response: ApiHuggingFaceNamespaceDatasetsBrowseResponse | ApiHuggingFaceDatasetParquetFilesBrowseResponse | ApiHuggingFaceFilesImportResponse,
 ): number {
   if (response.ok) {
     return 200;
@@ -483,6 +504,48 @@ export function registerArtifactRepoApiRoutes(
     const apiResponse = result.ok
       ? createApiHuggingFaceDatasetParquetFilesBrowseSuccessResponse(result.value, context)
       : createApiHuggingFaceDatasetParquetFilesBrowseFailureResponse(
+        result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
+          ? result.error.code
+          : "internal",
+        result.error.message,
+        {
+          details: result.error.details ? { ...result.error.details } : undefined,
+          requestId: context.requestId,
+          correlationId: context.correlationId,
+        },
+      );
+
+    response.status(mapBrowseStatusCode(apiResponse)).json(apiResponse);
+  });
+
+  dependencies.app.post("/api/huggingface/files/import", async (request, response) => {
+    const context = mapRequestContext(request);
+    let apiRequest: ReturnType<typeof createApiHuggingFaceFilesImportRequest>;
+
+    try {
+      const body = request.body as HuggingFaceFilesImportApiRequestBody | undefined;
+      apiRequest = createApiHuggingFaceFilesImportRequest({
+        repositories: body?.repositories,
+        files: body?.files,
+        source: normalizeSource(body?.source),
+      }, context);
+    } catch (error) {
+      const apiResponse = createApiHuggingFaceFilesImportFailureResponse(
+        "validation",
+        error instanceof Error ? error.message : "Invalid Hugging Face import request.",
+        context,
+      );
+      response.status(mapBrowseStatusCode(apiResponse)).json(apiResponse);
+      return;
+    }
+
+    const result = await dependencies.importHuggingFaceFilesUseCase.execute({
+      repositories: apiRequest.payload.repositories,
+      files: apiRequest.payload.files,
+    }, context);
+    const apiResponse = result.ok
+      ? createApiHuggingFaceFilesImportSuccessResponse(result.value, context)
+      : createApiHuggingFaceFilesImportFailureResponse(
         result.error.code === "validation" || result.error.code === "not-found" || result.error.code === "unavailable"
           ? result.error.code
           : "internal",

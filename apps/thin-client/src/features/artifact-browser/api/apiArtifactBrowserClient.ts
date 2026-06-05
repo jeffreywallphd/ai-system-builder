@@ -121,12 +121,41 @@ export interface ThinClientHuggingFaceDatasetParquetFile {
   sizeBytes?: number;
 }
 
+export interface ThinClientHuggingFaceFilesImportResult {
+  repositories: Array<{
+    repository: string;
+    revision: string;
+    status: "succeeded" | "partial" | "failed";
+    message?: string;
+    code?: "validation" | "not-found" | "unavailable" | "internal";
+    files: Array<{
+      repository: string;
+      path: string;
+      revision: string;
+      mediaType?: string;
+      status: "registered" | "failed";
+      artifactId?: string;
+      message?: string;
+      code?: "validation" | "not-found" | "unavailable" | "internal";
+    }>;
+  }>;
+  summary: {
+    attempted: number;
+    succeeded: number;
+    failed: number;
+  };
+}
+
 export interface ArtifactBrowserApiClient {
   getHuggingFaceTokenStatus: () => Promise<{ configured: boolean; maskedToken?: string }>;
   setHuggingFaceToken: (input: { token: string }) => Promise<{ configured: boolean; maskedToken?: string }>;
   clearHuggingFaceToken: () => Promise<{ configured: boolean; maskedToken?: string }>;
   browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<ThinClientHuggingFaceNamespaceDataset[]>;
   browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<ThinClientHuggingFaceDatasetParquetFile[]>;
+  importHuggingFaceFiles?: (input: {
+    repositories?: Array<{ repository: string; revision?: string }>;
+    files?: Array<{ repository: string; path: string; revision?: string; mediaType?: string }>;
+  }) => Promise<ThinClientHuggingFaceFilesImportResult>;
   browseArtifacts: (input?: { artifactFamily?: ThinClientArtifactFamily; workspaceId?: string }) => Promise<ThinClientArtifactBrowseItem[]>;
   readArtifactDetail: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<ThinClientArtifactDetail>;
   readArtifactContent: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<ThinClientArtifactContentDescriptor>;
@@ -244,6 +273,28 @@ export function createApiArtifactBrowserClient(
       return ensureSuccess(envelope, response.status, createApiUrl(apiBaseUrl, "/huggingface/dataset/parquet-files"), (value) => {
         const files = (value as { files?: ThinClientHuggingFaceDatasetParquetFile[] } | undefined)?.files;
         return Array.isArray(files) ? files : [];
+      });
+    },
+
+    async importHuggingFaceFiles(input) {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/huggingface/files/import"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          repositories: input.repositories,
+          files: input.files,
+          source,
+        }),
+      });
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, response.status, createApiUrl(apiBaseUrl, "/huggingface/files/import"), (value) => {
+        const result = value as ThinClientHuggingFaceFilesImportResult;
+        if (!result || typeof result !== "object" || !("summary" in result)) {
+          throw new Error("Hugging Face import response is missing summary information.");
+        }
+        return result;
       });
     },
 

@@ -144,9 +144,9 @@ it("maps website single-page ingestion via preload bridge", async () => {
   };
 
   const client = createDesktopArtifactUploadClient();
-  const response = await client.ingestWebsitePage({ url: "https://example.com" });
+  const response = await client.ingestWebsitePage({ url: "https://example.com", workspaceId: "workspace-a" });
 
-  expect(ingestWebsitePage).toHaveBeenCalledWith({ url: "https://example.com" });
+  expect(ingestWebsitePage).toHaveBeenCalledWith({ url: "https://example.com", workspaceId: "workspace-a" }, { workspaceId: "workspace-a" });
   expect(response.ok).toBe(true);
 });
 
@@ -179,8 +179,12 @@ it("maps website batch ingestion via preload bridge", async () => {
   const client = createDesktopArtifactUploadClient();
   const response = await client.ingestWebsitePagesBatch({
     targets: [{ url: "https://example.com/a" }, { url: "https://example.com/b" }],
+    workspaceId: "workspace-a",
   });
 
-  expect(ingestWebsitePagesBatch).toHaveBeenCalled();
+  expect(ingestWebsitePagesBatch).toHaveBeenCalledWith({
+    targets: [{ url: "https://example.com/a" }, { url: "https://example.com/b" }],
+    workspaceId: "workspace-a",
+  }, { workspaceId: "workspace-a" });
   expect(response.ok).toBe(true);
 });

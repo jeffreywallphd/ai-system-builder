@@ -62,7 +62,7 @@ export function useArtifactUploadFeature(client?: ApiArtifactUploadClient, onUpl
   const [viewState, setViewState] = useState<UploadViewState>(shouldPersistFileUploadState ? persistedFileUploadState.viewState : { status: "idle" });
   const selectedFileRef = useRef<File | null>(selectedFile);
   const uploadInProgressRef = useRef(false);
-  const websiteIngestion = useWebsiteArtifactIngestion(uploadClient, onUploadComplete);
+  const websiteIngestion = useWebsiteArtifactIngestion(uploadClient, onUploadComplete, workspaceId);
 
   useEffect(() => {
     if (!shouldPersistFileUploadState) return;

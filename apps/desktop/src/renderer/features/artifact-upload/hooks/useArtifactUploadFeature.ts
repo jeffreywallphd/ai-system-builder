@@ -48,7 +48,7 @@ export function useArtifactUploadFeature(
   const [acceptedFileTypes, setAcceptedFileTypes] = useState<string>("*");
 
   const fileUpload = useFileArtifactUpload(uploadClient, onUploadComplete, { persistState: client === undefined, workspaceId });
-  const websiteIngestion = useWebsiteArtifactIngestion(uploadClient, onUploadComplete);
+  const websiteIngestion = useWebsiteArtifactIngestion(uploadClient, onUploadComplete, workspaceId);
 
   useEffect(() => {
     void uploadClient.getAcceptedTypes().then((policy) => {

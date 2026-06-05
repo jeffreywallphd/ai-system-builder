@@ -50,10 +50,22 @@ describe("ArtifactIngestionFeature", () => {
     });
 
     expect(container.textContent).toContain("Data Artifact Ingester");
-    expect(container.textContent).toContain("Hugging Face settings");
-    expect(container.textContent).toContain("Register from Hugging Face");
     expect(container.textContent).toContain("Scrape web data");
+    expect(container.textContent).toContain("Import from Hugging Face");
+
+    const scrapeToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Scrape web data")) as HTMLButtonElement;
+    await act(async () => {
+      scrapeToggle.click();
+    });
     expect(container.textContent).toContain("Ingest page");
     expect(container.textContent).toContain("Ingest batch");
+
+    const huggingFaceToggle = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("Import from Hugging Face")) as HTMLButtonElement;
+    await act(async () => {
+      huggingFaceToggle.click();
+    });
+    expect(container.textContent).toContain("Hugging Face settings");
+    expect(container.textContent).toContain("Namespace (user/org)");
+    expect(container.textContent).not.toContain("Register from Hugging Face");
   });
 });

@@ -113,7 +113,7 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
       </CollapsiblePanel>
 
       <CollapsiblePanel
-        title="Import from HuggingFace"
+        title="Import from Hugging Face"
         contentId="artifact-huggingface-panel-content"
         isExpanded={expandedPanels.importFromHuggingFace}
         onToggle={() => togglePanel("importFromHuggingFace")}

@@ -6,11 +6,12 @@ import { useArtifactUploadFeature } from "../hooks/useArtifactUploadFeature";
 import type { ArtifactUploadClient } from "../api/desktopArtifactUploadClient";
 
 interface HookProbeProps {
-  client: ArtifactUploadClient;
+  client: Partial<ArtifactUploadClient> & Pick<ArtifactUploadClient, "uploadArtifact" | "getAcceptedTypes">;
+  workspaceId?: string;
 }
 
-function HookProbe({ client }: HookProbeProps) {
-  const { selectedFile, viewState, acceptedFileTypes, onFileChange, onUploadSubmit } = useArtifactUploadFeature(client);
+function HookProbe({ client, workspaceId = "workspace-a" }: HookProbeProps) {
+  const { selectedFile, viewState, acceptedFileTypes, onFileChange, onUploadSubmit } = useArtifactUploadFeature(client as ArtifactUploadClient, undefined, workspaceId);
 
   return (
     <form onSubmit={(event) => void onUploadSubmit(event)}>
@@ -221,9 +222,10 @@ interface WebsiteHookProbeProps {
   client: ArtifactUploadClient;
   onUploadComplete?: () => void;
   initialBatchInput?: string;
+  workspaceId?: string;
 }
 
-function WebsiteHookProbe({ client, onUploadComplete, initialBatchInput }: WebsiteHookProbeProps) {
+function WebsiteHookProbe({ client, onUploadComplete, initialBatchInput, workspaceId = "workspace-a" }: WebsiteHookProbeProps) {
   const {
     websiteSingleUrl,
     websiteBatchInput,
@@ -233,7 +235,7 @@ function WebsiteHookProbe({ client, onUploadComplete, initialBatchInput }: Websi
     setWebsiteBatchInput,
     ingestWebsiteSingle,
     ingestWebsiteBatch,
-  } = useArtifactUploadFeature(client, onUploadComplete);
+  } = useArtifactUploadFeature(client, onUploadComplete, workspaceId);
 
   useEffect(() => {
     if (initialBatchInput) {
@@ -289,7 +291,7 @@ it("submits single website ingestion and refreshes upload browser on success", a
     (container.querySelector("[data-testid='ingest-single']") as HTMLButtonElement).click();
   });
 
-  expect(ingestWebsitePage).toHaveBeenCalledWith({ url: "https://example.com", mode: "automatic" });
+  expect(ingestWebsitePage).toHaveBeenCalledWith({ url: "https://example.com", mode: "automatic", workspaceId: "workspace-a" });
   expect(onUploadComplete).toHaveBeenCalledTimes(1);
 
   await act(async () => {
@@ -337,6 +339,7 @@ it("submits website batch ingestion, renders summary message, and triggers one r
   expect(ingestWebsitePagesBatch).toHaveBeenCalledWith({
     targets: [{ url: "https://example.com/a" }, { url: "https://example.com/b" }],
     mode: "automatic",
+    workspaceId: "workspace-a",
   });
   expect(container.querySelector("[data-testid='batch-message']")?.textContent).toContain("2/2 succeeded");
   expect(onUploadComplete).toHaveBeenCalledTimes(1);

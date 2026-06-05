@@ -40,6 +40,7 @@ import {
   BrowseHuggingFaceDatasetParquetFilesUseCase,
   BrowseHuggingFaceNamespaceDatasetsUseCase,
   HasArtifactInRepoUseCase,
+  ImportHuggingFaceFilesUseCase,
   LocalizeArtifactFromRepoUseCase,
   PublishArtifactToRepoUseCase,
   ReadArtifactContentUseCase,
@@ -50,6 +51,8 @@ import {
   VerifyImportedArtifactSourceBackingUseCase,
   VerifyPublishedArtifactBackingUseCase,
   DeleteRegisteredArtifactUseCase,
+  IngestWebsitePageUseCase,
+  IngestWebsitePagesBatchUseCase,
   FinalizeGeneratedOutputAsAssetUseCase,
   ImportExternalRepositoryObjectAsAssetUseCase,
   BrowseModelsUseCase,
@@ -105,6 +108,7 @@ import {
   type HuggingFaceTokenStatus,
 } from "../../shared/huggingFaceTokenConfigStore";
 import { createRuntimePreparedModelCheckpointResolver } from "../../shared/createRuntimePreparedModelCheckpointResolver";
+import { createWebsiteHtmlAcquisitionPort } from "../../../adapters/ingestion";
 import {
   registerExpressApi,
   type RegisterExpressApiDependencies,
@@ -586,6 +590,15 @@ export function composeServerHost(
         now: options.now,
         workspaceRepository: workspaceFoundation.workspaceRepositories.workspaceRepository,
       });
+      const websiteHtmlAcquisition = createWebsiteHtmlAcquisitionPort();
+      const ingestWebsitePageUseCase = new IngestWebsitePageUseCase({
+        acquisition: websiteHtmlAcquisition,
+        storage,
+        now: options.now,
+      });
+      const ingestWebsitePagesBatchUseCase = new IngestWebsitePagesBatchUseCase({
+        ingestWebsitePage: ingestWebsitePageUseCase,
+      });
 
       const browseArtifacts = new BrowseArtifactsUseCase({
         artifactBrowserMetadataRead: artifactBrowserRead,
@@ -639,6 +652,12 @@ export function composeServerHost(
         logging: loggingPort,
         now: options.now,
         artifactIdFactory: new SystemArtifactIdFactory(),
+      });
+      const importHuggingFaceFiles = new ImportHuggingFaceFilesUseCase({
+        browseFiles: browseHuggingFaceDatasetParquetFiles,
+        registerArtifact: registerArtifactFromRepo,
+        logging: loggingPort,
+        now: options.now,
       });
       const localizeArtifactFromRepo = new LocalizeArtifactFromRepoUseCase({
         artifactRepoStorage,
@@ -1078,6 +1097,8 @@ export function composeServerHost(
         setHuggingFaceToken: (token) => tokenConfigStore.setToken(token),
         clearHuggingFaceToken: () => tokenConfigStore.clearToken(),
         storeArtifactUploadUseCase,
+        ingestWebsitePageUseCase,
+        ingestWebsitePagesBatchUseCase,
         browseArtifactsUseCase: browseArtifacts,
         readArtifactDetailUseCase: readArtifactDetail,
         readArtifactContentUseCase: readArtifactContent,
@@ -1086,6 +1107,7 @@ export function composeServerHost(
         hasArtifactInRepoUseCase: hasArtifactInRepo,
         browseHuggingFaceNamespaceDatasetsUseCase: browseHuggingFaceNamespaceDatasets,
         browseHuggingFaceDatasetParquetFilesUseCase: browseHuggingFaceDatasetParquetFiles,
+        importHuggingFaceFilesUseCase: importHuggingFaceFiles,
         storeArtifactInRepoUseCase: storeArtifactInRepo,
         publishArtifactToRepoUseCase: publishArtifactToRepo,
         verifyPublishedArtifactBackingUseCase: verifyPublishedArtifactBacking,

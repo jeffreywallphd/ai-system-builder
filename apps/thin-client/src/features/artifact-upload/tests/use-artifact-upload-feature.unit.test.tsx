@@ -8,6 +8,7 @@ import type { ApiArtifactUploadClient } from "../api/apiArtifactUploadClient";
 
 interface HookProbeProps {
   client: ApiArtifactUploadClient;
+  workspaceId?: string;
 }
 
 interface HookProbeActions {
@@ -28,8 +29,8 @@ function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void
   return { promise, resolve, reject };
 }
 
-function HookProbe({ client }: HookProbeProps) {
-  const { selectedFile, viewState, acceptedFileTypes, onFileChange, onUploadSubmit } = useArtifactUploadFeature(client);
+function HookProbe({ client, workspaceId = "workspace-a" }: HookProbeProps) {
+  const { selectedFile, viewState, acceptedFileTypes, onFileChange, onUploadSubmit } = useArtifactUploadFeature(client, undefined, workspaceId);
   hookProbeActions = { onFileChange, onUploadSubmit };
 
   return (
@@ -128,6 +129,7 @@ describe("thin-client useArtifactUploadFeature", () => {
       fileName: "cat.png",
       mediaType: "image/png",
       bytes: new Uint8Array([1, 2, 3, 4]),
+      workspaceId: "workspace-a",
     });
     expect(container.querySelector("[data-testid='status']")?.textContent).toBe("success");
     expect(container.querySelector("[data-testid='stored-key']")?.textContent).toBe("uploads/cat.png");

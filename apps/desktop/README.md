@@ -48,6 +48,12 @@ Current methods:
   - maps UI localize payload into the `artifact.localize.from-repo` IPC request envelope
   - invokes only `ipc.artifact.localize.from-repo.request`
   - returns structured localize result/failure envelope
+- `ingestWebsitePage(input, context?)`
+  - maps UI website-scrape payload into the `artifact.ingest-website-page` IPC request envelope
+  - forwards explicit `context.workspaceId` to the desktop host use case for workspace-scoped artifact catalog writes
+- `ingestWebsitePagesBatch(input, context?)`
+  - maps UI batch website-scrape payload into the `artifact.ingest-website-pages-batch` IPC request envelope
+  - forwards explicit `context.workspaceId` to the desktop host use case for workspace-scoped artifact catalog writes
 
 Design constraints:
 
@@ -65,6 +71,8 @@ Design constraints:
 - supports published-backing re-check and last-verified display from durable binding metadata
 - supports imported-source re-check and separate source verification status display
 - supports imported-source inspection and explicit localize/download action when local bytes are missing
+- supports website scraping through desktop preload/IPC with active workspace context
+- opens the Data Management Hugging Face import card directly to namespace browsing and repository/path registration controls
 - surfaces artifact-first backing-state cues (`Remote only`, `Localized`, `Published`) plus local object availability/localization state
 - reuses shared cross-host publish/re-check hook logic from `modules/ui/shared`
 

@@ -9,10 +9,11 @@ Current scope:
 - feature-local artifact upload workflow under `src/features/artifact-upload/`
 - feature-local artifact browser workflow under `src/features/artifact-browser/`
 - fetch-based HTTP artifact-upload client that calls the server API route (`/api/artifact/upload`)
+- fetch-based HTTP website ingestion client that calls server API routes (`/api/artifact/ingest-website-page`, `/api/artifact/ingest-website-pages-batch`)
 - artifact publish verification/re-check flow that calls `POST /api/artifact/publish/verify`
 - imported-source verification/re-check flow that calls `POST /api/artifact/source/verify`
 - artifact detail panel can render persisted published backing metadata from server-side binding records
-- artifact register/import flow that calls `POST /api/artifact/register-from-repo` and refreshes artifact-browser selection on success
+- artifact register/import flow that browses Hugging Face namespaces, lists dataset files, calls `POST /api/huggingface/files/import` for selected repositories/files, and refreshes artifact-browser selection on success
 - imported artifact localize/download flow that calls `POST /api/artifact/localize-from-repo` when remote-source artifacts do not yet have local bytes
 - artifact browser list/detail now surfaces minimal artifact-first backing-state cues (`Remote only`, `Localized`, `Published`) and local object availability/localization state
 - artifact-browser published-backing re-check state orchestration uses a shared cross-host hook from `modules/ui/shared`
@@ -22,6 +23,8 @@ Current scope:
 ## Hugging Face auth behavior
 
 - Thin-client Hugging Face register/localize/publish/verify requests are server-backed.
+- The Data Management Hugging Face import card opens directly to a guided namespace workflow: enter a Hugging Face user/org namespace, select one or more datasets, optionally load and select files, then import all files from selected datasets or only selected files.
+- Batch import is server-backed through `POST /api/huggingface/files/import`; the UI should not issue one register request per file.
 - Configure `HF_TOKEN` or `HUGGING_FACE_TOKEN` (or server host `huggingFaceAccessToken`) in the **server** environment for private/gated Hugging Face repositories.
 - Public repositories may work without a token depending on repository visibility/provider policy.
 - Missing/invalid token and access-denied responses are surfaced as explicit auth-required/access-denied errors in UI messaging.
@@ -57,6 +60,12 @@ case path rather than desktop preload wiring.
 - The upload form payload uses:
   - `file`: binary file body
   - `source`: upload source identifier
+  - `workspaceId`: active workspace id; the server writes artifact catalog records only with explicit workspace context.
+- Thin-client website scraping is server-backed and posts JSON payloads with:
+  - `request`: single-page or batch website ingestion request
+  - `workspaceId`: active workspace id
+  - `source`: `thin-client.artifact-upload.website-scrape`
+- Website acquisition happens in the server host, so server network reachability and server runtime dependencies determine whether simple or rendered scraping succeeds.
 
 ## Commands
 

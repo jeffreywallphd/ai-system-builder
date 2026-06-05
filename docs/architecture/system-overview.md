@@ -182,6 +182,7 @@ Transport technologies are adapters, not application definitions.
 - Shared storage foundation contracts keep family boundaries explicit: `StorageKind` (`artifact-object` | `artifact-repo`), `StorageProviderId`, thin `StorageBackingReference`, and `ArtifactStorageBinding` for internal-artifact linkage.
 - Provider integrations should be composed as specialized artifact-repo adapters/providers, not flattened into a generic blob-only framing.
 - Hugging Face is the first implemented artifact-repo provider adapter in this repository; treat it as one provider implementation, not as the family definition.
+- Hugging Face repository browsing/import currently flows through provider-scoped contracts and use cases: namespace dataset browse, dataset file browse, and batch file import. Batch import owns repository/file orchestration in application/server/desktop host layers so UI clients do not coordinate one register request per file.
 - Ingestion/staged artifact: canonical semantic model for inbound content (uploads, scrape outputs, selected generated outputs, and similar intake paths) above raw storage mechanics.
 
 They are separate architectural concerns even if they share physical disk territory in some host deployments.

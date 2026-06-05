@@ -12,6 +12,7 @@ import {
   type DesktopHuggingFaceTokenStatus,
   type DesktopHuggingFaceNamespaceDataset,
   type DesktopHuggingFaceDatasetParquetFile,
+  type DesktopHuggingFaceFilesImportResult,
 } from "../../../lib/desktopApi";
 import { normalizeArtifactMediaBytes } from "../helpers/artifactMediaBytes";
 
@@ -21,6 +22,10 @@ export interface DesktopArtifactBrowserClient {
   clearHuggingFaceToken: () => Promise<DesktopHuggingFaceTokenStatus>;
   browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<DesktopHuggingFaceNamespaceDataset[]>;
   browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<DesktopHuggingFaceDatasetParquetFile[]>;
+  importHuggingFaceFiles?: (input: {
+    repositories?: Array<{ repository: string; revision?: string }>;
+    files?: Array<{ repository: string; path: string; revision?: string; mediaType?: string }>;
+  }) => Promise<DesktopHuggingFaceFilesImportResult>;
   browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily; workspaceId?: string }) => Promise<DesktopArtifactBrowseItem[]>;
   browseUnregisteredArtifacts?: (input?: { workspaceId?: string }) => Promise<DesktopUnregisteredArtifactBrowseItem[]>;
   registerUnregisteredArtifact?: (input: { storageKey: string; workspaceId?: string }) => Promise<{ storageKey: string }>;
@@ -166,6 +171,20 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
           return Array.isArray(files) ? files : [];
         },
         "Failed to browse Hugging Face dataset parquet files.",
+      );
+    },
+
+    async importHuggingFaceFiles(input) {
+      if (!desktopApi.importHuggingFaceFiles) {
+        throw new Error("Desktop preload Hugging Face import bridge is unavailable.");
+      }
+      return ensureSuccess(
+        await desktopApi.importHuggingFaceFiles({
+          repositories: input.repositories,
+          files: input.files,
+        }),
+        (value) => value as DesktopHuggingFaceFilesImportResult,
+        "Failed to import Hugging Face files.",
       );
     },
 

@@ -33,6 +33,8 @@ import {
   DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_FILES_IMPORT_REQUEST_CHANNEL,
+  createDesktopHuggingFaceFilesImportRequest,
 } from "../../../../contracts/ipc";
 import {
   createDesktopArtifactRegisterFromRepoIpcHandler,
@@ -56,6 +58,7 @@ function createUseCases() {
     publishArtifactToRepoUseCase: { execute: testDouble.fn() },
     browseHuggingFaceNamespaceDatasetsUseCase: { execute: testDouble.fn() },
     browseHuggingFaceDatasetParquetFilesUseCase: { execute: testDouble.fn() },
+    importHuggingFaceFilesUseCase: { execute: testDouble.fn() },
     verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
     verifyImportedArtifactSourceBackingUseCase: { execute: testDouble.fn() },
     registerArtifactFromRepoUseCase: { execute: testDouble.fn() },
@@ -182,12 +185,13 @@ describe("registerArtifactBrowserIpc", () => {
 
     registerArtifactBrowserIpc({ ipcMain, ...dependencies });
 
-    expect(ipcMain.handle).toHaveBeenCalledTimes(18);
+    expect(ipcMain.handle).toHaveBeenCalledTimes(19);
     expect(handlers.has(DESKTOP_HUGGING_FACE_TOKEN_GET_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_HUGGING_FACE_TOKEN_CLEAR_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
+    expect(handlers.has(DESKTOP_HUGGING_FACE_FILES_IMPORT_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL.value)).toBe(true);
     expect(handlers.has(DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL.value)).toBe(true);
