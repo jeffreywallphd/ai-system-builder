@@ -1,10 +1,10 @@
-# Effective Asset Projections (Phase 9 Baseline)
+# Effective Asset Projections (effective asset projections Baseline)
 
-## Purpose and phase placement
+## Purpose and area placement
 
-Phase 9 establishes a conservative architecture baseline for **materialized/effective asset projections**.
+effective asset projections establishes a conservative architecture baseline for **materialized/effective asset projections**.
 
-This phase defines how the system can derive workspace-scoped, safe projection outputs from:
+This area defines how the system can derive workspace-scoped, safe projection outputs from:
 
 - system foundation assets,
 - workspace-local assets,
@@ -15,12 +15,12 @@ This phase defines how the system can derive workspace-scoped, safe projection o
 - active overrides/customizations,
 - and draft records only where explicitly allowed.
 
-Phase 9 is **not** runtime/workflow execution. It is a safety-first projection layer that prepares metadata-oriented records for later composition planning and runtime-readiness phases.
+effective asset projections is **not** runtime/workflow execution. It is a safety-first projection layer that prepares metadata-oriented records for later composition planning and runtime-readiness areas.
 
 ## Canonical vocabulary
 
 - **Effective asset projection**: A workspace-scoped, safe derived record that summarizes how an asset should be seen in that workspace after source selection and allowed customization rules.
-- **Materialized projection**: A persisted or computed-on-demand projection snapshot produced by Phase 9 policies.
+- **Materialized projection**: A persisted or computed-on-demand projection snapshot produced by effective asset projections policies.
 - **Projection source**: The origin record(s) used to derive a projection (system/workspace/user-library/authored/override inputs).
 - **Projection target**: The workspace context where the projection is produced and consumed.
 - **Projection input**: Safe source metadata and relationship state used to derive output.
@@ -39,7 +39,7 @@ Phase 9 is **not** runtime/workflow execution. It is a safety-first projection l
 - **Projection refresh**: Explicit recomputation/update of projection output after invalidation.
 - **Projection cache**: Internal storage/read optimization for projection snapshots; never a source-of-truth replacement for source assets.
 - **Safe projected fields**: Conservative allow-list of metadata fields permitted in projection output.
-- **Non-projectable fields**: Deny-list/deferred field classes excluded from Phase 9 projection outputs.
+- **Non-projectable fields**: Deny-list/deferred field classes excluded from effective asset projections projection outputs.
 - **Ready-for-planning projection**: Projection whose status/readiness indicates it is safe for *later* composition/runtime-readiness planning, not execution itself.
 - **Planning-blocked projection**: Projection with blockers/diagnostics that prevent downstream readiness use.
 
@@ -94,7 +94,7 @@ Overrides/customizations are explicit change records. Projection outputs include
 
 ### Projection and Asset Registry read models
 
-Phase 9 projections are complementary to Asset Registry read models:
+effective asset projections are complementary to Asset Registry read models:
 
 - Registry read models expose asset-centric listings/details.
 - Projection records expose workspace-effective, materialized readiness summaries for downstream planning.
@@ -105,9 +105,9 @@ Effective-source summaries answer **where visibility came from**. Projections an
 
 ### Projection and future runtime readiness
 
-Phase 11 runtime readiness binding should consume validated Phase 10 composition plan outputs first, and only consult projection summaries as freshness context where safely exposed. See `docs/architecture/runtime-readiness-binding.md`.
+runtime readiness binding should consume validated asset composition planning composition plan outputs first, and only consult projection summaries as freshness context where safely exposed. See `docs/architecture/runtime-readiness-binding.md`.
 
-`ready` projections indicate safe metadata availability for later phases; they do not imply execution has run or should run automatically.
+`ready` projections indicate safe metadata availability for later areas; they do not imply execution has run or should run automatically.
 
 ## Ownership model and workspace scope
 
@@ -134,7 +134,7 @@ Phase 11 runtime readiness binding should consume validated Phase 10 composition
 
 ## Materialization model (conceptual record shape)
 
-Phase 9 defines the architectural shape (not contracts yet). Conceptual projection records include:
+effective asset projections defines the architectural shape (not contracts yet). Conceptual projection records include:
 
 - projection ID,
 - target workspace ID,
@@ -178,7 +178,7 @@ Initial conservative allow-list:
 - summary,
 - description,
 - tags/classification (where supported),
-- safe metadata keys that pass Phase 8 sanitization,
+- safe metadata keys that pass asset authoring/customization sanitization,
 - source labels,
 - revision/version labels,
 - safe diagnostics,
@@ -244,9 +244,9 @@ Minimum expected behavior:
 
 No automatic rebase. No automatic source update. No hidden conflict resolution.
 
-## Phase 9 boundaries vs deferrals
+## effective asset projections boundaries vs deferrals
 
-### Implemented in Phase 9 prompt sequence (starting now)
+### Implemented in effective asset projections prompt sequence (starting now)
 
 - Architecture vocabulary and policy baseline.
 - Projection status/policy/safety rules.
@@ -261,49 +261,19 @@ No automatic rebase. No automatic source update. No hidden conflict resolution.
 - Live synchronization across workspaces.
 - Broad arbitrary prompt/workflow/json editing.
 
-## Relationship to Phase 8 prerequisites/limitations
+## Relationship to asset authoring/customization prerequisites/limitations
 
-Phase 9 depends on Phase 8 constructs (authored assets, drafts, published revisions, overrides, customization targets, effective-source summaries, safe editable fields, provenance, conflict state, explicit workspace context).
+Effective asset projections depends on asset authoring/customization constructs (authored assets, drafts, published revisions, overrides, customization targets, effective-source summaries, safe editable fields, provenance, conflict state, explicit workspace context).
 
-Known Phase 8 closeout limitations that Phase 9 must treat as prerequisites/deferrals where needed:
+Known asset authoring/customization limitations that effective asset projections must treat as prerequisites/deferrals where needed:
 
 - override creation with safe target validation remains deferred,
 - existing-authored-asset revision publishing remains deferred,
 - guaranteed workspace-wide effective-summary availability may be unavailable/partial.
 
-Phase 9 must not assume these deferred capabilities are complete.
+Effective asset projections must not assume these deferred capabilities are complete.
 
-## Phase 9 implementation sequence
-
-1. Prompt 1 — Architecture baseline, ADR, docs, context pack.
-2. Prompt 2 — Materialized/effective asset projection contract vocabulary.
-3. Prompt 3 — Application ports and persistence for projection records.
-4. Review A — Contract, persistence, boundary, and anti-drift review.
-5. Prompt 4 — Safe projection service for authored assets and safe fields.
-6. Prompt 5 — Safe projection service for overrides/customizations.
-7. Prompt 6 — Validation, diagnostics, and conflict-blocking behavior.
-8. Review B — Materialization semantics, immutability, and safety review.
-9. Prompt 7 — Effective-source/read-model integration for projected assets.
-10. Prompt 8 — API/IPC/preload exposure, split if needed.
-11. Prompt 9 — Minimal UI indicators/actions for projection readiness.
-12. Prompt 10 — Docs, context packs, ADR closeout, and Phase 10 handoff.
-13. Review C — Final Phase 9 closeout review.
-
-## Phase 10 handoff: Asset Composition Planning
-
-Phase 10 should treat Phase 9 projections as inputs for **Asset Composition Planning**, including:
-
-- projection selection,
-- composition ordering,
-- dependency planning,
-- compatibility checks,
-- system/workflow preparation,
-- non-runtime composition plans.
-
-Phase 10 must not assume workflow execution, runtime execution, collaboration, marketplace behavior, live synchronization, or arbitrary prompt/workflow/json editing.
-
-
-## Phase 9 closeout status (Prompt 10)
+## Effective asset projections current status
 
 ### Implemented
 
@@ -339,27 +309,12 @@ Phase 10 must not assume workflow execution, runtime execution, collaboration, m
 - `conflicted`/`blocked`/`disabled`/`stale` projections are never silently applied.
 - Unsafe payload classes remain excluded from projected fields.
 
-### Phase 10 handoff: Asset Composition Planning
-
-Phase 10 should start as a planning layer over Phase 9 safe projections by adding:
-
-- selecting projections for a composition plan,
-- validating compatibility across selected projections,
-- ordering dependency relationships,
-- grouping projected assets into non-runtime composition plans,
-- preparing system/workflow plans without execution,
-- surfacing missing/blocked/conflicted projections before plan construction.
-
-Phase 10 must not begin with runtime execution, workflow execution, visual canvas-first authoring, marketplace/collaboration features, pack import/export, background propagation, or arbitrary JSON/prompt/workflow editing.
-
-
-## UX surface guidance (Phase 9 correction)
+## UX surface guidance (effective asset projections correction)
 
 Effective asset projections are internal read-model infrastructure. In normal product UX, users navigate to **Assets** and see projection-derived readiness/status as secondary metadata on asset cards/details. A separate top-level 'Effective Assets' page is not part of the primary navigation model.
 
 Readiness language in user-facing surfaces must remain planning-oriented (for example, **Ready for planning**) and must not be presented as runtime or execution readiness.
 
+## Relationship To Asset Composition Planning
 
-## Phase 10 handoff
-
-Phase 9 projections are readiness-for-planning inputs for Phase 10 composition planning (`docs/architecture/asset-composition-planning.md`, ADR-0020). Projection `ready` is not runtime-ready and does not imply execution capability.
+Effective asset projections are readiness-for-planning inputs for asset composition planning (`docs/architecture/asset-composition-planning.md`, ADR-0020). Projection `ready` is not runtime-ready and does not imply execution capability.

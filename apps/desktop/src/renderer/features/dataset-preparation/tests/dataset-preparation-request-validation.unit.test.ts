@@ -5,6 +5,7 @@ import { validateAndParseDatasetPreparationInputs } from "../hooks/datasetPrepar
 function createValidInput() {
   return {
     selectedArtifactIds: ["artifact-1"],
+    taskType: "llm-instruction" as const,
     chunkSize: "1000",
     chunkOverlap: "200",
     maxChunkCount: "",
@@ -71,5 +72,12 @@ describe("datasetPreparationRequestValidation", () => {
       ok: false,
       error: "Dataset repository name cannot include backslashes. Use only the repository name (for example: my-dataset).",
     });
+  });
+
+  it("allows first-tier task profiles that are executable in dataset preparation", () => {
+    expect(validateAndParseDatasetPreparationInputs({
+      ...createValidInput(),
+      taskType: "vision-detection",
+    }).ok).toBe(true);
   });
 });

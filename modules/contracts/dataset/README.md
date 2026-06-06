@@ -1,5 +1,7 @@
 # Dataset Contracts
 
+> AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
+
 Dataset contracts define structured derived-output vocabulary for ELT progression.
 
 This family includes:

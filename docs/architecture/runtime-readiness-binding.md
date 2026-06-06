@@ -1,19 +1,19 @@
-# Runtime Readiness Binding (Phase 11 Baseline)
+# Runtime Readiness Binding (runtime readiness binding Baseline)
 
-## Purpose and phase placement
+## Purpose and area placement
 
-Phase 11 introduces **Runtime Readiness Binding**: a workspace-scoped, non-executing readiness layer that evaluates whether a validated Phase 10 composition plan can be safely mapped to available runtime capabilities.
+runtime readiness binding introduces **Runtime Readiness Binding**: a workspace-scoped, non-executing readiness layer that evaluates whether a validated asset composition planning composition plan can be safely mapped to available runtime capabilities.
 
-**Architecture thesis:** Phase 11 introduces workspace-scoped runtime readiness bindings that map validated Phase 10 composition plans to available runtime capabilities without executing workflows. Runtime readiness binding identifies required capabilities, evaluates available providers/resources/models/services, records safe binding candidates, and reports blockers before any execution-oriented phase begins.
+**Architecture thesis:** runtime readiness binding introduces workspace-scoped runtime readiness bindings that map validated asset composition planning composition plans to available runtime capabilities without executing workflows. Runtime readiness binding identifies required capabilities, evaluates available providers/resources/models/services, records safe binding candidates, and reports blockers before any execution-oriented area begins.
 
-Phase 11 is:
+runtime readiness binding is:
 
 - a readiness layer;
 - workspace-scoped;
 - non-executing;
 - capability-oriented;
 - provider-aware but not provider-invoking;
-- dependent on validated Phase 10 composition plans;
+- dependent on validated asset composition planning composition plans;
 - explicit about missing/unavailable/unsupported dependencies;
 - a preparation step for later execution-oriented planning.
 
@@ -40,14 +40,14 @@ Phase 11 is:
 - **Capability gap**: required capability without a safe matching candidate.
 - **Provider unavailable / unsupported / not installed / not configured**: explicit availability outcomes used for blockers/diagnostics.
 - **Model unavailable / Storage unavailable / Service unavailable / Permission unavailable / Environment unavailable**: requirement-specific blocker categories.
-- **Execution deferred**: explicit marker that Phase 11 does not execute workflows/runtimes/providers/models.
-- **Execution handoff**: constrained handoff object for later phases.
+- **Execution deferred**: explicit marker that runtime readiness binding does not execute workflows/runtimes/providers/models.
+- **Execution-plan output**: constrained readiness object for later planning areas.
 
 User-facing UI labels should remain simpler (for example: **Ready for setup**, **Needs setup**, **Missing requirement**, **Provider unavailable**, **Model missing**, **Storage unavailable**, **Check setup**, **Nothing runs from this screen**). Runtime setup/readiness presentation is placed inside **Assets / Plans** (desktop and thin-client), not as a separate top-level Runtime Readiness page.
 
 ## Conceptual model (non-contract baseline)
 
-Phase 11 defines conceptual readiness records only.
+runtime readiness binding defines conceptual readiness records only.
 
 ### Runtime readiness binding record (conceptual)
 
@@ -109,7 +109,7 @@ Phase 11 defines conceptual readiness records only.
 - safe configuration reference (if needed);
 - provenance.
 
-All Phase 11 records are readiness/planning metadata only and must not contain executable commands, workflow JSON, provider payloads, secrets, raw environment values, raw paths, bytes/blobs/base64, signed URLs, or runnable payloads.
+All runtime readiness binding records are readiness/planning metadata only and must not contain executable commands, workflow JSON, provider payloads, secrets, raw environment values, raw paths, bytes/blobs/base64, signed URLs, or runnable payloads.
 
 ## Runtime readiness statuses
 
@@ -140,7 +140,7 @@ Status rules:
 - `stale` means composition plan/runtime inventory changed and check is required.
 - `archived` means historical/inactive readiness record.
 
-Forbidden status language in Phase 11 architecture: `execution-ready`, `ready-to-run`, `running`, `completed`, `executed`.
+Forbidden status language in runtime readiness binding architecture: `execution-ready`, `ready-to-run`, `running`, `completed`, `executed`.
 
 ## Capability kinds and provider availability model
 
@@ -170,7 +170,7 @@ Initial conservative capability kinds:
 - `queue`
 - `scheduler`
 
-Future phases may refine kinds for concrete verticals (for example ComfyUI image-generation slices).
+Future areas may refine kinds for concrete verticals (for example ComfyUI image-generation slices).
 
 Provider/capability availability statuses:
 
@@ -206,9 +206,9 @@ Runtime inventory is a safe abstraction over runtime/provider availability. It m
 
 Runtime inventory must not expose secrets/tokens/raw env variables/raw paths/provider payloads/command lines/stack traces/bytes/blobs/base64/signed URLs. Raw details, when later needed, must be represented by safe handles/references.
 
-## Relationship to Phase 10 composition planning
+## Relationship to asset composition planning
 
-Phase 11 depends on validated Phase 10 composition plans and may read:
+runtime readiness binding depends on validated asset composition planning composition plans and may read:
 
 - validated composition plan ID;
 - workspace ID;
@@ -220,47 +220,47 @@ Phase 11 depends on validated Phase 10 composition plans and may read:
 - planning summary/provenance summary;
 - validated timestamp when available.
 
-Phase 11 must not:
+runtime readiness binding must not:
 
 - accept unvalidated plans as ready (it returns blocked diagnostics instead);
-- reinterpret raw Phase 9 projections directly when Phase 10 plan data exists;
+- reinterpret raw effective asset projections directly when asset composition planning plan data exists;
 - mutate composition plans (except future explicit refresh/check workflows);
-- treat Phase 10 `valid` as executable;
+- treat asset composition planning `valid` as executable;
 - generate workflow JSON;
 - execute nodes/workflows;
 - invoke providers;
 - install runtimes/download models/create credentials/write secrets.
 
-If a composition plan is missing/invalid/blocked/conflicted/stale/unsupported/archived/not validated, Phase 11 emits readiness blockers rather than bypassing planning constraints.
+If a composition plan is missing/invalid/blocked/conflicted/stale/unsupported/archived/not validated, runtime readiness binding emits readiness blockers rather than bypassing planning constraints.
 
-## Relationship to Phase 9 effective projections
+## Relationship to effective asset projections effective projections
 
-Phase 11 normally consumes Phase 10 plan outputs, not raw Phase 9 projection internals. Phase 11 may use projection summary references for freshness checks when surfaced through Phase 10 read models. Phase 11 does not reconstruct projection logic or inspect raw authoring/customization internals.
+runtime readiness binding normally consumes asset composition planning plan outputs, not raw effective asset projections projection internals. runtime readiness binding may use projection summary references for freshness checks when surfaced through asset composition planning read models. runtime readiness binding does not reconstruct projection logic or inspect raw authoring/customization internals.
 
 ## Relationship to runtime adapters and hosts
 
-Phase 11 may read safe inventory/capability summaries from runtime/provider adapters through application ports.
+runtime readiness binding may read safe inventory/capability summaries from runtime/provider adapters through application ports.
 
-Phase 11 must not call execution methods, invoke models, start ComfyUI workflows, mutate provider state, install dependencies, download models, run shell commands, read raw env values directly in use cases, expose local paths, or expose credentials.
+runtime readiness binding must not call execution methods, invoke models, start ComfyUI workflows, mutate provider state, install dependencies, download models, run shell commands, read raw env values directly in use cases, expose local paths, or expose credentials.
 
 Host expectations:
 
 - Desktop host may expose safe local inventory (Python/Node/ComfyUI/model cache summaries) via application ports.
 - Server host may expose server-side inventory/provider summaries.
 - Thin client must not inspect desktop-local resources directly; access is through server/desktop host APIs.
-- No host executes workflows in Phase 11.
+- No host executes workflows in runtime readiness binding.
 
-## What Phase 11 implements vs defers
+## What runtime readiness binding implements vs defers
 
-Implements in Phase 11:
+Implements in runtime readiness binding:
 
 - readiness vocabulary and architecture baseline;
 - capability requirement extraction from validated plans;
 - safe inventory discovery/matching model;
 - readiness status/blocker/diagnostic model;
-- readiness handoff object for Phase 12.
+- readiness output object for execution plan preparation.
 
-Defers from Phase 11:
+Defers from runtime readiness binding:
 
 - workflow/runtime/model/ComfyUI execution;
 - provider invocation;
@@ -273,9 +273,9 @@ Defers from Phase 11:
 - collaboration permissions/live workspace sync;
 - source asset mutation or `system.foundation` mutation/copy.
 
-## Phase 12 handoff
+## Execution Plan Output
 
-Phase 11 hands off readiness metadata to Phase 12 (**Execution Plan Preparation** / **Executable Workflow Materialization Planning**) through a conceptual object such as:
+runtime readiness binding hands off readiness metadata to execution plan preparation (**Execution Plan Preparation** / **Executable Workflow Materialization Planning**) through a conceptual object such as:
 
 ```ts
 RuntimeReadyCompositionBinding {
@@ -291,28 +291,8 @@ RuntimeReadyCompositionBinding {
 }
 ```
 
-Phase 12 may prepare execution-oriented plans/payloads (materialization planning, adapter selection, safety gates, dry-run planning, reservation, execution preview), but actual execution remains explicitly defined by later phase boundaries.
+execution plan preparation may prepare execution-oriented plans/payloads (materialization planning, adapter selection, safety gates, dry-run planning, reservation, execution preview), but actual execution remains explicitly defined by later canonical execution boundaries.
 
-## Phase 11 implementation sequence
+## Transport and UI status
 
-1. Prompt 1 — Architecture baseline, ADR, docs, context pack.
-2. Prompt 2 — Runtime capability/binding contract vocabulary.
-3. Prompt 3 — Application ports and persistence adapters for readiness checks/bindings.
-4. Review A — Contracts, ports, persistence, and no-execution boundary review.
-5. Prompt 4 — Runtime capability inventory/read services.
-6. Prompt 5 — Bind validated composition plans to required runtime capabilities.
-7. Prompt 6 — Readiness validation: missing providers, unavailable models, storage/server/API/runtime blockers.
-8. Review B — Binding semantics, blocker accuracy, and no-runtime-execution review.
-9. Prompt 7 — Runtime readiness read model integration.
-10. Prompt 8 — API/IPC/preload/client exposure.
-11. Prompt 9 — Minimal UI inside Assets/Plans showing runtime readiness status.
-12. Prompt 10 — Docs closeout and Phase 11 final hardening.
-13. Review C — Final Phase 11 closeout review.
-
-If Prompt 8 transport scope is too broad, split into:
-
-- 8a API routes and server composition;
-- 8b IPC/preload and desktop composition;
-- 8c desktop/thin-client clients and parity tests.
-
-Prompt 8 implementation note (current): transport exposure is implemented as thin API/IPC/preload/client surfaces with explicit workspace context and safe failure envelopes. Runtime/provider/workflow/model execution and visible runtime-readiness UI remain deferred to later prompts.
+Transport exposure is implemented as thin API/IPC/preload/client surfaces with explicit workspace context and safe failure envelopes. Runtime/provider/workflow/model execution remains out of scope for readiness surfaces. Visible setup/readiness UI must represent unavailable operations truthfully and must not imply runtime execution.

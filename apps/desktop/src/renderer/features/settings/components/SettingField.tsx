@@ -6,6 +6,7 @@ import type {
   ApplicationSettingValue,
   ModelDefaultConfig,
 } from "../../../../../../../modules/contracts/settings";
+import { TermWithHint } from "../../../../../../../modules/ui/shared";
 import { ModelDefaultSettingField } from "./ModelDefaultSettingField";
 import { SecretSettingField } from "./SecretSettingField";
 
@@ -63,7 +64,7 @@ export function SettingField(props: SettingFieldProps) {
           disabled={props.disabled}
           onChange={(event) => void props.onSave(event.target.checked)}
         />
-        {props.definition.label}
+        <TermWithHint termId="settingValue">{props.definition.label}</TermWithHint>
       </label>
     );
   }
@@ -71,7 +72,7 @@ export function SettingField(props: SettingFieldProps) {
   if (props.definition.valueKind === "select") {
     return (
       <label className="ui-stack ui-stack--sm">
-        <span>{props.definition.label}</span>
+        <span><TermWithHint termId="settingValue">{props.definition.label}</TermWithHint></span>
         <select data-testid={`setting-${props.definition.key}-select`} className="ui-input" value={draft} disabled={props.disabled} onChange={(event) => setDraft(event.target.value)}>
           <option value="">Select…</option>
           {(props.definition.options ?? []).map((option) => (
@@ -88,7 +89,7 @@ export function SettingField(props: SettingFieldProps) {
 
   return (
     <label className="ui-stack ui-stack--sm">
-      <span>{props.definition.label}</span>
+      <span><TermWithHint termId="settingValue">{props.definition.label}</TermWithHint></span>
       <input
         data-testid={`setting-${props.definition.key}-input`}
         className="ui-input"

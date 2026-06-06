@@ -1,4 +1,5 @@
 import type { useModelsFeature } from "../hooks/useModelsFeature";
+import { TermWithHint } from "../../../../../../../modules/ui/shared";
 
 type ModelsState = ReturnType<typeof useModelsFeature>;
 
@@ -9,15 +10,15 @@ export function BrowseModelsTab(props: { state: ModelsState }) {
       <h2>Browse Models</h2>
       <div className="ui-grid ui-grid--two">
         <label className="ui-stack ui-stack--sm">
-          <span>Query</span>
+          <span><TermWithHint termId="modelSearch">Query</TermWithHint></span>
           <input className="ui-input" value={s.browseQuery} onChange={(event) => s.setBrowseQuery(event.target.value)} />
         </label>
         <label className="ui-stack ui-stack--sm">
-          <span>Task tag</span>
+          <span><TermWithHint termId="modelTaskTag">Task tag</TermWithHint></span>
           <input className="ui-input" value={s.browseTaskTag} onChange={(event) => s.setBrowseTaskTag(event.target.value)} placeholder="text-generation" />
         </label>
         <label className="ui-stack ui-stack--sm">
-          <span>Limit</span>
+          <span><TermWithHint termId="modelSearchLimit">Limit</TermWithHint></span>
           <input className="ui-input" value={s.browseLimit} onChange={(event) => s.setBrowseLimit(event.target.value)} />
         </label>
       </div>

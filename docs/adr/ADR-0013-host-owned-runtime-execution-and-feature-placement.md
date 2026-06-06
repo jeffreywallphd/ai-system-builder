@@ -82,8 +82,8 @@ Server/thin-client image-generation work also exposed the need to keep runtime r
 - Add remote HTTP client adapters for feature ports later.
 - Add artifact localization/import flow for remote-generated assets if needed.
 - Add runtime-root config helpers and tests.
-- Compose application runtime readiness providers from installer/supervisor/task state at host boundaries, then expose snapshots through desktop/server transports in later prompts.
-- Update prompts/context packs when feature routing work begins.
+- Compose application runtime readiness providers from installer/supervisor/task state at host boundaries, then expose snapshots through desktop/server transports in later work.
+- Update context packs when feature routing work begins.
 
 
 ## Security boundary cross-reference

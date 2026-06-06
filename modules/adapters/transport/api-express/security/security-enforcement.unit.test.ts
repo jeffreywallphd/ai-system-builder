@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import assert from "node:assert/strict";
+import { describe, expect, it } from "../../../../testing/node-test";
 import { API_ROUTE_POLICIES, resolveApiRoutePolicy } from "./apiRouteSecurityPolicy";
 import { createExpressSecurityMiddleware } from "./createExpressSecurityMiddleware";
 import { createSecurityApplicationError } from "../../../../contracts/security";
@@ -6,7 +7,7 @@ import { createInMemoryDevSecurityEnforcementStore } from "./devSecurityEnforcem
 
 describe("api route security policy coverage", () => {
   it("has explicit policy entries for registered API routes", () => {
-    expect(API_ROUTE_POLICIES.size).toBeGreaterThan(20);
+    assert.ok(API_ROUTE_POLICIES.size > 20);
     const publicRoutes = [...API_ROUTE_POLICIES.entries()].filter(([, p]) => p.public).map(([route]) => route).sort();
     expect(publicRoutes).toContain("GET /api/security/status");
     expect(API_ROUTE_POLICIES.get("POST /api/security/token/revoke")?.public).toBe(false);

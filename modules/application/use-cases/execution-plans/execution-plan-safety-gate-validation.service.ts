@@ -32,7 +32,7 @@ export class ExecutionPlanSafetyGateValidationService {
         } else if (PASSABLE.has(a.status)) status = 'passed-by-plan';
         else status = 'needs-review';
       }
-      if (gate.kind === 'credentials-not-embedded' || gate.kind === 'unsafe-details-redacted' || gate.kind === 'executable-payload-deferred' || gate.kind === 'storage-destination-safe') status = 'passed-by-plan';
+      if (gate.kind === 'access-material-not-embedded' || gate.kind === 'unsafe-details-redacted' || gate.kind === 'runnable-material-deferred' || gate.kind === 'storage-destination-safe') status = 'passed-by-plan';
       return { ...gate, status };
     });
     return { blockers, diagnostics, requiresReview, safetyGates };

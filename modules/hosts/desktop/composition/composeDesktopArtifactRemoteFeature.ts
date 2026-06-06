@@ -3,6 +3,7 @@ import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
   BrowseHuggingFaceDatasetParquetFilesUseCase,
   BrowseHuggingFaceNamespaceDatasetsUseCase,
+  ImportHuggingFaceFilesUseCase,
   LocalizeArtifactFromRepoUseCase,
   PublishArtifactToRepoUseCase,
   RegisterArtifactFromRepoUseCase,
@@ -28,6 +29,8 @@ export function composeDesktopArtifactRemoteFeature(options: ComposeDesktopArtif
   });
   const artifactRepoStorage = createArtifactRepoStorageAdapter({ providers: [{ provider: "huggingface", adapter: huggingFaceArtifactRepoStorage }] });
   const foundation = options.artifacts;
+  const browseHuggingFaceDatasetParquetFilesUseCase = new BrowseHuggingFaceDatasetParquetFilesUseCase({ repoBrowser: huggingFaceArtifactRepoStorage, logging: options.loggingPort, now: options.now });
+  const registerArtifactFromRepoUseCase = new RegisterArtifactFromRepoUseCase({ artifactRepoStorage, artifactBindingStorage: foundation.artifactBindings, artifactCatalogAppend: foundation.artifactCatalog, logging: options.loggingPort, now: options.now, artifactIdFactory: new SystemArtifactIdFactory() });
   return {
     dispose() { disposed = true; },
     get disposed() { return disposed; },
@@ -35,10 +38,11 @@ export function composeDesktopArtifactRemoteFeature(options: ComposeDesktopArtif
     artifactRepoStorage,
     publishArtifactToRepoUseCase: new PublishArtifactToRepoUseCase({ artifactStorage: foundation.storage, artifactRepoStorage, artifactBindingStorage: foundation.artifactBindings, now: options.now }),
     browseHuggingFaceNamespaceDatasetsUseCase: new BrowseHuggingFaceNamespaceDatasetsUseCase({ repoBrowser: huggingFaceArtifactRepoStorage, logging: options.loggingPort, now: options.now }),
-    browseHuggingFaceDatasetParquetFilesUseCase: new BrowseHuggingFaceDatasetParquetFilesUseCase({ repoBrowser: huggingFaceArtifactRepoStorage, logging: options.loggingPort, now: options.now }),
+    browseHuggingFaceDatasetParquetFilesUseCase,
+    importHuggingFaceFilesUseCase: new ImportHuggingFaceFilesUseCase({ browseFiles: browseHuggingFaceDatasetParquetFilesUseCase, registerArtifact: registerArtifactFromRepoUseCase, logging: options.loggingPort, now: options.now }),
     verifyPublishedArtifactBackingUseCase: new VerifyPublishedArtifactBackingUseCase({ artifactRepoStorage, artifactBindingStorage: foundation.artifactBindings, now: options.now }),
     verifyImportedArtifactSourceBackingUseCase: new VerifyImportedArtifactSourceBackingUseCase({ artifactRepoStorage, artifactBindingStorage: foundation.artifactBindings, now: options.now }),
-    registerArtifactFromRepoUseCase: new RegisterArtifactFromRepoUseCase({ artifactRepoStorage, artifactBindingStorage: foundation.artifactBindings, artifactCatalogAppend: foundation.artifactCatalog, logging: options.loggingPort, now: options.now, artifactIdFactory: new SystemArtifactIdFactory() }),
+    registerArtifactFromRepoUseCase,
     localizeArtifactFromRepoUseCase: new LocalizeArtifactFromRepoUseCase({ artifactRepoStorage, artifactBindingStorage: foundation.artifactBindings, artifactStorage: foundation.storage, now: options.now }),
   };
 }

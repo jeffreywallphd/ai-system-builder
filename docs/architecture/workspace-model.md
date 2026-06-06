@@ -1,18 +1,10 @@
 # Workspace Model
 
-## Scope and phase placement
+## Scope
 
-Phase 6 is **Workspace Foundations**. It establishes persisted workspace records, explicit active-workspace selection, workspace-gated resource surfaces, workspace-owned operation context propagation, and reference-only activation of system-owned packs. It does not implement Phase 7 user-library reuse, asset authoring, override editing, composition authoring, collaboration permissions, pack import/export, marketplace behavior, or automatic legacy migration.
+Workspace foundations establish persisted workspace records, explicit active-workspace selection, workspace-gated resource surfaces, workspace-owned operation context propagation, and reference-only activation of system-owned packs. They do not implement User Library reuse, asset authoring, override editing, composition authoring, collaboration permissions, pack import/export, marketplace behavior, or automatic legacy migration.
 
-Current roadmap handoff:
-
-- Phase 6: Workspace Foundations.
-- Phase 7: User Library and Cross-Workspace Asset Reuse.
-- Phase 8: Asset Authoring, Customization, and Override Management.
-- Phase 9: Composition Planning and Authoring.
-- Phase 10: Execution Binding and Runtime-Orchestrated Systems.
-- Phase 11: Pack Import/Export, Sharing, and Distribution.
-- Phase 12: Collaboration, Permissions, and Multi-User Workspaces.
+Related topics are defined by their own architecture docs and ADRs. Do not infer later work ownership from historical phase labels.
 
 ## Workspace records and active selection
 
@@ -28,7 +20,7 @@ This applies to implemented workspace-owned resources such as artifacts/uploads,
 
 ## System Foundation activation by reference
 
-`system.foundation@1.0.0` remains system-owned. A workspace may activate it only by storing a workspace system-pack activation reference with pack id/version/provenance/status. Workspace creation and selection must not call the Phase 5 installer, copy pack manifests or definitions into workspace storage, seed packs at startup, create hidden/default workspaces, or auto-migrate legacy global resources.
+`system.foundation@1.0.0` remains system-owned. A workspace may activate it only by storing a workspace system-pack activation reference with pack id/version/provenance/status. Workspace creation and selection must not call the system foundation pack baseline installer, copy pack manifests or definitions into workspace storage, seed packs at startup, create hidden/default workspaces, or auto-migrate legacy global resources.
 
 Asset Library effective views may show System Foundation definitions only when the workspace has the active trusted reference and the definitions retain strict system-default provenance. A bare `sourcePackId` is informational and is not authority to expose system defaults.
 
@@ -50,15 +42,15 @@ Asset Library model resource-backed views may show those shared model entries as
 
 Public model and image-generation read models must continue to omit raw local paths. The Settings page may display and edit the configured folder because that is an explicit host configuration action.
 
-## Phase 7 reuse boundary
+## User Library reuse reuse boundary
 
-Phase 7 introduces User Library and Cross-Workspace Asset Reuse as explicit reuse relationships only. Workspace isolation remains the default: workspace-local assets and resources stay visible only inside their owning workspace unless a later promote, link, copy, or import workflow creates a durable relationship. Direct workspace-to-workspace reuse begins as independent import/copy into the target workspace, not live linking.
+User Library reuse introduces User Library and Cross-Workspace Asset Reuse as explicit reuse relationships only. Workspace isolation remains the default: workspace-local assets and resources stay visible only inside their owning workspace unless a later promote, link, copy, or import workflow creates a durable relationship. Direct workspace-to-workspace reuse begins as independent import/copy into the target workspace, not live linking.
 
-The User Library is a separate user-owned scope, not a workspace and not the system foundation. Phase 7 must not use the User Library to justify missing workspace context, hidden/default workspaces, system foundation mutation, startup seeding, or legacy/global auto-migration.
+The User Library is a separate user-owned scope, not a workspace and not the system foundation. User Library reuse must not use the User Library to justify missing workspace context, hidden/default workspaces, system foundation mutation, startup seeding, or legacy/global auto-migration.
 
 ## Collaboration placeholders
 
-Workspace records may carry passive collaboration/readiness placeholders for future phases, but Phase 6 does not implement invites, memberships, permissions, sync, remote auth, multi-user conflict resolution, or sharing policy. Those behaviors belong to later collaboration and distribution phases.
+Workspace records may carry passive collaboration/readiness placeholders for future phases, but workspace foundations does not implement invites, memberships, permissions, sync, remote auth, multi-user conflict resolution, or sharing policy. Those behaviors belong to later collaboration and distribution phases.
 
 ## UI route boundary
 

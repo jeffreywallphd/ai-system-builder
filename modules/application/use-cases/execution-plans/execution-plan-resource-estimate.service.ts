@@ -2,10 +2,19 @@ import { normalizeExecutionResourceEstimateId, type ExecutionPlanRecord, type Ex
 
 export class ExecutionPlanResourceEstimateService {
   public estimate(plan: ExecutionPlanRecord): ExecutionResourceEstimate[] {
-    const providerCount = new Set(plan.adapterReferences.map((a)=>a.providerKind).filter(Boolean)).size;
-    const compute = plan.steps.length > 8 ? 'high' : plan.steps.length > 3 ? 'medium' : plan.steps.length ? 'low' : 'none';
-    const storage = plan.outputs.length > 6 ? 'large' : plan.outputs.length > 2 ? 'medium' : plan.outputs.length ? 'small' : 'none';
-    const duration = plan.dependencies.length > 10 ? 'long' : plan.dependencies.length > 4 ? 'medium' : plan.steps.length ? 'short' : 'instant';
-    return [{ id: normalizeExecutionResourceEstimateId(`${plan.id}_resource-estimate`), compute, storage, duration, summary: `steps=${plan.steps.length};inputs=${plan.inputs.length};outputs=${plan.outputs.length};dependencies=${plan.dependencies.length};adapters=${plan.adapterReferences.length};gates=${plan.safetyGates.length};blockers=${plan.blockers.length};diagnostics=${plan.diagnostics.length};providerCategories=${providerCount}` }];
+    const steps = plan.steps ?? [];
+    const inputs = plan.inputs ?? [];
+    const outputs = plan.outputs ?? [];
+    const dependencies = plan.dependencies ?? [];
+    const adapterReferences = plan.adapterReferences ?? [];
+    const safetyGates = plan.safetyGates ?? [];
+    const blockers = plan.blockers ?? [];
+    const diagnostics = plan.diagnostics ?? [];
+    const providerCount = new Set(adapterReferences.map((a)=>a.providerKind).filter(Boolean)).size;
+    const unresolvedSetup = adapterReferences.some((a)=>['needs-setup','missing','unsupported','deferred'].includes(a.status));
+    const compute = steps.length > 8 ? 'high' : steps.length > 3 ? 'medium' : steps.length ? 'low' : 'none';
+    const storage = outputs.length > 6 ? 'large' : outputs.length > 2 ? 'medium' : outputs.length ? 'small' : 'none';
+    const duration = unresolvedSetup ? 'unknown' : dependencies.length > 10 ? 'long' : dependencies.length > 4 ? 'medium' : steps.length ? 'short' : 'instant';
+    return [{ id: normalizeExecutionResourceEstimateId(`${plan.id ?? 'execution-plan'}_resource-estimate`), compute, storage, duration, summary: `steps=${steps.length};inputs=${inputs.length};outputs=${outputs.length};dependencies=${dependencies.length};adapters=${adapterReferences.length};gates=${safetyGates.length};blockers=${blockers.length};diagnostics=${diagnostics.length};providerCategories=${providerCount}` }];
   }
 }

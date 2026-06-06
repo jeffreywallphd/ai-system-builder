@@ -2,7 +2,7 @@ import { useEffect, useId, useState, type ReactNode } from "react";
 
 export interface TabbedPanelTab {
   id: string;
-  label: string;
+  label: ReactNode;
   content: ReactNode;
 }
 

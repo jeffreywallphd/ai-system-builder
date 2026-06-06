@@ -327,5 +327,49 @@ describe("api artifact browser client", () => {
       );
     }
   });
+
+  it("imports Hugging Face files through the batch import endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          repositories: [{
+            repository: "openai/demo",
+            revision: "main",
+            status: "succeeded",
+            files: [{
+              repository: "openai/demo",
+              revision: "main",
+              path: "data/train.parquet",
+              status: "registered",
+              artifactId: "artifacts/20260418000000-import001",
+            }],
+          }],
+          summary: { attempted: 1, succeeded: 1, failed: 0 },
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createApiArtifactBrowserClient({ apiBaseUrl: "/api" });
+    const result = await client.importHuggingFaceFiles?.({
+      files: [{ repository: "openai/demo", path: "data/train.parquet", revision: "main" }],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/huggingface/files/import",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          repositories: undefined,
+          files: [{ repository: "openai/demo", path: "data/train.parquet", revision: "main" }],
+          source: "thin-client.artifact-browser",
+        }),
+      }),
+    );
+    expect(result?.summary.succeeded).toBe(1);
+    expect(result?.repositories[0]?.files[0]?.artifactId).toBe("artifacts/20260418000000-import001");
+  });
 });
 

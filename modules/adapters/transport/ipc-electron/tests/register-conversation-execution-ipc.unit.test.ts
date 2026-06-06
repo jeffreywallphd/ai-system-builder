@@ -3,7 +3,7 @@ import {
   DESKTOP_CONVERSATION_EXECUTION_V2_CREATE_SESSION_REQUEST_CHANNEL,
   DESKTOP_CONVERSATION_EXECUTION_V2_LIST_SESSIONS_REQUEST_CHANNEL,
   DESKTOP_CONVERSATION_EXECUTION_V2_SUBMIT_TURN_REQUEST_CHANNEL,
-} from '../../../../contracts/ipc/desktop-conversation-execution-v2-contract';
+} from '../../../../contracts/ipc';
 import { registerConversationExecutionIpc } from '../conversations/registerConversationExecutionIpc';
 import type { IpcMainHandleListener } from '../ipcMainHandlePort';
 

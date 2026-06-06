@@ -105,10 +105,15 @@ import {
   DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_OPERATION,
   DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_RESPONSE_CHANNEL,
+  DESKTOP_HUGGING_FACE_FILES_IMPORT_OPERATION,
+  DESKTOP_HUGGING_FACE_FILES_IMPORT_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_FILES_IMPORT_RESPONSE_CHANNEL,
   createDesktopHuggingFaceNamespaceDatasetsBrowseRequest,
   createDesktopHuggingFaceDatasetParquetFilesBrowseRequest,
+  createDesktopHuggingFaceFilesImportRequest,
   type DesktopHuggingFaceNamespaceDatasetsBrowseResponse,
   type DesktopHuggingFaceDatasetParquetFilesBrowseResponse,
+  type DesktopHuggingFaceFilesImportResponse,
   DESKTOP_INGEST_WEBSITE_PAGE_OPERATION,
   DESKTOP_INGEST_WEBSITE_PAGE_REQUEST_CHANNEL,
   DESKTOP_INGEST_WEBSITE_PAGE_RESPONSE_CHANNEL,
@@ -470,6 +475,13 @@ export interface DesktopPreloadApi {
     input: { repository: string; revision?: string },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopHuggingFaceDatasetParquetFilesBrowseResponse>;
+  importHuggingFaceFiles: (
+    input: {
+      repositories?: Array<{ repository: string; revision?: string }>;
+      files?: Array<{ repository: string; path: string; revision?: string; mediaType?: string }>;
+    },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopHuggingFaceFilesImportResponse>;
   uploadArtifact: (
     input: DesktopArtifactUploadBridgeInput,
     context?: DesktopArtifactUploadBridgeContext,
@@ -946,6 +958,30 @@ export function createDesktopPreloadApi(
       });
     },
 
+    async importHuggingFaceFiles(input, context = {}) {
+      const request = createDesktopHuggingFaceFilesImportRequest(
+        {
+          repositories: input.repositories,
+          files: input.files,
+          boundary: {
+            host: "desktop",
+            source: artifactSource,
+          },
+        },
+        context,
+      );
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_HUGGING_FACE_FILES_IMPORT_REQUEST_CHANNEL.value,
+        request,
+      );
+
+      return assertDesktopEnvelopeResponse<DesktopHuggingFaceFilesImportResponse>(response, {
+        operation: DESKTOP_HUGGING_FACE_FILES_IMPORT_OPERATION,
+        channel: DESKTOP_HUGGING_FACE_FILES_IMPORT_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop Hugging Face files import IPC response envelope.",
+      });
+    },
+
     async uploadArtifact(input, context = {}) {
       const request: DesktopArtifactUploadRequest = createDesktopArtifactUploadRequest(
         {
@@ -1008,6 +1044,7 @@ export function createDesktopPreloadApi(
           boundary: {
             host: "desktop",
             source: uploadSource,
+            workspaceId: context.workspaceId,
           },
         },
         context,
@@ -1034,6 +1071,7 @@ export function createDesktopPreloadApi(
           boundary: {
             host: "desktop",
             source: uploadSource,
+            workspaceId: context.workspaceId,
           },
         },
         context,
@@ -1659,8 +1697,9 @@ export function createDesktopPreloadApi(
       });
     },
 
-    async browseUnregisteredArtifacts(_input = {}, context = {}) {
+    async browseUnregisteredArtifacts(input = {}, context = {}) {
       const request = createDesktopArtifactUnregisteredBrowseRequest({
+        workspaceId: input.workspaceId ?? context.workspaceId ?? "",
         boundary: { host: "desktop", source: artifactSource },
       }, context);
       const response = await dependencies.ipcRenderer.invoke(
@@ -1678,6 +1717,7 @@ export function createDesktopPreloadApi(
     async registerUnregisteredArtifact(input, context = {}) {
       const request = createDesktopArtifactUnregisteredRegisterRequest({
         storageKey: input.storageKey,
+        workspaceId: input.workspaceId ?? context.workspaceId ?? "",
         boundary: { host: "desktop", source: artifactSource },
       }, context);
       const response = await dependencies.ipcRenderer.invoke(
@@ -1695,6 +1735,7 @@ export function createDesktopPreloadApi(
     async deleteUnregisteredArtifact(input, context = {}) {
       const request = createDesktopArtifactUnregisteredDeleteRequest({
         storageKey: input.storageKey,
+        workspaceId: input.workspaceId ?? context.workspaceId ?? "",
         boundary: { host: "desktop", source: artifactSource },
       }, context);
       const response = await dependencies.ipcRenderer.invoke(

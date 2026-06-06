@@ -144,10 +144,11 @@ describe("system foundation pack manifest", () => {
           "state-messages",
           "page-feature-shells",
           "workflow-system-shells",
+          "conversational-systems",
         ].includes(entry.category),
       );
       assert.equal(entry.sourceLayer, SYSTEM_FOUNDATION_PACK_SOURCE_LAYER);
-      assert.match(entry.entryId, /^system\.foundation\.(?:ui|form|display|state|shell|workflow|system)\.[a-z0-9.-]+$/);
+      assert.match(entry.entryId, /^system\.foundation\.(?:(?:ui|form|display|state|shell|workflow|system)\.|conversation[.-])[a-z0-9.-]+$/);
       assert.match(entry.fingerprint, /^fnv1a:[a-f0-9]{8}$/);
       assert.equal(entryIds.has(entry.entryId), false, entry.entryId);
       assert.equal(refKeys.has(`${entry.definitionRef.id}@${entry.definitionRef.version}`), false);
@@ -290,7 +291,11 @@ describe("system foundation pack manifest", () => {
       assert.equal(sourcePack?.packId, "system.foundation", entry.entryId);
       assert.equal(sourcePack?.version, "1.0.0", entry.entryId);
       assert.match(entry.fingerprint, /^fnv1a:[a-f0-9]{8}$/, entry.entryId);
-      assert.match(String(entry.definition.definitionId), /^builtin\.[a-z0-9.-]+$/, entry.entryId);
+      assert.match(String(entry.definition.definitionId), /^(?:builtin|conversation)\.[a-z0-9.-]+$/, entry.entryId);
+      if (String(entry.definition.definitionId).startsWith("conversation.")) {
+        assert.equal(entry.metadata?.derivedComposite, true, entry.entryId);
+        assert.equal(entry.metadata?.lineage, "foundation-referenced", entry.entryId);
+      }
       assert.equal(seenDefinitionIds.has(String(entry.definition.definitionId)), false, entry.entryId);
       seenDefinitionIds.add(String(entry.definition.definitionId));
     }

@@ -745,13 +745,16 @@ it("maps unregistered artifact browse/register/delete bridge calls to dedicated 
   });
   const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
 
-  await api.browseUnregisteredArtifacts();
-  await api.registerUnregisteredArtifact({ storageKey: "uploads/orphan.txt" });
-  await api.deleteUnregisteredArtifact({ storageKey: "uploads/orphan.txt" });
+  await api.browseUnregisteredArtifacts({ workspaceId: "workspace-a" });
+  await api.registerUnregisteredArtifact({ storageKey: "uploads/orphan.txt", workspaceId: "workspace-a" });
+  await api.deleteUnregisteredArtifact({ storageKey: "uploads/orphan.txt", workspaceId: "workspace-a" });
 
   expect(invoke.mock.calls[0]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_BROWSE_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[1]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_REGISTER_REQUEST_CHANNEL.value);
   expect(invoke.mock.calls[2]?.[0]).toBe(DESKTOP_ARTIFACT_UNREGISTERED_DELETE_REQUEST_CHANNEL.value);
+  expect((invoke.mock.calls[0]?.[1] as { payload?: { workspaceId?: string } } | undefined)?.payload?.workspaceId).toBe("workspace-a");
+  expect((invoke.mock.calls[1]?.[1] as { payload?: { workspaceId?: string } } | undefined)?.payload?.workspaceId).toBe("workspace-a");
+  expect((invoke.mock.calls[2]?.[1] as { payload?: { workspaceId?: string } } | undefined)?.payload?.workspaceId).toBe("workspace-a");
 });
 
 

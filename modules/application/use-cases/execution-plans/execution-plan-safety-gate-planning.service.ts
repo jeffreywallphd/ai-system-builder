@@ -1,6 +1,6 @@
 import type { ExecutionAdapterReference, ExecutionInput, ExecutionOutput, ExecutionSafetyGate, ExecutionSafetyGateId, ExecutionStep } from '../../../contracts/execution-plans';
 
-const REVIEW_GATES: Array<ExecutionSafetyGate['kind']> = ['no-unresolved-blockers','credentials-not-embedded','unsafe-details-redacted','executable-payload-deferred'];
+const REVIEW_GATES: Array<ExecutionSafetyGate['kind']> = ['no-unresolved-blockers','access-material-not-embedded','unsafe-details-redacted','runnable-material-deferred'];
 
 export class ExecutionPlanSafetyGatePlanningService {
   public plan(args:{steps:ExecutionStep[]; inputs:ExecutionInput[]; outputs:ExecutionOutput[]; adapterReferences:ExecutionAdapterReference[]; createSafetyGateId:()=>ExecutionSafetyGateId|string;}) {

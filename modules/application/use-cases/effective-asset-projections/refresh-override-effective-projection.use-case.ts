@@ -12,6 +12,7 @@ import { createProjectionProvenance } from "./effective-asset-projection-provena
 import { projectionFailure } from "./effective-asset-projection-result-helpers";
 import { defaultEffectiveAssetProjectionValidationService } from "./effective-asset-projection-validation.service";
 import { deriveOverrideProjectionStatus } from "./effective-asset-override-projection-status.service";
+import { defaultEffectiveAssetProjectionDiagnosticsService } from "./effective-asset-projection-diagnostics.service";
 
 const SUPPORTED = new Set(["workspace-customized","linked-with-workspace-override","copied-with-workspace-override","imported-with-workspace-override","system-derived-override"]);
 
@@ -24,7 +25,20 @@ export class RefreshOverrideEffectiveProjectionUseCase {
     const overrideId = existing.source.overrideId; if(!overrideId) return projectionFailure("validation","effective-projection-source-required");
     const o=await this.d.assetOverrideRepository.readAssetOverrideRecord(c.targetWorkspaceId, overrideId);
     const now=(this.d.now??(()=>new Date().toISOString()))();
-    if(!o) return projectionFailure("not-found","effective-projection-source-missing");
+    if(!o) {
+      const projection = {
+        ...existing,
+        status: "source-missing" as const,
+        policy: "blocked" as const,
+        projectedFields: {},
+        diagnostics: [defaultEffectiveAssetProjectionDiagnosticsService.createDiagnostic("effective-projection-source-missing")],
+        blockers: [defaultEffectiveAssetProjectionDiagnosticsService.createBlocker("effective-projection-source-missing")],
+        provenance: createProjectionProvenance(c.targetWorkspaceId, existing.source, now),
+        updatedAt: now,
+        materializedAt: now,
+      };
+      try{return {status:"success",value:await this.d.projectionRepository.updateEffectiveAssetProjectionRecord(projection)};}catch{return projectionFailure("unavailable","effective-projection-materialization-unavailable");}
+    }
     const target=await this.d.targetReader.readCustomizationTargetByReference(c.targetWorkspaceId,existing.target.effectiveAssetReference);
     const validation = defaultEffectiveAssetProjectionValidationService.validate({targetWorkspaceId:c.targetWorkspaceId,sourceWorkspaceId:o.targetWorkspaceId,sourceKind:existing.sourceKind,policy:existing.policy,targetReaderAvailable:Boolean(target),targetReferenceCompatible:Boolean(target && target.effectiveAssetReference.id===o.customizationTarget.effectiveAssetReference.id && target.effectiveAssetReference.kind===o.customizationTarget.effectiveAssetReference.kind),sourceRelationshipCompatible:o.customizationTarget.sourceKind===target?.sourceKind,baseVersionCompatible:!o.baseRevision || o.baseRevision===target?.currentBaseRevision,overrideConflictOpen:o.conflictStatus==="open",sourceStatus:o.status==="active"?"published":o.status==="archived"?"archived":"disabled"});
     const statusModel=deriveOverrideProjectionStatus(o);

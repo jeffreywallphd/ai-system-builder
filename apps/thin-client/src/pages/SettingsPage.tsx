@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { TermWithHint } from "../../../../modules/ui/shared";
 import type {
   ApplicationSettingDefinition,
   ApplicationSettingPrimitiveValue,
@@ -113,7 +114,7 @@ export function SettingsPage() {
           return (
             <section key={definition.key} className="settings-field ui-stack ui-stack--sm">
               <header className="ui-stack ui-stack--sm">
-                <h3>{definition.label}</h3>
+                <p className="ui-label"><TermWithHint termId="settingValue">{definition.label}</TermWithHint></p>
                 {definition.description ? <p className="ui-text-muted">{definition.description}</p> : null}
               </header>
               {definition.valueKind === "select" ? (

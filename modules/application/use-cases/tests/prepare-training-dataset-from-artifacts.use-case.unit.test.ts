@@ -19,13 +19,20 @@ describe("PrepareTrainingDatasetFromArtifactsUseCase", () => {
     await writeFile(outputPath, `{"x":1}\n`);
     const runtimeStart = testDouble.fn(async () => ({ requestId: "r1", taskType: "prepare-training-dataset", accepted: true, status: "queued" }));
     const runtimeStatus = testDouble.fn(async () => ({ requestId: "r1", taskType: "dataset-preparation", status: "succeeded", concurrencyClass: "unknown", data: { outputs:[{name:"d",role:"dataset",tempPath:outputPath,mediaType:"application/x-ndjson"}],summary:{sourceDocumentCount:1,normalizedDocumentCount:1,skippedDocumentCount:0,chunkCount:1,generatedExampleCount:1,datasetRowCount:1,trainRowCount:1,testRowCount:0} } }));
-    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({ runtimeTaskRegistry: createRegistry({ startTask: runtimeStart, getTaskStatus: runtimeStatus }), storageBindings:{ readArtifactStorageBindings:testDouble.fn(async()=>({ok:true,value:{bindings:[]}})), upsertArtifactStorageBinding:testDouble.fn(), deleteArtifactStorageBindings:testDouble.fn() }, storage:{ retrieveArtifact:testDouble.fn(async()=>({ok:true,value:{descriptor:{key:"a1",mediaType:"text/markdown",metadata:{}},content:new TextEncoder().encode("hi")}})), storeArtifact:testDouble.fn(async(request:any)=>({ok:true,value:request.descriptor})), hasArtifact:testDouble.fn(), deleteArtifact:testDouble.fn() }, taskPowerLifecycle: lifecycle });
+    let storedDatasetRequest: any;
+    const useCase = new PrepareTrainingDatasetFromArtifactsUseCase({ runtimeTaskRegistry: createRegistry({ startTask: runtimeStart, getTaskStatus: runtimeStatus }), storageBindings:{ readArtifactStorageBindings:testDouble.fn(async()=>({ok:true,value:{bindings:[]}})), upsertArtifactStorageBinding:testDouble.fn(), deleteArtifactStorageBindings:testDouble.fn() }, storage:{ retrieveArtifact:testDouble.fn(async()=>({ok:true,value:{descriptor:{key:"a1",mediaType:"text/markdown",metadata:{}},content:new TextEncoder().encode("hi")}})), storeArtifact:testDouble.fn(async(request:any)=>{ storedDatasetRequest = request; return {ok:true,value:request.descriptor}; }), hasArtifact:testDouble.fn(), deleteArtifact:testDouble.fn() }, taskPowerLifecycle: lifecycle });
     const started = await useCase.startPrepareTrainingDataset(command, { workspaceId: "workspace-a" });
     expect(started.ok).toBe(true);
     const status = await useCase.readPrepareTrainingDataset("r1", { workspaceId: "workspace-a" });
     expect(status.ok).toBe(true);
     expect(runtimeStart).toHaveBeenCalledTimes(1);
     expect(runtimeStatus).toHaveBeenCalledWith("r1");
+    expect(storedDatasetRequest.descriptor.metadata.datasetPreparationTask).toMatchObject({
+      taskType: "llm-instruction",
+      modelFamily: "llm",
+      outputSchema: "instruction-response",
+      runtimeSupport: "supported",
+    });
     await rm(outputDir, { recursive: true, force: true });
   });
 

@@ -33,6 +33,8 @@ const discoveryRoots = [
   "apps/server",
   "apps/desktop",
   "apps/thin-client",
+  "dev-tools/scripts/server",
+  "dev-tools/scripts/thin-client",
   "dev-tools/scripts/testing",
 ];
 const validTestFilePattern = /\.test\.[cm]?[jt]sx?$/i;

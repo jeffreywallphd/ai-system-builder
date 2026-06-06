@@ -24,11 +24,13 @@ async function startServer(): Promise<void> {
       message: createdServer.config.security.mode === "disabled-dev"
         ? "SECURITY MODE: disabled-dev (INSECURE). HTTP/no-auth local development mode is enabled."
         : "Server listening with LAN HTTPS token security.",
-      data: {
-        mode: createdServer.config.security.mode,
-        port: createdServer.config.port,
-        httpsEnabled: createdServer.config.security.httpsEnabled,
-        httpsRequired: createdServer.config.security.httpsRequired,
+        data: {
+          mode: createdServer.config.security.mode,
+          port: createdServer.config.port,
+          storageRootDirectory: createdServer.config.storageRootDirectory,
+          runtimeRootDirectory: createdServer.config.runtimeRootDirectory,
+          httpsEnabled: createdServer.config.security.httpsEnabled,
+          httpsRequired: createdServer.config.security.httpsRequired,
         authRequired: createdServer.config.security.authRequired,
         pairingEnabled: createdServer.config.security.pairingEnabled,
         securityStorePath: createdServer.config.security.securityStorePath,

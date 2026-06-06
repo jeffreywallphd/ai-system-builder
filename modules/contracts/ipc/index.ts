@@ -19,6 +19,7 @@ export * from "./desktop-artifact-localize-from-repo-contract";
 export * from "./desktop-huggingface-token-config-contract";
 export * from "./desktop-huggingface-namespace-datasets-contract";
 export * from "./desktop-huggingface-dataset-parquet-files-contract";
+export * from "./desktop-huggingface-files-import-contract";
 export * from "./desktop-artifact-registered-contract";
 
 export * from "./desktop-website-ingestion-contract";

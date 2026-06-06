@@ -240,7 +240,7 @@ describe("ensurePythonRuntimeWorkerDependencies", () => {
       if (command === "python" && args[0] === "-c" && args[1] === workerDependencyProbeScript) {
         return createSpawnSyncResult({
           status: 1,
-          stderr: "ModuleNotFoundError: No module named 'accelerate'",
+          stderr: "ModuleNotFoundError: No module named 'fastapi'",
         });
       }
       if (command === "python" && args.join(" ") === "-m pip install -r requirements.txt") {
@@ -342,8 +342,10 @@ describe("ensurePythonRuntimeWorkerDependencies", () => {
 
     expect(requirementsText).not.toContain("pyarrow==");
     expect(requirementsText).not.toContain("datasets>=");
+    expect(requirementsText).not.toContain("diffusers>=");
     expect(requirementsText).not.toContain("accelerate>=");
     expect(requirementsText).not.toContain("peft>=");
+    expect(requirementsText).not.toContain("torch>=");
   });
 
   it("fails early when Python version is unsupported", () => {

@@ -47,9 +47,13 @@ export function ImageGenerationResults({ outputs, finalizedAssets, sessionGaller
       <div className="image-generation-maximized" role="dialog" aria-modal="true" aria-label="Generated image preview">
         <button className="image-generation-maximized__backdrop" type="button" aria-label="Close preview" onClick={() => setMaximizedAsset(undefined)} />
         <figure className="image-generation-maximized__content ui-stack ui-stack--sm">
-          <img src={maximizedAsset.previewUrl} alt="Maximized generated result" />
-          <figcaption>Generated image</figcaption>
-          <button className="ui-button" type="button" onClick={() => setMaximizedAsset(undefined)}>Close</button>
+          <header className="ui-modal-header">
+            <figcaption>Generated image</figcaption>
+            <button className="ui-modal-close" type="button" aria-label="Close preview" onClick={() => setMaximizedAsset(undefined)}>x</button>
+          </header>
+          <div className="image-generation-maximized__body">
+            <img src={maximizedAsset.previewUrl} alt="Maximized generated result" />
+          </div>
         </figure>
       </div>
     ) : null}

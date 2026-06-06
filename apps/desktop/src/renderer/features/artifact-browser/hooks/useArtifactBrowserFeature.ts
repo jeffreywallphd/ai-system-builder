@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   useArtifactBrowserPublishLogic,
   type ArtifactBrowserViewState,
+  type ArtifactPreviewView,
   type UseArtifactBrowserPublishLogicResult,
 } from "../../../../../../../modules/ui/shared";
 import type {
@@ -38,6 +39,7 @@ export interface UseArtifactBrowserFeatureResult {
   content?: DesktopArtifactContentDescriptor;
   imageViewUrl?: string;
   htmlPreview?: string;
+  artifactPreview: ArtifactPreviewView;
   publishState: ArtifactBrowserViewState;
   registerState: ArtifactBrowserViewState;
   localizeState: ArtifactBrowserViewState;
@@ -197,6 +199,7 @@ export function useArtifactBrowserFeature(
     content: selection.content,
     imageViewUrl: selection.imageViewUrl,
     htmlPreview: selection.htmlPreview,
+    artifactPreview: selection.artifactPreview,
     publishState: publishLogic.publishState,
     registerState: huggingFace.registerState,
     localizeState: huggingFace.localizeState,

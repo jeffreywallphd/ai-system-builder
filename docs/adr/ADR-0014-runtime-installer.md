@@ -1,7 +1,7 @@
 # ADR-0014: Runtime Installer Architecture
 
 ## Status
-Proposed
+Accepted
 
 ## Problem
 
@@ -19,6 +19,8 @@ Introduce a generic **Runtime Installer** abstraction.
 - Supervisors may call installer operations before startup when configured to do so.
 - Installation targets are runtime-specific, but they share common install request/result/status contracts and application ports.
 - Shared runtime readiness contracts and the application readiness service may expose host-owned capability availability derived partly from installer status, but installer contracts remain the source of truth for install/discovery/repair/update status.
+- The current Git installer adapter implements clone/fetch/checkout/update/status/repair-safe behavior for Git-backed runtime installs.
+- The current ComfyUI installer adapter composes the generic Git installer, applies ComfyUI defaults, and manages Python dependency/finalization checks outside UI code and image-generation contracts.
 
 ## Layering
 
@@ -39,7 +41,7 @@ Introduce a generic **Runtime Installer** abstraction.
 
 ## Source Model
 
-Initial source type:
+Current implemented source type:
 
 - `git`
 
@@ -94,11 +96,13 @@ Installer request/result/status flows may include:
 - The flow is bounded (single retry only) to prevent infinite loops.
 - If repair fails, users receive an actionable dependency-repair error; if retry fails, users receive an actionable post-repair startup error.
 
-## Non-Goals (Prompt 1/4)
+## Current Implementation Boundaries
 
-- No Git clone/fetch/reset implementation.
-- No ComfyUI install implementation.
-- No UI implementation for install flows.
+- Generic Git install/status/repair behavior is implemented in the adapter layer and remains source-limited to Git.
+- ComfyUI install/status/repair behavior is implemented as runtime-specific adapter composition over the generic Git installer.
+- Desktop and server host composition may expose ComfyUI install status, explicit repair, and installer-before-start behavior through host-owned runtime wiring.
+- UI and feature use cases must not run installer commands directly; they may only call application/transport/host seams that preserve installer boundaries.
+- Archive, local-path, package-manager, marketplace/package registry, public runtime distribution, and destructive unmanaged-directory repair remain outside the current implemented source set.
 
 ## Metadata Persistence
 
@@ -106,5 +110,6 @@ Installer request/result/status flows may include:
 - Metadata should record source, requested ref, resolved ref/commit SHA, installedAt, lastCheckedAt, and an ownership/managed marker.
 - A managed marker is required before repair/update modifies an existing non-empty directory.
 - Managed metadata must be validated (shape + required ownership/source fields) before an install is treated as managed.
-- Exact metadata filename is implementation-defined in Prompt 2; suggested default: `.ai-system-builder-runtime-install.json`.
+- The current Git installer default metadata filename is `.ai-system-builder-runtime-install.json`.
+- The current ComfyUI installer also writes finalization metadata, by default `.ai-system-builder-comfyui-finalization.json`, to avoid repeating dependency and validation stages unnecessarily.
 - For Git sources: fetch should run before update checks; pinned refs/tags/SHAs should be checked out and recorded without implicit pull, while unpinned sources may use fast-forward pull.

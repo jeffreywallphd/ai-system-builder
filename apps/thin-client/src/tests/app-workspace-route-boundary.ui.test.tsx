@@ -104,9 +104,9 @@ describe("thin-client app workspace route boundary", () => {
     ({ container, root } = await renderAt("/models"));
 
     expect(window.location.pathname).toBe("/models");
-    expect(container.textContent).toContain("Active workspace: Thin Workspace");
+    expect(container.textContent).toContain("Current Workspace");
+    expect(container.textContent).toContain("Thin Workspace");
     expect(container.textContent).toContain("Model Management");
-    expect(container.textContent).toContain("Showing records for: Thin Workspace");
     expect(container.textContent).not.toContain("No workspace selected");
     expect(container.querySelector("button[aria-current='page']")?.textContent).toBe("Models");
   });

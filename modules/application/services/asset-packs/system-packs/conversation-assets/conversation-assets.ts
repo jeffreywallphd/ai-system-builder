@@ -1,4 +1,4 @@
-import type { AssetDefinition, AssetPackAssetEntry } from '../../../../../contracts/asset';
+import type { AssetAiContext, AssetDefinition, AssetPackAssetEntry } from '../../../../../contracts/asset';
 import { SYSTEM_FOUNDATION_PACK_ID, SYSTEM_FOUNDATION_PACK_SOURCE_LAYER, SYSTEM_FOUNDATION_PACK_VERSION } from '../system-foundation-pack.constants';
 
 const V='1.0.0';
@@ -13,9 +13,31 @@ function def(definitionId:string, assetType:AssetDefinition['assetType'], assetF
   return { definitionId, assetType, assetFamily, version:V, displayName, description, lifecycleStatus:'published', reviewStatus:'approved',
     provenance:{sourceKind:'system-generated', authorship:'human-authored', metadata:{sourcePackId:SYSTEM_FOUNDATION_PACK_ID,sourcePackVersion:SYSTEM_FOUNDATION_PACK_VERSION,categoryId,sourceLayer:SYSTEM_FOUNDATION_PACK_SOURCE_LAYER}},
     configurationSchema:{schemaId:`${definitionId}.configuration`,schemaVersion:V,strict:true,fields:[],requiredFieldIds:[],description:`${displayName} semantic definition.`,metadata:{declarativeOnly:true,categoryId}},
+    aiContext:createAiContext(definitionId, displayName, description, deps),
     defaultConfiguration:{}, requirements:[{requirementId:`${definitionId}.declarative`,requirementKind:'custom',required:false,safetyStatus:'safe',summary:'Declarative asset-only definition.',details:{declarativeOnly:true}}],
     compositionRules:[{ruleId:`${definitionId}.dependencies`,ruleKind:'custom',description:'Preserves dependency lineage to referenced foundation and conversational assets.',metadata:{dependencyDefinitionIds:deps}}],
     metadata:{builtIn:true,systemOwned:true,declarativeOnly:true,categoryId,sourcePackId:SYSTEM_FOUNDATION_PACK_ID,sourcePackVersion:SYSTEM_FOUNDATION_PACK_VERSION,sourceLayer:SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,dependencyDefinitionIds:deps}
+  };
+}
+
+function createAiContext(definitionId:string, displayName:string, description:string, deps:string[]): AssetAiContext {
+  return {
+    purpose:description,
+    userFacingSummary:`${displayName} describes one reusable part of a conversational assistant experience.`,
+    developerFacingSummary:`${displayName} is a declarative conversation-system asset for composition planning; it is catalog meaning, not executable behavior.`,
+    capabilities:[
+      {capabilityId:`${definitionId}.capability.semantic-role`,summary:'Declares a safe semantic role for conversational system composition.'},
+      {capabilityId:`${definitionId}.capability.lineage`,summary:'Preserves dependency lineage to the referenced foundation and conversation assets.'},
+    ],
+    limitations:[
+      {limitationId:`${definitionId}.limitation.declarative-only`,summary:'Does not perform work, store messages, or create generated text.'},
+      {limitationId:`${definitionId}.limitation.no-implementation`,summary:'Does not define screen code, route handlers, saved records, or adapter details.'},
+    ],
+    inputSummary:{summary:deps.length ? 'Uses referenced semantic foundation assets as composition inputs.' : 'No required composition inputs are declared.'},
+    outputSummary:{summary:'Produces only catalog metadata for later planning and review.'},
+    configurationGuidance:{summary:'No user-editable settings are defined by this foundation asset.',recommendedDefaults:{},commonMistakes:['Keep concrete service setup, message text, and executable details outside the catalog definition.']},
+    compositionGuidance:{summary:'Use this asset as a safe reusable building block when composing conversational systems from foundation assets.',bindingGuidance:'References identify semantic dependencies only; invocation details remain outside system foundation definitions.'},
+    safetyNotes:[{safetyNoteId:`${definitionId}.safety.declarative-only`,category:'thin-client',severity:'info',summary:'Safe for thin-client display because it contains descriptors and dependency references only.'}],
   };
 }
 

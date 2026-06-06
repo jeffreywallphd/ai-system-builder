@@ -19532,5 +19532,1782 @@
         "installedAt": "2026-05-21T13:53:22.324Z"
       }
     }
+  },
+  {
+    "definitionId": "conversation.user-message-input",
+    "assetType": "schema",
+    "assetFamily": "structural",
+    "version": "1.0.0",
+    "displayName": "Conversation User Message Input",
+    "description": "Bounded one-turn user text input contract.",
+    "lifecycleStatus": "published",
+    "reviewStatus": "approved",
+    "provenance": {
+      "sourceKind": "system-generated",
+      "authorship": "human-authored",
+      "metadata": {
+        "sourcePackId": "system.foundation",
+        "sourcePackVersion": "1.0.0",
+        "categoryId": "conversational-systems",
+        "sourceLayer": "system-default",
+        "sourcePackEntryId": "system.foundation.conversation-user-message-input"
+      }
+    },
+    "configurationSchema": {
+      "schemaId": "conversation.user-message-input.configuration",
+      "schemaVersion": "1.0.0",
+      "strict": true,
+      "fields": [],
+      "requiredFieldIds": [],
+      "description": "Conversation User Message Input semantic definition.",
+      "metadata": {
+        "declarativeOnly": true,
+        "categoryId": "conversational-systems"
+      }
+    },
+    "aiContext": {
+      "purpose": "Bounded one-turn user text input contract.",
+      "userFacingSummary": "Conversation User Message Input describes one reusable part of a conversational assistant experience.",
+      "developerFacingSummary": "Conversation User Message Input is a declarative conversation-system asset for composition planning; it is catalog meaning, not executable behavior.",
+      "capabilities": [
+        {
+          "capabilityId": "conversation.user-message-input.capability.semantic-role",
+          "summary": "Declares a safe semantic role for conversational system composition."
+        },
+        {
+          "capabilityId": "conversation.user-message-input.capability.lineage",
+          "summary": "Preserves dependency lineage to the referenced foundation and conversation assets."
+        }
+      ],
+      "limitations": [
+        {
+          "limitationId": "conversation.user-message-input.limitation.declarative-only",
+          "summary": "Does not perform work, store messages, or create generated text."
+        },
+        {
+          "limitationId": "conversation.user-message-input.limitation.no-implementation",
+          "summary": "Does not define screen code, route handlers, saved records, or adapter details."
+        }
+      ],
+      "inputSummary": {
+        "summary": "Uses referenced semantic foundation assets as composition inputs."
+      },
+      "outputSummary": {
+        "summary": "Produces only catalog metadata for later planning and review."
+      },
+      "configurationGuidance": {
+        "summary": "No user-editable settings are defined by this foundation asset.",
+        "recommendedDefaults": {},
+        "commonMistakes": [
+          "Keep concrete service setup, message text, and executable details outside the catalog definition."
+        ]
+      },
+      "compositionGuidance": {
+        "summary": "Use this asset as a safe reusable building block when composing conversational systems from foundation assets.",
+        "bindingGuidance": "References identify semantic dependencies only; invocation details remain outside system foundation definitions."
+      },
+      "safetyNotes": [
+        {
+          "safetyNoteId": "conversation.user-message-input.safety.declarative-only",
+          "category": "thin-client",
+          "severity": "info",
+          "summary": "Safe for thin-client display because it contains descriptors and dependency references only."
+        }
+      ]
+    },
+    "defaultConfiguration": {},
+    "requirements": [
+      {
+        "requirementId": "conversation.user-message-input.declarative",
+        "requirementKind": "custom",
+        "required": false,
+        "safetyStatus": "safe",
+        "summary": "Declarative asset-only definition.",
+        "details": {
+          "declarativeOnly": true
+        }
+      }
+    ],
+    "compositionRules": [
+      {
+        "ruleId": "conversation.user-message-input.dependencies",
+        "ruleKind": "custom",
+        "description": "Preserves dependency lineage to referenced foundation and conversational assets.",
+        "metadata": {
+          "dependencyDefinitionIds": [
+            "builtin.form.text-area"
+          ]
+        }
+      }
+    ],
+    "metadata": {
+      "builtIn": true,
+      "systemOwned": true,
+      "declarativeOnly": true,
+      "categoryId": "conversational-systems",
+      "sourcePackId": "system.foundation",
+      "sourcePackVersion": "1.0.0",
+      "sourceLayer": "system-default",
+      "dependencyDefinitionIds": [
+        "builtin.form.text-area"
+      ],
+      "sourcePackEntryId": "system.foundation.conversation-user-message-input",
+      "sourcePackFingerprint": "fnv1a:58604f4d",
+      "assetPackInstall": {
+        "packId": "system.foundation",
+        "packVersion": "1.0.0",
+        "entryId": "system.foundation.conversation-user-message-input",
+        "fingerprint": "fnv1a:58604f4d",
+        "sourceKind": "system",
+        "sourceLayer": "system-default",
+        "trustStatus": "system-trusted",
+        "managedBy": "asset-kernel",
+        "installedAt": "2026-06-05T23:32:10.441Z"
+      }
+    }
+  },
+  {
+    "definitionId": "conversation.assistant-text-response-output",
+    "assetType": "schema",
+    "assetFamily": "structural",
+    "version": "1.0.0",
+    "displayName": "Conversation Assistant Text Response Output",
+    "description": "Bounded assistant text output contract.",
+    "lifecycleStatus": "published",
+    "reviewStatus": "approved",
+    "provenance": {
+      "sourceKind": "system-generated",
+      "authorship": "human-authored",
+      "metadata": {
+        "sourcePackId": "system.foundation",
+        "sourcePackVersion": "1.0.0",
+        "categoryId": "conversational-systems",
+        "sourceLayer": "system-default",
+        "sourcePackEntryId": "system.foundation.conversation-assistant-text-response-output"
+      }
+    },
+    "configurationSchema": {
+      "schemaId": "conversation.assistant-text-response-output.configuration",
+      "schemaVersion": "1.0.0",
+      "strict": true,
+      "fields": [],
+      "requiredFieldIds": [],
+      "description": "Conversation Assistant Text Response Output semantic definition.",
+      "metadata": {
+        "declarativeOnly": true,
+        "categoryId": "conversational-systems"
+      }
+    },
+    "aiContext": {
+      "purpose": "Bounded assistant text output contract.",
+      "userFacingSummary": "Conversation Assistant Text Response Output describes one reusable part of a conversational assistant experience.",
+      "developerFacingSummary": "Conversation Assistant Text Response Output is a declarative conversation-system asset for composition planning; it is catalog meaning, not executable behavior.",
+      "capabilities": [
+        {
+          "capabilityId": "conversation.assistant-text-response-output.capability.semantic-role",
+          "summary": "Declares a safe semantic role for conversational system composition."
+        },
+        {
+          "capabilityId": "conversation.assistant-text-response-output.capability.lineage",
+          "summary": "Preserves dependency lineage to the referenced foundation and conversation assets."
+        }
+      ],
+      "limitations": [
+        {
+          "limitationId": "conversation.assistant-text-response-output.limitation.declarative-only",
+          "summary": "Does not perform work, store messages, or create generated text."
+        },
+        {
+          "limitationId": "conversation.assistant-text-response-output.limitation.no-implementation",
+          "summary": "Does not define screen code, route handlers, saved records, or adapter details."
+        }
+      ],
+      "inputSummary": {
+        "summary": "Uses referenced semantic foundation assets as composition inputs."
+      },
+      "outputSummary": {
+        "summary": "Produces only catalog metadata for later planning and review."
+      },
+      "configurationGuidance": {
+        "summary": "No user-editable settings are defined by this foundation asset.",
+        "recommendedDefaults": {},
+        "commonMistakes": [
+          "Keep concrete service setup, message text, and executable details outside the catalog definition."
+        ]
+      },
+      "compositionGuidance": {
+        "summary": "Use this asset as a safe reusable building block when composing conversational systems from foundation assets.",
+        "bindingGuidance": "References identify semantic dependencies only; invocation details remain outside system foundation definitions."
+      },
+      "safetyNotes": [
+        {
+          "safetyNoteId": "conversation.assistant-text-response-output.safety.declarative-only",
+          "category": "thin-client",
+          "severity": "info",
+          "summary": "Safe for thin-client display because it contains descriptors and dependency references only."
+        }
+      ]
+    },
+    "defaultConfiguration": {},
+    "requirements": [
+      {
+        "requirementId": "conversation.assistant-text-response-output.declarative",
+        "requirementKind": "custom",
+        "required": false,
+        "safetyStatus": "safe",
+        "summary": "Declarative asset-only definition.",
+        "details": {
+          "declarativeOnly": true
+        }
+      }
+    ],
+    "compositionRules": [
+      {
+        "ruleId": "conversation.assistant-text-response-output.dependencies",
+        "ruleKind": "custom",
+        "description": "Preserves dependency lineage to referenced foundation and conversational assets.",
+        "metadata": {
+          "dependencyDefinitionIds": [
+            "builtin.display.detail-view"
+          ]
+        }
+      }
+    ],
+    "metadata": {
+      "builtIn": true,
+      "systemOwned": true,
+      "declarativeOnly": true,
+      "categoryId": "conversational-systems",
+      "sourcePackId": "system.foundation",
+      "sourcePackVersion": "1.0.0",
+      "sourceLayer": "system-default",
+      "dependencyDefinitionIds": [
+        "builtin.display.detail-view"
+      ],
+      "sourcePackEntryId": "system.foundation.conversation-assistant-text-response-output",
+      "sourcePackFingerprint": "fnv1a:7fcb4639",
+      "assetPackInstall": {
+        "packId": "system.foundation",
+        "packVersion": "1.0.0",
+        "entryId": "system.foundation.conversation-assistant-text-response-output",
+        "fingerprint": "fnv1a:7fcb4639",
+        "sourceKind": "system",
+        "sourceLayer": "system-default",
+        "trustStatus": "system-trusted",
+        "managedBy": "asset-kernel",
+        "installedAt": "2026-06-05T23:32:10.448Z"
+      }
+    }
+  },
+  {
+    "definitionId": "conversation.history-reference",
+    "assetType": "schema",
+    "assetFamily": "structural",
+    "version": "1.0.0",
+    "displayName": "Conversation History Reference",
+    "description": "Ordered conversational history reference contract.",
+    "lifecycleStatus": "published",
+    "reviewStatus": "approved",
+    "provenance": {
+      "sourceKind": "system-generated",
+      "authorship": "human-authored",
+      "metadata": {
+        "sourcePackId": "system.foundation",
+        "sourcePackVersion": "1.0.0",
+        "categoryId": "conversational-systems",
+        "sourceLayer": "system-default",
+        "sourcePackEntryId": "system.foundation.conversation-history-reference"
+      }
+    },
+    "configurationSchema": {
+      "schemaId": "conversation.history-reference.configuration",
+      "schemaVersion": "1.0.0",
+      "strict": true,
+      "fields": [],
+      "requiredFieldIds": [],
+      "description": "Conversation History Reference semantic definition.",
+      "metadata": {
+        "declarativeOnly": true,
+        "categoryId": "conversational-systems"
+      }
+    },
+    "aiContext": {
+      "purpose": "Ordered conversational history reference contract.",
+      "userFacingSummary": "Conversation History Reference describes one reusable part of a conversational assistant experience.",
+      "developerFacingSummary": "Conversation History Reference is a declarative conversation-system asset for composition planning; it is catalog meaning, not executable behavior.",
+      "capabilities": [
+        {
+          "capabilityId": "conversation.history-reference.capability.semantic-role",
+          "summary": "Declares a safe semantic role for conversational system composition."
+        },
+        {
+          "capabilityId": "conversation.history-reference.capability.lineage",
+          "summary": "Preserves dependency lineage to the referenced foundation and conversation assets."
+        }
+      ],
+      "limitations": [
+        {
+          "limitationId": "conversation.history-reference.limitation.declarative-only",
+          "summary": "Does not perform work, store messages, or create generated text."
+        },
+        {
+          "limitationId": "conversation.history-reference.limitation.no-implementation",
+          "summary": "Does not define screen code, route handlers, saved records, or adapter details."
+        }
+      ],
+      "inputSummary": {
+        "summary": "Uses referenced semantic foundation assets as composition inputs."
+      },
+      "outputSummary": {
+        "summary": "Produces only catalog metadata for later planning and review."
+      },
+      "configurationGuidance": {
+        "summary": "No user-editable settings are defined by this foundation asset.",
+        "recommendedDefaults": {},
+        "commonMistakes": [
+          "Keep concrete service setup, message text, and executable details outside the catalog definition."
+        ]
+      },
+      "compositionGuidance": {
+        "summary": "Use this asset as a safe reusable building block when composing conversational systems from foundation assets.",
+        "bindingGuidance": "References identify semantic dependencies only; invocation details remain outside system foundation definitions."
+      },
+      "safetyNotes": [
+        {
+          "safetyNoteId": "conversation.history-reference.safety.declarative-only",
+          "category": "thin-client",
+          "severity": "info",
+          "summary": "Safe for thin-client display because it contains descriptors and dependency references only."
+        }
+      ]
+    },
+    "defaultConfiguration": {},
+    "requirements": [
+      {
+        "requirementId": "conversation.history-reference.declarative",
+        "requirementKind": "custom",
+        "required": false,
+        "safetyStatus": "safe",
+        "summary": "Declarative asset-only definition.",
+        "details": {
+          "declarativeOnly": true
+        }
+      }
+    ],
+    "compositionRules": [
+      {
+        "ruleId": "conversation.history-reference.dependencies",
+        "ruleKind": "custom",
+        "description": "Preserves dependency lineage to referenced foundation and conversational assets.",
+        "metadata": {
+          "dependencyDefinitionIds": [
+            "builtin.display.list"
+          ]
+        }
+      }
+    ],
+    "metadata": {
+      "builtIn": true,
+      "systemOwned": true,
+      "declarativeOnly": true,
+      "categoryId": "conversational-systems",
+      "sourcePackId": "system.foundation",
+      "sourcePackVersion": "1.0.0",
+      "sourceLayer": "system-default",
+      "dependencyDefinitionIds": [
+        "builtin.display.list"
+      ],
+      "sourcePackEntryId": "system.foundation.conversation-history-reference",
+      "sourcePackFingerprint": "fnv1a:2cf3e0a7",
+      "assetPackInstall": {
+        "packId": "system.foundation",
+        "packVersion": "1.0.0",
+        "entryId": "system.foundation.conversation-history-reference",
+        "fingerprint": "fnv1a:2cf3e0a7",
+        "sourceKind": "system",
+        "sourceLayer": "system-default",
+        "trustStatus": "system-trusted",
+        "managedBy": "asset-kernel",
+        "installedAt": "2026-06-05T23:32:10.457Z"
+      }
+    }
+  },
+  {
+    "definitionId": "conversation.message-composer",
+    "assetType": "ui-component",
+    "assetFamily": "composition",
+    "version": "1.0.0",
+    "displayName": "Conversation Message Composer",
+    "description": "Composed message composer using foundational text input and submit semantics.",
+    "lifecycleStatus": "published",
+    "reviewStatus": "approved",
+    "provenance": {
+      "sourceKind": "system-generated",
+      "authorship": "human-authored",
+      "metadata": {
+        "sourcePackId": "system.foundation",
+        "sourcePackVersion": "1.0.0",
+        "categoryId": "conversational-systems",
+        "sourceLayer": "system-default",
+        "sourcePackEntryId": "system.foundation.conversation-message-composer"
+      }
+    },
+    "configurationSchema": {
+      "schemaId": "conversation.message-composer.configuration",
+      "schemaVersion": "1.0.0",
+      "strict": true,
+      "fields": [],
+      "requiredFieldIds": [],
+      "description": "Conversation Message Composer semantic definition.",
+      "metadata": {
+        "declarativeOnly": true,
+        "categoryId": "conversational-systems"
+      }
+    },
+    "aiContext": {
+      "purpose": "Composed message composer using foundational text input and submit semantics.",
+      "userFacingSummary": "Conversation Message Composer describes one reusable part of a conversational assistant experience.",
+      "developerFacingSummary": "Conversation Message Composer is a declarative conversation-system asset for composition planning; it is catalog meaning, not executable behavior.",
+      "capabilities": [
+        {
+          "capabilityId": "conversation.message-composer.capability.semantic-role",
+          "summary": "Declares a safe semantic role for conversational system composition."
+        },
+        {
+          "capabilityId": "conversation.message-composer.capability.lineage",
+          "summary": "Preserves dependency lineage to the referenced foundation and conversation assets."
+        }
+      ],
+      "limitations": [
+        {
+          "limitationId": "conversation.message-composer.limitation.declarative-only",
+          "summary": "Does not perform work, store messages, or create generated text."
+        },
+        {
+          "limitationId": "conversation.message-composer.limitation.no-implementation",
+          "summary": "Does not define screen code, route handlers, saved records, or adapter details."
+        }
+      ],
+      "inputSummary": {
+        "summary": "Uses referenced semantic foundation assets as composition inputs."
+      },
+      "outputSummary": {
+        "summary": "Produces only catalog metadata for later planning and review."
+      },
+      "configurationGuidance": {
+        "summary": "No user-editable settings are defined by this foundation asset.",
+        "recommendedDefaults": {},
+        "commonMistakes": [
+          "Keep concrete service setup, message text, and executable details outside the catalog definition."
+        ]
+      },
+      "compositionGuidance": {
+        "summary": "Use this asset as a safe reusable building block when composing conversational systems from foundation assets.",
+        "bindingGuidance": "References identify semantic dependencies only; invocation details remain outside system foundation definitions."
+      },
+      "safetyNotes": [
+        {
+          "safetyNoteId": "conversation.message-composer.safety.declarative-only",
+          "category": "thin-client",
+          "severity": "info",
+          "summary": "Safe for thin-client display because it contains descriptors and dependency references only."
+        }
+      ]
+    },
+    "defaultConfiguration": {},
+    "requirements": [
+      {
+        "requirementId": "conversation.message-composer.declarative",
+        "requirementKind": "custom",
+        "required": false,
+        "safetyStatus": "safe",
+        "summary": "Declarative asset-only definition.",
+        "details": {
+          "declarativeOnly": true
+        }
+      }
+    ],
+    "compositionRules": [
+      {
+        "ruleId": "conversation.message-composer.dependencies",
+        "ruleKind": "custom",
+        "description": "Preserves dependency lineage to referenced foundation and conversational assets.",
+        "metadata": {
+          "dependencyDefinitionIds": [
+            "conversation.user-message-input",
+            "builtin.form.text-area",
+            "builtin.form.submit-action",
+            "builtin.display.status-badge"
+          ]
+        }
+      }
+    ],
+    "metadata": {
+      "builtIn": true,
+      "systemOwned": true,
+      "declarativeOnly": true,
+      "categoryId": "conversational-systems",
+      "sourcePackId": "system.foundation",
+      "sourcePackVersion": "1.0.0",
+      "sourceLayer": "system-default",
+      "dependencyDefinitionIds": [
+        "conversation.user-message-input",
+        "builtin.form.text-area",
+        "builtin.form.submit-action",
+        "builtin.display.status-badge"
+      ],
+      "sourcePackEntryId": "system.foundation.conversation-message-composer",
+      "sourcePackFingerprint": "fnv1a:613865cf",
+      "assetPackInstall": {
+        "packId": "system.foundation",
+        "packVersion": "1.0.0",
+        "entryId": "system.foundation.conversation-message-composer",
+        "fingerprint": "fnv1a:613865cf",
+        "sourceKind": "system",
+        "sourceLayer": "system-default",
+        "trustStatus": "system-trusted",
+        "managedBy": "asset-kernel",
+        "installedAt": "2026-06-05T23:32:10.464Z"
+      }
+    }
+  },
+  {
+    "definitionId": "conversation.message-history-display",
+    "assetType": "ui-component",
+    "assetFamily": "composition",
+    "version": "1.0.0",
+    "displayName": "Conversation Message History Display",
+    "description": "Composed conversational history display using foundational list/container semantics.",
+    "lifecycleStatus": "published",
+    "reviewStatus": "approved",
+    "provenance": {
+      "sourceKind": "system-generated",
+      "authorship": "human-authored",
+      "metadata": {
+        "sourcePackId": "system.foundation",
+        "sourcePackVersion": "1.0.0",
+        "categoryId": "conversational-systems",
+        "sourceLayer": "system-default",
+        "sourcePackEntryId": "system.foundation.conversation-message-history-display"
+      }
+    },
+    "configurationSchema": {
+      "schemaId": "conversation.message-history-display.configuration",
+      "schemaVersion": "1.0.0",
+      "strict": true,
+      "fields": [],
+      "requiredFieldIds": [],
+      "description": "Conversation Message History Display semantic definition.",
+      "metadata": {
+        "declarativeOnly": true,
+        "categoryId": "conversational-systems"
+      }
+    },
+    "aiContext": {
+      "purpose": "Composed conversational history display using foundational list/container semantics.",
+      "userFacingSummary": "Conversation Message History Display describes one reusable part of a conversational assistant experience.",
+      "developerFacingSummary": "Conversation Message History Display is a declarative conversation-system asset for composition planning; it is catalog meaning, not executable behavior.",
+      "capabilities": [
+        {
+          "capabilityId": "conversation.message-history-display.capability.semantic-role",
+          "summary": "Declares a safe semantic role for conversational system composition."
+        },
+        {
+          "capabilityId": "conversation.message-history-display.capability.lineage",
+          "summary": "Preserves dependency lineage to the referenced foundation and conversation assets."
+        }
+      ],
+      "limitations": [
+        {
+          "limitationId": "conversation.message-history-display.limitation.declarative-only",
+          "summary": "Does not perform work, store messages, or create generated text."
+        },
+        {
+          "limitationId": "conversation.message-history-display.limitation.no-implementation",
+          "summary": "Does not define screen code, route handlers, saved records, or adapter details."
+        }
+      ],
+      "inputSummary": {
+        "summary": "Uses referenced semantic foundation assets as composition inputs."
+      },
+      "outputSummary": {
+        "summary": "Produces only catalog metadata for later planning and review."
+      },
+      "configurationGuidance": {
+        "summary": "No user-editable settings are defined by this foundation asset.",
+        "recommendedDefaults": {},
+        "commonMistakes": [
+          "Keep concrete service setup, message text, and executable details outside the catalog definition."
+        ]
+      },
+      "compositionGuidance": {
+        "summary": "Use this asset as a safe reusable building block when composing conversational systems from foundation assets.",
+        "bindingGuidance": "References identify semantic dependencies only; invocation details remain outside system foundation definitions."
+      },
+      "safetyNotes": [
+        {
+          "safetyNoteId": "conversation.message-history-display.safety.declarative-only",
+          "category": "thin-client",
+          "severity": "info",
+          "summary": "Safe for thin-client display because it contains descriptors and dependency references only."
+        }
+      ]
+    },
+    "defaultConfiguration": {},
+    "requirements": [
+      {
+        "requirementId": "conversation.message-history-display.declarative",
+        "requirementKind": "custom",
+        "required": false,
+        "safetyStatus": "safe",
+        "summary": "Declarative asset-only definition.",
+        "details": {
+          "declarativeOnly": true
+        }
+      }
+    ],
+    "compositionRules": [
+      {
+        "ruleId": "conversation.message-history-display.dependencies",
+        "ruleKind": "custom",
+        "description": "Preserves dependency lineage to referenced foundation and conversational assets.",
+        "metadata": {
+          "dependencyDefinitionIds": [
+            "conversation.history-reference",
+            "builtin.display.list",
+            "builtin.ui.container"
+          ]
+        }
+      }
+    ],
+    "metadata": {
+      "builtIn": true,
+      "systemOwned": true,
+      "declarativeOnly": true,
+      "categoryId": "conversational-systems",
+      "sourcePackId": "system.foundation",
+      "sourcePackVersion": "1.0.0",
+      "sourceLayer": "system-default",
+      "dependencyDefinitionIds": [
+        "conversation.history-reference",
+        "builtin.display.list",
+        "builtin.ui.container"
+      ],
+      "sourcePackEntryId": "system.foundation.conversation-message-history-display",
+      "sourcePackFingerprint": "fnv1a:0b630e58",
+      "assetPackInstall": {
+        "packId": "system.foundation",
+        "packVersion": "1.0.0",
+        "entryId": "system.foundation.conversation-message-history-display",
+        "fingerprint": "fnv1a:0b630e58",
+        "sourceKind": "system",
+        "sourceLayer": "system-default",
+        "trustStatus": "system-trusted",
+        "managedBy": "asset-kernel",
+        "installedAt": "2026-06-05T23:32:10.471Z"
+      }
+    }
+  },
+  {
+    "definitionId": "conversation.assistant-response-panel",
+    "assetType": "ui-component",
+    "assetFamily": "composition",
+    "version": "1.0.0",
+    "displayName": "Conversation Assistant Response Panel",
+    "description": "Composed assistant response panel with text display and loading/error/status semantics.",
+    "lifecycleStatus": "published",
+    "reviewStatus": "approved",
+    "provenance": {
+      "sourceKind": "system-generated",
+      "authorship": "human-authored",
+      "metadata": {
+        "sourcePackId": "system.foundation",
+        "sourcePackVersion": "1.0.0",
+        "categoryId": "conversational-systems",
+        "sourceLayer": "system-default",
+        "sourcePackEntryId": "system.foundation.conversation-assistant-response-panel"
+      }
+    },
+    "configurationSchema": {
+      "schemaId": "conversation.assistant-response-panel.configuration",
+      "schemaVersion": "1.0.0",
+      "strict": true,
+      "fields": [],
+      "requiredFieldIds": [],
+      "description": "Conversation Assistant Response Panel semantic definition.",
+      "metadata": {
+        "declarativeOnly": true,
+        "categoryId": "conversational-systems"
+      }
+    },
+    "aiContext": {
+      "purpose": "Composed assistant response panel with text display and loading/error/status semantics.",
+      "userFacingSummary": "Conversation Assistant Response Panel describes one reusable part of a conversational assistant experience.",
+      "developerFacingSummary": "Conversation Assistant Response Panel is a declarative conversation-system asset for composition planning; it is catalog meaning, not executable behavior.",
+      "capabilities": [
+        {
+          "capabilityId": "conversation.assistant-response-panel.capability.semantic-role",
+          "summary": "Declares a safe semantic role for conversational system composition."
+        },
+        {
+          "capabilityId": "conversation.assistant-response-panel.capability.lineage",
+          "summary": "Preserves dependency lineage to the referenced foundation and conversation assets."
+        }
+      ],
+      "limitations": [
+        {
+          "limitationId": "conversation.assistant-response-panel.limitation.declarative-only",
+          "summary": "Does not perform work, store messages, or create generated text."
+        },
+        {
+          "limitationId": "conversation.assistant-response-panel.limitation.no-implementation",
+          "summary": "Does not define screen code, route handlers, saved records, or adapter details."
+        }
+      ],
+      "inputSummary": {
+        "summary": "Uses referenced semantic foundation assets as composition inputs."
+      },
+      "outputSummary": {
+        "summary": "Produces only catalog metadata for later planning and review."
+      },
+      "configurationGuidance": {
+        "summary": "No user-editable settings are defined by this foundation asset.",
+        "recommendedDefaults": {},
+        "commonMistakes": [
+          "Keep concrete service setup, message text, and executable details outside the catalog definition."
+        ]
+      },
+      "compositionGuidance": {
+        "summary": "Use this asset as a safe reusable building block when composing conversational systems from foundation assets.",
+        "bindingGuidance": "References identify semantic dependencies only; invocation details remain outside system foundation definitions."
+      },
+      "safetyNotes": [
+        {
+          "safetyNoteId": "conversation.assistant-response-panel.safety.declarative-only",
+          "category": "thin-client",
+          "severity": "info",
+          "summary": "Safe for thin-client display because it contains descriptors and dependency references only."
+        }
+      ]
+    },
+    "defaultConfiguration": {},
+    "requirements": [
+      {
+        "requirementId": "conversation.assistant-response-panel.declarative",
+        "requirementKind": "custom",
+        "required": false,
+        "safetyStatus": "safe",
+        "summary": "Declarative asset-only definition.",
+        "details": {
+          "declarativeOnly": true
+        }
+      }
+    ],
+    "compositionRules": [
+      {
+        "ruleId": "conversation.assistant-response-panel.dependencies",
+        "ruleKind": "custom",
+        "description": "Preserves dependency lineage to referenced foundation and conversational assets.",
+        "metadata": {
+          "dependencyDefinitionIds": [
+            "conversation.assistant-text-response-output",
+            "builtin.display.detail-view",
+            "builtin.state.loading-state",
+            "builtin.state.error-state",
+            "builtin.display.status-badge"
+          ]
+        }
+      }
+    ],
+    "metadata": {
+      "builtIn": true,
+      "systemOwned": true,
+      "declarativeOnly": true,
+      "categoryId": "conversational-systems",
+      "sourcePackId": "system.foundation",
+      "sourcePackVersion": "1.0.0",
+      "sourceLayer": "system-default",
+      "dependencyDefinitionIds": [
+        "conversation.assistant-text-response-output",
+        "builtin.display.detail-view",
+        "builtin.state.loading-state",
+        "builtin.state.error-state",
+        "builtin.display.status-badge"
+      ],
+      "sourcePackEntryId": "system.foundation.conversation-assistant-response-panel",
+      "sourcePackFingerprint": "fnv1a:37f75cae",
+      "assetPackInstall": {
+        "packId": "system.foundation",
+        "packVersion": "1.0.0",
+        "entryId": "system.foundation.conversation-assistant-response-panel",
+        "fingerprint": "fnv1a:37f75cae",
+        "sourceKind": "system",
+        "sourceLayer": "system-default",
+        "trustStatus": "system-trusted",
+        "managedBy": "asset-kernel",
+        "installedAt": "2026-06-05T23:32:10.482Z"
+      }
+    }
+  },
+  {
+    "definitionId": "conversation.chat-shell",
+    "assetType": "feature",
+    "assetFamily": "composition",
+    "version": "1.0.0",
+    "displayName": "Conversation Chat Shell",
+    "description": "Composed conversational shell that arranges history display, response panel, and message composer.",
+    "lifecycleStatus": "published",
+    "reviewStatus": "approved",
+    "provenance": {
+      "sourceKind": "system-generated",
+      "authorship": "human-authored",
+      "metadata": {
+        "sourcePackId": "system.foundation",
+        "sourcePackVersion": "1.0.0",
+        "categoryId": "conversational-systems",
+        "sourceLayer": "system-default",
+        "sourcePackEntryId": "system.foundation.conversation-chat-shell"
+      }
+    },
+    "configurationSchema": {
+      "schemaId": "conversation.chat-shell.configuration",
+      "schemaVersion": "1.0.0",
+      "strict": true,
+      "fields": [],
+      "requiredFieldIds": [],
+      "description": "Conversation Chat Shell semantic definition.",
+      "metadata": {
+        "declarativeOnly": true,
+        "categoryId": "conversational-systems"
+      }
+    },
+    "aiContext": {
+      "purpose": "Composed conversational shell that arranges history display, response panel, and message composer.",
+      "userFacingSummary": "Conversation Chat Shell describes one reusable part of a conversational assistant experience.",
+      "developerFacingSummary": "Conversation Chat Shell is a declarative conversation-system asset for composition planning; it is catalog meaning, not executable behavior.",
+      "capabilities": [
+        {
+          "capabilityId": "conversation.chat-shell.capability.semantic-role",
+          "summary": "Declares a safe semantic role for conversational system composition."
+        },
+        {
+          "capabilityId": "conversation.chat-shell.capability.lineage",
+          "summary": "Preserves dependency lineage to the referenced foundation and conversation assets."
+        }
+      ],
+      "limitations": [
+        {
+          "limitationId": "conversation.chat-shell.limitation.declarative-only",
+          "summary": "Does not perform work, store messages, or create generated text."
+        },
+        {
+          "limitationId": "conversation.chat-shell.limitation.no-implementation",
+          "summary": "Does not define screen code, route handlers, saved records, or adapter details."
+        }
+      ],
+      "inputSummary": {
+        "summary": "Uses referenced semantic foundation assets as composition inputs."
+      },
+      "outputSummary": {
+        "summary": "Produces only catalog metadata for later planning and review."
+      },
+      "configurationGuidance": {
+        "summary": "No user-editable settings are defined by this foundation asset.",
+        "recommendedDefaults": {},
+        "commonMistakes": [
+          "Keep concrete service setup, message text, and executable details outside the catalog definition."
+        ]
+      },
+      "compositionGuidance": {
+        "summary": "Use this asset as a safe reusable building block when composing conversational systems from foundation assets.",
+        "bindingGuidance": "References identify semantic dependencies only; invocation details remain outside system foundation definitions."
+      },
+      "safetyNotes": [
+        {
+          "safetyNoteId": "conversation.chat-shell.safety.declarative-only",
+          "category": "thin-client",
+          "severity": "info",
+          "summary": "Safe for thin-client display because it contains descriptors and dependency references only."
+        }
+      ]
+    },
+    "defaultConfiguration": {},
+    "requirements": [
+      {
+        "requirementId": "conversation.chat-shell.declarative",
+        "requirementKind": "custom",
+        "required": false,
+        "safetyStatus": "safe",
+        "summary": "Declarative asset-only definition.",
+        "details": {
+          "declarativeOnly": true
+        }
+      }
+    ],
+    "compositionRules": [
+      {
+        "ruleId": "conversation.chat-shell.dependencies",
+        "ruleKind": "custom",
+        "description": "Preserves dependency lineage to referenced foundation and conversational assets.",
+        "metadata": {
+          "dependencyDefinitionIds": [
+            "conversation.message-history-display",
+            "conversation.assistant-response-panel",
+            "conversation.message-composer",
+            "builtin.ui.stack",
+            "builtin.ui.container"
+          ]
+        }
+      }
+    ],
+    "metadata": {
+      "builtIn": true,
+      "systemOwned": true,
+      "declarativeOnly": true,
+      "categoryId": "conversational-systems",
+      "sourcePackId": "system.foundation",
+      "sourcePackVersion": "1.0.0",
+      "sourceLayer": "system-default",
+      "dependencyDefinitionIds": [
+        "conversation.message-history-display",
+        "conversation.assistant-response-panel",
+        "conversation.message-composer",
+        "builtin.ui.stack",
+        "builtin.ui.container"
+      ],
+      "sourcePackEntryId": "system.foundation.conversation-chat-shell",
+      "sourcePackFingerprint": "fnv1a:38f77a3a",
+      "assetPackInstall": {
+        "packId": "system.foundation",
+        "packVersion": "1.0.0",
+        "entryId": "system.foundation.conversation-chat-shell",
+        "fingerprint": "fnv1a:38f77a3a",
+        "sourceKind": "system",
+        "sourceLayer": "system-default",
+        "trustStatus": "system-trusted",
+        "managedBy": "asset-kernel",
+        "installedAt": "2026-06-05T23:32:10.490Z"
+      }
+    }
+  },
+  {
+    "definitionId": "conversation.session-behavior",
+    "assetType": "workflow-step",
+    "assetFamily": "behavioral",
+    "version": "1.0.0",
+    "displayName": "Conversation Session Behavior",
+    "description": "Declarative session-level turn and history relationship semantics.",
+    "lifecycleStatus": "published",
+    "reviewStatus": "approved",
+    "provenance": {
+      "sourceKind": "system-generated",
+      "authorship": "human-authored",
+      "metadata": {
+        "sourcePackId": "system.foundation",
+        "sourcePackVersion": "1.0.0",
+        "categoryId": "conversational-systems",
+        "sourceLayer": "system-default",
+        "sourcePackEntryId": "system.foundation.conversation-session-behavior"
+      }
+    },
+    "configurationSchema": {
+      "schemaId": "conversation.session-behavior.configuration",
+      "schemaVersion": "1.0.0",
+      "strict": true,
+      "fields": [],
+      "requiredFieldIds": [],
+      "description": "Conversation Session Behavior semantic definition.",
+      "metadata": {
+        "declarativeOnly": true,
+        "categoryId": "conversational-systems"
+      }
+    },
+    "aiContext": {
+      "purpose": "Declarative session-level turn and history relationship semantics.",
+      "userFacingSummary": "Conversation Session Behavior describes one reusable part of a conversational assistant experience.",
+      "developerFacingSummary": "Conversation Session Behavior is a declarative conversation-system asset for composition planning; it is catalog meaning, not executable behavior.",
+      "capabilities": [
+        {
+          "capabilityId": "conversation.session-behavior.capability.semantic-role",
+          "summary": "Declares a safe semantic role for conversational system composition."
+        },
+        {
+          "capabilityId": "conversation.session-behavior.capability.lineage",
+          "summary": "Preserves dependency lineage to the referenced foundation and conversation assets."
+        }
+      ],
+      "limitations": [
+        {
+          "limitationId": "conversation.session-behavior.limitation.declarative-only",
+          "summary": "Does not perform work, store messages, or create generated text."
+        },
+        {
+          "limitationId": "conversation.session-behavior.limitation.no-implementation",
+          "summary": "Does not define screen code, route handlers, saved records, or adapter details."
+        }
+      ],
+      "inputSummary": {
+        "summary": "Uses referenced semantic foundation assets as composition inputs."
+      },
+      "outputSummary": {
+        "summary": "Produces only catalog metadata for later planning and review."
+      },
+      "configurationGuidance": {
+        "summary": "No user-editable settings are defined by this foundation asset.",
+        "recommendedDefaults": {},
+        "commonMistakes": [
+          "Keep concrete service setup, message text, and executable details outside the catalog definition."
+        ]
+      },
+      "compositionGuidance": {
+        "summary": "Use this asset as a safe reusable building block when composing conversational systems from foundation assets.",
+        "bindingGuidance": "References identify semantic dependencies only; invocation details remain outside system foundation definitions."
+      },
+      "safetyNotes": [
+        {
+          "safetyNoteId": "conversation.session-behavior.safety.declarative-only",
+          "category": "thin-client",
+          "severity": "info",
+          "summary": "Safe for thin-client display because it contains descriptors and dependency references only."
+        }
+      ]
+    },
+    "defaultConfiguration": {},
+    "requirements": [
+      {
+        "requirementId": "conversation.session-behavior.declarative",
+        "requirementKind": "custom",
+        "required": false,
+        "safetyStatus": "safe",
+        "summary": "Declarative asset-only definition.",
+        "details": {
+          "declarativeOnly": true
+        }
+      }
+    ],
+    "compositionRules": [
+      {
+        "ruleId": "conversation.session-behavior.dependencies",
+        "ruleKind": "custom",
+        "description": "Preserves dependency lineage to referenced foundation and conversational assets.",
+        "metadata": {
+          "dependencyDefinitionIds": [
+            "conversation.turn-behavior",
+            "conversation.history-context-behavior"
+          ]
+        }
+      }
+    ],
+    "metadata": {
+      "builtIn": true,
+      "systemOwned": true,
+      "declarativeOnly": true,
+      "categoryId": "conversational-systems",
+      "sourcePackId": "system.foundation",
+      "sourcePackVersion": "1.0.0",
+      "sourceLayer": "system-default",
+      "dependencyDefinitionIds": [
+        "conversation.turn-behavior",
+        "conversation.history-context-behavior"
+      ],
+      "sourcePackEntryId": "system.foundation.conversation-session-behavior",
+      "sourcePackFingerprint": "fnv1a:1ebd864c",
+      "assetPackInstall": {
+        "packId": "system.foundation",
+        "packVersion": "1.0.0",
+        "entryId": "system.foundation.conversation-session-behavior",
+        "fingerprint": "fnv1a:1ebd864c",
+        "sourceKind": "system",
+        "sourceLayer": "system-default",
+        "trustStatus": "system-trusted",
+        "managedBy": "asset-kernel",
+        "installedAt": "2026-06-05T23:32:10.499Z"
+      }
+    }
+  },
+  {
+    "definitionId": "conversation.turn-behavior",
+    "assetType": "workflow-step",
+    "assetFamily": "behavioral",
+    "version": "1.0.0",
+    "displayName": "Conversation Turn Behavior",
+    "description": "Declarative one-turn user-input to assistant-response interaction semantics.",
+    "lifecycleStatus": "published",
+    "reviewStatus": "approved",
+    "provenance": {
+      "sourceKind": "system-generated",
+      "authorship": "human-authored",
+      "metadata": {
+        "sourcePackId": "system.foundation",
+        "sourcePackVersion": "1.0.0",
+        "categoryId": "conversational-systems",
+        "sourceLayer": "system-default",
+        "sourcePackEntryId": "system.foundation.conversation-turn-behavior"
+      }
+    },
+    "configurationSchema": {
+      "schemaId": "conversation.turn-behavior.configuration",
+      "schemaVersion": "1.0.0",
+      "strict": true,
+      "fields": [],
+      "requiredFieldIds": [],
+      "description": "Conversation Turn Behavior semantic definition.",
+      "metadata": {
+        "declarativeOnly": true,
+        "categoryId": "conversational-systems"
+      }
+    },
+    "aiContext": {
+      "purpose": "Declarative one-turn user-input to assistant-response interaction semantics.",
+      "userFacingSummary": "Conversation Turn Behavior describes one reusable part of a conversational assistant experience.",
+      "developerFacingSummary": "Conversation Turn Behavior is a declarative conversation-system asset for composition planning; it is catalog meaning, not executable behavior.",
+      "capabilities": [
+        {
+          "capabilityId": "conversation.turn-behavior.capability.semantic-role",
+          "summary": "Declares a safe semantic role for conversational system composition."
+        },
+        {
+          "capabilityId": "conversation.turn-behavior.capability.lineage",
+          "summary": "Preserves dependency lineage to the referenced foundation and conversation assets."
+        }
+      ],
+      "limitations": [
+        {
+          "limitationId": "conversation.turn-behavior.limitation.declarative-only",
+          "summary": "Does not perform work, store messages, or create generated text."
+        },
+        {
+          "limitationId": "conversation.turn-behavior.limitation.no-implementation",
+          "summary": "Does not define screen code, route handlers, saved records, or adapter details."
+        }
+      ],
+      "inputSummary": {
+        "summary": "Uses referenced semantic foundation assets as composition inputs."
+      },
+      "outputSummary": {
+        "summary": "Produces only catalog metadata for later planning and review."
+      },
+      "configurationGuidance": {
+        "summary": "No user-editable settings are defined by this foundation asset.",
+        "recommendedDefaults": {},
+        "commonMistakes": [
+          "Keep concrete service setup, message text, and executable details outside the catalog definition."
+        ]
+      },
+      "compositionGuidance": {
+        "summary": "Use this asset as a safe reusable building block when composing conversational systems from foundation assets.",
+        "bindingGuidance": "References identify semantic dependencies only; invocation details remain outside system foundation definitions."
+      },
+      "safetyNotes": [
+        {
+          "safetyNoteId": "conversation.turn-behavior.safety.declarative-only",
+          "category": "thin-client",
+          "severity": "info",
+          "summary": "Safe for thin-client display because it contains descriptors and dependency references only."
+        }
+      ]
+    },
+    "defaultConfiguration": {},
+    "requirements": [
+      {
+        "requirementId": "conversation.turn-behavior.declarative",
+        "requirementKind": "custom",
+        "required": false,
+        "safetyStatus": "safe",
+        "summary": "Declarative asset-only definition.",
+        "details": {
+          "declarativeOnly": true
+        }
+      }
+    ],
+    "compositionRules": [
+      {
+        "ruleId": "conversation.turn-behavior.dependencies",
+        "ruleKind": "custom",
+        "description": "Preserves dependency lineage to referenced foundation and conversational assets.",
+        "metadata": {
+          "dependencyDefinitionIds": [
+            "conversation.user-message-input",
+            "conversation.assistant-text-response-output"
+          ]
+        }
+      }
+    ],
+    "metadata": {
+      "builtIn": true,
+      "systemOwned": true,
+      "declarativeOnly": true,
+      "categoryId": "conversational-systems",
+      "sourcePackId": "system.foundation",
+      "sourcePackVersion": "1.0.0",
+      "sourceLayer": "system-default",
+      "dependencyDefinitionIds": [
+        "conversation.user-message-input",
+        "conversation.assistant-text-response-output"
+      ],
+      "sourcePackEntryId": "system.foundation.conversation-turn-behavior",
+      "sourcePackFingerprint": "fnv1a:63259889",
+      "assetPackInstall": {
+        "packId": "system.foundation",
+        "packVersion": "1.0.0",
+        "entryId": "system.foundation.conversation-turn-behavior",
+        "fingerprint": "fnv1a:63259889",
+        "sourceKind": "system",
+        "sourceLayer": "system-default",
+        "trustStatus": "system-trusted",
+        "managedBy": "asset-kernel",
+        "installedAt": "2026-06-05T23:32:10.511Z"
+      }
+    }
+  },
+  {
+    "definitionId": "conversation.text-generation-runtime-requirement",
+    "assetType": "runtime-binding",
+    "assetFamily": "context",
+    "version": "1.0.0",
+    "displayName": "Conversation Text Generation Runtime Requirement",
+    "description": "Requires supported text-generation runtime capability only.",
+    "lifecycleStatus": "published",
+    "reviewStatus": "approved",
+    "provenance": {
+      "sourceKind": "system-generated",
+      "authorship": "human-authored",
+      "metadata": {
+        "sourcePackId": "system.foundation",
+        "sourcePackVersion": "1.0.0",
+        "categoryId": "conversational-systems",
+        "sourceLayer": "system-default",
+        "sourcePackEntryId": "system.foundation.conversation-text-generation-runtime-requirement"
+      }
+    },
+    "configurationSchema": {
+      "schemaId": "conversation.text-generation-runtime-requirement.configuration",
+      "schemaVersion": "1.0.0",
+      "strict": true,
+      "fields": [],
+      "requiredFieldIds": [],
+      "description": "Conversation Text Generation Runtime Requirement semantic definition.",
+      "metadata": {
+        "declarativeOnly": true,
+        "categoryId": "conversational-systems"
+      }
+    },
+    "aiContext": {
+      "purpose": "Requires supported text-generation runtime capability only.",
+      "userFacingSummary": "Conversation Text Generation Runtime Requirement describes one reusable part of a conversational assistant experience.",
+      "developerFacingSummary": "Conversation Text Generation Runtime Requirement is a declarative conversation-system asset for composition planning; it is catalog meaning, not executable behavior.",
+      "capabilities": [
+        {
+          "capabilityId": "conversation.text-generation-runtime-requirement.capability.semantic-role",
+          "summary": "Declares a safe semantic role for conversational system composition."
+        },
+        {
+          "capabilityId": "conversation.text-generation-runtime-requirement.capability.lineage",
+          "summary": "Preserves dependency lineage to the referenced foundation and conversation assets."
+        }
+      ],
+      "limitations": [
+        {
+          "limitationId": "conversation.text-generation-runtime-requirement.limitation.declarative-only",
+          "summary": "Does not perform work, store messages, or create generated text."
+        },
+        {
+          "limitationId": "conversation.text-generation-runtime-requirement.limitation.no-implementation",
+          "summary": "Does not define screen code, route handlers, saved records, or adapter details."
+        }
+      ],
+      "inputSummary": {
+        "summary": "Uses referenced semantic foundation assets as composition inputs."
+      },
+      "outputSummary": {
+        "summary": "Produces only catalog metadata for later planning and review."
+      },
+      "configurationGuidance": {
+        "summary": "No user-editable settings are defined by this foundation asset.",
+        "recommendedDefaults": {},
+        "commonMistakes": [
+          "Keep concrete service setup, message text, and executable details outside the catalog definition."
+        ]
+      },
+      "compositionGuidance": {
+        "summary": "Use this asset as a safe reusable building block when composing conversational systems from foundation assets.",
+        "bindingGuidance": "References identify semantic dependencies only; invocation details remain outside system foundation definitions."
+      },
+      "safetyNotes": [
+        {
+          "safetyNoteId": "conversation.text-generation-runtime-requirement.safety.declarative-only",
+          "category": "thin-client",
+          "severity": "info",
+          "summary": "Safe for thin-client display because it contains descriptors and dependency references only."
+        }
+      ]
+    },
+    "defaultConfiguration": {},
+    "requirements": [
+      {
+        "requirementId": "conversation.text-generation-runtime-requirement.declarative",
+        "requirementKind": "custom",
+        "required": false,
+        "safetyStatus": "safe",
+        "summary": "Declarative asset-only definition.",
+        "details": {
+          "declarativeOnly": true
+        }
+      }
+    ],
+    "compositionRules": [
+      {
+        "ruleId": "conversation.text-generation-runtime-requirement.dependencies",
+        "ruleKind": "custom",
+        "description": "Preserves dependency lineage to referenced foundation and conversational assets.",
+        "metadata": {
+          "dependencyDefinitionIds": [
+            "builtin.system.subsystem"
+          ]
+        }
+      }
+    ],
+    "metadata": {
+      "builtIn": true,
+      "systemOwned": true,
+      "declarativeOnly": true,
+      "categoryId": "conversational-systems",
+      "sourcePackId": "system.foundation",
+      "sourcePackVersion": "1.0.0",
+      "sourceLayer": "system-default",
+      "dependencyDefinitionIds": [
+        "builtin.system.subsystem"
+      ],
+      "sourcePackEntryId": "system.foundation.conversation-text-generation-runtime-requirement",
+      "sourcePackFingerprint": "fnv1a:1903a9b2",
+      "assetPackInstall": {
+        "packId": "system.foundation",
+        "packVersion": "1.0.0",
+        "entryId": "system.foundation.conversation-text-generation-runtime-requirement",
+        "fingerprint": "fnv1a:1903a9b2",
+        "sourceKind": "system",
+        "sourceLayer": "system-default",
+        "trustStatus": "system-trusted",
+        "managedBy": "asset-kernel",
+        "installedAt": "2026-06-05T23:32:10.522Z"
+      }
+    }
+  },
+  {
+    "definitionId": "conversation.assistant-response-generation-behavior",
+    "assetType": "workflow-step",
+    "assetFamily": "behavioral",
+    "version": "1.0.0",
+    "displayName": "Conversation Assistant Response Generation Behavior",
+    "description": "Declarative behavior that depends on text-generation runtime capability.",
+    "lifecycleStatus": "published",
+    "reviewStatus": "approved",
+    "provenance": {
+      "sourceKind": "system-generated",
+      "authorship": "human-authored",
+      "metadata": {
+        "sourcePackId": "system.foundation",
+        "sourcePackVersion": "1.0.0",
+        "categoryId": "conversational-systems",
+        "sourceLayer": "system-default",
+        "sourcePackEntryId": "system.foundation.conversation-assistant-response-generation-behavior"
+      }
+    },
+    "configurationSchema": {
+      "schemaId": "conversation.assistant-response-generation-behavior.configuration",
+      "schemaVersion": "1.0.0",
+      "strict": true,
+      "fields": [],
+      "requiredFieldIds": [],
+      "description": "Conversation Assistant Response Generation Behavior semantic definition.",
+      "metadata": {
+        "declarativeOnly": true,
+        "categoryId": "conversational-systems"
+      }
+    },
+    "aiContext": {
+      "purpose": "Declarative behavior that depends on text-generation runtime capability.",
+      "userFacingSummary": "Conversation Assistant Response Generation Behavior describes one reusable part of a conversational assistant experience.",
+      "developerFacingSummary": "Conversation Assistant Response Generation Behavior is a declarative conversation-system asset for composition planning; it is catalog meaning, not executable behavior.",
+      "capabilities": [
+        {
+          "capabilityId": "conversation.assistant-response-generation-behavior.capability.semantic-role",
+          "summary": "Declares a safe semantic role for conversational system composition."
+        },
+        {
+          "capabilityId": "conversation.assistant-response-generation-behavior.capability.lineage",
+          "summary": "Preserves dependency lineage to the referenced foundation and conversation assets."
+        }
+      ],
+      "limitations": [
+        {
+          "limitationId": "conversation.assistant-response-generation-behavior.limitation.declarative-only",
+          "summary": "Does not perform work, store messages, or create generated text."
+        },
+        {
+          "limitationId": "conversation.assistant-response-generation-behavior.limitation.no-implementation",
+          "summary": "Does not define screen code, route handlers, saved records, or adapter details."
+        }
+      ],
+      "inputSummary": {
+        "summary": "Uses referenced semantic foundation assets as composition inputs."
+      },
+      "outputSummary": {
+        "summary": "Produces only catalog metadata for later planning and review."
+      },
+      "configurationGuidance": {
+        "summary": "No user-editable settings are defined by this foundation asset.",
+        "recommendedDefaults": {},
+        "commonMistakes": [
+          "Keep concrete service setup, message text, and executable details outside the catalog definition."
+        ]
+      },
+      "compositionGuidance": {
+        "summary": "Use this asset as a safe reusable building block when composing conversational systems from foundation assets.",
+        "bindingGuidance": "References identify semantic dependencies only; invocation details remain outside system foundation definitions."
+      },
+      "safetyNotes": [
+        {
+          "safetyNoteId": "conversation.assistant-response-generation-behavior.safety.declarative-only",
+          "category": "thin-client",
+          "severity": "info",
+          "summary": "Safe for thin-client display because it contains descriptors and dependency references only."
+        }
+      ]
+    },
+    "defaultConfiguration": {},
+    "requirements": [
+      {
+        "requirementId": "conversation.assistant-response-generation-behavior.declarative",
+        "requirementKind": "custom",
+        "required": false,
+        "safetyStatus": "safe",
+        "summary": "Declarative asset-only definition.",
+        "details": {
+          "declarativeOnly": true
+        }
+      }
+    ],
+    "compositionRules": [
+      {
+        "ruleId": "conversation.assistant-response-generation-behavior.dependencies",
+        "ruleKind": "custom",
+        "description": "Preserves dependency lineage to referenced foundation and conversational assets.",
+        "metadata": {
+          "dependencyDefinitionIds": [
+            "conversation.text-generation-runtime-requirement"
+          ]
+        }
+      }
+    ],
+    "metadata": {
+      "builtIn": true,
+      "systemOwned": true,
+      "declarativeOnly": true,
+      "categoryId": "conversational-systems",
+      "sourcePackId": "system.foundation",
+      "sourcePackVersion": "1.0.0",
+      "sourceLayer": "system-default",
+      "dependencyDefinitionIds": [
+        "conversation.text-generation-runtime-requirement"
+      ],
+      "sourcePackEntryId": "system.foundation.conversation-assistant-response-generation-behavior",
+      "sourcePackFingerprint": "fnv1a:4a798035",
+      "assetPackInstall": {
+        "packId": "system.foundation",
+        "packVersion": "1.0.0",
+        "entryId": "system.foundation.conversation-assistant-response-generation-behavior",
+        "fingerprint": "fnv1a:4a798035",
+        "sourceKind": "system",
+        "sourceLayer": "system-default",
+        "trustStatus": "system-trusted",
+        "managedBy": "asset-kernel",
+        "installedAt": "2026-06-05T23:32:10.531Z"
+      }
+    }
+  },
+  {
+    "definitionId": "conversation.history-context-behavior",
+    "assetType": "workflow-step",
+    "assetFamily": "behavioral",
+    "version": "1.0.0",
+    "displayName": "Conversation History Context Behavior",
+    "description": "Declarative behavior that maps prior history to response-generation context.",
+    "lifecycleStatus": "published",
+    "reviewStatus": "approved",
+    "provenance": {
+      "sourceKind": "system-generated",
+      "authorship": "human-authored",
+      "metadata": {
+        "sourcePackId": "system.foundation",
+        "sourcePackVersion": "1.0.0",
+        "categoryId": "conversational-systems",
+        "sourceLayer": "system-default",
+        "sourcePackEntryId": "system.foundation.conversation-history-context-behavior"
+      }
+    },
+    "configurationSchema": {
+      "schemaId": "conversation.history-context-behavior.configuration",
+      "schemaVersion": "1.0.0",
+      "strict": true,
+      "fields": [],
+      "requiredFieldIds": [],
+      "description": "Conversation History Context Behavior semantic definition.",
+      "metadata": {
+        "declarativeOnly": true,
+        "categoryId": "conversational-systems"
+      }
+    },
+    "aiContext": {
+      "purpose": "Declarative behavior that maps prior history to response-generation context.",
+      "userFacingSummary": "Conversation History Context Behavior describes one reusable part of a conversational assistant experience.",
+      "developerFacingSummary": "Conversation History Context Behavior is a declarative conversation-system asset for composition planning; it is catalog meaning, not executable behavior.",
+      "capabilities": [
+        {
+          "capabilityId": "conversation.history-context-behavior.capability.semantic-role",
+          "summary": "Declares a safe semantic role for conversational system composition."
+        },
+        {
+          "capabilityId": "conversation.history-context-behavior.capability.lineage",
+          "summary": "Preserves dependency lineage to the referenced foundation and conversation assets."
+        }
+      ],
+      "limitations": [
+        {
+          "limitationId": "conversation.history-context-behavior.limitation.declarative-only",
+          "summary": "Does not perform work, store messages, or create generated text."
+        },
+        {
+          "limitationId": "conversation.history-context-behavior.limitation.no-implementation",
+          "summary": "Does not define screen code, route handlers, saved records, or adapter details."
+        }
+      ],
+      "inputSummary": {
+        "summary": "Uses referenced semantic foundation assets as composition inputs."
+      },
+      "outputSummary": {
+        "summary": "Produces only catalog metadata for later planning and review."
+      },
+      "configurationGuidance": {
+        "summary": "No user-editable settings are defined by this foundation asset.",
+        "recommendedDefaults": {},
+        "commonMistakes": [
+          "Keep concrete service setup, message text, and executable details outside the catalog definition."
+        ]
+      },
+      "compositionGuidance": {
+        "summary": "Use this asset as a safe reusable building block when composing conversational systems from foundation assets.",
+        "bindingGuidance": "References identify semantic dependencies only; invocation details remain outside system foundation definitions."
+      },
+      "safetyNotes": [
+        {
+          "safetyNoteId": "conversation.history-context-behavior.safety.declarative-only",
+          "category": "thin-client",
+          "severity": "info",
+          "summary": "Safe for thin-client display because it contains descriptors and dependency references only."
+        }
+      ]
+    },
+    "defaultConfiguration": {},
+    "requirements": [
+      {
+        "requirementId": "conversation.history-context-behavior.declarative",
+        "requirementKind": "custom",
+        "required": false,
+        "safetyStatus": "safe",
+        "summary": "Declarative asset-only definition.",
+        "details": {
+          "declarativeOnly": true
+        }
+      }
+    ],
+    "compositionRules": [
+      {
+        "ruleId": "conversation.history-context-behavior.dependencies",
+        "ruleKind": "custom",
+        "description": "Preserves dependency lineage to referenced foundation and conversational assets.",
+        "metadata": {
+          "dependencyDefinitionIds": [
+            "conversation.history-reference"
+          ]
+        }
+      }
+    ],
+    "metadata": {
+      "builtIn": true,
+      "systemOwned": true,
+      "declarativeOnly": true,
+      "categoryId": "conversational-systems",
+      "sourcePackId": "system.foundation",
+      "sourcePackVersion": "1.0.0",
+      "sourceLayer": "system-default",
+      "dependencyDefinitionIds": [
+        "conversation.history-reference"
+      ],
+      "sourcePackEntryId": "system.foundation.conversation-history-context-behavior",
+      "sourcePackFingerprint": "fnv1a:7b14ac2c",
+      "assetPackInstall": {
+        "packId": "system.foundation",
+        "packVersion": "1.0.0",
+        "entryId": "system.foundation.conversation-history-context-behavior",
+        "fingerprint": "fnv1a:7b14ac2c",
+        "sourceKind": "system",
+        "sourceLayer": "system-default",
+        "trustStatus": "system-trusted",
+        "managedBy": "asset-kernel",
+        "installedAt": "2026-06-05T23:32:10.544Z"
+      }
+    }
+  },
+  {
+    "definitionId": "conversation.basic-assistant-system",
+    "assetType": "system",
+    "assetFamily": "composition",
+    "version": "1.0.0",
+    "displayName": "Conversation Basic Assistant System",
+    "description": "Reusable starter conversational assistant system composed from conversation assets and foundation shell semantics.",
+    "lifecycleStatus": "published",
+    "reviewStatus": "approved",
+    "provenance": {
+      "sourceKind": "system-generated",
+      "authorship": "human-authored",
+      "metadata": {
+        "sourcePackId": "system.foundation",
+        "sourcePackVersion": "1.0.0",
+        "categoryId": "conversational-systems",
+        "sourceLayer": "system-default",
+        "sourcePackEntryId": "system.foundation.conversation-basic-assistant-system"
+      }
+    },
+    "configurationSchema": {
+      "schemaId": "conversation.basic-assistant-system.configuration",
+      "schemaVersion": "1.0.0",
+      "strict": true,
+      "fields": [],
+      "requiredFieldIds": [],
+      "description": "Conversation Basic Assistant System semantic definition.",
+      "metadata": {
+        "declarativeOnly": true,
+        "categoryId": "conversational-systems"
+      }
+    },
+    "aiContext": {
+      "purpose": "Reusable starter conversational assistant system composed from conversation assets and foundation shell semantics.",
+      "userFacingSummary": "Conversation Basic Assistant System describes one reusable part of a conversational assistant experience.",
+      "developerFacingSummary": "Conversation Basic Assistant System is a declarative conversation-system asset for composition planning; it is catalog meaning, not executable behavior.",
+      "capabilities": [
+        {
+          "capabilityId": "conversation.basic-assistant-system.capability.semantic-role",
+          "summary": "Declares a safe semantic role for conversational system composition."
+        },
+        {
+          "capabilityId": "conversation.basic-assistant-system.capability.lineage",
+          "summary": "Preserves dependency lineage to the referenced foundation and conversation assets."
+        }
+      ],
+      "limitations": [
+        {
+          "limitationId": "conversation.basic-assistant-system.limitation.declarative-only",
+          "summary": "Does not perform work, store messages, or create generated text."
+        },
+        {
+          "limitationId": "conversation.basic-assistant-system.limitation.no-implementation",
+          "summary": "Does not define screen code, route handlers, saved records, or adapter details."
+        }
+      ],
+      "inputSummary": {
+        "summary": "Uses referenced semantic foundation assets as composition inputs."
+      },
+      "outputSummary": {
+        "summary": "Produces only catalog metadata for later planning and review."
+      },
+      "configurationGuidance": {
+        "summary": "No user-editable settings are defined by this foundation asset.",
+        "recommendedDefaults": {},
+        "commonMistakes": [
+          "Keep concrete service setup, message text, and executable details outside the catalog definition."
+        ]
+      },
+      "compositionGuidance": {
+        "summary": "Use this asset as a safe reusable building block when composing conversational systems from foundation assets.",
+        "bindingGuidance": "References identify semantic dependencies only; invocation details remain outside system foundation definitions."
+      },
+      "safetyNotes": [
+        {
+          "safetyNoteId": "conversation.basic-assistant-system.safety.declarative-only",
+          "category": "thin-client",
+          "severity": "info",
+          "summary": "Safe for thin-client display because it contains descriptors and dependency references only."
+        }
+      ]
+    },
+    "defaultConfiguration": {},
+    "requirements": [
+      {
+        "requirementId": "conversation.basic-assistant-system.declarative",
+        "requirementKind": "custom",
+        "required": false,
+        "safetyStatus": "safe",
+        "summary": "Declarative asset-only definition.",
+        "details": {
+          "declarativeOnly": true
+        }
+      }
+    ],
+    "compositionRules": [
+      {
+        "ruleId": "conversation.basic-assistant-system.dependencies",
+        "ruleKind": "custom",
+        "description": "Preserves dependency lineage to referenced foundation and conversational assets.",
+        "metadata": {
+          "dependencyDefinitionIds": [
+            "conversation.chat-shell",
+            "conversation.session-behavior",
+            "conversation.turn-behavior",
+            "conversation.assistant-response-generation-behavior",
+            "conversation.history-context-behavior",
+            "conversation.user-message-input",
+            "conversation.assistant-text-response-output",
+            "conversation.history-reference",
+            "conversation.text-generation-runtime-requirement",
+            "builtin.system.system"
+          ]
+        }
+      }
+    ],
+    "metadata": {
+      "builtIn": true,
+      "systemOwned": true,
+      "declarativeOnly": true,
+      "categoryId": "conversational-systems",
+      "sourcePackId": "system.foundation",
+      "sourcePackVersion": "1.0.0",
+      "sourceLayer": "system-default",
+      "dependencyDefinitionIds": [
+        "conversation.chat-shell",
+        "conversation.session-behavior",
+        "conversation.turn-behavior",
+        "conversation.assistant-response-generation-behavior",
+        "conversation.history-context-behavior",
+        "conversation.user-message-input",
+        "conversation.assistant-text-response-output",
+        "conversation.history-reference",
+        "conversation.text-generation-runtime-requirement",
+        "builtin.system.system"
+      ],
+      "sourcePackEntryId": "system.foundation.conversation-basic-assistant-system",
+      "sourcePackFingerprint": "fnv1a:7f3eb188",
+      "assetPackInstall": {
+        "packId": "system.foundation",
+        "packVersion": "1.0.0",
+        "entryId": "system.foundation.conversation-basic-assistant-system",
+        "fingerprint": "fnv1a:7f3eb188",
+        "sourceKind": "system",
+        "sourceLayer": "system-default",
+        "trustStatus": "system-trusted",
+        "managedBy": "asset-kernel",
+        "installedAt": "2026-06-05T23:32:10.556Z"
+      }
+    }
   }
 ]

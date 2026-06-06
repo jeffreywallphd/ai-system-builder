@@ -1,6 +1,7 @@
 import { useId, useMemo, useState, type ReactNode } from "react";
 
 import type { AssetMetadata } from "../../../contracts/asset";
+import { TermWithHint, type GlossaryTermId } from "../glossary";
 import type { AssetLibraryDefinitionDetail } from "./assetLibraryReadModels";
 import {
   buildAssetLibraryAdvancedSections,
@@ -41,6 +42,15 @@ const COLLAPSED_SECTIONS: Readonly<Record<AssetLibraryAdvancedSectionKey, boolea
   metadata: false,
 };
 
+const DETAIL_ROW_GLOSSARY_TERMS: Readonly<Record<string, GlossaryTermId>> = {
+  Category: "asset",
+  Family: "assetFamily",
+  Pack: "assetPack",
+  Source: "source",
+  Status: "lifecycleStatus",
+  Type: "assetDefinition",
+};
+
 export function AssetLibraryEmptyValue() {
   return <span className="asset-library-empty-value">Not specified</span>;
 }
@@ -62,9 +72,10 @@ export function AssetLibraryBadge({
 
 export function AssetLibraryDetailRow({ label, value }: AssetLibraryDetailRowModel) {
   const displayValue = displayAssetLibraryValue(value);
+  const glossaryTermId = DETAIL_ROW_GLOSSARY_TERMS[label];
   return (
     <div className="asset-library-definition-row">
-      <dt>{label}</dt>
+      <dt>{glossaryTermId ? <TermWithHint termId={glossaryTermId}>{label}</TermWithHint> : label}</dt>
       <dd>{displayValue === "Not specified" ? <AssetLibraryEmptyValue /> : displayValue}</dd>
     </div>
   );

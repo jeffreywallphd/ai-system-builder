@@ -99,7 +99,10 @@ export class RuntimeReadinessValidationService {
         else pushDiagnostic(diagnostics, "runtime-readiness-capability-missing", "warning", "Optional capability has no runtime candidate.");
       }
       if (selected.length > 1 && requirement.isRequired) pushBlocker(blockers, "runtime-readiness-binding-candidate-missing", "Conflicting selected bindings found for one required capability.");
-      if (requirement.isRequired && candidates.length > 0 && selected.length === 0) pushBlocker(blockers, "runtime-readiness-provider-unavailable", "Required capability has candidates but no safe selected binding.");
+      if (requirement.isRequired && candidates.length > 0 && selected.length === 0) {
+        const hasSpecificRequirementBlocker = blockers.some((blocker) => blocker.safeDetails?.requirementId === requirement.requirementId);
+        if (!hasSpecificRequirementBlocker) pushBlocker(blockers, "runtime-readiness-provider-unavailable", "Required capability has candidates but no safe selected binding.");
+      }
       if (!requirement.isRequired && candidates.length > 1 && selected.length === 0) pushDiagnostic(diagnostics, "runtime-readiness-binding-candidate-missing", "warning", "Optional capability has ambiguous unselected candidates.");
     }
 

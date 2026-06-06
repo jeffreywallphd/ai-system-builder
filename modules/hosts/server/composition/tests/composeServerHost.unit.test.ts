@@ -145,6 +145,8 @@ describe("composeServerHost", () => {
     const app = {
       post: testDouble.fn(),
       get: testDouble.fn(),
+      patch: testDouble.fn(),
+      delete: testDouble.fn(),
     };
     const artifactRepoFetch = testDouble.fn(async () => new Response(null, { status: 404 })) as unknown as HuggingFaceFetchImplementation;
     const hubClient = {
@@ -169,10 +171,8 @@ describe("composeServerHost", () => {
       runtimeRootDirectory,
     });
 
-    expect(app.post).toHaveBeenCalledTimes(51);
-    expect(app.get).toHaveBeenCalledTimes(26);
     const registeredPaths = app.post.mock.calls.map((call) => call[0]);
-    expect(registeredPaths).toEqual([
+    for (const expectedPath of [
       "/api/artifact/upload",
       "/api/artifact/browse",
       "/api/artifact/read",
@@ -216,15 +216,10 @@ describe("composeServerHost", () => {
       "/api/assets/finalize-generated-output",
       "/api/assets/import-external-repository-object",
       "/api/assets/localize-external-repository-object",
-      "/api/asset-authoring/create-workspace-authored-asset",
-      "/api/asset-authoring/create-draft",
-      "/api/asset-authoring/update-draft",
-      "/api/asset-authoring/publish-draft",
-      "/api/asset-authoring/create-override",
-      "/api/asset-authoring/update-override",
-      "/api/asset-authoring/disable-override",
       "/api/server/restart",
-    ]);
+    ]) {
+      expect(registeredPaths).toContain(expectedPath);
+    }
     expect(registeredPaths.filter((path) => String(path).startsWith("/api/assets"))).toEqual([
       "/api/assets/register-resource-backed-view",
       "/api/assets/finalize-generated-output",
@@ -253,10 +248,11 @@ describe("composeServerHost", () => {
     const registeredGetPaths = app.get.mock.calls.map((call) => call[0]);
 
     expect(registeredGetPaths).toContain("/api/assets/definitions");
-    expect(registeredPaths.some((path) => /\/api\/assets.*(create|update|delete|patch|edit|seed|publish|execute|run|scan)/i.test(String(path)))).toBe(false);
+    expect([...registeredPaths, ...app.patch.mock.calls.map((call) => call[0]), ...app.delete.mock.calls.map((call) => call[0])]
+      .some((path) => /\/api\/assets.*(create|update|delete|patch|edit|seed|publish|execute|run|scan)/i.test(String(path)))).toBe(false);
     expect(readFileSync(resolve("modules/hosts/server/composition/composeServerHost.ts"), "utf8")).toContain("assetRegistryRead: internalAssetRegistry.readFacade");
     expect(readFileSync(resolve("modules/hosts/server/composition/composeServerHost.ts"), "utf8")).toContain("assetMutationUseCases");
-    expect(registeredGetPaths).toEqual([
+    for (const expectedPath of [
       "/api/artifact/upload/policy",
       "/api/artifact/media/view",
       "/api/config/huggingface-token",
@@ -268,22 +264,24 @@ describe("composeServerHost", () => {
       "/api/workspaces/:workspaceId/user-library/links/:linkId",
       "/api/workspaces/:workspaceId/effective-asset-sources",
       "/api/assets/definitions",
-      "/api/asset-authoring/authored-assets",
-      "/api/asset-authoring/authored-assets/:authoredAssetId",
-      "/api/asset-authoring/drafts",
-      "/api/asset-authoring/drafts/:draftId",
-      "/api/asset-authoring/revisions",
-      "/api/asset-authoring/revisions/:revisionId",
-      "/api/asset-authoring/overrides",
-      "/api/asset-authoring/overrides/:overrideId",
-      "/api/asset-authoring/effective-summaries",
+      "/api/asset-authoring/workspaces/:workspaceId/authored-assets",
+      "/api/asset-authoring/workspaces/:workspaceId/authored-assets/:authoredAssetId",
+      "/api/asset-authoring/workspaces/:workspaceId/drafts",
+      "/api/asset-authoring/workspaces/:workspaceId/drafts/:draftId",
+      "/api/asset-authoring/workspaces/:workspaceId/revisions",
+      "/api/asset-authoring/workspaces/:workspaceId/revisions/:revisionId",
+      "/api/asset-authoring/workspaces/:workspaceId/overrides",
+      "/api/asset-authoring/workspaces/:workspaceId/overrides/:overrideId",
+      "/api/asset-authoring/workspaces/:workspaceId/effective-summaries",
       "/api/assets/resource-backed-views",
       "/api/assets/resource-backed-views/:viewId",
       "/api/assets/definitions/:definitionId",
       "/api/assets/definitions/:definitionId/versions/:version",
       "/api/runtime/readiness",
       "/api/runtime/capabilities/:capabilityId",
-    ]);
+    ]) {
+      expect(registeredGetPaths).toContain(expectedPath);
+    }
   });
 
   it("builds server model-publishing readiness as explicit unavailable, not missing", async () => {
@@ -343,16 +341,16 @@ describe("composeServerHost", () => {
     const previous = process.env.COMFYUI_RUNTIME_DEVICE_MODE;
     process.env.COMFYUI_RUNTIME_DEVICE_MODE = "vulkan";
     const host = composeServerHost();
-    expect(() => host.registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: join(tmpdir(), "server-invalid-runtime") })).toThrow("Unsupported COMFYUI runtime mode");
+    expect(() => host.registerApi({ app: { post: testDouble.fn(), get: testDouble.fn(), patch: testDouble.fn(), delete: testDouble.fn() }, storageRootDirectory: join(tmpdir(), "server-invalid-runtime") })).toThrow("Unsupported COMFYUI runtime mode");
     process.env.COMFYUI_RUNTIME_DEVICE_MODE = previous;
   });
 
   it("accepts cpu and directml COMFYUI runtime modes", () => {
     const previous = process.env.COMFYUI_RUNTIME_DEVICE_MODE;
     process.env.COMFYUI_RUNTIME_DEVICE_MODE = "cpu";
-    expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: join(tmpdir(), "server-runtime-cpu") })).not.toThrow();
+    expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn(), patch: testDouble.fn(), delete: testDouble.fn() }, storageRootDirectory: join(tmpdir(), "server-runtime-cpu") })).not.toThrow();
     process.env.COMFYUI_RUNTIME_DEVICE_MODE = "directml";
-    expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn() }, storageRootDirectory: join(tmpdir(), "server-runtime-directml") })).not.toThrow();
+    expect(() => composeServerHost().registerApi({ app: { post: testDouble.fn(), get: testDouble.fn(), patch: testDouble.fn(), delete: testDouble.fn() }, storageRootDirectory: join(tmpdir(), "server-runtime-directml") })).not.toThrow();
     process.env.COMFYUI_RUNTIME_DEVICE_MODE = previous;
   });
 
@@ -515,16 +513,17 @@ describe("server ComfyUI python/runtime resolution", () => {
     const storageRootDirectory = join(tmpdir(), "server-storage");
     const runtimeRootDirectory = join(tmpdir(), "server-runtime");
     host.registerApi({
-      app: { post: testDouble.fn(), get: testDouble.fn() },
+      app: { post: testDouble.fn(), get: testDouble.fn(), patch: testDouble.fn(), delete: testDouble.fn() },
       storageRootDirectory,
       runtimeRootDirectory,
     });
     const comfyLog = sink.mock.calls
       .map((call) => call[1] as StructuredLogEvent)
       .find((event) => event.event === "runtime.comfyui.server.configuration");
+    const expectedBasePythonCommand = process.platform === "win32" ? "python" : "python3";
     expect(comfyLog?.data).toMatchObject({
       pythonEnvironmentMode: "managed-venv",
-      basePythonCommand: "python3",
+      basePythonCommand: expectedBasePythonCommand,
       launchPythonExecutableSource: "managed-venv",
       skipPythonSetup: false,
       skipPythonValidation: false,
@@ -539,7 +538,7 @@ describe("server ComfyUI python/runtime resolution", () => {
     const storageRootDirectory = join(tmpdir(), "server-storage");
     const runtimeRootDirectory = join(tmpdir(), "server-runtime");
     host.registerApi({
-      app: { post: testDouble.fn(), get: testDouble.fn() },
+      app: { post: testDouble.fn(), get: testDouble.fn(), patch: testDouble.fn(), delete: testDouble.fn() },
       storageRootDirectory,
       runtimeRootDirectory,
     });

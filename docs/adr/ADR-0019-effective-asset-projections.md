@@ -5,17 +5,17 @@
 
 ## Context
 
-Phase 9 needs a conservative architecture baseline for deriving safe, workspace-scoped effective outputs from system/workspace/user-library/authored/customized asset sources.
+effective asset projections needs a conservative architecture baseline for deriving safe, workspace-scoped effective outputs from system/workspace/user-library/authored/customized asset sources.
 
-Phase 8 established authoring/customization/override vocabulary, but intentionally deferred portions of override targeting, existing-authored revision publishing, and guaranteed workspace-wide effective summaries. Phase 9 must build on available behavior without assuming deferred capabilities are complete.
+asset authoring/customization established authoring/customization/override vocabulary, but intentionally deferred portions of override targeting, existing-authored revision publishing, and guaranteed workspace-wide effective summaries. effective asset projections must build on available behavior without assuming deferred capabilities are complete.
 
 ## Decision
 
-Phase 9 introduces workspace-scoped effective asset projections as safe, metadata-oriented outputs derived from system, workspace, user-library, authored, and customized sources. Projections do not execute workflows, mutate sources, resolve conflicts automatically, or materialize unsafe payloads.
+effective asset projections introduces workspace-scoped effective asset projections as safe, metadata-oriented outputs derived from system, workspace, user-library, authored, and customized sources. Projections do not execute workflows, mutate sources, resolve conflicts automatically, or materialize unsafe payloads.
 
-## Accepted Phase 9 boundaries
+## Accepted effective asset projections boundaries
 
-Phase 9 Prompt 1 is architecture/docs/context baseline only. It adds no contracts, ports, persistence adapters, use cases, API/IPC/preload handlers, or UI runtime behavior.
+effective asset projections current implementation is architecture/docs/context baseline only. It adds no contracts, ports, persistence adapters, use cases, API/IPC/preload handlers, or UI runtime behavior.
 
 ## Projection ownership and workspace scope
 
@@ -41,9 +41,9 @@ No policy implies workflow payload synthesis, runtime execution, or arbitrary JS
 
 ## Safe projected fields decision
 
-Phase 9 projections are metadata-oriented and conservative.
+effective asset projections projections are metadata-oriented and conservative.
 
-Allowed baseline fields include display/summary/description labels, classification/tags, Phase 8-sanitized metadata keys, source/revision labels, readiness, and safe diagnostics.
+Allowed baseline fields include display/summary/description labels, classification/tags, asset authoring/customization-sanitized metadata keys, source/revision labels, readiness, and safe diagnostics.
 
 Explicitly excluded by default: raw paths/storage roots, bytes/blobs/base64, provider payloads, raw prompt/workflow payloads, credentials/tokens, environment values, stack traces, command lines, signed URLs, and arbitrary JSON blobs.
 
@@ -72,13 +72,13 @@ Positive:
 
 Costs:
 
-- Requires explicit conflict and invalidation handling surfaces in later prompts.
+- Requires explicit conflict and invalidation handling surfaces.
 - Keeps high-risk payload fields deferred until explicit schemas/tests are accepted.
-- Depends on truthful handling of Phase 8 deferred capabilities.
+- Depends on truthful handling of asset authoring/customization deferred capabilities.
 
 ## Explicit non-goals
 
-Phase 9 Prompt 1 does not introduce:
+This decision does not introduce:
 
 - workflow/runtime execution,
 - collaboration permissions/multi-user auth,
@@ -87,26 +87,26 @@ Phase 9 Prompt 1 does not introduce:
 - live workspace synchronization,
 - arbitrary prompt/workflow/json editing.
 
-## Relationship to Phase 8
+## Relationship to asset authoring/customization
 
-Phase 9 consumes Phase 8 authored assets, drafts, published revisions, override records, customization targets, provenance, conflict status, safe editable fields, and explicit workspace context.
+effective asset projections consumes asset authoring/customization authored assets, drafts, published revisions, override records, customization targets, provenance, conflict status, safe editable fields, and explicit workspace context.
 
-Phase 9 must preserve Phase 8 truthfulness limits:
+effective asset projections must preserve asset authoring/customization truthfulness limits:
 
 - override creation safe-target flow may remain deferred,
 - existing-authored-asset revision publishing may remain deferred,
 - workspace-wide effective summaries may be partial/unavailable.
 
-## Phase 10 handoff implications
+## Relationship To Asset Composition Planning
 
-Phase 10 (**Asset Composition Planning**) should build on Phase 9 projections for selection, ordering, dependency planning, compatibility checks, and non-runtime preparation.
+asset composition planning (**Asset Composition Planning**) should build on effective asset projections projections for selection, ordering, dependency planning, compatibility checks, and non-runtime preparation.
 
-Phase 10 must not reinterpret Phase 9 as execution authorization, and must not assume runtime execution, collaboration, marketplace behavior, or arbitrary payload editing.
+asset composition planning must not reinterpret effective asset projections as execution authorization, and must not assume runtime execution, collaboration, marketplace behavior, or arbitrary payload editing.
 
 
-## Prompt 10 closeout alignment
+## Current implementation alignment
 
-The final Phase 9 implementation confirms these accepted decisions:
+Current effective asset projections implementation confirms these accepted decisions:
 
 1. Projection records are workspace-scoped and require explicit workspace context at creation/read/refresh surfaces.
 2. Safe projected fields remain metadata-oriented and explicitly exclude raw runtime/provider/payload content classes.
@@ -115,13 +115,13 @@ The final Phase 9 implementation confirms these accepted decisions:
 5. Projection `ready` is planning-consumability only, not runtime execution readiness.
 6. `blocked`, `conflicted`, `disabled`, and `stale` remain explicit states and are never silently treated as applied.
 7. Transport/UI exposure remains readiness/status oriented, not execution-capability exposure.
-8. Phase 10 handoff is constrained to **Asset Composition Planning** over safe projections.
+8. Downstream planning is constrained to **Asset Composition Planning** over safe projections.
 
 ### Deferred consequences retained
 
-The implementation intentionally keeps runtime/workflow execution, visual composition-first flows, arbitrary payload projection/editing, background propagation, collaboration, pack import/export, marketplace behavior, and automatic conflict resolution out of Phase 9 scope.
+The implementation intentionally keeps runtime/workflow execution, visual composition-first flows, arbitrary payload projection/editing, background propagation, collaboration, pack import/export, marketplace behavior, and automatic conflict resolution out of effective asset projections scope.
 
 
 ## UX alignment note
 
-Phase 9 projection records and transports remain internal architecture. The primary user-facing destination is the **Assets** area, which may display projection-derived readiness/status badges. ADR-0019 does not require or endorse a separate top-level 'Effective Assets' page in normal navigation.
+effective asset projections projection records and transports remain internal architecture. The primary user-facing destination is the **Assets** area, which may display projection-derived readiness/status badges. ADR-0019 does not require or endorse a separate top-level 'Effective Assets' page in normal navigation.

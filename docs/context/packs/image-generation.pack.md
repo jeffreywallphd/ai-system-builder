@@ -38,17 +38,17 @@ Use this pack for tasks involving image generation contracts, runtime lifecycle 
 - Runtime task registry is the execution path for image generation workloads.
 - Assets are created post-execution in the application layer, not in the runtime layer.
 
-## Prompt 4/7 Application Layer Notes
+## Application Layer Notes
 
 - Application image generation use cases must depend on `RuntimeTaskRegistryPort` for task lifecycle orchestration.
 - ComfyUI integration remains adapter-only and must not leak into contracts or application use-case imports.
-- Image asset registration for generated outputs is intentionally deferred to the next prompt.
+- Generated-output finalization and image asset registration belong after runtime completion in application/asset flows, not in runtime adapters.
 
 
 ## Runtime Installer Alignment
 
 - ComfyUI may be auto-installed through the Runtime Installer abstraction.
-- ComfyUI supervisor should call installer-before-start in a later prompt, not in this contract/architecture step.
+- ComfyUI supervisor may call installer-before-start through host/runtime composition; keep installation outside image generation contracts and use cases.
 - Installation is separate from image generation contracts and application use cases.
 
 

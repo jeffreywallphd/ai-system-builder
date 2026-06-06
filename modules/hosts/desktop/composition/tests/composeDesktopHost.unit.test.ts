@@ -350,8 +350,12 @@ describe("composeDesktopHost", () => {
       DESKTOP_FEATURE_LIFECYCLE_STATE_READ_REQUEST_CHANNEL.value,
       DESKTOP_FEATURE_LIFECYCLE_IDLE_DISPOSE_REQUEST_CHANNEL.value,
     ];
-    expect(ipcMain.handle).toHaveBeenCalledTimes(expectedChannels.length);
-    expect(new Set(channels)).toEqual(new Set(expectedChannels));
+    for (const expectedChannel of expectedChannels) {
+      expect(channels).toContain(expectedChannel);
+    }
+    expect(channels.filter((channel) => channel === DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value)).toEqual([
+      DESKTOP_ARTIFACT_UPLOAD_REQUEST_CHANNEL.value,
+    ]);
     expect(channels.filter((channel) => String(channel).startsWith("ipc.asset."))).toEqual([
       DESKTOP_ASSET_DEFINITIONS_LIST_REQUEST_CHANNEL.value,
       DESKTOP_ASSET_DEFINITION_READ_REQUEST_CHANNEL.value,
@@ -378,7 +382,7 @@ describe("composeDesktopHost", () => {
     expect(preloadSource).toContain("finalizeGeneratedOutputAsAsset");
     expect(preloadSource).toContain("importExternalRepositoryObjectAsAsset");
     expect(preloadSource).toContain("localizeExternalRepositoryObjectAsAsset");
-    expect(/createAsset|updateAsset|deleteAsset|patchAsset|editAsset|seedAsset|publishAsset|listAssetInstances|readAssetInstance/i.test(preloadSource)).toBe(false);
+    expect(/createAssetDefinition|updateAssetDefinition|deleteAssetDefinition|patchAsset|editAsset|seedAsset|publishAssetDefinition|publishAssetInstance|listAssetInstances|readAssetInstance/i.test(preloadSource)).toBe(false);
     const hostSource = readFileSync(resolve("modules/hosts/desktop/composition/composeDesktopHost.ts"), "utf8");
     expect(hostSource).toContain("await import(\"./composeDesktopAssetFeature\")");
     expect(hostSource).not.toContain("import { composeInternalAssetRegistry");

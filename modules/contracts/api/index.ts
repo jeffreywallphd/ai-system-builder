@@ -7,6 +7,7 @@ export * from "./artifact-browse-api-contract";
 export * from "./artifact-read-api-contract";
 export * from "./artifact-content-read-api-contract";
 export * from "./artifact-delete-api-contract";
+export * from "./website-ingestion-api-contract";
 
 export * from "./artifact-repo-has-api-contract";
 export * from "./artifact-repo-store-api-contract";
@@ -18,6 +19,7 @@ export * from "./artifact-register-from-repo-api-contract";
 export * from "./artifact-localize-from-repo-api-contract";
 export * from "./huggingface-namespace-datasets-api-contract";
 export * from "./huggingface-dataset-parquet-files-api-contract";
+export * from "./huggingface-files-import-api-contract";
 export * from "./runtime-readiness-api-contract";
 export * from "./asset-registry-api-contract";
 

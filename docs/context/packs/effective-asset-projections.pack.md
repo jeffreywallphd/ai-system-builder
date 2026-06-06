@@ -1,10 +1,10 @@
-# Context Pack: Effective Asset Projections (Phase 9 Closeout)
+# Context Pack: Effective Asset Projections
 
 - Pack name: `effective-asset-projections`
 
 ## Purpose
 
-Provide compact, truthful Phase 9 closeout context for effective asset projections, readiness semantics, and Phase 10 planning handoff.
+Provide compact, truthful context for effective asset projections, readiness semantics, and asset composition planning output boundaries.
 
 ## Use When
 
@@ -24,7 +24,7 @@ Provide compact, truthful Phase 9 closeout context for effective asset projectio
 - `docs/architecture/asset-authoring-customization-and-overrides.md`
 - `docs/architecture/user-library-and-cross-workspace-reuse.md`
 
-## Final Phase 9 implemented surfaces
+## Implemented Surfaces
 
 - Workspace-scoped projection contract vocabulary + normalizers.
 - Projection repository port + local JSON persistence adapter.
@@ -45,16 +45,16 @@ Provide compact, truthful Phase 9 closeout context for effective asset projectio
 ## Anti-drift rules
 
 - Keep status/policy/diagnostic vocabulary aligned with contracts + ADR-0019.
-- Do not claim runtime/workflow execution in Phase 9 docs/UI/transport.
+- Do not claim runtime/workflow execution in projection docs/UI/transport.
 - Do not expand safe projected field classes without explicit contract + tests.
 
 ## Deferred items
 
 Runtime/workflow execution, visual composition-first UX, payload/materialized-workflow generation, prompt/provider/binary payload projection, automatic conflict resolution/rebase, background propagation, collaboration/permissions, pack import/export, marketplace, and advanced source/target authoring UX remain deferred.
 
-## Phase 10 handoff guidance
+## Asset Composition Planning Output Boundary
 
-Phase 10 is **Asset Composition Planning** on top of safe projections: select compatible projections, order dependencies, build non-runtime plans, and surface missing/blocked/conflicted readiness gaps before plan build.
+Asset composition planning works on top of safe projections: select compatible projections, order dependencies, build non-runtime plans, and surface missing/blocked/conflicted readiness gaps before plan build.
 
 ## Related packs
 
@@ -62,7 +62,6 @@ Phase 10 is **Asset Composition Planning** on top of safe projections: select co
 - `docs/context/packs/user-library.pack.md`
 - `docs/context/packs/asset-kernel.pack.md`
 - `docs/architecture/system-overview.md`
-
 
 ## UX correction guardrail
 

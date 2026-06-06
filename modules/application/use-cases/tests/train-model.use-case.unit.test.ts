@@ -7,7 +7,7 @@ import type { ArtifactObjectStoragePort, ArtifactStorageBindingPort } from "../.
 import { TrainModelUseCase } from "../model/train-model.use-case";
 
 describe("TrainModelUseCase", () => {
-  const baseRequest = { baseModel: { modelRecordId: "base-1" }, datasets: [{ artifactId: "dataset-1", splitRole: "train" as const }], method: "lora" as const, commonParameters: {}, output: { outputModelName: "demo-adapter", destination: { local: { enabled: true } }, registration: { displayName: "Demo Adapter", artifactForm: "adapter" as const } } };
+  const baseRequest = { workspaceId: "workspace-a" as never, trainingTask: "llm-classification", baseModel: { modelRecordId: "base-1" }, datasets: [{ artifactId: "dataset-1", splitRole: "train" as const }], method: "lora" as const, commonParameters: {}, output: { outputModelName: "demo-adapter", destination: { local: { enabled: true } }, registration: { displayName: "Demo Adapter", artifactForm: "adapter" as const } } };
   const baseRegistry: ModelRegistryPort = {
     listModels: async () => ({ models: [] }), getModelRecord: async () => ({ modelRecordId: "base-1", displayName: "Base", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", modelId: "org/base", createdAt: "2026-04-27T00:00:00.000Z" }), saveModelReference: async () => { throw new Error("not used"); }, registerDownloadedModel: async () => { throw new Error("not used"); }, updateModelRecord: async () => { throw new Error("not used"); }, deleteModelRecord: async () => { throw new Error("not used"); },
   };
@@ -61,6 +61,8 @@ describe("TrainModelUseCase", () => {
     expect(runtimeTaskRegistry.startTask).toHaveBeenCalledTimes(1);
     const startRequest = (runtimeTaskRegistry.startTask as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0];
     expect(startRequest.taskType).toBe(TaskType.MODEL_TRAINING);
+    expect(startRequest.payload.trainingTask).toBe("llm-classification");
+    expect(startRequest.payload.runMetadata.trainingTask).toBe("llm-classification");
     expect(startRequest.payload.datasets[0]).toMatchObject({ artifactId: "dataset-1", path: "/tmp/dataset-1.parquet" });
     expect(lifecycle.startTask).toHaveBeenCalledWith("train-req-1", TaskType.MODEL_TRAINING);
     expect(result).toEqual({ runId: "train-req-1", status: "queued" });
@@ -219,6 +221,7 @@ describe("TrainModelUseCase", () => {
     const result = await useCase.read("train-req-1");
 
     expect(modelPublisher.publishModel).toHaveBeenCalledWith({
+      workspaceId: "workspace-a",
       modelRecordId: "train-req-1",
       repository: "org/demo-adapter",
       revision: undefined,
@@ -300,6 +303,58 @@ describe("TrainModelUseCase", () => {
     expect(startRequest.payload.datasets[0].artifactId).toBe("generated/20260429160945623-2e7fe0660f46449f9ce819d011eb13f9-training-dataset.parquet");
     expect(startRequest.payload.datasets[0].path).toContain("training-dataset.parquet");
     expect(startRequest.payload.datasets[0].format).toBe("parquet");
+  });
+
+  it("stages source artifact paths for image training datasets", async () => {
+    const lifecycle = createLifecycleFake();
+    const runtimeTaskRegistry = createRuntimeTaskRegistryFake();
+    const storageBindings: Pick<ArtifactStorageBindingPort, "readArtifactStorageBindings"> = {
+      readArtifactStorageBindings: testDouble.fn(async ({ artifactId }: { artifactId: string }) => ({
+        ok: true as const,
+        value: {
+          bindings: artifactId === "source-image-1"
+            ? [{
+                artifactId,
+                role: "primary",
+                backing: { kind: "artifact-object" as const, provider: "local" as const, locator: "uploads/source-image-1.png" },
+              }]
+            : [],
+        },
+      })),
+    };
+    const storage: Pick<ArtifactObjectStoragePort, "retrieveArtifact"> = {
+      retrieveArtifact: testDouble.fn(async ({ key }: { key: string }) => ({
+        ok: true as const,
+        value: key === "uploads/source-image-1.png"
+          ? {
+              descriptor: { key, mediaType: "image/png" },
+              content: new Uint8Array([137, 80, 78, 71]),
+            }
+          : {
+              descriptor: { key, mediaType: "application/x-ndjson", metadata: { sourceArtifactIds: ["source-image-1"] } },
+              content: new TextEncoder().encode('{"image":"source-image-1","caption":"demo"}\n'),
+            },
+      })),
+    };
+    const useCase = new TrainModelUseCase({
+      runtimeTaskRegistry,
+      modelRegistry: { ...baseRegistry, registerGeneratedModel: testDouble.fn<ModelRegistryPort["registerGeneratedModel"]>() },
+      storageBindings,
+      storage,
+      taskPowerLifecycle: lifecycle,
+    });
+
+    await useCase.execute({
+      ...baseRequest,
+      trainingTask: "diffusion-lora",
+      datasets: [{ artifactId: "generated/image-dataset.jsonl", splitRole: "train" as const }],
+    });
+
+    const startRequest = (runtimeTaskRegistry.startTask as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0];
+    const dataset = startRequest.payload.datasets[0];
+    expect(dataset.path).toContain("image-dataset.jsonl");
+    expect(dataset.metadata.sourceArtifactIds).toEqual(["source-image-1"]);
+    expect(dataset.metadata.stagedSourceArtifactPaths["source-image-1"]).toContain("source-image-1.png");
   });
 
 

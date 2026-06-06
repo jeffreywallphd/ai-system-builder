@@ -1,3 +1,8 @@
+import {
+  resolveDatasetPreparationTaskProfileDefinition,
+  type DatasetPreparationTaskType,
+} from "../../../../../../../modules/contracts/runtime";
+
 const TRAIN_TEST_SUM_TOLERANCE = 0.000_001;
 
 export function parseOptionalNumber(value: string): number | undefined {
@@ -21,6 +26,7 @@ export function parseOptionalInteger(value: string): number | undefined {
 
 export interface DatasetPreparationValidationInput {
   selectedArtifactIds: string[];
+  taskType: DatasetPreparationTaskType;
   chunkSize: string;
   chunkOverlap: string;
   maxChunkCount: string;
@@ -60,6 +66,14 @@ export type DatasetPreparationValidationResult =
 export function validateAndParseDatasetPreparationInputs(
   input: DatasetPreparationValidationInput,
 ): DatasetPreparationValidationResult {
+  const profile = resolveDatasetPreparationTaskProfileDefinition(input.taskType);
+  if (profile.runtimeSupport !== "supported") {
+    return {
+      ok: false,
+      error: "This training task is defined for the system but is not available in the current local runtime yet.",
+    };
+  }
+
   if (input.selectedArtifactIds.length === 0) {
     return { ok: false, error: "Select at least one source artifact." };
   }

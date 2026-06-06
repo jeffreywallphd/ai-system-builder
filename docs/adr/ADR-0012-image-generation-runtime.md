@@ -1,7 +1,7 @@
 # ADR-0012: Image Generation Runtime Architecture and Contracts
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 
@@ -33,11 +33,11 @@ Image generation is established as a **first-class feature** with execution mana
 Layered execution flow:
 
 Renderer/UI
-→ Application Use Case
-→ ImageGenerationPort (engine abstraction)
-→ RuntimeTaskRegistryPort
-→ Runtime Adapter (ComfyUI, future engines)
-→ Sidecar (ComfyUI server)
+-> Application Use Case
+-> ImageGenerationPort (engine abstraction)
+-> RuntimeTaskRegistryPort
+-> Runtime Adapter (ComfyUI, future engines)
+-> Sidecar (ComfyUI server)
 
 Boundary responsibilities:
 
@@ -84,13 +84,13 @@ Clarifications:
 - Future engines include local diffusers-based runtimes and remote/cloud APIs.
 - Engine-specific request mapping, workflow translation, and adapter quirks are confined to runtime adapters only.
 
-## Non-Goals (This Prompt)
+## Non-Goals
 
-- No UI implementation
-- No ComfyUI workflow editor
-- No model downloading workflows
-- No ControlNet or advanced generation features
-- No runtime adapter/client implementation changes
+- No ComfyUI workflow editor.
+- No ControlNet or advanced generation features.
+- No image-generation contract dependency on ComfyUI workflow JSON.
+- No UI/runtime shortcut around the Runtime Task Registry lifecycle.
+- No model download workflow requirement inside image-generation contracts; model management remains a separate feature boundary.
 
 ## Consequences
 
@@ -113,7 +113,7 @@ Future desktop-remote image generation (not yet implemented) should return serve
 
 ### Tradeoffs
 
-- Requires adapter mapping work in follow-up prompts.
+- Requires adapter mapping work in follow-up work.
 - Defers engine-specific power-user features until boundary contracts are stable.
 
 ## Separation of Concerns
@@ -123,10 +123,10 @@ Future desktop-remote image generation (not yet implemented) should return serve
 - `ImageGenerationRequest` is not equivalent to a ComfyUI workflow definition.
 - Asset registration occurs after runtime completion in the application layer, not in the runtime adapter layer.
 
-## Runtime Installer Alignment (Prompt 1/4)
+## Runtime Installer Alignment
 
 - ComfyUI may be auto-installed through the Runtime Installer abstraction before runtime startup, based on host/runtime configuration.
-- ComfyUI supervisor integration with installer pre-start checks is deferred to a later prompt.
+- ComfyUI supervisor integration with installer pre-start checks is implemented through host/runtime composition where an installer is supplied.
 - Installation concerns remain separate from image generation contracts and use-case orchestration.
 
 ## UI Result Presentation

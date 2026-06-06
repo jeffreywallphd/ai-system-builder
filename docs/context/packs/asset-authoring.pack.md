@@ -1,10 +1,10 @@
-# Context Pack: Asset Authoring, Customization, and Overrides (Phase 8)
+# Context Pack: Asset Authoring, Customization, and Overrides
 
 - Pack name: `asset-authoring`
 
 ## Purpose
 
-Provide minimum-sufficient routing context for Phase 8 asset authoring, customization, override records, revisions/conflicts, and ownership-safe editing workflows.
+Provide minimum-sufficient routing context for asset authoring, customization, override records, revisions/conflicts, and ownership-safe editing workflows.
 
 ## Use When
 
@@ -41,43 +41,29 @@ Include this pack when prompts materially involve:
 
 ## Anti-drift rules
 
-- Do not introduce Phase 8 assumptions that depend on unavailable Phase 7 UI/composition behavior.
+- Do not introduce authoring assumptions that depend on unavailable User Library UI/composition behavior.
 - Keep safe editable fields allowlisted and conservative.
 - Treat prompt/workflow/provider/runtime/storage internals as deferred until explicitly scoped with safe schema/tests.
 - Keep override behavior non-destructive and explicit.
 
-## Relationship to Phase 7
+## Relationship to User Library Reuse
 
 When tasks combine reuse relationships (promote/link/copy/import/effective-source) with customization/overrides, include both:
 
 - `docs/context/packs/user-library.pack.md`
 - `docs/context/packs/asset-authoring.pack.md`
 
-Phase 7 closeout constraints remain binding prerequisites.
-
-## Phase 8 prompt ownership sequence
-
-1. Prompt 1 — architecture baseline, ADR, docs, context pack.
-2. Prompt 2 — contract vocabulary.
-3. Prompt 3 — application ports + persistence adapters.
-4. Review A — contracts/boundaries/persistence/anti-drift.
-5. Prompt 4 — create/edit workspace-authored asset use cases.
-6. Prompt 5 — override/customization use cases for linked/copied/imported assets.
-7. Prompt 6 — versioning/conflict/provenance behavior.
-8. Review B — use-case/provenance/versioning/workspace-isolation.
-9. Prompt 7 — effective-source/read-model integration.
-10. Prompt 8 — API/IPC/preload/server exposure.
-11. Prompt 9 — minimal desktop/thin-client UI.
-12. Review C — final Phase 8 closeout.
+User Library reuse constraints remain binding prerequisites.
 
 ## Non-goals
 
 This pack does not authorize implementation of collaboration permissions, live cross-workspace linking, pack import/export, marketplace behavior, broad arbitrary editor behavior, runtime execution features, or hidden/global migration behavior.
 
-## Phase 8 final truthfulness notes
+## Current Truthfulness Notes
 
 Use conservative wording in prompts and reviews:
+
 - treat effective-summary listing as partial/deferred unless the current backend confirms availability;
-- treat create-override flows as deferred until safe target selection/validation exists;
+- treat create-override flows as available only when safe target selection/validation and a real customization-target reader are composed; otherwise present them as unavailable/unsupported;
 - treat draft publication as creating new authored assets only;
 - do not claim workflow execution, materialized outputs, rebase/conflict-resolution flows, source mutation, or `system.foundation` mutation.

@@ -1,4 +1,5 @@
 import type { useModelsFeature } from "../hooks/useModelsFeature";
+import { TermWithHint } from "../../../../../../../modules/ui/shared";
 
 type ModelsState = ReturnType<typeof useModelsFeature>;
 
@@ -11,7 +12,7 @@ export function ManageModelsTab(props: { state: ModelsState }) {
       <p>Saved: {s.lifecycleCounts.saved} · Generated: {s.lifecycleCounts.generated} · Downloaded: {s.lifecycleCounts.downloaded}</p>
       <div className="ui-grid ui-grid--two">
         <label className="ui-stack ui-stack--sm">
-          <span>Source</span>
+          <span><TermWithHint termId="modelSource">Source</TermWithHint></span>
           <select className="ui-input" value={s.manageSource} onChange={(event) => s.setManageSource(event.target.value)}>
             <option value="">All</option>
             <option value="huggingface">huggingface</option>
@@ -20,7 +21,7 @@ export function ManageModelsTab(props: { state: ModelsState }) {
           </select>
         </label>
         <label className="ui-stack ui-stack--sm">
-          <span>Lifecycle</span>
+          <span><TermWithHint termId="lifecycleStatus">Lifecycle</TermWithHint></span>
           <select className="ui-input" value={s.manageLifecycleStatus} onChange={(event) => s.setManageLifecycleStatus(event.target.value)}>
             <option value="">All</option>
             <option value="saved-reference">saved-reference</option>
@@ -30,7 +31,7 @@ export function ManageModelsTab(props: { state: ModelsState }) {
           </select>
         </label>
         <label className="ui-stack ui-stack--sm">
-          <span>Artifact form</span>
+          <span><TermWithHint termId="artifactFamily">Artifact form</TermWithHint></span>
           <select className="ui-input" value={s.manageArtifactForm} onChange={(event) => s.setManageArtifactForm(event.target.value)}>
             <option value="">All</option>
             <option value="full-model">full-model</option>
@@ -40,7 +41,7 @@ export function ManageModelsTab(props: { state: ModelsState }) {
           </select>
         </label>
         <label className="ui-stack ui-stack--sm">
-          <span>Search</span>
+          <span><TermWithHint termId="modelSearch">Search</TermWithHint></span>
           <input className="ui-input" value={s.manageSearch} onChange={(event) => s.setManageSearch(event.target.value)} />
         </label>
       </div>
@@ -50,6 +51,8 @@ export function ManageModelsTab(props: { state: ModelsState }) {
       {s.pendingDeleteModelRecordId ? (
         <section className="ui-panel ui-stack ui-stack--sm" role="dialog" aria-label="Model delete confirmation">
           <p>Type <strong>Delete</strong> to remove the model record from the registry only.</p>
+          <label className="ui-stack ui-stack--sm">
+            <span><TermWithHint termId="deleteConfirmation">Confirmation</TermWithHint></span>
           <input
             className="ui-input"
             value={s.deleteConfirmationInput}
@@ -57,6 +60,7 @@ export function ManageModelsTab(props: { state: ModelsState }) {
             onInput={(event) => s.setDeleteConfirmationInput((event.target as HTMLInputElement).value)}
             placeholder="Delete"
           />
+          </label>
           <div className="ui-grid ui-grid--two">
             <button className="ui-button ui-button--destructive" type="button" onClick={() => void s.confirmDeleteModelRecord()} disabled={s.deleteConfirmationInput !== "Delete"}>
               Confirm Registry Delete
@@ -102,7 +106,7 @@ export function ManageModelsTab(props: { state: ModelsState }) {
               ) : null}
               <p>Validation report: {s.selectedManagedModel.validationReportPath ?? "n/a"}</p>
               <label className="ui-stack ui-stack--sm">
-                <span>Hugging Face repository (owner/name)</span>
+                <span><TermWithHint termId="repository">Hugging Face repository</TermWithHint> (owner/name)</span>
                 <input className="ui-input" value={s.publishRepository} onChange={(event) => s.setPublishRepository(event.target.value)} placeholder="owner/model-name" />
               </label>
               <div className="ui-grid ui-grid--two">

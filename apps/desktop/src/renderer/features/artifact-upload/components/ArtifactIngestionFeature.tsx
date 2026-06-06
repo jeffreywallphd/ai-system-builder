@@ -27,7 +27,7 @@ let persistedExpandedPanels: ExpandedPanelsState = {
   importFromHuggingFace: false,
 };
 
-export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComplete, workspaceId, workspaceName }: ArtifactIngestionFeatureProps) {
+export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComplete, workspaceId }: ArtifactIngestionFeatureProps) {
   const shouldPersistPanelState = client === undefined && ingestionClient === undefined;
   const [expandedPanels, setExpandedPanels] = useState<ExpandedPanelsState>(shouldPersistPanelState ? persistedExpandedPanels : {
     uploadData: true,
@@ -43,7 +43,7 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
   }
 
   const {
-    selectedFile,
+    selectedFiles,
     viewState,
     acceptedFileTypes,
     websiteSingleUrl,
@@ -54,6 +54,7 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
     websiteBatchViewState,
     onFileChange,
     onUploadSubmit,
+    onCancelUpload,
     setWebsiteSingleUrl,
     setWebsiteSingleMode,
     setWebsiteBatchInput,
@@ -68,60 +69,64 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
   }, [expandedPanels, shouldPersistPanelState]);
 
   return (
-    <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
-      <h1>Data Artifact Ingester</h1>
-      <p>Workspace: {workspaceName ?? "No workspace selected"}</p>
-      <p>Please select a method below to add data to the system.</p>
+    <section className="ui-panel ui-panel--elevated ui-panel--sectioned">
+      <header className="ui-panel__section-header">
+        <h2 className="ui-panel__title">Data Artifact Ingester</h2>
+      </header>
+      <div className="ui-panel__section-body ui-stack ui-stack--sm">
+        <p>Please select a method below to add data to the system.</p>
 
-      <CollapsiblePanel
-        title="Upload data"
-        contentId="artifact-upload-panel-content"
-        isExpanded={expandedPanels.uploadData}
-        onToggle={() => togglePanel("uploadData")}
-      >
-        <ArtifactUploadForm
-          selectedFile={selectedFile}
-          viewState={viewState}
-          acceptedFileTypes={acceptedFileTypes}
-          onFileChange={onFileChange}
-          onSubmit={(event) => void onUploadSubmit(event)}
-        />
-      </CollapsiblePanel>
-
-      <CollapsiblePanel
-        title="Scrape web data"
-        contentId="artifact-scrape-panel-content"
-        isExpanded={expandedPanels.scrapeWebData}
-        onToggle={() => togglePanel("scrapeWebData")}
-      >
-        {expandedPanels.scrapeWebData ? (
-          <ArtifactScrapeForm
-            websiteSingleUrl={websiteSingleUrl}
-            websiteSingleMode={websiteSingleMode}
-            websiteBatchInput={websiteBatchInput}
-            websiteBatchMode={websiteBatchMode}
-            websiteSingleViewState={websiteSingleViewState}
-            websiteBatchViewState={websiteBatchViewState}
-            setWebsiteSingleUrl={setWebsiteSingleUrl}
-            setWebsiteSingleMode={setWebsiteSingleMode}
-            setWebsiteBatchInput={setWebsiteBatchInput}
-            setWebsiteBatchMode={setWebsiteBatchMode}
-            ingestWebsiteSingle={ingestWebsiteSingle}
-            ingestWebsiteBatch={ingestWebsiteBatch}
+        <CollapsiblePanel
+          title="Upload data"
+          contentId="artifact-upload-panel-content"
+          isExpanded={expandedPanels.uploadData}
+          onToggle={() => togglePanel("uploadData")}
+        >
+          <ArtifactUploadForm
+            selectedFiles={selectedFiles}
+            viewState={viewState}
+            acceptedFileTypes={acceptedFileTypes}
+            onFileChange={onFileChange}
+            onSubmit={(event) => void onUploadSubmit(event)}
+            onCancelUpload={onCancelUpload}
           />
-        ) : <p>Open this section to configure website scraping.</p>}
-      </CollapsiblePanel>
+        </CollapsiblePanel>
 
-      <CollapsiblePanel
-        title="Import from HuggingFace"
-        contentId="artifact-huggingface-panel-content"
-        isExpanded={expandedPanels.importFromHuggingFace}
-        onToggle={() => togglePanel("importFromHuggingFace")}
-      >
-        {expandedPanels.importFromHuggingFace ? (
-          <ArtifactHuggingFaceForm client={ingestionClient} onRegistered={() => onUploadComplete?.()} />
-        ) : <p>Open this section to register or import Hugging Face artifacts.</p>}
-      </CollapsiblePanel>
+        <CollapsiblePanel
+          title="Scrape web data"
+          contentId="artifact-scrape-panel-content"
+          isExpanded={expandedPanels.scrapeWebData}
+          onToggle={() => togglePanel("scrapeWebData")}
+        >
+          {expandedPanels.scrapeWebData ? (
+            <ArtifactScrapeForm
+              websiteSingleUrl={websiteSingleUrl}
+              websiteSingleMode={websiteSingleMode}
+              websiteBatchInput={websiteBatchInput}
+              websiteBatchMode={websiteBatchMode}
+              websiteSingleViewState={websiteSingleViewState}
+              websiteBatchViewState={websiteBatchViewState}
+              setWebsiteSingleUrl={setWebsiteSingleUrl}
+              setWebsiteSingleMode={setWebsiteSingleMode}
+              setWebsiteBatchInput={setWebsiteBatchInput}
+              setWebsiteBatchMode={setWebsiteBatchMode}
+              ingestWebsiteSingle={ingestWebsiteSingle}
+              ingestWebsiteBatch={ingestWebsiteBatch}
+            />
+          ) : <p>Open this section to configure website scraping.</p>}
+        </CollapsiblePanel>
+
+        <CollapsiblePanel
+          title="Import from Hugging Face"
+          contentId="artifact-huggingface-panel-content"
+          isExpanded={expandedPanels.importFromHuggingFace}
+          onToggle={() => togglePanel("importFromHuggingFace")}
+        >
+          {expandedPanels.importFromHuggingFace ? (
+            <ArtifactHuggingFaceForm client={ingestionClient} onRegistered={() => onUploadComplete?.()} />
+          ) : <p>Open this section to register or import Hugging Face artifacts.</p>}
+        </CollapsiblePanel>
+      </div>
     </section>
   );
 }

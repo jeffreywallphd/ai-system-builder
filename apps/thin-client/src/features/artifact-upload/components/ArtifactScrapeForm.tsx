@@ -1,3 +1,5 @@
+import { TermWithHint } from "../../../../../../modules/ui/shared";
+
 export interface ArtifactScrapeFormProps {
   websiteSingleUrl: string;
   websiteSingleMode: "automatic" | "rendered";
@@ -48,7 +50,7 @@ export function ArtifactScrapeForm({
   return (
     <section className="ui-stack ui-stack--sm">
       <label className="ui-stack ui-stack--sm">
-        <span>Single page URL</span>
+        <span><TermWithHint termId="sourceUrl">Single page URL</TermWithHint></span>
         <input
           className="ui-input"
           value={websiteSingleUrl}
@@ -57,7 +59,7 @@ export function ArtifactScrapeForm({
         />
       </label>
       <label className="ui-stack ui-stack--sm">
-        <span>Single-page mode</span>
+        <span><TermWithHint termId="singlePageMode">Single-page mode</TermWithHint></span>
         <select
           className="ui-input"
           value={websiteSingleMode}
@@ -75,19 +77,19 @@ export function ArtifactScrapeForm({
       ) : null}
       {websiteSingleViewState.result?.stagedArtifact ? (
         <dl className="ui-stack ui-stack--xs">
-          <dt>Requested mode</dt>
+          <dt><TermWithHint termId="singlePageMode">Requested mode</TermWithHint></dt>
           <dd>{websiteSingleMode}</dd>
-          <dt>Acquisition mechanism</dt>
+          <dt><TermWithHint termId="acquisitionMechanism">Acquisition mechanism</TermWithHint></dt>
           <dd>{websiteSingleViewState.result.acquisitionMechanismUsed}</dd>
-          <dt>Stored key</dt>
+          <dt><TermWithHint termId="storedKey">Stored key</TermWithHint></dt>
           <dd>{websiteSingleViewState.result.stagedArtifact.storage.key}</dd>
-          <dt>Original name</dt>
+          <dt><TermWithHint termId="originalName">Original name</TermWithHint></dt>
           <dd>{websiteSingleViewState.result.stagedArtifact.originalName ?? "unknown"}</dd>
         </dl>
       ) : null}
 
       <label className="ui-stack ui-stack--sm">
-        <span>Batch URLs (one URL per line)</span>
+        <span><TermWithHint termId="batchUrlList">Batch URLs</TermWithHint> (one URL per line)</span>
         <textarea
           className="ui-input"
           rows={5}
@@ -97,7 +99,7 @@ export function ArtifactScrapeForm({
         />
       </label>
       <label className="ui-stack ui-stack--sm">
-        <span>Batch mode</span>
+        <span><TermWithHint termId="batchMode">Batch mode</TermWithHint></span>
         <select
           className="ui-input"
           value={websiteBatchMode}

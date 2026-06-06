@@ -5,13 +5,12 @@ export interface WorkspaceScopedPageProps {
   workspaceName: string;
 }
 
-export function ModelsPage({ workspaceId, workspaceName }: WorkspaceScopedPageProps) {
+export function ModelsPage({ workspaceId }: WorkspaceScopedPageProps) {
   return (
-    <section className="ui-stack ui-stack--sm" data-workspace-name={workspaceName}>
+    <section className="ui-stack ui-stack--sm">
       <h1>Model Management</h1>
-      <p>Showing records for: {workspaceName}</p>
       <p>Browse remote model references, manage model asset records, and prepare future training workflows.</p>
-      <ModelsFeature key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} />
+      <ModelsFeature key={workspaceId} workspaceId={workspaceId} />
     </section>
   );
 }

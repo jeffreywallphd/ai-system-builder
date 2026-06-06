@@ -26,6 +26,7 @@
 - Persistence contracts are record-oriented and operation-identity driven.
 - Storage contracts are family-specific: shared foundation identity, artifact-object key/blob semantics, artifact-repo provider/repository/revision/path semantics, and ingestion/staged-artifact intake semantics.
 - Artifact browser list/detail/content concerns stay separated; media/content retrieval must not collapse into descriptor-first browse contracts.
+- Artifact previews are bounded read-side renderers: sample text-like content, prefer compressed/downscaled image object URLs, constrain video/PDF display, keep Office previews placeholder-only without a safe parser, and leave full-fidelity viewing to download/open actions.
 - Storage keys are opaque contract vocabulary and must flow through shared helpers; UI-facing contracts must stay path-agnostic.
 - Application logic depends on persistence/storage ports, not direct DB/filesystem/provider details.
 - Host wiring composes concrete adapters and roots; runtime roots must not be used as persistence or asset-resource roots unless a canonical doc explicitly says so.

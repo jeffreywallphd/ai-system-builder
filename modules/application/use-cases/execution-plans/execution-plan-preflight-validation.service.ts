@@ -43,6 +43,16 @@ export class ExecutionPlanPreflightValidationService {
     return { blockers, diagnostics, hasMissingInputs: blockers.some((b) => b.code.includes('input')), hasMissingOutputs: blockers.some((b) => b.code.includes('output')), hasMissingAdapters: blockers.some((b) => b.code.includes('adapter') || b.code.includes('provider-setup')), hasUnsafeDetails };
   }
   private hasForbiddenDetails(plan: ExecutionPlanRecord): boolean {
+    const unsafeKeyPattern = /^(?:unsafePayload|rawPath|payload|token|secret|credential|apiKey|api_key|commandLine|envValue|base64|blob|workflowJson|providerPayload|promptText)$/i;
+    const unsafeValuePattern = /(?:base64|base64:\/\/|signed\s*url|[a-zA-Z]:[\\/]|(?:^|\s)(?:\.|~)?\/(?:tmp|var|home|users|etc)\b|token|secret|api[_-]?key|command\s*line|process\.env)/i;
+    const hasUnsafeShape = (value: unknown): boolean => {
+      if (typeof value === 'string') return unsafeValuePattern.test(value);
+      if (Array.isArray(value)) return value.some(hasUnsafeShape);
+      if (value && typeof value === 'object') {
+        return Object.entries(value as Record<string, unknown>).some(([key, entry]) => unsafeKeyPattern.test(key) || hasUnsafeShape(entry));
+      }
+      return false;
+    };
     const textFields = [
       ...plan.steps.map((x)=>x.summary ?? ''),
       ...plan.diagnostics.map((x)=>x.message ?? ''),
@@ -51,7 +61,7 @@ export class ExecutionPlanPreflightValidationService {
     const hasForbiddenField = plan.outputs.some((o)=> (o as unknown as Record<string, unknown>).rawPath || (o as unknown as Record<string, unknown>).payload)
       || plan.inputs.some((i)=> (i as unknown as Record<string, unknown>).token || (i as unknown as Record<string, unknown>).secret)
       || textFields.includes('base64://');
-    return hasForbiddenField;
+    return hasForbiddenField || hasUnsafeShape(plan);
   }
   private b(code: string, message: string, targetReferenceId?: string): ExecutionBlocker { return { code, message, ...(targetReferenceId ? { targetReferenceKind: 'execution-step', targetReferenceId: targetReferenceId } : {}) }; }
 }

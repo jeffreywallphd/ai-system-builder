@@ -1,6 +1,5 @@
 import type { AssetCompositionPlanId } from "../../../contracts/asset-composition";
-import type { RuntimeBindingStatus, RuntimeProviderAvailabilityStatus, RuntimeReadinessBinding, RuntimeReadinessBindingId, RuntimeReadinessStatus } from "../../../contracts/runtime-readiness";
-import type { RuntimeCapabilityKind } from "../../../contracts/runtime-readiness/runtime-readiness-capability";
+import type { RuntimeBindingStatus, RuntimeCapabilityKind, RuntimeProviderAvailabilityStatus, RuntimeReadinessBinding, RuntimeReadinessBindingId, RuntimeReadinessStatus } from "../../../contracts/runtime-readiness";
 import type { WorkspaceId } from "../../../contracts/workspace";
 
 export interface RuntimeReadinessBindingListQuery {
