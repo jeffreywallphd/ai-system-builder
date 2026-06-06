@@ -26,7 +26,7 @@ test("validates readiness binding to ready-for-setup and appends provenance", as
   assert.equal(result.status, "success");
   assert.equal(result.value.status, "ready-for-setup");
   assert.equal(result.value.updatedAt, "2026-05-21T01:00:00.000Z");
-  assert.equal(result.value.provenance.at(-1)?.operation, "readiness-validated");
+  assert.equal(result.value.provenance.at(-1)?.kind, "readiness-validated");
   assert.equal(saved.length, 1);
 });
 

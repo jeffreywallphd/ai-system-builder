@@ -33,7 +33,7 @@ test('orchestrator returns deferred when no adapter exists', async () => {
     contextValidationService: new ConversationalInvocationContextValidationService(),
     invocationPort: { invokeConversationTurn: async () => (invoked = true, { status: 'completed', assistantResponseText: 'ok' }) },
   });
-  const result = await orch.invoke({ workspaceId: 'w1', session: { id: 's1', status: 'approved', executionApprovalId: 'a1' }, approval: { approvalStatus: 'approved' }, runtime: { runtimeId: 'r1', capabilityKind: 'text-generation' }, userTurnContent: 'hello' });
+  const result = await orch.invoke({ workspaceId: 'w1', session: { id: 's1', status: 'approved', executionApprovalId: 'a1' }, approval: { id: 'a1', approvalStatus: 'granted' }, runtime: { runtimeId: 'r1', capabilityKind: 'text-generation' }, userTurnContent: 'hello' });
   assert.equal(result.status, 'deferred');
   assert.equal(invoked, false);
 });
@@ -48,7 +48,7 @@ test('orchestrator invokes exactly once on valid supported happy path', async ()
     contextValidationService: new ConversationalInvocationContextValidationService(),
     invocationPort: { invokeConversationTurn: async () => (count++, { status: 'completed', assistantResponseText: 'safe response' }) },
   });
-  const result = await orch.invoke({ workspaceId: 'w1', session: { id: 's1', status: 'approved', executionApprovalId: 'a1' }, approval: { approvalStatus: 'approved' }, runtime: { runtimeId: 'r1', capabilityKind: 'text-generation' }, userTurnContent: 'hello' });
+  const result = await orch.invoke({ workspaceId: 'w1', session: { id: 's1', status: 'approved', executionApprovalId: 'a1' }, approval: { id: 'a1', approvalStatus: 'granted' }, runtime: { runtimeId: 'r1', capabilityKind: 'text-generation' }, userTurnContent: 'hello' });
   assert.equal(result.status, 'completed');
   assert.equal(count, 1);
 });

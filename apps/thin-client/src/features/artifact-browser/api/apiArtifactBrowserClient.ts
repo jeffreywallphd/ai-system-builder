@@ -161,6 +161,7 @@ export interface ArtifactBrowserApiClient {
   readArtifactContent: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<ThinClientArtifactContentDescriptor>;
   deleteRegisteredArtifact: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<{ storageKey: string }>;
   createArtifactMediaViewUrl: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => string;
+  readArtifactMedia?: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<{ mediaType?: string; bytes: Uint8Array }>;
   publishArtifactToHuggingFace: (input: {
     artifactId: string;
     repository: string;
@@ -383,6 +384,22 @@ export function createApiArtifactBrowserClient(
         query.set("workspaceId", input.workspaceId);
       }
       return createApiUrl(apiBaseUrl, `/artifact/media/view?${query.toString()}`);
+    },
+
+    async readArtifactMedia(locator: ArtifactBrowserLocator, input = {}): Promise<{ mediaType?: string; bytes: Uint8Array }> {
+      const query = new URLSearchParams({ storageKey: locator.storageKey });
+      if (input.workspaceId) {
+        query.set("workspaceId", input.workspaceId);
+      }
+      const response = await secureFetch(createApiUrl(apiBaseUrl, `/artifact/media/view?${query.toString()}`), { method: "GET" });
+      if (!response.ok) {
+        throw new ArtifactBrowserApiError("Failed to read artifact preview media.", undefined, undefined, response.status);
+      }
+
+      return {
+        mediaType: response.headers.get("content-type") ?? undefined,
+        bytes: new Uint8Array(await response.arrayBuffer()),
+      };
     },
 
     async publishArtifactToHuggingFace(input): Promise<ThinClientPublishedBacking> {

@@ -5,6 +5,8 @@ import {
   deriveArtifactListStatusLabels,
   derivePublishedBackingDisplayRows,
   derivePublishedBackingVerificationPresentation,
+  ArtifactPreviewPanel,
+  TermWithHint,
   type PublishedBackingView,
 } from "../../../../../../modules/ui/shared";
 import type { ArtifactBrowserApiClient } from "../api/apiArtifactBrowserClient";
@@ -36,7 +38,7 @@ function PublishedBackingPanel(
             <dd>{row.value}</dd>
           </Fragment>
         ))}
-        <dt>Verification</dt>
+        <dt><TermWithHint termId="verification">Verification</TermWithHint></dt>
         <dd>{verification.statusLabel}</dd>
         <dt>Checked</dt>
         <dd>{verification.lastCheckedLabel}</dd>
@@ -48,7 +50,7 @@ function PublishedBackingPanel(
   );
 }
 
-export function ArtifactBrowserFeature({ client, workspaceId, workspaceName }: ArtifactBrowserFeatureProps) {
+export function ArtifactBrowserFeature({ client, workspaceId }: ArtifactBrowserFeatureProps) {
   const {
     items,
     selectedStorageKey,
@@ -58,7 +60,7 @@ export function ArtifactBrowserFeature({ client, workspaceId, workspaceName }: A
     bulkDeleteConfirmationInput,
     detail,
     content,
-    imageViewUrl,
+    artifactPreview,
     canSelectPreviousImage,
     canSelectNextImage,
     publishState,
@@ -105,37 +107,45 @@ export function ArtifactBrowserFeature({ client, workspaceId, workspaceName }: A
   const backingState = deriveArtifactBackingState(detail, content);
 
   return (
-    <section className="ui-panel ui-stack ui-stack--sm">
-      <header className="ui-grid ui-grid--two">
-        <h2>Data Artifact Browser</h2>
-        <button className="ui-button" type="button" onClick={() => void refreshArtifacts()}>Refresh</button>
+    <section className="ui-panel ui-panel--elevated ui-panel--sectioned">
+      <header className="ui-panel__section-header">
+        <h2 className="ui-panel__title">Artifact Browser</h2>
       </header>
+      <div className="ui-panel__section-body ui-stack ui-stack--sm">
+      <div className="artifact-browser__toolbar">
+        <button className="ui-button" type="button" onClick={() => void refreshArtifacts()}>Refresh</button>
+      </div>
       {viewState.message ? <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p> : null}
       {pendingDeleteStorageKey ? (
         <div className="ui-modal-overlay" role="presentation">
           <section className="ui-panel ui-modal-dialog ui-stack ui-stack--sm" role="dialog" aria-label="Delete artifact confirmation" aria-modal="true">
-            <h3>Delete Artifact</h3>
-            <p>Type <strong>Delete</strong> to remove this artifact and local backing data.</p>
-            <p className="ui-text-muted">{pendingDeleteStorageKey}</p>
-            <label className="ui-stack ui-stack--sm">
-              <span>Confirmation</span>
-              <input
-                className="ui-input"
-                value={deleteConfirmationInput}
-                onChange={(event) => setDeleteConfirmationInput(event.target.value)}
-                placeholder="Delete"
-              />
-            </label>
-            <div className="ui-grid ui-grid--two">
-              <button
-                className="ui-button ui-button--destructive"
-                type="button"
-                onClick={() => void confirmPendingDelete()}
-                disabled={deleteConfirmationInput !== "Delete"}
-              >
-                Confirm delete
-              </button>
-              <button className="ui-button" type="button" onClick={cancelPendingDelete}>Cancel</button>
+            <header className="ui-modal-header">
+              <h3>Delete artifact</h3>
+              <button className="ui-modal-close" type="button" aria-label="Close delete confirmation" onClick={cancelPendingDelete}>x</button>
+            </header>
+            <div className="ui-modal-body ui-stack ui-stack--sm">
+              <p>Type <strong>Delete</strong> to remove this artifact and local backing data.</p>
+              <p className="ui-text-muted">Artifact: {pendingDeleteStorageKey}</p>
+              <label className="ui-stack ui-stack--sm">
+                <span><TermWithHint termId="deleteConfirmation">Confirmation</TermWithHint></span>
+                <input
+                  className="ui-input"
+                  value={deleteConfirmationInput}
+                  onChange={(event) => setDeleteConfirmationInput(event.target.value)}
+                  placeholder="Delete"
+                />
+              </label>
+              <div className="ui-grid ui-grid--two">
+                <button
+                  className="ui-button ui-button--destructive"
+                  type="button"
+                  onClick={() => void confirmPendingDelete()}
+                  disabled={deleteConfirmationInput !== "Delete"}
+                >
+                  Confirm delete
+                </button>
+                <button className="ui-button" type="button" onClick={cancelPendingDelete}>Cancel</button>
+              </div>
             </div>
           </section>
         </div>
@@ -145,7 +155,7 @@ export function ArtifactBrowserFeature({ client, workspaceId, workspaceName }: A
       {registerForm.showRegisterForm ? (
         <section className="ui-stack ui-stack--sm">
           <p role="note">Private or gated Hugging Face repositories may require a host/server token.</p>
-          <label className="ui-stack ui-stack--sm"><span>Namespace (user/org)</span><input className="ui-input" value={registerForm.namespace} onChange={(event) => setRegisterNamespace(event.target.value)} placeholder="OpenFinAL" required /></label>
+          <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="namespace">Namespace</TermWithHint> (user/org)</span><input className="ui-input" value={registerForm.namespace} onChange={(event) => setRegisterNamespace(event.target.value)} placeholder="OpenFinAL" required /></label>
           <button className="ui-button" type="button" disabled={registerState.status === "loading" || registerForm.namespace.trim().length === 0} onClick={() => void registerHuggingFaceNamespace()}>
             Register namespace
           </button>
@@ -204,10 +214,10 @@ export function ArtifactBrowserFeature({ client, workspaceId, workspaceName }: A
               ))}
             </ul>
           )}
-          <label className="ui-stack ui-stack--sm"><span>Repository</span><input className="ui-input" value={registerForm.repository} onChange={(event) => setRegisterRepository(event.target.value)} required /></label>
-          <label className="ui-stack ui-stack--sm"><span>Path in repo</span><input className="ui-input" value={registerForm.pathInRepo} onChange={(event) => setRegisterPathInRepo(event.target.value)} required /></label>
-          <label className="ui-stack ui-stack--sm"><span>Revision (optional)</span><input className="ui-input" value={registerForm.revision} onChange={(event) => setRegisterRevision(event.target.value)} /></label>
-          <label className="ui-stack ui-stack--sm"><span>Media type (optional)</span><input className="ui-input" value={registerForm.mediaType} onChange={(event) => setRegisterMediaType(event.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="repository">Repository</TermWithHint></span><input className="ui-input" value={registerForm.repository} onChange={(event) => setRegisterRepository(event.target.value)} required /></label>
+          <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="pathInRepository">Path in repo</TermWithHint></span><input className="ui-input" value={registerForm.pathInRepo} onChange={(event) => setRegisterPathInRepo(event.target.value)} required /></label>
+          <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="revision">Revision</TermWithHint> (optional)</span><input className="ui-input" value={registerForm.revision} onChange={(event) => setRegisterRevision(event.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="mediaType">Media type</TermWithHint> (optional)</span><input className="ui-input" value={registerForm.mediaType} onChange={(event) => setRegisterMediaType(event.target.value)} /></label>
           <button className="ui-button" type="button" disabled={registerState.status === "loading" || registerForm.repository.trim().length === 0 || registerForm.pathInRepo.trim().length === 0} onClick={() => void registerArtifactFromHuggingFace()}>
             {registerState.status === "loading" ? "Registering..." : "Register"}
           </button>
@@ -229,7 +239,7 @@ export function ArtifactBrowserFeature({ client, workspaceId, workspaceName }: A
         </li>
         <li className="ui-grid ui-grid--two">
           <label className="ui-stack ui-stack--sm">
-            <span>Bulk delete confirmation</span>
+            <span><TermWithHint termId="deleteConfirmation">Bulk delete confirmation</TermWithHint></span>
             <input className="ui-input" value={bulkDeleteConfirmationInput} onChange={(event) => setBulkDeleteConfirmationInput(event.target.value)} placeholder="Delete All" />
           </label>
           <div className="ui-stack ui-stack--sm">
@@ -259,28 +269,28 @@ export function ArtifactBrowserFeature({ client, workspaceId, workspaceName }: A
 
       {detail ? (
         <dl className="ui-grid ui-grid--two">
-          <dt>Selected key</dt>
+          <dt><TermWithHint termId="storedKey">Selected key</TermWithHint></dt>
           <dd>{detail.locator.storageKey}</dd>
-          <dt>Media type</dt>
+          <dt><TermWithHint termId="mediaType">Media type</TermWithHint></dt>
           <dd>{detail.mediaType ?? "unknown"}</dd>
-          <dt>Artifact family</dt>
+          <dt><TermWithHint termId="artifactFamily">Artifact family</TermWithHint></dt>
           <dd>{detail.artifactFamily}</dd>
-          <dt>Source</dt>
+          <dt><TermWithHint termId="source">Source</TermWithHint></dt>
           <dd>{detail.sourceKind ?? "unknown"}</dd>
-          <dt>Size bytes</dt>
+          <dt><TermWithHint termId="storedSize">Size bytes</TermWithHint></dt>
           <dd>{detail.sizeBytes ?? "unknown"}</dd>
-          <dt>Created at</dt>
+          <dt><TermWithHint termId="createdAt">Created at</TermWithHint></dt>
           <dd>{detail.createdAt ?? "unknown"}</dd>
         </dl>
       ) : <p className="ui-text-muted">Select a data artifact to inspect metadata and preview availability.</p>}
 
       {content ? (
         <dl className="ui-grid ui-grid--two">
-          <dt>Availability</dt>
+          <dt><TermWithHint termId="availability">Availability</TermWithHint></dt>
           <dd>{content.availability}</dd>
-          <dt>Retrieval</dt>
+          <dt><TermWithHint termId="retrieval">Retrieval</TermWithHint></dt>
           <dd>{content.retrieval}</dd>
-          <dt>Local bytes</dt>
+          <dt><TermWithHint termId="localBytes">Local bytes</TermWithHint></dt>
           <dd>{content.availability === "available" ? "present" : "missing"}</dd>
         </dl>
       ) : null}
@@ -296,11 +306,22 @@ export function ArtifactBrowserFeature({ client, workspaceId, workspaceName }: A
           </button>
           <h3>Local Object State</h3>
           <dl className="ui-grid ui-grid--two">
-            <dt>Local object availability</dt>
+            <dt><TermWithHint termId="localObject">Local object availability</TermWithHint></dt>
             <dd>{backingState.hasLocalObjectAvailable ? "available" : "not available"}</dd>
-            <dt>Localization state</dt>
+            <dt><TermWithHint termId="localization">Localization state</TermWithHint></dt>
             <dd>{backingState.isLocalized ? "localized" : backingState.isRemoteOnly ? "not localized" : "n/a"}</dd>
           </dl>
+          <ArtifactPreviewPanel preview={artifactPreview} />
+          {artifactPreview.descriptor?.kind === "image" ? (
+            <div className="ui-grid ui-grid--two">
+              <button className="ui-button" type="button" onClick={() => void selectPreviousImage()} disabled={!canSelectPreviousImage}>
+                Previous
+              </button>
+              <button className="ui-button" type="button" onClick={() => void selectNextImage()} disabled={!canSelectNextImage}>
+                Next
+              </button>
+            </div>
+          ) : null}
           {backingState.isRemoteOnly ? (
             <p role="status">Remote-only artifact. Local preview is unavailable until localization.</p>
           ) : null}
@@ -311,17 +332,17 @@ export function ArtifactBrowserFeature({ client, workspaceId, workspaceName }: A
         <section className="ui-stack ui-stack--sm">
           <h3>Imported Source Backing</h3>
           <dl className="ui-grid ui-grid--two">
-            <dt>Provider</dt>
+            <dt><TermWithHint termId="provider">Provider</TermWithHint></dt>
             <dd>{detail.metadata.importedSourceBacking.target.provider}</dd>
-            <dt>Repo</dt>
+            <dt><TermWithHint termId="repository">Repo</TermWithHint></dt>
             <dd>{detail.metadata.importedSourceBacking.target.repository}</dd>
-            <dt>Path</dt>
+            <dt><TermWithHint termId="pathInRepository">Path</TermWithHint></dt>
             <dd>{detail.metadata.importedSourceBacking.target.path}</dd>
-            <dt>Revision</dt>
+            <dt><TermWithHint termId="revision">Revision</TermWithHint></dt>
             <dd>{detail.metadata.importedSourceBacking.target.revision ?? "main"}</dd>
-            <dt>Source verified</dt>
+            <dt><TermWithHint termId="sourceVerified">Source verified</TermWithHint></dt>
             <dd>{detail.metadata.importedSourceBacking.verification.exists ? "yes" : "no"}</dd>
-            <dt>Source checked</dt>
+            <dt><TermWithHint termId="sourceChecked">Source checked</TermWithHint></dt>
             <dd>{detail.metadata.importedSourceBacking.verification.verifiedAt ?? "never"}</dd>
           </dl>
           <button
@@ -354,21 +375,6 @@ export function ArtifactBrowserFeature({ client, workspaceId, workspaceName }: A
         </section>
       ) : null}
 
-      {imageViewUrl && content?.availability === "available" ? (
-        <figure id="artifact-browser-image-preview" className="ui-stack ui-stack--sm">
-          <img src={imageViewUrl} alt={detail?.locator.storageKey ?? "Selected artifact"} />
-          <figcaption>Image preview for {detail?.locator.storageKey}</figcaption>
-          <div className="ui-grid ui-grid--two">
-            <button className="ui-button" type="button" onClick={() => void selectPreviousImage()} disabled={!canSelectPreviousImage}>
-              Previous
-            </button>
-            <button className="ui-button" type="button" onClick={() => void selectNextImage()} disabled={!canSelectNextImage}>
-              Next
-            </button>
-          </div>
-        </figure>
-      ) : null}
-
       {publishedBacking ? (
         <PublishedBackingPanel
           publishedBacking={publishedBacking}
@@ -376,6 +382,7 @@ export function ArtifactBrowserFeature({ client, workspaceId, workspaceName }: A
           onRecheck={() => void recheckPublishedBacking()}
         />
       ) : null}
+      </div>
     </section>
   );
 }

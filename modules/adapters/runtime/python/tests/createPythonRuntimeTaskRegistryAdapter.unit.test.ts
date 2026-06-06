@@ -4,10 +4,13 @@ import type {
   StartPythonRuntimeTaskRequest,
 } from "../../../../contracts/runtime";
 import { TaskType } from "../../../../contracts/runtime";
+import { createWorkspaceId } from "../../../../contracts/workspace";
 import { describe, expect, expectTypeOf, it, testDouble } from "../../../../testing/node-test";
 import { createPythonRuntimeTaskRegistryAdapter } from "../createPythonRuntimeTaskRegistryAdapter";
 
 describe("createPythonRuntimeTaskRegistryAdapter", () => {
+  const workspaceId = createWorkspaceId("workspace.test");
+
   it("keeps the python runtime port on python-specific task contracts", () => {
     expectTypeOf<Parameters<PythonRuntimePort["startTask"]>[0]>()
       .toEqualTypeOf<StartPythonRuntimeTaskRequest>();
@@ -22,7 +25,7 @@ describe("createPythonRuntimeTaskRegistryAdapter", () => {
     const ensureRuntimeReady = testDouble.fn(async () => { callOrder.push("ensureRuntimeReady"); });
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort, { ensureRuntimeReady });
 
-    await adapter.startTask({ requestId: "req-ensure", taskType: TaskType.DATASET_PREPARATION, payload: {} });
+    await adapter.startTask({ workspaceId, requestId: "req-ensure", taskType: TaskType.DATASET_PREPARATION, payload: {} });
 
     expect(callOrder).toEqual(["ensureRuntimeReady", "startTask"]);
   });
@@ -32,7 +35,7 @@ describe("createPythonRuntimeTaskRegistryAdapter", () => {
     const ensureRuntimeReady = testDouble.fn(async () => { throw new Error("supervisor unavailable"); });
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort, { ensureRuntimeReady });
 
-    await expect(adapter.startTask({ requestId: "req-fail", taskType: TaskType.DATASET_PREPARATION, payload: {} }))
+    await expect(adapter.startTask({ workspaceId, requestId: "req-fail", taskType: TaskType.DATASET_PREPARATION, payload: {} }))
       .rejects.toThrow("Python runtime failed to start or become ready");
     expect(runtimePort.startTask).not.toHaveBeenCalled();
   });
@@ -59,34 +62,34 @@ describe("createPythonRuntimeTaskRegistryAdapter", () => {
 it("maps DATASET_PREPARATION startTask to python runtime task type", async () => {
     const runtimePort: any = { startTask: testDouble.fn(async (request) => ({ requestId: request.requestId })), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
-    await adapter.startTask({ requestId: "req-1", taskType: TaskType.DATASET_PREPARATION, payload: { a: 1 } });
-    expect(runtimePort.startTask).toHaveBeenCalledWith({ requestId: "req-1", taskType: "prepare-training-dataset", payload: { a: 1 }, metadata: undefined });
+    await adapter.startTask({ workspaceId, requestId: "req-1", taskType: TaskType.DATASET_PREPARATION, payload: { a: 1 } });
+    expect(runtimePort.startTask).toHaveBeenCalledWith({ requestId: "req-1", taskType: "prepare-training-dataset", payload: { a: 1 }, metadata: { workspaceId } });
   });
 
   it("maps MODEL_TRAINING startTask to train-model", async () => {
     const runtimePort: any = { startTask: testDouble.fn(async (request) => ({ requestId: request.requestId })), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
-    await adapter.startTask({ requestId: "req-2", taskType: TaskType.MODEL_TRAINING, payload: {} });
-    expect(runtimePort.startTask).toHaveBeenCalledWith({ requestId: "req-2", taskType: "train-model", payload: {}, metadata: undefined });
+    await adapter.startTask({ workspaceId, requestId: "req-2", taskType: TaskType.MODEL_TRAINING, payload: {} });
+    expect(runtimePort.startTask).toHaveBeenCalledWith({ requestId: "req-2", taskType: "train-model", payload: {}, metadata: { workspaceId } });
   });
 
   
   it("maps MODEL_VALIDATION startTask type", async () => {
     const runtimePort: any = { startTask: testDouble.fn(async (request) => ({ requestId: request.requestId })), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
-    await adapter.startTask({ requestId: "req-v", taskType: TaskType.MODEL_VALIDATION, payload: { hello: 1 } });
+    await adapter.startTask({ workspaceId, requestId: "req-v", taskType: TaskType.MODEL_VALIDATION, payload: { hello: 1 } });
     expect(runtimePort.startTask.mock.calls[0]?.[0]?.taskType).toBe("validate-model");
   });
   it("rejects MODEL_PUBLISHING startTask until implemented", async () => {
     const runtimePort: any = { startTask: testDouble.fn(), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
-    await expect(adapter.startTask({ requestId: "req-p", taskType: TaskType.MODEL_PUBLISHING, payload: { world: 2 } })).rejects.toThrow("model publishing runtime task is not implemented");
+    await expect(adapter.startTask({ workspaceId, requestId: "req-p", taskType: TaskType.MODEL_PUBLISHING, payload: { world: 2 } })).rejects.toThrow("model publishing runtime task is not implemented");
     expect(runtimePort.startTask).not.toHaveBeenCalled();
   });
 it("generates non-timestamp request ids when caller does not provide one", async () => {
     const runtimePort: any = { startTask: testDouble.fn(async (request) => ({ requestId: request.requestId })), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
-    await adapter.startTask({ taskType: TaskType.MODEL_TRAINING, payload: {} });
+    await adapter.startTask({ workspaceId, taskType: TaskType.MODEL_TRAINING, payload: {} });
     const requestId = runtimePort.startTask.mock.calls[0]?.[0]?.requestId as string;
     expect(requestId.startsWith("runtime-task-")).toBe(false);
     expect(typeof requestId).toBe("string");
@@ -134,7 +137,7 @@ it("generates non-timestamp request ids when caller does not provide one", async
   it("returns explicit unsupported metadata instead of throwing for listTasks", async () => {
     const runtimePort: any = { startTask: testDouble.fn(), readTaskStatus: testDouble.fn(), cancelTask: testDouble.fn(), getHealthStatus: testDouble.fn(), getCapabilities: testDouble.fn(), ensureModelDownloaded: testDouble.fn(), getModelStatus: testDouble.fn(), unloadModels: testDouble.fn() };
     const adapter = createPythonRuntimeTaskRegistryAdapter(runtimePort);
-    const result = await adapter.listTasks({ taskTypes: [TaskType.MODEL_TRAINING] });
+    const result = await adapter.listTasks({ workspaceId, taskTypes: [TaskType.MODEL_TRAINING] });
     expect(result).toMatchObject({
       tasks: [],
       unsupportedTaskTypes: [TaskType.MODEL_TRAINING],

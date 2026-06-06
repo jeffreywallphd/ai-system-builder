@@ -201,7 +201,7 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
         return [];
       }
       return ensureSuccess(
-        await desktopApi.browseUnregisteredArtifacts({ workspaceId: input?.workspaceId }),
+        await desktopApi.browseUnregisteredArtifacts({ workspaceId: input?.workspaceId }, { workspaceId: input?.workspaceId }),
         (value) => {
           const items = (value as { items?: DesktopUnregisteredArtifactBrowseItem[] } | undefined)?.items;
           return Array.isArray(items) ? items : [];

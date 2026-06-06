@@ -13,6 +13,22 @@ from .model_validation import validate_model_output
 
 SUPPORTED_METHODS = {"lora", "qlora", "full-finetune"}
 SUPPORTED_DATASET_FORMATS = {"jsonl", "json", "csv", "parquet"}
+DEFAULT_TRAINING_TASK = "llm-instruction"
+TEXT_CAUSAL_TRAINING_TASKS = {
+    "llm-instruction",
+    "llm-classification",
+    "llm-extraction",
+    "llm-embedding",
+    "llm-reranker",
+}
+NON_TEXT_TRAINING_TASKS = {
+    "diffusion-lora",
+    "vision-classification",
+    "vision-detection",
+    "vision-segmentation",
+}
+DIFFUSION_TRAINING_TASKS = {"diffusion-lora"}
+VISION_TRAINING_TASKS = {"vision-classification", "vision-detection", "vision-segmentation"}
 DEFAULT_SEQUENCE_LENGTH = 512
 MAX_REASONABLE_TOKENIZER_LENGTH = 1_000_000
 
@@ -48,6 +64,33 @@ def _parse_max_shard_size(payload: TrainModelTaskRequest) -> str:
     output = _to_dict(payload.output)
     raw = output.get("maxShardSize")
     return str(raw).strip() if isinstance(raw, str) and raw.strip() else DEFAULT_MAX_SHARD_SIZE
+
+
+def _resolve_training_task(payload: TrainModelTaskRequest) -> str:
+    raw = payload.trainingTask
+    if not raw and isinstance(payload.runMetadata, dict):
+        metadata_task = payload.runMetadata.get("trainingTask")
+        if isinstance(metadata_task, str):
+            raw = metadata_task
+        else:
+            metadata_task = payload.runMetadata.get("trainingTaskType")
+            raw = metadata_task if isinstance(metadata_task, str) else raw
+    normalized = str(raw or DEFAULT_TRAINING_TASK).strip().lower()
+    return normalized or DEFAULT_TRAINING_TASK
+
+
+def _training_task_tags(training_task: str) -> list[str]:
+    return {
+        "llm-instruction": ["text-generation"],
+        "llm-classification": ["text-classification"],
+        "llm-extraction": ["token-classification", "text-generation"],
+        "llm-embedding": ["sentence-similarity", "feature-extraction"],
+        "llm-reranker": ["text-ranking"],
+        "diffusion-lora": ["text-to-image"],
+        "vision-classification": ["image-classification"],
+        "vision-detection": ["object-detection"],
+        "vision-segmentation": ["image-segmentation"],
+    }.get(training_task, [])
 
 
 def _dataset_path(dataset: Any) -> Path:
@@ -214,16 +257,50 @@ def _resolve_effective_sequence_length(model: Any, tokenizer: Any, requested_len
 def _tokenize_dataset(dataset: Any, tokenizer: Any, max_sequence_length: int | None) -> Any:
     block_size = _to_positive_int(max_sequence_length) or DEFAULT_SEQUENCE_LENGTH
 
-    text_column = "text"
-    if text_column not in dataset["train"].column_names:
-        # fallback for common instruction datasets
-        for candidate in ["prompt", "input", "completion", "output"]:
-            if candidate in dataset["train"].column_names:
-                text_column = candidate
-                break
+    column_names = list(dataset["train"].column_names)
+
+    def format_row(batch: dict[str, list[Any]], index: int) -> str:
+        def value(column: str) -> str:
+            values = batch.get(column, [])
+            if index >= len(values):
+                return ""
+            raw = values[index]
+            if isinstance(raw, (dict, list)):
+                return json.dumps(raw, ensure_ascii=False)
+            return "" if raw is None else str(raw)
+
+        if {"instruction", "output"}.issubset(column_names):
+            instruction = value("instruction")
+            input_value = value("input")
+            output = value("output")
+            input_block = f"\nInput:\n{input_value}" if input_value else ""
+            return f"Instruction:\n{instruction}{input_block}\nResponse:\n{output}"
+
+        if {"text", "label"}.issubset(column_names):
+            return f"Text:\n{value('text')}\nLabel:\n{value('label')}"
+
+        if {"text", "expectedOutput"}.issubset(column_names):
+            return f"Text:\n{value('text')}\nExpected output:\n{value('expectedOutput')}"
+
+        if {"anchorText", "positiveText"}.issubset(column_names):
+            negative = value("negativeText")
+            negative_block = f"\nNegative:\n{negative}" if negative else ""
+            return f"Anchor:\n{value('anchorText')}\nPositive:\n{value('positiveText')}{negative_block}"
+
+        if {"query", "passage", "relevance"}.issubset(column_names):
+            negative = value("negativePassage")
+            negative_block = f"\nNegative passage:\n{negative}" if negative else ""
+            return f"Query:\n{value('query')}\nPassage:\n{value('passage')}\nRelevance:\n{value('relevance')}{negative_block}"
+
+        for candidate in ["text", "prompt", "input", "completion", "output"]:
+            if candidate in column_names:
+                return value(candidate)
+
+        return " ".join(value(column) for column in column_names if value(column))
 
     def tokenize(batch: dict[str, list[Any]]) -> dict[str, Any]:
-        texts = [str(item) for item in batch.get(text_column, [])]
+        row_count = max((len(values) for values in batch.values() if isinstance(values, list)), default=0)
+        texts = [format_row(batch, index) for index in range(row_count)]
         encoded = tokenizer(texts, truncation=True, padding="max_length", max_length=block_size)
         encoded["labels"] = list(encoded["input_ids"])
         return encoded
@@ -381,6 +458,7 @@ def train_model(
     on_progress: Callable[[dict[str, Any]], None] | None = None,
 ) -> TrainModelTaskResult:
     _require_non_empty(payload.output.get("outputModelName"), "output.outputModelName")
+    training_task = _resolve_training_task(payload)
 
     if payload.method not in SUPPORTED_METHODS:
         raise ValueError(f"Training method '{payload.method}' is not supported. Supported methods: {', '.join(sorted(SUPPORTED_METHODS))}")
@@ -395,7 +473,49 @@ def train_model(
     warnings: list[str] = []
     logs: list[str] = []
 
+    if training_task not in TEXT_CAUSAL_TRAINING_TASKS and training_task not in NON_TEXT_TRAINING_TASKS:
+        return TrainModelTaskResult(
+            runId=run_id,
+            status="failed",
+            outputDirectory=str(output_path),
+            outputModelName=output_model_name,
+            logs=logs,
+            warnings=warnings,
+            error={
+                "code": "training_task_unknown",
+                "message": f"Training task '{training_task}' is not recognized.",
+                "details": {
+                    "trainingTask": training_task,
+                    "supportedTrainingTasks": sorted(TEXT_CAUSAL_TRAINING_TASKS | NON_TEXT_TRAINING_TASKS),
+                },
+            },
+        )
+
     try:
+        if training_task in DIFFUSION_TRAINING_TASKS:
+            from .train_model_multimodal import train_diffusion_lora_model
+
+            return train_diffusion_lora_model(
+                payload,
+                training_task=training_task,
+                run_id=run_id,
+                output_path=output_path,
+                output_model_name=output_model_name,
+                on_progress=on_progress,
+            )
+
+        if training_task in VISION_TRAINING_TASKS:
+            from .train_model_multimodal import train_vision_model
+
+            return train_vision_model(
+                payload,
+                training_task=training_task,
+                run_id=run_id,
+                output_path=output_path,
+                output_model_name=output_model_name,
+                on_progress=on_progress,
+            )
+
         if on_progress is not None:
             on_progress({"stage": "initializing", "message": "Loading training datasets and model assets..."})
 
@@ -468,6 +588,7 @@ def train_model(
         manifest_path = write_serialization_manifest(output_path, {
             "runId": run_id,
             "method": payload.method,
+            "trainingTask": training_task,
             "serialization": serialization,
             "validation": validation,
         })
@@ -477,6 +598,7 @@ def train_model(
             {
                 "runId": run_id,
                 "method": payload.method,
+                "trainingTask": training_task,
                 "baseModel": payload.baseModel.model_dump(mode="json"),
                 "datasets": [dataset_entry.model_dump(mode="json") for dataset_entry in payload.datasets],
                 "startedAt": datetime.now(timezone.utc).isoformat(),
@@ -493,6 +615,7 @@ def train_model(
 
         metadata = {
             "runtimeTask": "train-model",
+            "trainingTask": training_task,
             "runMetadataPath": run_metadata_path,
             "validation": validation,
             "serialization": serialization,
@@ -507,6 +630,7 @@ def train_model(
                 "localPath": generated_model_path,
                 "artifactForm": artifact_form,
                 "inferenceMode": payload.baseModel.inferenceMode,
+                "taskTags": _training_task_tags(training_task),
                 "baseModelId": model_id,
                 "adapterOfModelId": model_id if artifact_form == "adapter" else None,
                 "generatedFromRunId": run_id,
@@ -556,6 +680,7 @@ def train_model(
                 "message": str(error),
                 "details": {
                     "method": payload.method,
+                    "trainingTask": training_task,
                 },
             },
         )

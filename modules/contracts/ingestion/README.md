@@ -1,5 +1,7 @@
 # Ingestion Contracts
 
+> AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
+
 Use this family for transport-neutral staged artifact intake semantics.
 
 What belongs here:

@@ -1,5 +1,7 @@
 # ADR Index
 
+> AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
+
 This directory stores Architecture Decision Records (ADRs) for `ai-system-builder`.
 
 ## Purpose
@@ -27,13 +29,8 @@ Use one of: `proposed`, `accepted`, `superseded`, `deprecated`.
 2. Link related ADRs and docs/context packs when relevant.
 3. Keep decision and rationale aligned with current code.
 
+## Inventory Rule
 
-## Current ADRs
+Treat the ADR files in this directory as the inventory source. Do not maintain a partial hand-written ADR list unless it is generated or checked as part of documentation review.
 
-- ADR-0003: Host Model and Transport Separation
-- ADR-0012: Image Generation Runtime
-- ADR-0013: Host-Owned Runtime Execution and Feature Placement (important source for cross-host runtime ownership and feature execution-placement decisions)
-- ADR-0014: Runtime Installer Architecture
-- ADR-0015: Security Architecture and Policy Boundaries (canonical security architecture boundaries across host, transport, storage, runtime, and policy layering)
-- ADR-0016: Asset Kernel Terminology and Architecture Baseline (accepted Phase 2A Asset Kernel vocabulary and sequence refining ADR-0005)
-- ADR-0017: User Library and Cross-Workspace Asset Reuse (accepted Phase 7 ownership/reuse baseline for user-library assets, explicit promote/link/copy/import relationships, provenance, and propagation constraints)
+ADRs may preserve decision history, but they should not become phase diaries, prompt transcripts, or later scope trackers. Historical context belongs in rationale only when it explains the decision.

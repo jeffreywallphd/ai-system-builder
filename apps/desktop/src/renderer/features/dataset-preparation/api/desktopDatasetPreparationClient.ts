@@ -30,7 +30,7 @@ export interface DesktopDatasetPreparationRequestContext {
 }
 
 export interface DesktopDatasetPreparationClient {
-  browseSourceArtifacts: (workspaceId?: string) => Promise<Array<{ artifactId: string; label: string; storageKey: string }>>;
+  browseSourceArtifacts: (workspaceId?: string) => Promise<Array<{ artifactId: string; label: string; storageKey: string; mediaType?: string; sourceKind?: string }>>;
   startPrepareTrainingDataset: (
     input: DesktopPrepareTrainingDatasetInput,
     context?: DesktopDatasetPreparationRequestContext,
@@ -108,6 +108,8 @@ export function createDesktopDatasetPreparationClient(): DesktopDatasetPreparati
           artifactId: artifact.artifactId,
           label: artifact.originalName ?? artifact.storageKey,
           storageKey: artifact.storageKey,
+          mediaType: artifact.mediaType,
+          sourceKind: artifact.sourceKind,
         };
       });
     },

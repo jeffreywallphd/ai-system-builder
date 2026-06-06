@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   ApplicationSettingCategory,
@@ -54,7 +54,19 @@ export function useApplicationSettings(options: UseApplicationSettingsOptions = 
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
   const [successMessage, setSuccessMessage] = useState<string | undefined>(undefined);
 
-  const query = useMemo(() => ({ category: options.category, keys: options.keys }), [options.category, options.keys]);
+  const keysSignature = options.keys === undefined ? undefined : JSON.stringify(options.keys);
+  const stableKeysRef = useRef<{
+    signature: string | undefined;
+    keys: ApplicationSettingKey[] | undefined;
+  }>({ signature: undefined, keys: undefined });
+  if (stableKeysRef.current.signature !== keysSignature) {
+    stableKeysRef.current = {
+      signature: keysSignature,
+      keys: options.keys === undefined ? undefined : [...options.keys],
+    };
+  }
+  const stableKeys = stableKeysRef.current.keys;
+  const query = useMemo(() => ({ category: options.category, keys: stableKeys }), [options.category, stableKeys]);
 
   const refresh = useCallback(async () => {
     setLoading(true);

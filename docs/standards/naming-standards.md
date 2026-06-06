@@ -34,7 +34,7 @@ If one of these is unavoidable, narrow it with role + domain context (for exampl
 Examples:
 
 - `modules/adapters/persistence/postgres/`
-- `modules/adapters/transport/express/`
+- `modules/adapters/transport/api-express/`
 - `modules/hosts/desktop/`
 
 Do not create vague folder buckets such as `modules/common/` or `modules/misc/` to bypass boundary discipline.

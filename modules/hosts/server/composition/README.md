@@ -1,5 +1,7 @@
 # Server host composition
 
+> AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
+
 `composeServerHost` wires server-host lifecycle dependencies while keeping transport setup thin.
 
 Current composition includes:

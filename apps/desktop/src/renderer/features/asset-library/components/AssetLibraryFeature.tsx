@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { TermWithHint } from "../../../../../../../modules/ui/shared";
 import type { AssetLibraryClient } from "../../../../../../../modules/ui/shared/asset-library";
 import {
   buildAssetLibraryMutationCommand,
@@ -27,7 +28,7 @@ interface AssetLibraryFeatureProps {
   readonly workspaceName?: string;
 }
 
-export function AssetLibraryFeature({ client, workspaceId, workspaceName }: AssetLibraryFeatureProps) {
+export function AssetLibraryFeature({ client, workspaceId }: AssetLibraryFeatureProps) {
   const state = useAssetLibraryFeature(client, workspaceId);
   const [pendingAction, setPendingAction] = useState<AssetLibraryMutationAction | undefined>();
   const [isMutating, setIsMutating] = useState(false);
@@ -61,8 +62,6 @@ export function AssetLibraryFeature({ client, workspaceId, workspaceName }: Asse
 
   return (
     <section className="asset-library-feature ui-stack ui-stack--lg">
-      {workspaceName ? <div className="ui-status" role="status">Workspace: {workspaceName}</div> : null}
-
       <AssetLibraryFilters
         filters={state.filters}
         onSearchTextChange={state.setSearchText}
@@ -234,12 +233,12 @@ function ResourceBackedViewDetailPanel({
       <h2>{detail.displayName}</h2>
       {detail.summary ? <p>{detail.summary}</p> : null}
       <dl className="asset-library-detail__facts">
-        <dt>View kind</dt><dd>{detail.viewKindLabel}</dd>
-        <dt>Status</dt><dd>{detail.registrationStatusLabel}</dd>
-        <dt>Type</dt><dd>{getAssetLibraryTypeLabel(detail)}</dd>
-        <dt>Family</dt><dd>{getAssetLibraryFamilyLabel(detail)}</dd>
-        {detail.sourceKind ? <><dt>Source</dt><dd>{detail.sourceKind}</dd></> : null}
-        {detail.resourceBackingSummary?.resourceKind ? <><dt>Backing</dt><dd>{detail.resourceBackingSummary.resourceKind}</dd></> : null}
+        <dt><TermWithHint termId="resourceBackedView">View kind</TermWithHint></dt><dd>{detail.viewKindLabel}</dd>
+        <dt><TermWithHint termId="lifecycleStatus">Status</TermWithHint></dt><dd>{detail.registrationStatusLabel}</dd>
+        <dt><TermWithHint termId="assetDefinition">Type</TermWithHint></dt><dd>{getAssetLibraryTypeLabel(detail)}</dd>
+        <dt><TermWithHint termId="assetFamily">Family</TermWithHint></dt><dd>{getAssetLibraryFamilyLabel(detail)}</dd>
+        {detail.sourceKind ? <><dt><TermWithHint termId="source">Source</TermWithHint></dt><dd>{detail.sourceKind}</dd></> : null}
+        {detail.resourceBackingSummary?.resourceKind ? <><dt><TermWithHint termId="backing">Backing</TermWithHint></dt><dd>{detail.resourceBackingSummary.resourceKind}</dd></> : null}
       </dl>
       {actions.length > 0 ? (
         <div className="asset-library-actions" aria-label="Resource view actions">

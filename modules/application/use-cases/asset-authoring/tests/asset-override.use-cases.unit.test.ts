@@ -13,7 +13,7 @@ const repo = () => {
     port: {
       async saveAssetOverrideRecord(r: AssetOverrideRecord){ state.saved.push(r); return r; },
       async updateAssetOverrideRecord(r: AssetOverrideRecord){ state.updated.push(r); state.read = r; return r; },
-      async readAssetOverrideRecord(){ return state.read; },
+      async readAssetOverrideRecord(_workspaceId: string, overrideId: string){ return state.read?.overrideId === overrideId ? state.read : undefined; },
       async listAssetOverrideRecords(){ return { records: [] }; },
       async findActiveOverrideForTarget(){ return state.active; },
       async listConflictedOverridesByWorkspace(){ return []; },
@@ -64,7 +64,7 @@ test("update override preserves protected fields and updates timestamp", async (
 
 test("disable override sets disabled and preserves immutability boundaries", async () => {
   const r = repo();
-  r.state.read = { overrideId: "override.1", targetWorkspaceId: ws, customizationTarget: target("system-owned-asset"), baseAssetReference: target().effectiveAssetReference, overrideScope: "system-derived", overrideValues: { summary: "before" }, status: "active", provenance: { kind: "system-derived-override", operationAt: "2026-05-19T00:00:00.000Z" }, createdAt: "2026-05-19T00:00:00.000Z", updatedAt: "2026-05-19T00:00:00.000Z" } as any;
+  r.state.read = { overrideId: "override.1", targetWorkspaceId: ws, customizationTarget: target("system-owned-asset"), baseAssetReference: target().effectiveAssetReference, overrideScope: "system-derived", overrideValues: { summary: "before" }, status: "active", provenance: { kind: "system-derived-override", targetWorkspaceId: ws, operationAt: "2026-05-19T00:00:00.000Z" }, createdAt: "2026-05-19T00:00:00.000Z", updatedAt: "2026-05-19T00:00:00.000Z" } as any;
   const uc = new DisableAssetOverrideUseCase({ assetOverrideRepository: r.port as any, now: () => "2026-05-19T02:00:00.000Z" });
   const ok = await uc.execute({ targetWorkspaceId: ws, overrideId: "override.1" } as any);
   assert.equal(ok.kind, "success");

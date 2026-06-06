@@ -1,5 +1,7 @@
 # IPC Contracts
 
+> AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
+
 IPC contracts specialize the shared transport contract core for desktop host
 message boundaries.
 

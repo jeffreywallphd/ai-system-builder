@@ -93,8 +93,8 @@ Use this pack for tasks involving:
 - `docs/architecture/asset-authoring-customization-and-overrides.md` - authored/customized asset and override behavior.
 - `docs/architecture/effective-asset-projections.md` - materialized/effective read surfaces.
 - `docs/architecture/asset-composition-planning.md` - composition plan semantics.
-- `docs/architecture/runtime-readiness-binding.md` - readiness/capability handoff.
-- `docs/architecture/execution-plan-preparation.md` - execution plan handoff.
+- `docs/architecture/runtime-readiness-binding.md` - readiness/capability output.
+- `docs/architecture/execution-plan-preparation.md` - execution plan output boundary.
 - `docs/architecture/controlled-conversational-system-execution.md` - conversational runtime execution when in scope.
 - `docs/architecture/persistence-and-storage.md` - artifact/resource/storage boundaries.
 - `docs/architecture/module-dependency-rules.md` - dependency direction constraints.
@@ -121,6 +121,6 @@ Use this pack for tasks involving:
 
 ## Prompt Assembly Notes
 
-- Pair this pack with the narrow phase pack that matches the task.
+- Pair this pack with the narrow task pack that matches the work.
 - Read canonical docs when changing architecture, source semantics, workspace scope, mutation behavior, or public transport/UI exposure.
-- Keep this pack as stable vocabulary and constraints; historical prompt-by-prompt state belongs in canonical docs or release notes, not reusable prompt context.
+- Keep this pack as stable vocabulary and constraints; implementation-history state belongs in issues, PRs, or release notes, not reusable context.

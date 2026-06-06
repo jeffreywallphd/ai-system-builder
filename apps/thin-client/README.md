@@ -1,12 +1,16 @@
 # Thin Client App
 
+> AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
+
 `apps/thin-client` is the server-backed thin-client host UI surface.
 
 Current scope:
 
 - minimal React bootstrap (`src/main.tsx`, `src/App.tsx`)
 - page-first composition (`src/pages/HomePage.tsx`)
-- feature-local artifact upload workflow under `src/features/artifact-upload/`
+- header shell with a centered compact **Current Workspace** selector between the brand area and the right-side hamburger/settings actions
+- Home page workspace card with a compact responsive equal-width two-column layout: change-workspace controls on the left and create-workspace controls on the right
+- feature-local artifact upload workflow under `src/features/artifact-upload/`, including multi-file selection, independent per-file results, and cancelation for selected or queued uploads
 - feature-local artifact browser workflow under `src/features/artifact-browser/`
 - fetch-based HTTP artifact-upload client that calls the server API route (`/api/artifact/upload`)
 - fetch-based HTTP website ingestion client that calls server API routes (`/api/artifact/ingest-website-page`, `/api/artifact/ingest-website-pages-batch`)
@@ -19,6 +23,7 @@ Current scope:
 - artifact-browser published-backing re-check state orchestration uses a shared cross-host hook from `modules/ui/shared`
 - settings page server restart control that calls `POST /api/server/restart`
 - token-first style baseline under `src/styles/`
+- Data Management tab content uses the shared sectioned panel header style for Data Artifact Ingester and Artifact Browser; panel headers stay title-only, with actions such as Artifact Browser refresh placed in the body.
 
 ## Hugging Face auth behavior
 
@@ -57,6 +62,8 @@ case path rather than desktop preload wiring.
 ## Upload transport
 
 - Thin-client artifact upload submits browser-native `multipart/form-data`.
+- The Upload data UI may select multiple files, but it sends one request per file so a validation failure for one file does not cancel the rest of the selected batch.
+- Upload results are reported per file, and cancelation clears a pending selection or stops remaining queued files after the current request finishes.
 - The upload form payload uses:
   - `file`: binary file body
   - `source`: upload source identifier

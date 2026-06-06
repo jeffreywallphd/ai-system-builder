@@ -5,6 +5,7 @@ import type {
   AuthoredAssetDraftRecord,
   AuthoredAssetRecord,
 } from '../../../../../../../modules/contracts/asset-authoring';
+import { TermWithHint } from '../../../../../../../modules/ui/shared';
 import { createDesktopAssetAuthoringClient } from '../api/desktopAssetAuthoringClient';
 
 type RowVm = {
@@ -198,13 +199,28 @@ export function AssetAuthoringFeature({ workspaceId, initialSection = "create" }
           }
         }}
       >
-        <input aria-label="Name" value={name} onChange={(event) => setName(event.target.value)} />
-        <select aria-label="Asset type" value={classification} onChange={(event) => setClassification(event.target.value)}>
-          {ASSET_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-        </select>
-        <input aria-label="Short summary" value={summary} onChange={(event) => setSummary(event.target.value)} />
-        <textarea aria-label="Description" value={description} onChange={(event) => setDescription(event.target.value)} />
-        <input aria-label="Tags" value={tags} onChange={(event) => setTags(event.target.value)} />
+        <label className="ui-stack ui-stack--sm">
+          <span><TermWithHint termId="assetDisplayName">Name</TermWithHint></span>
+          <input aria-label="Name" value={name} onChange={(event) => setName(event.target.value)} />
+        </label>
+        <label className="ui-stack ui-stack--sm">
+          <span><TermWithHint termId="assetTypeFilter">Asset type</TermWithHint></span>
+          <select aria-label="Asset type" value={classification} onChange={(event) => setClassification(event.target.value)}>
+            {ASSET_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+          </select>
+        </label>
+        <label className="ui-stack ui-stack--sm">
+          <span><TermWithHint termId="assetSummary">Short summary</TermWithHint></span>
+          <input aria-label="Short summary" value={summary} onChange={(event) => setSummary(event.target.value)} />
+        </label>
+        <label className="ui-stack ui-stack--sm">
+          <span><TermWithHint termId="assetDescription">Description</TermWithHint></span>
+          <textarea aria-label="Description" value={description} onChange={(event) => setDescription(event.target.value)} />
+        </label>
+        <label className="ui-stack ui-stack--sm">
+          <span><TermWithHint termId="assetTags">Tags</TermWithHint></span>
+          <input aria-label="Tags" value={tags} onChange={(event) => setTags(event.target.value)} />
+        </label>
         <button type="submit">Create asset draft</button>
       </form>
       {sectionMatches.customizations ? <h3>Customizations</h3> : null}

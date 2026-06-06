@@ -17,6 +17,7 @@ describe("security services", () => {
       },
       audit: { recordSecurityEvent: async (event) => events.push(event) },
       now: () => new Date("2026-05-01T00:00:00.000Z"),
+      idGenerator: { createDeviceId: () => "device-1", createSecurityEventId: () => "event-1" },
     });
 
     const result = await service.execute({ pairingCode: "1234" });
@@ -31,6 +32,7 @@ describe("security services", () => {
       pairingCodes: { consumePairingCode: async () => ({ status }) },
       tokens: { issueDeviceToken: async () => { throw new Error("no"); } },
       credentials: { saveDeviceCredential: async () => {}, findActiveDeviceCredentialByTokenHash: async () => undefined, revokeDevice: async () => false, countActiveDevices: async () => 0 },
+      idGenerator: { createDeviceId: () => "device-1", createSecurityEventId: () => "event-1" },
     });
 
     await expect(mk("invalid").execute({ pairingCode: "x" })).rejects.toThrow("Invalid pairing code");
@@ -44,7 +46,16 @@ describe("security services", () => {
     expect(context.authenticated).toBe(false);
 
     const required = new VerifyTransportAuthenticationService(verifier, { authRequired: true });
-    await expect(required.execute({ now: new Date(), bearerToken: undefined })).rejects.toThrow("Authentication required");
+    let rejected: unknown;
+    try {
+      await required.execute({ now: new Date(), bearerToken: undefined });
+    } catch (error) {
+      rejected = error;
+    }
+    expect(rejected).toMatchObject({
+      code: "security.unauthenticated",
+      message: "Authentication required.",
+    });
   });
 
   it("verify auth delegates token verification", async () => {

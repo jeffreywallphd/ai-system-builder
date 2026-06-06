@@ -24,6 +24,27 @@ const txt=(v:string,f:string,required=true)=>{const t=v.trim(); if(!t&&required)
 const ts=(v:string,f:string)=>{const t=v.trim(); if(!ISO.test(t)) throw new Error(`${f} is invalid.`); return t;};
 const code=(v:string,f:string)=>{const t=v.trim().toLowerCase(); if(!CODE.test(t)||UNSAFE.test(t)) throw new Error(`${f} is invalid.`); return t;};
 const ref=(v:string,f:string)=>txt(v,f,true)!;
+const EXECUTION_PLAN_RECORD_KEYS = new Set([
+  'id',
+  'workspaceId',
+  'sourceCompositionPlanId',
+  'sourceRuntimeReadinessBindingId',
+  'sourceReadinessStatus',
+  'status',
+  'steps',
+  'dependencies',
+  'inputs',
+  'outputs',
+  'adapterReferences',
+  'safetyGates',
+  'blockers',
+  'diagnostics',
+  'resourceEstimates',
+  'provenance',
+  'createdAt',
+  'updatedAt',
+  'archivedAt',
+]);
 
 export const normalizeExecutionDiagnostic=(d:ExecutionDiagnostic):ExecutionDiagnostic=>({ ...d, ...(d.diagnosticId?{diagnosticId:normalizeExecutionDiagnosticId(d.diagnosticId as string)}:{}), code: code(d.code,'Diagnostic code'), message: txt(d.message,'Diagnostic message')!, severity:d.severity, ...(d.targetReferenceId?{targetReferenceId:txt(d.targetReferenceId,'Diagnostic target')}:{}), ...(d.targetReferenceKind?{targetReferenceKind:txt(d.targetReferenceKind,'Diagnostic target kind')}:{}),});
 export const normalizeExecutionBlocker=(b:ExecutionBlocker):ExecutionBlocker=>({ ...b, ...(b.blockerId?{blockerId:normalizeExecutionBlockerId(b.blockerId as string)}:{}), code: code(b.code,'Blocker code'), message: txt(b.message,'Blocker message')!, ...(b.targetReferenceId?{targetReferenceId:txt(b.targetReferenceId,'Blocker target')}:{}), ...(b.targetReferenceKind?{targetReferenceKind:txt(b.targetReferenceKind,'Blocker target kind')}:{}),});
@@ -36,7 +57,7 @@ export const normalizeExecutionAdapterReference=(a:ExecutionAdapterReference):Ex
 export const normalizeExecutionSafetyGate=(g:ExecutionSafetyGate):ExecutionSafetyGate=>({...g,id:normalizeExecutionSafetyGateId(g.id as string),kind:normalizeExecutionSafetyGateKind(g.kind),status:normalizeExecutionSafetyGateStatus(g.status),label:txt(g.label,'safety gate label')!,...(g.summary?{summary:txt(g.summary,'safety gate summary')}:{}),...(g.stepId?{stepId:normalizeExecutionStepId(g.stepId as string)}:{}),...(g.inputId?{inputId:normalizeExecutionInputId(g.inputId as string)}:{}),...(g.outputId?{outputId:normalizeExecutionOutputId(g.outputId as string)}:{}),...(g.adapterReferenceId?{adapterReferenceId:normalizeExecutionAdapterReferenceId(g.adapterReferenceId as string)}:{}),blockers:block(g.blockers),diagnostics:diag(g.diagnostics)});
 export const normalizeExecutionResourceEstimate=(r:ExecutionResourceEstimate):ExecutionResourceEstimate=>({...r,id:normalizeExecutionResourceEstimateId(r.id as string),compute:normalizeExecutionComputeEstimateCategory(r.compute),storage:normalizeExecutionStorageEstimateCategory(r.storage),duration:normalizeExecutionDurationEstimateCategory(r.duration),...(r.summary?{summary:txt(r.summary,'resource summary')}:{}),});
 export const normalizeExecutionPlanProvenanceEntry=(p:ExecutionPlanProvenanceEntry):ExecutionPlanProvenanceEntry=>({...p,at:ts(p.at,'provenance at'),...(p.workspaceId?{workspaceId:createWorkspaceId(p.workspaceId)}:{}),...(p.executionPlanId?{executionPlanId:normalizeExecutionPlanId(p.executionPlanId as string)}:{}),...(p.runtimeReadinessBindingId?{runtimeReadinessBindingId:txt(p.runtimeReadinessBindingId,'runtimeReadinessBindingId')}:{}),...(p.compositionPlanId?{compositionPlanId:txt(p.compositionPlanId,'compositionPlanId')}:{}),...(p.stepId?{stepId:normalizeExecutionStepId(p.stepId as string)}:{}),...(p.inputId?{inputId:normalizeExecutionInputId(p.inputId as string)}:{}),...(p.outputId?{outputId:normalizeExecutionOutputId(p.outputId as string)}:{}),...(p.adapterReferenceId?{adapterReferenceId:normalizeExecutionAdapterReferenceId(p.adapterReferenceId as string)}:{}),...(p.safetyGateId?{safetyGateId:normalizeExecutionSafetyGateId(p.safetyGateId as string)}:{}),...(p.actorId?{actorId:txt(p.actorId,'actorId')}:{}),});
-export function normalizeExecutionPlanRecord(input: ExecutionPlanRecord): ExecutionPlanRecord { return {...input,id:normalizeExecutionPlanId(input.id as string),workspaceId:createWorkspaceId(input.workspaceId),sourceCompositionPlanId:txt(input.sourceCompositionPlanId,'sourceCompositionPlanId')!,sourceRuntimeReadinessBindingId:txt(input.sourceRuntimeReadinessBindingId,'sourceRuntimeReadinessBindingId')!,sourceReadinessStatus:txt(input.sourceReadinessStatus,'sourceReadinessStatus')!,status:normalizeExecutionPlanStatus(input.status),steps:input.steps.map(normalizeExecutionStep),dependencies:input.dependencies.map(normalizeExecutionDependency),inputs:input.inputs.map(normalizeExecutionInput),outputs:input.outputs.map(normalizeExecutionOutput),adapterReferences:input.adapterReferences.map(normalizeExecutionAdapterReference),safetyGates:input.safetyGates.map(normalizeExecutionSafetyGate),blockers:block(input.blockers),diagnostics:diag(input.diagnostics),resourceEstimates:input.resourceEstimates.map(normalizeExecutionResourceEstimate),provenance:input.provenance.map(normalizeExecutionPlanProvenanceEntry),createdAt:ts(input.createdAt,'createdAt'),updatedAt:ts(input.updatedAt,'updatedAt'),...(input.archivedAt?{archivedAt:ts(input.archivedAt,'archivedAt')}:{}),}; }
+export function normalizeExecutionPlanRecord(input: ExecutionPlanRecord): ExecutionPlanRecord { for (const key of Object.keys(input as unknown as Record<string, unknown>)) { if (!EXECUTION_PLAN_RECORD_KEYS.has(key)) throw new Error('Execution plan record contains an unsupported field.'); } return {...input,id:normalizeExecutionPlanId(input.id as string),workspaceId:createWorkspaceId(input.workspaceId),sourceCompositionPlanId:txt(input.sourceCompositionPlanId,'sourceCompositionPlanId')!,sourceRuntimeReadinessBindingId:txt(input.sourceRuntimeReadinessBindingId,'sourceRuntimeReadinessBindingId')!,sourceReadinessStatus:txt(input.sourceReadinessStatus,'sourceReadinessStatus')!,status:normalizeExecutionPlanStatus(input.status),steps:input.steps.map(normalizeExecutionStep),dependencies:input.dependencies.map(normalizeExecutionDependency),inputs:input.inputs.map(normalizeExecutionInput),outputs:input.outputs.map(normalizeExecutionOutput),adapterReferences:input.adapterReferences.map(normalizeExecutionAdapterReference),safetyGates:input.safetyGates.map(normalizeExecutionSafetyGate),blockers:block(input.blockers),diagnostics:diag(input.diagnostics),resourceEstimates:input.resourceEstimates.map(normalizeExecutionResourceEstimate),provenance:input.provenance.map(normalizeExecutionPlanProvenanceEntry),createdAt:ts(input.createdAt,'createdAt'),updatedAt:ts(input.updatedAt,'updatedAt'),...(input.archivedAt?{archivedAt:ts(input.archivedAt,'archivedAt')}:{}),}; }
 
 const ws=<T extends {workspaceId:string}>(v:T)=>({...v,workspaceId:createWorkspaceId(v.workspaceId)});
 export const normalizeCreateExecutionPlanCommand=(v:CreateExecutionPlanCommand)=>({...ws(v),runtimeReadinessBindingId:txt(v.runtimeReadinessBindingId,'runtimeReadinessBindingId')!,...(v.compositionPlanId?{compositionPlanId:txt(v.compositionPlanId,'compositionPlanId')}:{}),});

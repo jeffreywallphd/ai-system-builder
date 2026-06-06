@@ -16,6 +16,18 @@ function setSelectValue(select: HTMLSelectElement, value: string): void {
   select.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
+function findArtifactDetailsButton(container: HTMLElement, storageKey: string): HTMLButtonElement {
+  const button = Array.from(container.querySelectorAll("button"))
+    .find((candidate) => candidate.textContent === "View Details"
+      && Boolean(candidate.closest("article, section, li")?.textContent?.includes(storageKey)));
+
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Unable to find View Details button for ${storageKey}.`);
+  }
+
+  return button;
+}
+
 describe("Desktop ArtifactBrowserFeature publish flow", () => {
   let mountedRoot: Root | undefined;
   let mountedContainer: HTMLDivElement | undefined;
@@ -114,8 +126,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       root.render(<ArtifactBrowserFeature client={client} />);
     });
 
-    const artifactButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent?.includes("uploads/cat.png")) as HTMLButtonElement;
+    const artifactButton = findArtifactDetailsButton(container, "uploads/cat.png");
     await act(async () => {
       artifactButton.click();
     });
@@ -186,8 +197,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       root.render(<ArtifactBrowserFeature client={client} />);
     });
 
-    const artifactButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent?.includes("uploads/cat.png")) as HTMLButtonElement;
+    const artifactButton = findArtifactDetailsButton(container, "uploads/cat.png");
     await act(async () => {
       artifactButton.click();
     });
@@ -250,8 +260,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       root.render(<ArtifactBrowserFeature client={client} />);
     });
 
-    const artifactButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent?.includes("uploads/cat.png")) as HTMLButtonElement;
+    const artifactButton = findArtifactDetailsButton(container, "uploads/cat.png");
     await act(async () => {
       artifactButton.click();
     });
@@ -290,6 +299,8 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
 
     expect(container.textContent).toContain("Artifact Browser");
     expect(container.textContent).toContain("Hugging Face settings");
+    expect(container.textContent).toContain("There are currently no uploaded artifacts in the workspace.");
+    expect(container.textContent).toContain("There are currently no generated artifacts in the workspace.");
     expect(container.textContent).not.toContain("Register from Hugging Face");
   });
 
@@ -333,8 +344,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     });
 
     expect(container.textContent).toContain("uploads/train.parquet");
-    const parquetButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent?.includes("uploads/train.parquet")) as HTMLButtonElement;
+    const parquetButton = findArtifactDetailsButton(container, "uploads/train.parquet");
 
     await act(async () => {
       parquetButton.click();
@@ -510,8 +520,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       root.render(<ArtifactBrowserFeature client={client} />);
     });
 
-    const artifactButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent?.includes("uploads/cat.png")) as HTMLButtonElement;
+    const artifactButton = findArtifactDetailsButton(container, "uploads/cat.png");
     await act(async () => {
       artifactButton.click();
     });
@@ -568,8 +577,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       root.render(<ArtifactBrowserFeature client={client} />);
     });
 
-    const artifactButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent?.includes("uploads/cat.png")) as HTMLButtonElement;
+    const artifactButton = findArtifactDetailsButton(container, "uploads/cat.png");
     await act(async () => {
       artifactButton.click();
     });
@@ -690,8 +698,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       root.render(<ArtifactBrowserFeature client={client} />);
     });
 
-    const artifactButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent?.includes("uploads/cat.png")) as HTMLButtonElement;
+    const artifactButton = findArtifactDetailsButton(container, "uploads/cat.png");
     await act(async () => {
       artifactButton.click();
     });
@@ -773,8 +780,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
       root.render(<ArtifactBrowserFeature client={client} />);
     });
 
-    const artifactButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent?.includes("artifacts/20260418000000-local01")) as HTMLButtonElement;
+    const artifactButton = findArtifactDetailsButton(container, "artifacts/20260418000000-local01");
     await act(async () => {
       artifactButton.click();
     });
@@ -869,8 +875,7 @@ describe("Desktop ArtifactBrowserFeature publish flow", () => {
     expect(container.textContent).toContain("Remote only");
     expect(container.textContent).toContain("Published");
 
-    const artifactButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent?.includes("artifacts/20260418000000-local01")) as HTMLButtonElement;
+    const artifactButton = findArtifactDetailsButton(container, "artifacts/20260418000000-local01");
     await act(async () => {
       artifactButton.click();
     });
@@ -931,8 +936,7 @@ it("renders website capture metadata and HTML source preview for website-ingeste
     root.render(<ArtifactBrowserFeature client={client} />);
   });
 
-  const artifactButton = Array.from(container.querySelectorAll("button"))
-    .find((button) => button.textContent?.includes("staged/website/example.com/index.html")) as HTMLButtonElement;
+  const artifactButton = findArtifactDetailsButton(container, "staged/website/example.com/index.html");
 
   await act(async () => {
     artifactButton.click();
@@ -997,8 +1001,8 @@ it("revokes prior object URLs when image preview selection changes and on unmoun
     root.render(<ArtifactBrowserFeature client={client} />);
   });
 
-  const first = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("cat-1")) as HTMLButtonElement;
-  const second = Array.from(container.querySelectorAll("button")).find((button) => button.textContent?.includes("cat-2")) as HTMLButtonElement;
+  const first = findArtifactDetailsButton(container, "uploads/cat-1.png");
+  const second = findArtifactDetailsButton(container, "uploads/cat-2.png");
 
   await act(async () => {
     first.click();

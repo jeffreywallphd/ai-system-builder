@@ -48,9 +48,9 @@ Include this pack when prompts involve:
 - Runtime installers should write install metadata under the install root or a target-specific metadata file.
 - Metadata should include source, requested ref, resolved ref/commit SHA, installedAt, lastCheckedAt, and an ownership/managed marker.
 - The managed marker is required before repair/update modifies an existing non-empty directory.
-- Prompt 2 can choose the exact metadata filename; suggested: `.ai-system-builder-runtime-install.json`.
+- Current default metadata filename: `.ai-system-builder-runtime-install.json`.
 
-## Prompt 2 Progress
+## Implemented Installer Surfaces
 
 - A generic Git runtime installer adapter exists in the adapter layer.
 - The Git installer is generic and not ComfyUI-specific.
@@ -60,7 +60,7 @@ Include this pack when prompts involve:
 - `forceRepair` is conservative: it reuses managed update/repair flow only and does not permit destructive unmanaged repair.
 - Managed metadata must be valid before an install root is considered managed.
 - Update semantics are conservative: fetch always runs, pinned refs/tags/SHAs are checked out and recorded, and pull is only used when no ref is pinned.
-- ComfyUI-specific defaults/composition are deferred to Prompt 3.
+- ComfyUI-specific defaults/composition are handled by the ComfyUI installer composition layer.
 
 ## ComfyUI Installer Composition
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type { AssetAuthoringEffectiveSourceSummary, AssetOverrideRecord, AuthoredAssetDraftRecord, AuthoredAssetRecord } from '../../../../../../modules/contracts/asset-authoring';
+import { TermWithHint } from '../../../../../../modules/ui/shared';
 import { createThinClientAssetAuthoringClient } from '../api/thinClientAssetAuthoringClient';
 
 type RowVm = { id: string; label: string; statusLabel: string; summary?: string; typeLabel?: string; tags?: readonly string[] };
@@ -95,11 +96,11 @@ export function AssetAuthoringFeature({ workspaceId, initialSection = 'create' }
         <section className="ui-panel ui-stack">
           <h3>Create Asset</h3>
           <form className="ui-stack" onSubmit={createDraft}>
-            <label>Display name <input aria-label="Display name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
-            <label>Asset type <select aria-label="Asset type" value={classification} onChange={(event) => setClassification(event.target.value)}>{ASSET_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-            <label>Summary <input aria-label="Summary" value={summary} onChange={(event) => setSummary(event.target.value)} /></label>
-            <label>Description <textarea aria-label="Description" value={description} onChange={(event) => setDescription(event.target.value)} /></label>
-            <label>Tags <input aria-label="Tags" value={tags} onChange={(event) => setTags(event.target.value)} /></label>
+            <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="assetDisplayName">Display name</TermWithHint></span><input aria-label="Display name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label>
+            <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="assetTypeFilter">Asset type</TermWithHint></span><select aria-label="Asset type" value={classification} onChange={(event) => setClassification(event.target.value)}>{ASSET_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+            <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="assetSummary">Summary</TermWithHint></span><input aria-label="Summary" value={summary} onChange={(event) => setSummary(event.target.value)} /></label>
+            <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="assetDescription">Description</TermWithHint></span><textarea aria-label="Description" value={description} onChange={(event) => setDescription(event.target.value)} /></label>
+            <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="assetTags">Tags</TermWithHint></span><input aria-label="Tags" value={tags} onChange={(event) => setTags(event.target.value)} /></label>
             <button type="submit">Save draft</button>
           </form>
           <AssetList title="Created Assets" emptyLabel="No custom assets yet." rows={authored} />

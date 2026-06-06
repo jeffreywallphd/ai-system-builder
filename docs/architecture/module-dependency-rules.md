@@ -66,7 +66,7 @@ Configuration loading/resolution remains a composition-root responsibility today
 **Rule**: Contracts are stable cross-boundary language, not implementation containers.
 Contract families must compose, not fork:
 
-- Keep `modules/contracts/asset` as the shared Asset Kernel contract family for core asset identity/lifecycle/provenance/reference/definition/instance/binding/composition vocabulary only; detailed configuration, AI-context, port/rule validation, registry/application ports, persistence, and resource-backed mapping belong to later Phase 2A prompts/layers.
+- Keep `modules/contracts/asset` as the shared Asset Kernel contract family for core asset identity/lifecycle/provenance/reference/definition/instance/binding/composition vocabulary only; detailed configuration, AI-context, port/rule validation, registry/application ports, persistence, and resource-backed mapping belong to later Asset Kernel contract baseline layers.
 - Treat `modules/contracts/transport` as the shared transport envelope and operation base.
 - Keep API and IPC contracts as specializations over that shared base.
 - Keep operation identity and IPC channel derivation helper-driven rather than ad hoc string assembly.
@@ -185,4 +185,4 @@ See ADR-0015.
 
 Workspace-owned operations cannot rely on renderer/page gating alone. The active workspace id must be represented in shared contracts and carried through clients, API/IPC/preload transports, application use cases, port interfaces, provider seams, and persistence adapters. Lower layers should fail safely or return sanitized diagnostics when workspace context is absent; they must not invent default/global workspace ids or add legacy global fallback behavior.
 
-Phase ownership remains: Phase 6 is Workspace Foundations; Phase 7 is User Library and Cross-Workspace Asset Reuse; Phase 8 is Asset Authoring, Customization, and Override Management; Phase 9 is Composition Planning and Authoring; Phase 10 is Execution Binding and Runtime-Orchestrated Systems; Phase 11 is Pack Import/Export, Sharing, and Distribution; Phase 12 is Collaboration, Permissions, and Multi-User Workspaces.
+Topic ownership belongs in the specific architecture docs for each area. Do not maintain phase/topic maps in dependency rules; update the relevant architecture doc and ADR instead.

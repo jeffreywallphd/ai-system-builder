@@ -1,26 +1,26 @@
-# Asset Composition Planning (Phase 10)
+# Asset Composition Planning
 
 ## Purpose
 
-Phase 10 introduces **Asset Composition Planning** as a workspace-scoped, non-runtime planning layer.
+Asset composition planning is a workspace-scoped, non-runtime planning layer.
 
-Architecture thesis: **Phase 10 introduces workspace-scoped composition plans that reference safe effective asset projections from Phase 9. Composition plans organize selected projections into roles and relationships, validate compatibility, and identify blockers before any runtime binding or workflow execution occurs.**
+Architecture thesis: workspace-scoped composition plans reference safe effective asset projections, organize selected projections into roles and relationships, validate compatibility, and identify blockers before any runtime binding or workflow execution occurs.
 
-This phase answers: _Which effective assets can be combined, in what planning roles and relationships, to form a valid system/workflow plan?_ It does **not** execute workflows.
+This layer answers: _Which effective assets can be combined, in what planning roles and relationships, to form a valid system/workflow plan?_ It does **not** execute workflows.
 
 ## Scope and boundaries
 
-Phase 10 is:
+Asset composition planning is:
 
 - a planning layer;
 - workspace-scoped;
 - reference-oriented (projection references, not raw authored payloads);
 - non-runtime;
 - non-executing;
-- dependent on Phase 9 projection summaries/statuses/diagnostics;
-- preparatory for Phase 11 runtime-readiness binding.
+- dependent on effective asset projection summaries, statuses, blockers, and diagnostics;
+- preparatory for runtime readiness binding.
 
-Phase 10 is not visual-canvas-first authoring, not runtime execution, and not workflow materialization.
+Asset composition planning is not visual-canvas-first authoring, runtime execution, or workflow materialization.
 
 ## Vocabulary
 
@@ -28,15 +28,15 @@ Phase 10 is not visual-canvas-first authoring, not runtime execution, and not wo
 - **Composition node**: a plan-local role assignment for one selected projection.
 - **Composition relationship**: a plan-local planning connection between nodes.
 - **Selected projection**: an effective asset projection chosen for planning.
-- **Projection reference**: stable reference to a Phase 9 effective projection record.
+- **Projection reference**: stable reference to an effective asset projection record.
 - **Composition role**: plan-level role assigned to a node.
 - **Relationship kind**: plan-level relationship category used for compatibility checks.
 - **Compatibility check**: deterministic plan-time validation against workspace scope, projection status, role compatibility, and relationship rules.
-- **Compatibility status**: outcome of compatibility checks (for plan, node, relationship).
-- **Composition blocker**: issue that prevents a plan from being valid for runtime-readiness handoff.
+- **Compatibility status**: outcome of compatibility checks for a plan, node, or relationship.
+- **Composition blocker**: issue that prevents a plan from being valid for runtime-readiness analysis.
 - **Composition diagnostic**: safe explanation/warning/error used by operators and UI.
 - **Composition readiness**: planning-only readiness state; not runtime readiness.
-- **Planning-ready**: plan/projection state sufficient for Phase 10 planning checks.
+- **Planning-ready**: plan/projection state sufficient for planning checks.
 - **Planning-blocked**: plan/projection state that blocks planning progress.
 - **Missing dependency**: required node/relationship/capability reference is absent.
 - **Required capability**: capability needed by node/relationship during planning analysis.
@@ -45,16 +45,16 @@ Phase 10 is not visual-canvas-first authoring, not runtime execution, and not wo
 - **Plan validation**: compatibility check execution and status/diagnostic updates.
 - **Plan refresh**: re-check against latest projection summaries/statuses.
 - **Plan snapshot**: optional immutable read view of a plan at a point in time.
-- **Runtime-readiness handoff**: constrained output passed to Phase 11 for capability binding analysis.
+- **Runtime-readiness output**: constrained output passed to runtime readiness binding for capability analysis.
 - **Execution deferred**: explicit marker that workflow/runtime/model execution is out of scope.
 
-User-facing labels should stay simpler (for example: “Plan”, “Assets in this plan”, “Role”, “Connection”, “Ready for planning”, “Needs attention”, “Missing requirement”).
+User-facing labels should stay simpler, such as "Plan", "Assets in this plan", "Role", "Connection", "Ready for planning", "Needs attention", and "Missing requirement".
 
-## Conceptual model (non-contract baseline)
+## Conceptual model
 
-Phase 10 defines conceptual records only (no TypeScript contracts in Prompt 1).
+Composition planning records are planning metadata only. They must not carry executable payloads, runtime/provider command payloads, prompt text, workflow JSON, bytes/base64, paths, or secrets.
 
-### Composition plan (conceptual)
+### Composition Plan
 
 - composition plan ID;
 - target workspace ID;
@@ -70,7 +70,7 @@ Phase 10 defines conceptual records only (no TypeScript contracts in Prompt 1).
 - provenance;
 - created/updated timestamps.
 
-### Composition node (conceptual)
+### Composition Node
 
 - node ID;
 - projection ID;
@@ -81,7 +81,7 @@ Phase 10 defines conceptual records only (no TypeScript contracts in Prompt 1).
 - provided outputs/capabilities;
 - diagnostics.
 
-### Composition relationship (conceptual)
+### Composition Relationship
 
 - relationship ID;
 - source node ID;
@@ -90,11 +90,9 @@ Phase 10 defines conceptual records only (no TypeScript contracts in Prompt 1).
 - compatibility status;
 - diagnostics.
 
-All records are planning metadata only. They must not carry executable payloads, runtime/provider command payloads, prompt text, workflow JSON, bytes/base64, paths, or secrets.
-
 ## Plan status baseline
 
-Conservative Phase 10 plan statuses:
+Conservative plan statuses:
 
 - `draft`
 - `valid`
@@ -107,12 +105,12 @@ Conservative Phase 10 plan statuses:
 
 Status semantics:
 
-- `valid` = valid as a non-runtime composition plan only.
+- `valid` means valid as a non-runtime composition plan only.
 - `valid` does **not** imply executable.
 - `valid` does **not** imply runtime-ready.
-- `blocked` = cannot safely proceed to runtime-readiness binding.
-- `stale` = projection summaries/statuses changed and plan refresh is required.
-- `archived` = inactive historical plan.
+- `blocked` means the plan cannot safely proceed to runtime-readiness analysis.
+- `stale` means projection summaries/statuses changed and plan refresh is required.
+- `archived` means inactive historical plan.
 
 ## Initial composition role vocabulary
 
@@ -127,7 +125,7 @@ Status semantics:
 - `runtime-capability-placeholder`
 - `supporting-asset`
 
-These are intentionally modest planning roles, not a full workflow language. Later phases may refine role taxonomies based on concrete vertical slices.
+These are intentionally modest planning roles, not a full workflow language. Later canonical execution slices may refine role taxonomies based on concrete vertical slices.
 
 ## Initial relationship kinds
 
@@ -165,11 +163,11 @@ Plan validation should check, at minimum:
 
 Checks must output safe diagnostics and explicit blockers.
 
-## Dependency on Phase 9 effective projections
+## Dependency on effective asset projections
 
-Phase 10 depends on the stable Phase 9 concept of workspace-scoped effective projection summaries and statuses.
+Asset composition planning depends on workspace-scoped effective projection summaries and statuses.
 
-Phase 10 may read:
+Composition planning may read:
 
 - projection IDs;
 - workspace IDs;
@@ -183,7 +181,7 @@ Phase 10 may read:
 - provenance summaries;
 - readiness/consumability flags.
 
-Phase 10 must not:
+Composition planning must not:
 
 - bypass projection summaries to inspect raw authored/customization internals when summaries exist;
 - reconstruct projection logic;
@@ -191,29 +189,31 @@ Phase 10 must not:
 - treat projection `ready` as runtime-ready;
 - hide missing projections by direct source fallbacks.
 
-If a required summary is missing, Phase 10 emits planning diagnostics/blockers (not bypass logic).
+If a required summary is missing, composition planning emits planning diagnostics/blockers rather than bypass logic.
 
-## Relationship to Phase 8 Asset Authoring
+## Relationships to source layers
 
-- Phase 10 may compose projections derived from authored/customized assets.
-- Phase 10 does not author or edit those assets.
+Asset authoring/customization:
+
+- Composition planning may compose projections derived from authored/customized assets.
+- Composition planning does not author or edit those assets.
 - If edits are needed, user flow returns to Assets authoring/customization surfaces.
 
-## Relationship to Phase 7 User Library
+User Library reuse:
 
-- Phase 10 may compose projections derived from linked assets, detached copies, or workspace imports.
-- Phase 10 must not mutate user-library sources, create live workspace-to-workspace links, or silently propagate source changes.
-- Phase 10 does not perform marketplace or import/export behavior.
+- Composition planning may compose projections derived from linked assets, detached copies, or workspace imports.
+- Composition planning must not mutate user-library sources, create live workspace-to-workspace links, or silently propagate source changes.
+- Composition planning does not perform marketplace or import/export behavior.
 
-## Relationship to Asset Kernel
+Asset Kernel:
 
-- Phase 10 consumes effective asset references and safe projected fields.
-- Phase 10 does not write kernel definitions, mutate system foundation assets, copy `system.foundation@1.0.0`, or generate executable payloads.
+- Composition planning consumes effective asset references and safe projected fields.
+- Composition planning does not write kernel definitions, mutate system foundation assets, copy `system.foundation@1.0.0`, or generate executable payloads.
 - Composition nodes are planning wrappers, not new kernel definitions.
 
-## What Phase 10 implements vs defers
+## Implemented and deferred scope
 
-Implemented in Phase 10 (across planned prompts):
+Implemented scope:
 
 - planning vocabulary and contracts for composition plans/nodes/relationships;
 - workspace-scoped plan creation/read/list/archive;
@@ -222,7 +222,7 @@ Implemented in Phase 10 (across planned prompts):
 - compatibility/readiness diagnostics;
 - read-model/transport/UI baseline for planning workflows.
 
-Deferred from Phase 10:
+Deferred scope:
 
 - workflow/runtime/model execution;
 - runtime/provider binding and capability activation;
@@ -236,13 +236,11 @@ Deferred from Phase 10:
 - pack import/export and marketplace behavior;
 - source mutation (authoring/library/system foundation).
 
-## Phase 11 handoff (runtime readiness binding)
+## Runtime Readiness Output
 
-Phase 11 is **Runtime Readiness Binding**.
+Asset composition planning outputs validated planning structure. Runtime readiness binding determines whether runtime capabilities/providers are actually available, including installed runtimes, model/provider/storage/API/dependency/environment readiness, and capability mapping.
 
-Phase 10 hands off validated planning structure; Phase 11 determines whether runtime capabilities/providers are actually available (installed runtimes, model/provider/storage/API/dependency/environment readiness, capability mapping).
-
-Conceptual handoff shape (illustrative only):
+Conceptual output shape:
 
 ```ts
 ValidatedCompositionPlan {
@@ -258,42 +256,18 @@ ValidatedCompositionPlan {
 }
 ```
 
-Phase 11 may still remain non-executing unless a later phase introduces execution semantics.
+Runtime readiness binding remains non-executing unless a later canonical execution boundary introduces execution semantics.
 
-## Phase 10 implementation sequence
+## Non-goals
 
-1. Prompt 1 — Architecture baseline, ADR, docs, context pack.
-2. Prompt 2 — Contract vocabulary: plans, nodes, relationships, roles, compatibility.
-3. Prompt 3 — Application ports and persistence adapters.
-4. Review A — Contracts, persistence, workspace isolation, and anti-drift review.
-5. Prompt 4 — Create/read/list/archive composition plans.
-6. Prompt 5 — Add/remove projected assets as composition nodes.
-7. Prompt 6 — Relationship modeling and simple dependency planning.
-8. Review B — Plan semantics, compatibility, no-runtime boundary review.
-9. Prompt 7 — Compatibility/readiness validation services.
-10. Prompt 8 — Composition read model integration.
-11. Prompt 9 — API/IPC/preload exposure (may split into 9a/9b/9c if needed).
-12. Prompt 10 — Minimal desktop/thin-client planning UI and docs closeout.
-13. Review C — Final Phase 10 closeout review.
+Asset composition planning does not implement workflow execution, runtime execution, ComfyUI execution, model execution, visual canvas authoring, arbitrary graph editing, prompt/workflow JSON editing, materialized workflow payload generation, conflict rebase/resolution, background propagation, live workspace linking/sync, collaboration permissions, pack import/export, marketplace behavior, or mutation/copy of `system.foundation`.
 
-## Non-goals (explicit)
-
-Phase 10 does not implement workflow execution, runtime execution, ComfyUI execution, model execution, visual canvas authoring, arbitrary graph editing, prompt/workflow JSON editing, materialized workflow payload generation, conflict rebase/resolution, background propagation, live workspace linking/sync, collaboration permissions, pack import/export, marketplace behavior, or mutation/copy of `system.foundation`.
-
-
-## Phase 10 UI closeout
+## UI placement
 
 - Composition planning is exposed inside the **Assets** area as a `Plans` tab, not as a separate top-level page.
-- The Phase 10 UI is structured form/list planning (plans, assets in plan, connections, check plan), not visual canvas authoring.
-- `valid` means **Ready for planning** only; it does not mean runtime-ready or execution-ready.
-- Runtime-readiness binding and workflow/runtime/model execution remain deferred to Phase 11+.
-- API/IPC/preload/client exposure from Prompt 9 is the boundary used by UI operations; unsupported operations must render as unavailable in UI.
-
-## Phase 10 UI closeout (Review C)
-
-- Plans remain inside the **Assets** page as a `Plans` tab for desktop and thin client.
+- The UI is structured form/list planning (plans, assets in plan, connections, check plan), not visual canvas authoring.
+- `valid` means **ready for planning** only; it does not mean runtime-ready or execution-ready.
+- Runtime-readiness binding and workflow/runtime/model execution remain deferred.
+- API/IPC/preload/client exposure is the boundary used by UI operations; unsupported operations must render as unavailable in UI.
 - Plans list/detail UI consumes safe read-model responses (`summaries`, `summary`, `nodes`, `relationships`, `diagnostics`, `blockers`).
 - User-facing UI does not present Effective Asset Projection terminology as a primary concept.
-- `valid` means **ready for planning** only (not runtime-ready, execution-ready, or workflow-ready).
-- Runtime-readiness binding is deferred to Phase 11.
-- Workflow/runtime/model execution and visual canvas authoring remain deferred.

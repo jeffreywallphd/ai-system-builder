@@ -7,7 +7,7 @@
 
 ## Context
 
-Phase 10 introduced validated workspace-scoped asset composition plans that remain planning-only and non-executing. The next architecture layer must determine whether required runtime capabilities are available before execution-oriented phases begin.
+asset composition planning introduced validated workspace-scoped asset composition plans that remain planning-only and non-executing. The next architecture layer must determine whether required runtime capabilities are available before execution-oriented phases begin.
 
 The repository needs a conservative readiness layer that:
 
@@ -18,25 +18,25 @@ The repository needs a conservative readiness layer that:
 
 ## Decision
 
-Phase 11 introduces workspace-scoped runtime readiness bindings that map validated Phase 10 composition plans to safe runtime capability/provider inventory. These bindings identify available candidates, missing requirements, and blockers, but do not execute workflows, invoke providers, install dependencies, download models, or generate executable payloads.
+runtime readiness binding introduces workspace-scoped runtime readiness bindings that map validated asset composition planning composition plans to safe runtime capability/provider inventory. These bindings identify available candidates, missing requirements, and blockers, but do not execute workflows, invoke providers, install dependencies, download models, or generate executable payloads.
 
-## Accepted Phase 11 boundaries
+## Accepted runtime readiness binding boundaries
 
-Phase 11 accepts only readiness responsibilities:
+runtime readiness binding accepts only readiness responsibilities:
 
 - capability requirement extraction from validated plans;
 - safe inventory discovery and capability matching;
 - binding candidate and confirmed-binding metadata;
 - readiness statuses, blockers, diagnostics, and provenance;
-- handoff metadata to Phase 12.
+- readiness output metadata for execution plan preparation.
 
 ## Runtime readiness ownership and workspace scope
 
-Runtime readiness records are workspace-scoped planning metadata. Ownership is application/readiness-layer governed, while inventory sources come from host/runtime adapter seams. No direct UI/runtime host execution is owned by Phase 11.
+Runtime readiness records are workspace-scoped planning metadata. Ownership is application/readiness-layer governed, while inventory sources come from host/runtime adapter seams. No direct UI/runtime host execution is owned by runtime readiness binding.
 
-## Depend on validated Phase 10 composition plans
+## Depend on validated asset composition planning composition plans
 
-Phase 11 consumes validated plan status/data as the sole normal source of readiness requirements. If plan state is missing/invalid/blocked/conflicted/stale/unsupported/archived/unvalidated, readiness returns blockers instead of bypassing planning.
+runtime readiness binding consumes validated plan status/data as the sole normal source of readiness requirements. If plan state is missing/invalid/blocked/conflicted/stale/unsupported/archived/unvalidated, readiness returns blockers instead of bypassing planning.
 
 ## Keep runtime readiness non-executing
 
@@ -53,15 +53,15 @@ Inventory is represented by safe capability/provider summaries only. No secrets,
 
 ## Defer provider invocation and execution
 
-Provider invocation, model execution, workflow execution, installation, and model download are deferred to later phases and specific execution-oriented boundaries.
+Provider invocation, model execution, workflow execution, installation, and model download belong to explicit execution-oriented boundaries, not runtime readiness binding.
 
-## Relationship to Phase 10
+## Relationship to asset composition planning
 
-Phase 11 is downstream of Phase 10 composition planning. `valid` in Phase 10 means planning-valid only, not executable. Phase 11 preserves that constraint and only evaluates readiness-to-prepare.
+runtime readiness binding is downstream of asset composition planning. `valid` in asset composition planning means planning-valid only, not executable. runtime readiness binding preserves that constraint and only evaluates readiness-to-prepare.
 
-## Phase 12 handoff implications
+## Relationship To Execution Plan Preparation
 
-Phase 11 outputs a constrained readiness handoff object (`RuntimeReadyCompositionBinding` conceptual shape) for Phase 12 execution plan preparation/materialization planning. Phase 12 may remain non-executing unless explicitly expanded later.
+runtime readiness binding outputs a constrained readiness object (`RuntimeReadyCompositionBinding` conceptual shape) for execution plan preparation/materialization planning. execution plan preparation remains non-executing unless a later accepted execution boundary explicitly changes that.
 
 ## Consequences
 
@@ -75,12 +75,12 @@ Positive:
 Tradeoffs:
 
 - readiness cannot guarantee successful execution;
-- execution-specific failures remain for later phases;
+- execution-specific failures remain outside runtime readiness binding;
 - requires strict anti-drift rules to prevent accidental execution creep.
 
 ## Explicit non-goals
 
-Phase 11 does not implement:
+runtime readiness binding does not implement:
 
 - workflow/runtime/model/ComfyUI execution;
 - provider invocation;

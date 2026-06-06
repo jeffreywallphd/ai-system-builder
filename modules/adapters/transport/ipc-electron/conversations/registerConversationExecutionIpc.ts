@@ -30,7 +30,7 @@ import {
   type DesktopConversationReadTurnActivityRequestPayload,
   type DesktopConversationRetryTurnRequestPayload,
   type DesktopConversationSubmitTurnRequestPayload,
-} from '../../../../contracts/ipc/desktop-conversation-execution-v2-contract';
+} from '../../../../contracts/ipc';
 
 export interface RegisterConversationExecutionIpcDependencies {
   ipcMain: IpcMainHandlePort;

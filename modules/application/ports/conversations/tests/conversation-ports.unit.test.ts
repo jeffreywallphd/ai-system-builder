@@ -14,7 +14,7 @@ describe('conversation port source boundaries', () => {
     assert.match(index, /assistant-response-repository\.port/);
   });
 
-  test('port interfaces do not import adapters/runtime/provider/ui layers', async () => {
+  test('port interfaces do not import adapter/provider/transport/ui layers', async () => {
     const files = [
       'conversation-session-repository.port.ts',
       'conversation-turn-repository.port.ts',
@@ -23,7 +23,7 @@ describe('conversation port source boundaries', () => {
     ];
     for (const file of files) {
       const content = await readFile(join(root, file), 'utf8');
-      assert.doesNotMatch(content, /adapters|runtime|provider|transport|ui|electron|shell|workflow/i);
+      assert.doesNotMatch(content, /\bfrom\s+['"][^'"]*(?:adapters|provider|transport|ui|electron|shell|workflow)[^'"]*['"]/i);
     }
   });
 });

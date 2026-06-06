@@ -28,7 +28,7 @@ describe("createHuggingFaceModelPublisherAdapter", () => {
 
     const adapter = createHuggingFaceModelPublisherAdapter({ client: { uploadFile: testDouble.fn(async () => undefined) } });
     await expect(adapter.publishModel({ workspaceId: "workspace-a" as never, modelRecordId: "m1", modelPath: root, repository: "owner/repo" })).rejects.toThrow(
-      /requires both adapter_config\.json and adapter_model\.safetensors/i,
+      /requires adapter_config\.json and adapter safetensors weights/i,
     );
   });
 
@@ -86,6 +86,20 @@ describe("createHuggingFaceModelPublisherAdapter", () => {
 
     const uploadedPaths = uploadFile.mock.calls.map((call) => call[0].path).sort();
     expect(uploadedPaths).toEqual(["adapter_config.json", "adapter_model.safetensors", "tokenizer.json"]);
+  });
+
+  it("publishes valid diffusion LoRA directory files", async () => {
+    const root = join(tmpdir(), `hf-publish-valid-diffusion-lora-${Date.now()}`);
+    await mkdir(root, { recursive: true });
+    await writeFile(join(root, "adapter_config.json"), "{}", "utf8");
+    await writeFile(join(root, "pytorch_lora_weights.safetensors"), "tensor", "utf8");
+
+    const uploadFile = testDouble.fn(async () => undefined);
+    const adapter = createHuggingFaceModelPublisherAdapter({ client: { uploadFile } });
+    await adapter.publishModel({ workspaceId: "workspace-a" as never, modelRecordId: "m1", modelPath: root, repository: "owner/repo" });
+
+    const uploadedPaths = uploadFile.mock.calls.map((call) => call[0].path).sort();
+    expect(uploadedPaths).toEqual(["adapter_config.json", "pytorch_lora_weights.safetensors"]);
   });
 
   it("creates missing model repository and retries upload on provider 404", async () => {

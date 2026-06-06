@@ -1697,8 +1697,9 @@ export function createDesktopPreloadApi(
       });
     },
 
-    async browseUnregisteredArtifacts(_input = {}, context = {}) {
+    async browseUnregisteredArtifacts(input = {}, context = {}) {
       const request = createDesktopArtifactUnregisteredBrowseRequest({
+        workspaceId: input.workspaceId ?? context.workspaceId ?? "",
         boundary: { host: "desktop", source: artifactSource },
       }, context);
       const response = await dependencies.ipcRenderer.invoke(
@@ -1716,6 +1717,7 @@ export function createDesktopPreloadApi(
     async registerUnregisteredArtifact(input, context = {}) {
       const request = createDesktopArtifactUnregisteredRegisterRequest({
         storageKey: input.storageKey,
+        workspaceId: input.workspaceId ?? context.workspaceId ?? "",
         boundary: { host: "desktop", source: artifactSource },
       }, context);
       const response = await dependencies.ipcRenderer.invoke(
@@ -1733,6 +1735,7 @@ export function createDesktopPreloadApi(
     async deleteUnregisteredArtifact(input, context = {}) {
       const request = createDesktopArtifactUnregisteredDeleteRequest({
         storageKey: input.storageKey,
+        workspaceId: input.workspaceId ?? context.workspaceId ?? "",
         boundary: { host: "desktop", source: artifactSource },
       }, context);
       const response = await dependencies.ipcRenderer.invoke(

@@ -5,24 +5,22 @@
 
 ## Context
 
-Phase 8 needs a conservative architecture baseline for user-facing asset authoring and safe customization that preserves:
+asset authoring/customization needs a conservative architecture baseline for user-facing asset authoring and safe customization that preserves:
 
-- Phase 6 workspace isolation and explicit workspace context,
-- Phase 7 user-library reuse semantics (promote/link/copy/import),
+- workspace foundations workspace isolation and explicit workspace context,
+- User Library reuse user-library reuse semantics (promote/link/copy/import),
 - immutable system-owned foundation behavior,
 - explicit provenance and no hidden propagation.
 
-Phase 7 closeout is accepted, but Prompt 11 explicitly leaves parts of promote/import UI behavior unavailable and keeps effective-source behavior conservative/minimal. Phase 8 must not assume unavailable Phase 7 surfaces are complete.
+User Library reuse current status leaves parts of promote/import UI behavior unavailable and keeps effective-source behavior conservative/minimal. asset authoring/customization must not assume unavailable User Library reuse surfaces are complete.
 
 ## Decision
 
-Phase 8 introduces explicit workspace-scoped asset authoring and customization/override records. It does not mutate system-owned assets, does not silently mutate linked user-library sources, and does not introduce hidden propagation or live workspace-to-workspace synchronization.
+asset authoring/customization introduces explicit workspace-scoped asset authoring and customization/override records. It does not mutate system-owned assets, does not silently mutate linked user-library sources, and does not introduce hidden propagation or live workspace-to-workspace synchronization.
 
-## Accepted Phase 8 boundaries
+## Accepted asset authoring/customization boundaries
 
-Phase 8 Prompt 1 is architecture/docs/context only. It does not add contracts, ports, persistence adapters, use cases, API/IPC/preload exposure, or UI behavior.
-
-Phase 8 implementation sequence proceeds through Prompts 2–9 with Reviews A–C.
+This ADR records the baseline boundaries for asset authoring/customization. Current implementation status must be checked against `docs/architecture/asset-authoring-customization-and-overrides.md`, current code, and downstream context packs.
 
 ## Ownership and scope rules
 
@@ -63,7 +61,7 @@ Override records must exclude unsafe/sensitive internals (raw paths, blobs/base6
 Positive:
 
 - Preserves workspace and ownership safety while enabling controlled customization.
-- Provides clear vocabulary for contracts/use cases/transports/UI in later prompts.
+- Provides clear vocabulary for contracts/use cases/transports/UI.
 - Reduces accidental mutation/propagation risk.
 
 Costs:
@@ -74,7 +72,7 @@ Costs:
 
 ## Explicit non-goals
 
-Phase 8 Prompt 1 does not introduce:
+This decision does not introduce:
 
 - broad arbitrary field editing,
 - prompt/workflow raw editing,
@@ -83,19 +81,20 @@ Phase 8 Prompt 1 does not introduce:
 - pack import/export or marketplace behavior,
 - hidden/default workspaces, startup seeding, or legacy/global auto-migration.
 
-## Relationship to Phase 7
+## Relationship to User Library reuse
 
-Phase 8 depends on accepted Phase 7 constraints and implemented relationships (link vs copy, detached import semantics, provenance, explicit workspace context, effective-source summaries where available).
+asset authoring/customization depends on accepted User Library reuse constraints and implemented relationships (link vs copy, detached import semantics, provenance, explicit workspace context, effective-source summaries where available).
 
-If Phase 7 Review D truthfulness/composition checks regress, impacted Phase 8 prompts must mark those capabilities as prerequisites/deferrals and avoid building assumptions on unavailable behavior.
+If User Library reuse truthfulness/composition checks regress, impacted asset authoring/customization work must mark those capabilities as prerequisites/deferrals and avoid building assumptions on unavailable behavior.
 
-## Phase 9 handoff implications
+## Relationship To Effective Asset Projections
 
-Phase 9 composition planning should consume Phase 8 authored/customized/override vocabulary as explicit inputs and should not bypass override safety, ownership isolation, or conflict visibility rules.
+effective asset projections composition planning should consume asset authoring/customization authored/customized/override vocabulary as explicit inputs and should not bypass override safety, ownership isolation, or conflict visibility rules.
 
-## Phase 8 closeout addendum
+## Asset authoring/customization current status addendum
 
-Phase 8 closeout confirms UI/client/docs truthfulness constraints:
-- implemented: workspace draft lifecycle (create/update/publish-new), override listing, override disabling;
-- deferred: create override with safe target validation, existing-authored revision publishing, guaranteed workspace-wide effective-summary listing;
+Current asset authoring/customization status confirms UI/client/docs truthfulness constraints:
+- implemented: workspace draft lifecycle (create/update/publish-new), override listing, override disabling, and application/API/IPC create/update/disable override operations;
+- conditional: user-facing create-override availability requires safe target selection and a real customization-target reader;
+- deferred: existing-authored revision publishing and guaranteed workspace-wide effective-summary listing;
 - out of scope: workflow execution, materialization, propagation, conflict rebase/resolution workflows, source mutation, `system.foundation` mutation.

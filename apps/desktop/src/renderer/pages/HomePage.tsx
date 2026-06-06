@@ -1,4 +1,5 @@
-import { useActiveWorkspace, WorkspaceSwitcher } from "../features/workspace";
+import { TermWithHint } from "../../../../../modules/ui/shared";
+import { WorkspaceSwitcher } from "../features/workspace";
 import type { DesktopPageKey } from "../routes/desktopPages";
 
 export interface HomePageProps {
@@ -127,22 +128,18 @@ function HomeCardIllustration({ kind }: { readonly kind: HomeCardIllustrationKin
 }
 
 export function HomePage({ onNavigate }: HomePageProps) {
-  const workspace = useActiveWorkspace();
-  const activeWorkspaceName = workspace.activeWorkspace?.displayName;
-
   return (
     <section className="home-page ui-stack ui-stack--lg" aria-labelledby="home-title">
       <div className="ui-panel ui-panel--elevated home-workspace-card ui-stack">
         <div className="home-card__header">
           <div className="ui-stack ui-stack--sm">
-            <p className="home-card__eyebrow">Workspace</p>
+            <p className="home-card__eyebrow"><TermWithHint termId="workspace">Workspace</TermWithHint></p>
             <h2 id="home-title" className="ui-panel__title">Choose your working context</h2>
             <p className="ui-text-muted">
               Workspace selection controls which project resources are visible across Data, Assets, Models, and Image Generation.
             </p>
           </div>
           <HomeCardIllustration kind="workspace" />
-          {activeWorkspaceName ? <p className="ui-status">Active workspace: {activeWorkspaceName}</p> : null}
         </div>
         <WorkspaceSwitcher />
       </div>

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "../../../../testing/node-test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -14,15 +14,15 @@ function tlsEnv() {
 }
 
 describe("composeServerSecurity", () => {
-  it("uses insecure fallback only in disabled-dev", () => {
+  it("uses insecure fallback only in disabled-dev", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    expect(() => composeServerSecurity({ AI_SYSTEM_BUILDER_SECURITY_MODE: "disabled-dev" } as any, "/tmp/x")).not.toThrow();
+    await composeServerSecurity({ AI_SYSTEM_BUILDER_SECURITY_MODE: "disabled-dev" } as any, "/tmp/x");
     expect(warn).toHaveBeenCalled();
   });
-  it("fails lan-https-token without token hash secret", () => {
-    expect(() => composeServerSecurity({ AI_SYSTEM_BUILDER_SECURITY_MODE: "lan-https-token", ...tlsEnv() } as any, "/tmp/x")).toThrow(/SERVER_TOKEN_HASH_SECRET is required/);
+  it("fails lan-https-token without token hash secret", async () => {
+    await expect(composeServerSecurity({ AI_SYSTEM_BUILDER_SECURITY_MODE: "lan-https-token", ...tlsEnv() } as any, "/tmp/x")).rejects.toThrow(/SERVER_TOKEN_HASH_SECRET is required/);
   });
-  it("accepts lan-https-token with token hash secret", () => {
-    expect(() => composeServerSecurity({ AI_SYSTEM_BUILDER_SECURITY_MODE: "lan-https-token", SERVER_TOKEN_HASH_SECRET: "abc123", ...tlsEnv() } as any, "/tmp/x")).not.toThrow();
+  it("accepts lan-https-token with token hash secret", async () => {
+    await composeServerSecurity({ AI_SYSTEM_BUILDER_SECURITY_MODE: "lan-https-token", SERVER_TOKEN_HASH_SECRET: "abc123", ...tlsEnv() } as any, "/tmp/x");
   });
 });

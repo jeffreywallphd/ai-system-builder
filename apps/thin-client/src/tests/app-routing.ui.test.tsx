@@ -80,7 +80,8 @@ describe("thin-client routing and page composition", () => {
       imageButtonAfterWorkspace?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("Active workspace: Thin Workspace");
+    expect(container.textContent).toContain("Current Workspace");
+    expect(container.textContent).toContain("Thin Workspace");
     expect(container.textContent).toContain("Open Models");
     expect(container.textContent).not.toContain("thin-workspace");
 
@@ -96,13 +97,13 @@ describe("thin-client routing and page composition", () => {
       artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
     expect(container.textContent).toContain("Data Artifact Ingester");
-    expect(container.textContent).not.toContain("Data Artifact Browser");
+    expect(container.querySelector(".ui-panel__section-header h2")?.textContent).toBe("Data Artifact Ingester");
 
     const browserTab = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Artifact Browser");
     await act(async () => {
       browserTab?.dispatchEvent(new Event("click", { bubbles: true }));
     });
-    expect(container.textContent).toContain("Data Artifact Browser");
+    expect(container.querySelector(".ui-panel__section-header h2")?.textContent).toBe("Artifact Browser");
 
     const securityButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Security");
     await act(async () => { securityButton?.dispatchEvent(new Event("click", { bubbles: true })); });

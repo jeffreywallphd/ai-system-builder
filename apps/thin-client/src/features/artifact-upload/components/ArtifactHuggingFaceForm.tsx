@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { TermWithHint } from "../../../../../../modules/ui/shared";
 import type {
   ArtifactBrowserApiClient,
   ThinClientHuggingFaceDatasetParquetFile,
@@ -43,6 +44,16 @@ export function ArtifactHuggingFaceForm({ client, onRegistered }: ArtifactHuggin
     () => loadedFiles.filter((file) => selectedFiles.has(fileKey(file))),
     [loadedFiles, selectedFiles],
   );
+  const allDatasetsSelected = datasets.length > 0 && datasets.every((dataset) => selectedRepositories.has(dataset.repository));
+  const allFilesSelected = loadedFiles.length > 0 && loadedFiles.every((file) => selectedFiles.has(fileKey(file)));
+
+  function toggleAllDatasets(): void {
+    setSelectedRepositories(allDatasetsSelected ? new Set() : new Set(datasets.map((dataset) => dataset.repository)));
+  }
+
+  function toggleAllFiles(): void {
+    setSelectedFiles(allFilesSelected ? new Set() : new Set(loadedFiles.map(fileKey)));
+  }
 
   async function loadNamespace(): Promise<void> {
     setViewState({ status: "loading", message: "Finding datasets..." });
@@ -135,11 +146,11 @@ export function ArtifactHuggingFaceForm({ client, onRegistered }: ArtifactHuggin
 
       <div className="ui-grid ui-grid--two">
         <label className="ui-stack ui-stack--sm">
-          <span>Namespace</span>
+          <span><TermWithHint termId="namespace">Namespace</TermWithHint></span>
           <input className="ui-input" value={namespace} onChange={(event) => setNamespace(event.target.value)} placeholder="user or organization" required />
         </label>
         <label className="ui-stack ui-stack--sm">
-          <span>Revision</span>
+          <span><TermWithHint termId="revision">Revision</TermWithHint></span>
           <input className="ui-input" value={revision} onChange={(event) => setRevision(event.target.value)} placeholder="main" />
         </label>
       </div>
@@ -152,10 +163,11 @@ export function ArtifactHuggingFaceForm({ client, onRegistered }: ArtifactHuggin
         <section className="ui-stack ui-stack--sm">
           <div className="ui-grid ui-grid--two">
             <h4>Datasets</h4>
-            <button className="ui-button artifact-ingestion-mobile-button" type="button" onClick={() => setSelectedRepositories(new Set(datasets.map((dataset) => dataset.repository)))}>
-              Select all
+            <button className="ui-button artifact-ingestion-mobile-button" type="button" aria-pressed={allDatasetsSelected} onClick={toggleAllDatasets}>
+              {allDatasetsSelected ? "Deselect all" : "Select all"}
             </button>
           </div>
+          <p className="ui-label"><TermWithHint termId="datasetSelection">Select datasets</TermWithHint></p>
           <ul className="ui-stack ui-stack--sm">
             {datasets.map((dataset) => (
               <li key={dataset.repository} className="ui-panel ui-stack ui-stack--sm">
@@ -172,10 +184,10 @@ export function ArtifactHuggingFaceForm({ client, onRegistered }: ArtifactHuggin
           </ul>
           <div className="ui-grid ui-grid--two">
             <button className="ui-button artifact-ingestion-mobile-button" type="button" disabled={viewState.status === "loading" || selectedRepositoryList.length === 0} onClick={() => void loadSelectedFiles()}>
-              Load files
+              View importable files from dataset
             </button>
             <button className="ui-button artifact-ingestion-mobile-button" type="button" disabled={viewState.status === "loading" || selectedRepositoryList.length === 0} onClick={() => void importSelectedRepositories()}>
-              Import all from selected
+              Import all files from selected datasets
             </button>
           </div>
         </section>
@@ -185,10 +197,11 @@ export function ArtifactHuggingFaceForm({ client, onRegistered }: ArtifactHuggin
         <section className="ui-stack ui-stack--sm">
           <div className="ui-grid ui-grid--two">
             <h4>Files</h4>
-            <button className="ui-button artifact-ingestion-mobile-button" type="button" onClick={() => setSelectedFiles(new Set(loadedFiles.map(fileKey)))}>
-              Select all files
+            <button className="ui-button artifact-ingestion-mobile-button" type="button" aria-pressed={allFilesSelected} onClick={toggleAllFiles}>
+              {allFilesSelected ? "Deselect all files" : "Select all files"}
             </button>
           </div>
+          <p className="ui-label"><TermWithHint termId="datasetFileSelection">Select files</TermWithHint></p>
           <ul className="ui-stack ui-stack--sm">
             {Object.entries(filesByRepository).map(([repository, entry]) => (
               <li key={repository} className="ui-panel ui-stack ui-stack--sm">

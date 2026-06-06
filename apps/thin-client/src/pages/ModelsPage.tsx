@@ -1,11 +1,10 @@
 import { ModelManagementFeature } from "../features/model-management";
 export interface WorkspaceScopedPageProps { workspaceId: string; workspaceName: string; }
-export function ModelsPage({ workspaceId, workspaceName }: WorkspaceScopedPageProps) {
+export function ModelsPage({ workspaceId }: WorkspaceScopedPageProps) {
   return (
-    <section className="ui-stack ui-stack--sm" data-workspace-name={workspaceName}>
+    <section className="ui-stack ui-stack--sm">
       <h1>Model Management</h1>
-      <p>Showing records for: {workspaceName}</p>
-      <ModelManagementFeature key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} />
+      <ModelManagementFeature key={workspaceId} workspaceId={workspaceId} />
     </section>
   );
 }

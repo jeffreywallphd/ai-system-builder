@@ -12,7 +12,7 @@ import type {
 } from "../../../lib/desktopApi";
 
 export interface UseArtifactUploadFeatureResult {
-  selectedFile: File | null;
+  selectedFiles: readonly File[];
   viewState: UploadViewState;
   acceptedFileTypes: string;
   websiteSingleUrl: string;
@@ -31,6 +31,7 @@ export interface UseArtifactUploadFeatureResult {
   };
   onFileChange: (event: FormEvent<HTMLInputElement>) => void;
   onUploadSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onCancelUpload: () => void;
   setWebsiteSingleUrl: (value: string) => void;
   setWebsiteSingleMode: (mode: WebsiteIngestionMode) => void;
   setWebsiteBatchInput: (value: string) => void;
@@ -59,7 +60,7 @@ export function useArtifactUploadFeature(
   }, [uploadClient]);
 
   return {
-    selectedFile: fileUpload.selectedFile,
+    selectedFiles: fileUpload.selectedFiles,
     viewState: fileUpload.viewState,
     acceptedFileTypes,
     websiteSingleUrl: websiteIngestion.websiteSingleUrl,
@@ -70,6 +71,7 @@ export function useArtifactUploadFeature(
     websiteBatchViewState: websiteIngestion.websiteBatchViewState,
     onFileChange: fileUpload.onFileChange,
     onUploadSubmit: fileUpload.onUploadSubmit,
+    onCancelUpload: fileUpload.onCancelUpload,
     setWebsiteSingleUrl: websiteIngestion.setWebsiteSingleUrl,
     setWebsiteSingleMode: websiteIngestion.setWebsiteSingleMode,
     setWebsiteBatchInput: websiteIngestion.setWebsiteBatchInput,

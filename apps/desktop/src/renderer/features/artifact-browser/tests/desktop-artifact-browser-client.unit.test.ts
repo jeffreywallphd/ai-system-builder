@@ -108,15 +108,16 @@ describe("desktop artifact browser client", () => {
     };
 
     const client = createDesktopArtifactBrowserClient();
-    const unregistered = await client.browseUnregisteredArtifacts?.();
-    await client.registerUnregisteredArtifact?.({ storageKey: "uploads/orphan.json" });
-    await client.deleteUnregisteredArtifact?.({ storageKey: "uploads/orphan.json" });
+    const unregistered = await client.browseUnregisteredArtifacts?.({ workspaceId: "workspace-a" });
+    await client.registerUnregisteredArtifact?.({ storageKey: "uploads/orphan.json", workspaceId: "workspace-a" });
+    await client.deleteUnregisteredArtifact?.({ storageKey: "uploads/orphan.json", workspaceId: "workspace-a" });
 
     expect(unregistered).toEqual([
       expect.objectContaining({ storageKey: "uploads/orphan.json" }),
     ]);
-    expect(window.desktopApi.registerUnregisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/orphan.json" });
-    expect(window.desktopApi.deleteUnregisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/orphan.json" });
+    expect(window.desktopApi.browseUnregisteredArtifacts).toHaveBeenCalledWith({ workspaceId: "workspace-a" }, { workspaceId: "workspace-a" });
+    expect(window.desktopApi.registerUnregisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/orphan.json", workspaceId: "workspace-a" }, { workspaceId: "workspace-a" });
+    expect(window.desktopApi.deleteUnregisteredArtifact).toHaveBeenCalledWith({ storageKey: "uploads/orphan.json", workspaceId: "workspace-a" }, { workspaceId: "workspace-a" });
   });
 
   it("maps registered artifact browse results from registeredItemsMap payloads", async () => {

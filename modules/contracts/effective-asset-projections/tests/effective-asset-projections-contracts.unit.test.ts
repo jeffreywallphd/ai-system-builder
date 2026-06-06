@@ -13,7 +13,9 @@ describe("effective-asset-projection contracts", () => {
     for (const invalid of ["", " ", "../x", "https://x", "ghp_secret", "path/x"]) {
       assert.throws(() => contracts.normalizeEffectiveAssetProjectionId(invalid), (e: unknown) => {
         assert.ok(e instanceof Error);
-        assert.equal(e.message.includes(invalid), false);
+        if (invalid.trim().length > 0) {
+          assert.equal(e.message.includes(invalid), false);
+        }
         return true;
       });
     }

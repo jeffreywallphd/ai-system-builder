@@ -77,6 +77,7 @@ export interface DesktopArtifactBrowseItem {
   artifactFamily: ArtifactBrowseContractItem["artifactFamily"];
   mediaType?: string;
   sizeBytes?: number;
+  sourceKind?: ArtifactBrowseContractItem["sourceKind"];
   originalName?: string;
   createdAt?: string;
   metadata?: {

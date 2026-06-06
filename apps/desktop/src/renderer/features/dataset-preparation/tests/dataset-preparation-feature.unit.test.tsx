@@ -105,11 +105,13 @@ describe("DatasetPreparationFeature", () => {
       );
     });
 
-    expect(container.textContent).toContain("Dataset preparation model defaults");
-    const modelOverridesToggle = Array.from(container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Model override defaults"));
+    expect(container.textContent).toContain("Instruction tuning");
+    expect(container.textContent).not.toContain("Available now");
+    expect(container.textContent).not.toContain("models.tasks.qaGeneration.default");
+    const formattingToggle = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Automated Data Formatting"));
     await act(async () => {
-      modelOverridesToggle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      formattingToggle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(container.textContent).toContain("Inference mode");
 
@@ -125,6 +127,14 @@ describe("DatasetPreparationFeature", () => {
     expect(startPrepareTrainingDataset).toHaveBeenCalledWith(expect.objectContaining({
       sourceArtifactIds: ["artifact-1"],
       recipe: {
+        task: {
+          taskType: "llm-instruction",
+          textInputMode: "generate",
+          promptStyle: "instruction-response",
+          inputField: "input",
+          outputField: "output",
+          sourceContextPolicy: "include",
+        },
         normalization: {
           targetFormat: "markdown",
           normalizationMode: undefined,
@@ -139,20 +149,21 @@ describe("DatasetPreparationFeature", () => {
         },
         generation: {
           mode: "qa",
+          promptTemplate: expect.stringContaining("instruction-tuning"),
             model: {
               provider: "transformers",
-              modelId: "google/flan-t5-base",
-              inferenceMode: "text2text",
+              modelId: "Qwen/Qwen2.5-7B-Instruct",
+              inferenceMode: "chat",
               device: "auto",
-              torchDtype: undefined,
+              torchDtype: "auto",
             },
           maxExamplesPerChunk: 4,
           batchSize: 4,
           failurePolicy: "skip",
           generationParams: {
-            temperature: undefined,
-            topP: undefined,
-            maxNewTokens: undefined,
+            temperature: 0.7,
+            topP: 0.8,
+            maxNewTokens: 512,
           },
         },
       },
@@ -167,8 +178,70 @@ describe("DatasetPreparationFeature", () => {
     }), expect.objectContaining({
       requestId: expect.stringMatching(/^dataset-preparation-/),
     }));
-    expect(settingsClient.resolveModelDefault).toHaveBeenCalled();
     expect(container.textContent).toContain("stored-dataset");
+  });
+
+  it("saves and loads changed training settings", async () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    await act(async () => {
+      root?.render(
+        <DatasetPreparationFeature
+          client={{
+            browseSourceArtifacts: async () => [{ artifactId: "artifact-1", label: "artifact-1.jsonl", storageKey: "uploads/artifact-1.jsonl", mediaType: "application/x-ndjson" }],
+            startPrepareTrainingDataset: async () => ({ ok: false, error: { code: "internal", message: "failed" } }),
+          }}
+        />,
+      );
+    });
+
+    const formattingToggle = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Automated Data Formatting")) as HTMLButtonElement;
+    await act(async () => {
+      formattingToggle.click();
+    });
+
+    const modelPresetSelect = Array.from(container.querySelectorAll("select")).find((select) =>
+      Array.from(select.options).some((option) => option.value === "compact-3b")) as HTMLSelectElement;
+    await act(async () => {
+      modelPresetSelect.value = "compact-3b";
+      modelPresetSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    const saveButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent === "Save training settings") as HTMLButtonElement;
+    expect(saveButton).toBeTruthy();
+    await act(async () => {
+      saveButton.click();
+    });
+
+    expect(container.textContent).toContain("Saved training settings");
+
+    await act(async () => {
+      modelPresetSelect.value = "quality-7b";
+      modelPresetSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    const savedSettingsSelect = Array.from(container.querySelectorAll("select")).find((select) =>
+      Array.from(select.options).some((option) => option.textContent?.includes("llm instruction settings"))) as HTMLSelectElement;
+    const savedOption = Array.from(savedSettingsSelect.options).find((option) => option.value.length > 0);
+    expect(savedOption).toBeTruthy();
+    await act(async () => {
+      savedSettingsSelect.value = savedOption?.value ?? "";
+      savedSettingsSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    const loadButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent === "Load settings") as HTMLButtonElement;
+    await act(async () => {
+      loadButton.click();
+    });
+
+    const modelIdInput = Array.from(container.querySelectorAll("input")).find((input) =>
+      input.value === "Qwen/Qwen2.5-3B-Instruct") as HTMLInputElement | undefined;
+    expect(modelIdInput).toBeTruthy();
   });
 
   it("shows error state when preparation fails", async () => {
@@ -966,10 +1039,10 @@ describe("DatasetPreparationFeature", () => {
       );
     });
 
-    const modelOverridesToggle = Array.from(container.querySelectorAll("button")).find((button) =>
-      button.textContent?.includes("Model override defaults")) as HTMLButtonElement;
+    const formattingToggle = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("Automated Data Formatting")) as HTMLButtonElement;
     await act(async () => {
-      modelOverridesToggle.click();
+      formattingToggle.click();
     });
     expect(container.textContent).toContain("Inference mode");
 
@@ -1308,7 +1381,7 @@ describe("DatasetPreparationFeature", () => {
     expect(container.textContent).toContain("Model unloaded from memory.");
   });
 
-  it("surfaces warning when model default settings resolution fails", async () => {
+  it("does not render model generation settings keys", async () => {
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -1328,7 +1401,8 @@ describe("DatasetPreparationFeature", () => {
       );
     });
 
-    expect(container.textContent).toContain("Using built-in model defaults because settings could not be loaded.");
+    expect(container.textContent).not.toContain("features.datasetPreparation.qaGeneration.default");
+    expect(container.textContent).not.toContain("models.tasks.qaGeneration.default");
   });
 
   it("surfaces warning when Hugging Face namespace settings cannot be read", async () => {

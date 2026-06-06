@@ -1,0 +1,89 @@
+# Documentation Mismatch Register
+
+This file records documentation drift found during documentation reviews. It is a triage ledger, not a changelog and not a place to silently resolve policy questions.
+
+Resolved findings are removed after the corresponding docs/code alignment has been implemented and verified.
+
+## Scope
+
+Use this register for:
+
+- canonical docs that do not match corresponding code,
+- canonical docs that conflict with other canonical docs,
+- canonical docs that conflict with support docs,
+- canonical docs that conflict with README files,
+- context packs, treated as support docs in this review, that conflict with canonical docs, other context packs, or README files,
+- repeated drift patterns that need a standards or template update.
+
+Do not use this register for:
+
+- implementation plans,
+- phase diaries,
+- review transcripts,
+- resolved historical notes that no longer require a decision.
+
+## Entry Template
+
+```md
+### DM-YYYYMMDD-###
+
+- Status: open
+- Severity: high | medium | low
+- Drift type: canonical-vs-code | canonical-vs-canonical | canonical-vs-support-doc | canonical-vs-readme | support-vs-canonical | support-vs-support | support-vs-readme | documentation-shape
+- Primary doc: `docs/path/to/source.md`
+- Compared with: `path/to/code-or-doc.md`
+- Summary: One sentence describing the mismatch.
+- Evidence:
+  - `docs/path/to/source.md`: concise statement of what the doc currently claims.
+  - `path/to/code-or-doc.md`: concise statement of what the code or other doc currently does or claims.
+- Expected decision: Identify which source should change, or what owner decision is needed.
+- Notes: Optional implementation-neutral details for reviewers.
+```
+
+## Examples
+
+### DM-EXAMPLE-001
+
+- Status: example
+- Severity: medium
+- Drift type: canonical-vs-code
+- Primary doc: `docs/architecture/example-feature.md`
+- Compared with: `modules/application/use-cases/exampleUseCase.ts`
+- Summary: The canonical doc says the use case rejects missing workspace ids, but the implementation accepts an omitted workspace id.
+- Evidence:
+  - `docs/architecture/example-feature.md`: states that workspace identity is required for every example operation.
+  - `modules/application/use-cases/exampleUseCase.ts`: accepts requests without `workspaceId` and supplies a fallback.
+- Expected decision: Decide whether the code should reject omitted workspace ids or the doc should describe the fallback.
+- Notes: Do not update the doc or code from this register entry alone; owner confirmation is required.
+
+### DM-EXAMPLE-002
+
+- Status: example
+- Severity: high
+- Drift type: canonical-vs-canonical
+- Primary doc: `docs/adr/ADR-9999-example.md`
+- Compared with: `docs/architecture/example-boundary.md`
+- Summary: The ADR assigns runtime startup to the host, while the architecture doc assigns it to the renderer.
+- Evidence:
+  - `docs/adr/ADR-9999-example.md`: says the host owns runtime startup and lifecycle.
+  - `docs/architecture/example-boundary.md`: says renderer code starts the runtime directly.
+- Expected decision: Confirm the owner of runtime startup and update the losing canonical source.
+- Notes: Also check context packs after the canonical decision is made.
+
+### DM-EXAMPLE-003
+
+- Status: example
+- Severity: low
+- Drift type: support-vs-canonical
+- Primary doc: `docs/context/packs/example.pack.md`
+- Compared with: `docs/standards/example-standard.md`
+- Summary: The context pack repeats an older rule that is stricter than the current standard.
+- Evidence:
+  - `docs/context/packs/example.pack.md`: says every adapter must provide a fixture.
+  - `docs/standards/example-standard.md`: says fixtures are required only for adapters with persisted behavior.
+- Expected decision: Update the context pack after confirming the standard is authoritative.
+- Notes: This is a downstream summary drift, not a standards change.
+
+## Findings
+
+No open findings.

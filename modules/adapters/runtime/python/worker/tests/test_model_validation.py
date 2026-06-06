@@ -143,6 +143,20 @@ def test_validate_detects_lora_tensor_keys(monkeypatch, tmp_path: Path) -> None:
     assert diff["detectedLoRAKeys"] == ["layers.0.attn.q_proj.lora_A.weight"]
 
 
+def test_validate_diffusers_lora_weights(monkeypatch, tmp_path: Path) -> None:
+    (tmp_path / "adapter_config.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "pytorch_lora_weights.safetensors").write_bytes(b"x")
+    _mock_safe_open(monkeypatch, {"pytorch_lora_weights.safetensors": {"unet.down_blocks.0.attn.to_q.lora_A.weight": [8, 4]}})
+
+    result = validate_model_output(tmp_path, expected_lora=True)
+    diff = json.loads((tmp_path / "model_validation_diff.json").read_text(encoding="utf-8"))
+
+    assert result["status"] in {"valid", "warning"}
+    assert result["serializationFormat"] == "diffusers-lora-safetensors"
+    assert result["detectedLoRA"] is True
+    assert diff["hfCompatibility"]["adapterFiles"] is True
+
+
 def test_publish_strict_validation_fails_when_tensor_checks_are_skipped(monkeypatch, tmp_path: Path) -> None:
     (tmp_path / "model.safetensors").write_bytes(b"x")
     (tmp_path / "config.json").write_text("{}", encoding="utf-8")

@@ -81,7 +81,7 @@ function writeStoredExpandedPanels(expandedPanels: ExpandedPanelsState): void {
   }
 }
 
-export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComplete, workspaceId, workspaceName }: ArtifactIngestionFeatureProps) {
+export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComplete, workspaceId }: ArtifactIngestionFeatureProps) {
   const [expandedPanels, setExpandedPanels] = useState<ExpandedPanelsState>(() => readStoredExpandedPanels());
 
   function togglePanel(panel: keyof typeof expandedPanels): void {
@@ -92,7 +92,7 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
   }
 
   const {
-    selectedFile,
+    selectedFiles,
     viewState,
     acceptedFileTypes,
     websiteSingleUrl,
@@ -103,6 +103,7 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
     websiteBatchViewState,
     onFileChange,
     onUploadSubmit,
+    onCancelUpload,
     setWebsiteSingleUrl,
     setWebsiteSingleMode,
     setWebsiteBatchInput,
@@ -116,55 +117,60 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
   }, [expandedPanels]);
 
   return (
-    <section className="ui-stack ui-stack--sm">
-      <h2>Data Artifact Ingester</h2>
-      <p>Please select a method below to add data to the system.</p>
+    <section className="ui-panel ui-panel--elevated ui-panel--sectioned">
+      <header className="ui-panel__section-header">
+        <h2 className="ui-panel__title">Data Artifact Ingester</h2>
+      </header>
+      <div className="ui-panel__section-body ui-stack ui-stack--sm">
+        <p>Please select a method below to add data to the system.</p>
 
-      <CollapsiblePanel
-        title="Upload data"
-        contentId="thin-client-artifact-upload-panel-content"
-        isExpanded={expandedPanels.uploadData}
-        onToggle={() => togglePanel("uploadData")}
-      >
-        <ArtifactUploadForm
-          selectedFile={selectedFile}
-          viewState={viewState}
-          acceptedFileTypes={acceptedFileTypes}
-          onFileChange={onFileChange}
-          onSubmit={(event) => void onUploadSubmit(event)}
-        />
-      </CollapsiblePanel>
+        <CollapsiblePanel
+          title="Upload data"
+          contentId="thin-client-artifact-upload-panel-content"
+          isExpanded={expandedPanels.uploadData}
+          onToggle={() => togglePanel("uploadData")}
+        >
+          <ArtifactUploadForm
+            selectedFiles={selectedFiles}
+            viewState={viewState}
+            acceptedFileTypes={acceptedFileTypes}
+            onFileChange={onFileChange}
+            onSubmit={(event) => void onUploadSubmit(event)}
+            onCancelUpload={onCancelUpload}
+          />
+        </CollapsiblePanel>
 
-      <CollapsiblePanel
-        title="Scrape web data"
-        contentId="thin-client-artifact-scrape-panel-content"
-        isExpanded={expandedPanels.scrapeWebData}
-        onToggle={() => togglePanel("scrapeWebData")}
-      >
-        <ArtifactScrapeForm
-          websiteSingleUrl={websiteSingleUrl}
-          websiteSingleMode={websiteSingleMode}
-          websiteBatchInput={websiteBatchInput}
-          websiteBatchMode={websiteBatchMode}
-          websiteSingleViewState={websiteSingleViewState}
-          websiteBatchViewState={websiteBatchViewState}
-          setWebsiteSingleUrl={setWebsiteSingleUrl}
-          setWebsiteSingleMode={setWebsiteSingleMode}
-          setWebsiteBatchInput={setWebsiteBatchInput}
-          setWebsiteBatchMode={setWebsiteBatchMode}
-          ingestWebsiteSingle={ingestWebsiteSingle}
-          ingestWebsiteBatch={ingestWebsiteBatch}
-        />
-      </CollapsiblePanel>
+        <CollapsiblePanel
+          title="Scrape web data"
+          contentId="thin-client-artifact-scrape-panel-content"
+          isExpanded={expandedPanels.scrapeWebData}
+          onToggle={() => togglePanel("scrapeWebData")}
+        >
+          <ArtifactScrapeForm
+            websiteSingleUrl={websiteSingleUrl}
+            websiteSingleMode={websiteSingleMode}
+            websiteBatchInput={websiteBatchInput}
+            websiteBatchMode={websiteBatchMode}
+            websiteSingleViewState={websiteSingleViewState}
+            websiteBatchViewState={websiteBatchViewState}
+            setWebsiteSingleUrl={setWebsiteSingleUrl}
+            setWebsiteSingleMode={setWebsiteSingleMode}
+            setWebsiteBatchInput={setWebsiteBatchInput}
+            setWebsiteBatchMode={setWebsiteBatchMode}
+            ingestWebsiteSingle={ingestWebsiteSingle}
+            ingestWebsiteBatch={ingestWebsiteBatch}
+          />
+        </CollapsiblePanel>
 
-      <CollapsiblePanel
-        title="Import from Hugging Face"
-        contentId="thin-client-artifact-huggingface-panel-content"
-        isExpanded={expandedPanels.importFromHuggingFace}
-        onToggle={() => togglePanel("importFromHuggingFace")}
-      >
-        <ArtifactHuggingFaceForm client={ingestionClient} onRegistered={() => onUploadComplete?.()} />
-      </CollapsiblePanel>
+        <CollapsiblePanel
+          title="Import from Hugging Face"
+          contentId="thin-client-artifact-huggingface-panel-content"
+          isExpanded={expandedPanels.importFromHuggingFace}
+          onToggle={() => togglePanel("importFromHuggingFace")}
+        >
+          <ArtifactHuggingFaceForm client={ingestionClient} onRegistered={() => onUploadComplete?.()} />
+        </CollapsiblePanel>
+      </div>
     </section>
   );
 }

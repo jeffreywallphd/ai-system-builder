@@ -13,6 +13,27 @@
   margin-bottom: var(--space-sm);
 }
 
+.ui-panel--sectioned {
+  padding: 0;
+  overflow: hidden;
+}
+
+.ui-panel__section-header {
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  border-start-start-radius: inherit;
+  border-start-end-radius: inherit;
+  background: var(--color-bg-primary);
+}
+
+.ui-panel__section-header .ui-panel__title {
+  margin: 0;
+}
+
+.ui-panel__section-body {
+  padding: var(--space-lg);
+}
+
 .ui-panel--collapsible {
   padding: 0;
   overflow: clip;
@@ -73,7 +94,7 @@
 .ui-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: var(--ui-modal-z-index, 1000);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -81,6 +102,90 @@
   background: color-mix(in srgb, var(--color-bg-primary) 65%, black);
 }
 
+.ui-modal-overlay--stacked {
+  --ui-modal-z-index: 1010;
+}
+
 .ui-modal-dialog {
   width: min(32rem, 100%);
+  max-block-size: calc(100vh - (2 * var(--space-lg)));
+  padding: 0;
+  overflow: hidden;
+}
+
+.ui-modal-dialog.ui-stack {
+  gap: 0;
+}
+
+.ui-modal-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-block-end: 1px solid var(--color-border);
+  border-start-start-radius: inherit;
+  border-start-end-radius: inherit;
+  background: var(--color-bg-primary);
+}
+
+.ui-modal-header > :first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ui-modal-header h2,
+.ui-modal-header h3 {
+  margin: 0;
+}
+
+.ui-modal-body {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  padding: var(--space-lg);
+  overflow: auto;
+  background: var(--color-bg-panel);
+}
+
+.ui-modal-close {
+  position: relative;
+  inline-size: var(--control-height-sm);
+  block-size: var(--control-height-sm);
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-sm);
+  background: var(--color-danger);
+  color: var(--color-text-inverse);
+  cursor: pointer;
+  font-size: 0;
+  font-weight: 700;
+  line-height: 0;
+}
+
+.ui-modal-close::before,
+.ui-modal-close::after {
+  content: "";
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 0.875rem;
+  block-size: 0.125rem;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.ui-modal-close::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.ui-modal-close:hover:enabled,
+.ui-modal-close:focus-visible {
+  border-color: var(--color-border-inverse);
+  outline: none;
 }

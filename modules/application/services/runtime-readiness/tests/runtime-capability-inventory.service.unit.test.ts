@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createWorkspaceId, type RuntimeInventory } from "../../../../contracts/runtime-readiness";
+import type { RuntimeInventory } from "../../../../contracts/runtime-readiness";
+import { createWorkspaceId } from "../../../../contracts/workspace";
 import { RuntimeCapabilityInventoryService } from "../runtime-capability-inventory.service";
 import { RuntimeCapabilityInventorySummaryService } from "../runtime-capability-inventory-summary.service";
 

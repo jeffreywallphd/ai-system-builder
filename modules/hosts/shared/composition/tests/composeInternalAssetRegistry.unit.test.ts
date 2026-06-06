@@ -178,7 +178,7 @@ describe("composeInternalAssetRegistry", () => {
     assert.equal(composition.diagnostics.resourceBackedViewsEnabled, true);
     assert.equal(provider.listCalls, 1);
     assert.equal(provider.readCalls, 1);
-    assert.deepEqual(provider.queries, [{ searchText: "resource", assetTypes: undefined, assetFamilies: undefined, lifecycleStatuses: undefined, viewKinds: undefined, limit: 10, cursor: undefined }]);
+    assert.deepEqual(provider.queries, [{ searchText: "resource", assetTypes: undefined, assetFamilies: undefined, lifecycleStatuses: undefined, viewKinds: undefined, limit: 10, cursor: undefined, workspaceId: undefined }]);
     assert.deepEqual(cards.items.map((card) => card.viewId), ["view.internal.resource"]);
     assert.equal(cards.diagnostics?.some((diagnostic) => diagnostic.code === "test-provider-read"), true);
     assert.equal(detail?.view.viewId, "view.internal.resource");

@@ -210,6 +210,7 @@ describe("registerArtifactBrowserIpc", () => {
       {},
       createDesktopArtifactBrowseRequest({
         artifactFamily: "image",
+        workspaceId: "workspace-a",
         boundary: { host: "desktop", source: "desktop.renderer" },
       }),
     );
@@ -217,6 +218,7 @@ describe("registerArtifactBrowserIpc", () => {
       {},
       createDesktopArtifactReadRequest({
         locator: { storageKey: "uploads/a.png" },
+        workspaceId: "workspace-a",
         boundary: { host: "desktop", source: "desktop.renderer" },
       }),
     );
@@ -224,6 +226,7 @@ describe("registerArtifactBrowserIpc", () => {
       {},
       createDesktopArtifactContentReadRequest({
         locator: { storageKey: "uploads/a.png" },
+        workspaceId: "workspace-a",
         boundary: { host: "desktop", source: "desktop.renderer" },
       }),
     );
@@ -231,6 +234,7 @@ describe("registerArtifactBrowserIpc", () => {
       {},
       createDesktopArtifactMediaViewRequest({
         storageKey: "uploads/a.png",
+        workspaceId: "workspace-a",
         boundary: { host: "desktop", source: "desktop.renderer" },
       }),
     );
@@ -281,19 +285,19 @@ describe("registerArtifactBrowserIpc", () => {
 
     expect(dependencies.browseArtifactsUseCase.execute).toHaveBeenCalledWith(
       { artifactFamily: "image" },
-      { requestId: undefined, correlationId: undefined },
+      { requestId: undefined, correlationId: undefined, workspaceId: "workspace-a" },
     );
     expect(dependencies.readArtifactDetailUseCase.execute).toHaveBeenCalledWith(
       { locator: { storageKey: "uploads/a.png" } },
-      { requestId: undefined, correlationId: undefined },
+      { requestId: undefined, correlationId: undefined, workspaceId: "workspace-a" },
     );
     expect(dependencies.readArtifactContentUseCase.execute).toHaveBeenCalledWith(
       { locator: { storageKey: "uploads/a.png" } },
-      { requestId: undefined, correlationId: undefined },
+      { requestId: undefined, correlationId: undefined, workspaceId: "workspace-a" },
     );
     expect(dependencies.artifactMediaViewRetrieval.retrieveArtifactViewerMediaByStorageKey).toHaveBeenCalledWith(
       { storageKey: "uploads/a.png" },
-      { requestId: undefined, correlationId: undefined },
+      { requestId: undefined, correlationId: undefined, workspaceId: "workspace-a" },
     );
     expect(dependencies.publishArtifactToRepoUseCase.execute).toHaveBeenCalledWith({
       artifactId: "uploads/a.png",
@@ -332,6 +336,7 @@ describe("registerArtifactBrowserIpc", () => {
   it("maps descriptor-oriented content failures through explicit response helper", () => {
     const request = createDesktopArtifactContentReadRequest({
       locator: { storageKey: "uploads/missing.png" },
+      workspaceId: "workspace-a",
       boundary: { host: "desktop", source: "desktop.renderer" },
     });
 
@@ -360,6 +365,7 @@ describe("registerArtifactBrowserIpc", () => {
   it("maps request correlation metadata with an explicit helper", () => {
     const request = createDesktopArtifactBrowseRequest({
       artifactFamily: "image",
+      workspaceId: "workspace-a",
       boundary: { host: "desktop", source: "desktop.renderer" },
     }, {
       requestId: "req-ipc-1",
@@ -369,6 +375,7 @@ describe("registerArtifactBrowserIpc", () => {
     expect(mapDesktopArtifactRequestContext(request)).toEqual({
       requestId: "req-ipc-1",
       correlationId: "corr-ipc-1",
+      workspaceId: "workspace-a",
     });
   });
 

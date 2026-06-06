@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import importlib
 import sys
 from types import SimpleNamespace
 from pathlib import Path
 
 from modules.adapters.runtime.python.worker.models import TrainModelTaskRequest
-from modules.adapters.runtime.python.worker.tasks import train_model as train_model_module
+
+train_model_module = importlib.import_module("modules.adapters.runtime.python.worker.tasks.train_model")
+multimodal_module = importlib.import_module("modules.adapters.runtime.python.worker.tasks.train_model_multimodal")
 
 
-def _request(tmp_path: Path, method: str = "lora") -> TrainModelTaskRequest:
+def _request(tmp_path: Path, method: str = "lora", training_task: str = "llm-instruction") -> TrainModelTaskRequest:
     dataset_path = tmp_path / "train.jsonl"
     dataset_path.write_text('{"text":"hello"}\n', encoding="utf-8")
     return TrainModelTaskRequest.model_validate(
         {
+            "trainingTask": training_task,
             "baseModel": {"modelRecordId": "base-1", "modelId": "org/base"},
             "datasets": [{"artifactId": "dataset-1", "splitRole": "train", "path": str(dataset_path), "format": "jsonl"}],
             "method": method,
@@ -86,6 +90,34 @@ def test_synchronize_model_token_embeddings_resizes_when_tokenizer_has_added_tok
     assert model.resized_to == 12
 
 
+def test_tokenize_dataset_formats_classification_rows_for_causal_training() -> None:
+    class _Split:
+        column_names = ["text", "label"]
+
+    class _DatasetDict(dict):
+        def __init__(self):
+            super().__init__({"train": _Split()})
+
+        def map(self, callback, *, batched: bool, remove_columns: list[str]):
+            assert batched is True
+            assert remove_columns == ["text", "label"]
+            return callback({"text": ["Payment failed"], "label": ["billing"]})
+
+    class _Tokenizer:
+        captured_texts: list[str] | None = None
+
+        def __call__(self, texts, **_kwargs):
+            self.captured_texts = texts
+            return {"input_ids": [[1, 2, 3]]}
+
+    tokenizer = _Tokenizer()
+
+    tokenized = train_model_module._tokenize_dataset(_DatasetDict(), tokenizer, 128)
+
+    assert tokenizer.captured_texts == ["Text:\nPayment failed\nLabel:\nbilling"]
+    assert tokenized["labels"] == [[1, 2, 3]]
+
+
 def test_train_model_validates_required_inputs(tmp_path: Path) -> None:
     payload = _request(tmp_path)
     payload.datasets = []
@@ -107,6 +139,42 @@ def test_train_model_rejects_unsupported_method(tmp_path: Path) -> None:
     assert "modelid or localpath" in result.error["message"].lower()
 
 
+def test_train_model_routes_vision_training_task_to_multimodal_trainer(monkeypatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_train_vision_model(payload, **kwargs):
+        captured["payload"] = payload
+        captured.update(kwargs)
+        return train_model_module.TrainModelTaskResult(runId=kwargs["run_id"], status="succeeded", outputModelName=kwargs["output_model_name"])
+
+    monkeypatch.setattr(multimodal_module, "train_vision_model", fake_train_vision_model)
+    payload = _request(tmp_path, method="full-finetune", training_task="vision-detection")
+
+    result = train_model_module.train_model(payload)
+
+    assert result.status == "succeeded"
+    assert captured["payload"] is payload
+    assert captured["training_task"] == "vision-detection"
+
+
+def test_train_model_routes_diffusion_training_task_to_multimodal_trainer(monkeypatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_train_diffusion_lora_model(payload, **kwargs):
+        captured["payload"] = payload
+        captured.update(kwargs)
+        return train_model_module.TrainModelTaskResult(runId=kwargs["run_id"], status="succeeded", outputModelName=kwargs["output_model_name"])
+
+    monkeypatch.setattr(multimodal_module, "train_diffusion_lora_model", fake_train_diffusion_lora_model)
+    payload = _request(tmp_path, method="lora", training_task="diffusion-lora")
+
+    result = train_model_module.train_model(payload)
+
+    assert result.status == "succeeded"
+    assert captured["payload"] is payload
+    assert captured["training_task"] == "diffusion-lora"
+
+
 def test_train_model_lora_path_returns_real_result_with_mocks(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(train_model_module, "_load_dataset", lambda payload: ({"train": type("T", (), {"column_names": ["text"]})()}, None))
     monkeypatch.setattr(train_model_module, "_resolve_base_model", lambda payload: "org/base")
@@ -116,12 +184,14 @@ def test_train_model_lora_path_returns_real_result_with_mocks(monkeypatch, tmp_p
     monkeypatch.setattr(train_model_module, "_build_training_args", lambda payload, output: type("Args", (), {"output_dir": str(output / "ckpt")} )())
     monkeypatch.setattr(train_model_module, "_run_trainer", lambda *args, **kwargs: ({"loss": 0.1}, [{"path": "x", "step": 1, "metric": "loss", "value": 0.1}]))
 
-    result = train_model_module.train_model(_request(tmp_path, "lora"))
+    result = train_model_module.train_model(_request(tmp_path, "lora", "llm-classification"))
 
     assert result.status == "succeeded"
     assert result.generatedModelCandidate is not None
     assert result.generatedModelCandidate["artifactForm"] == "adapter"
     assert "provider" not in result.generatedModelCandidate
+    assert result.generatedModelCandidate["taskTags"] == ["text-classification"]
+    assert result.generatedModelCandidate["metadata"]["trainingTask"] == "llm-classification"
     assert result.generatedModelCandidate["metadata"]["validation"]["validationReportPath"]
 
 

@@ -30,6 +30,7 @@ describe("assetRegistryReadInputMapper", () => {
       includeMetadata: true,
       limit: 10,
       cursor: "abc-123",
+      workspaceId: undefined,
     });
   });
 
@@ -55,6 +56,7 @@ describe("assetRegistryReadInputMapper", () => {
       includeMetadata: false,
       limit: 10,
       cursor: "abc-123",
+      workspaceId: undefined,
     });
   });
 
@@ -98,6 +100,7 @@ describe("assetRegistryReadInputMapper", () => {
       includePorts: true,
       includeRequirements: false,
       includeMetadata: true,
+      workspaceId: undefined,
     });
   });
 

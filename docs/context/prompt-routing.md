@@ -19,7 +19,7 @@ Use this guide to select **minimum-sufficient** context packs. Start with `index
 | custom asset creation, authored drafts, revisions, overrides, promotion readiness | `docs/context/packs/asset-authoring.pack.md` |
 | effective/materialized projections, projection readiness, blockers, diagnostics | `docs/context/packs/effective-asset-projections.pack.md` |
 | asset composition plans, compatibility, dependencies, planning blockers | `docs/context/packs/asset-composition-planning.pack.md` |
-| runtime readiness, capability matching, runtime resources, execution handoff readiness | `docs/context/packs/runtime-readiness-binding.pack.md` |
+| runtime readiness, capability matching, runtime resources, execution-output readiness | `docs/context/packs/runtime-readiness-binding.pack.md` |
 | execution plans, dry-run/preflight, planned steps/inputs/outputs, safety gates | `docs/context/packs/execution-plan-preparation.pack.md` |
 | conversational runnable systems, sessions, turns, runs, text-generation adapters | `docs/context/packs/controlled-conversational-system-execution.pack.md` |
 | runtime adapters, runtime contracts, runtime execution flow | `docs/context/packs/runtime.pack.md` |
@@ -46,7 +46,7 @@ Use this guide to select **minimum-sufficient** context packs. Start with `index
 - Workspace-scoped assets/resources: add `asset-kernel`, `persistence-storage`, `security`, `testing`, and affected host/client packs.
 - User-library reuse: add `user-library`, `asset-kernel`, `persistence-storage`, `security`, `testing`.
 - Asset authoring/customization: add `asset-authoring`, `asset-kernel`, `user-library` if source reuse matters, plus `security` and `testing`.
-- Projection/composition/readiness/execution handoff: add packs in order from `effective-asset-projections` -> `asset-composition-planning` -> `runtime-readiness-binding` -> `execution-plan-preparation`.
+- Projection/composition/readiness/execution output boundaries: add packs in order from `effective-asset-projections` -> `asset-composition-planning` -> `runtime-readiness-binding` -> `execution-plan-preparation`.
 - Controlled conversational execution: add `controlled-conversational-system-execution` plus execution/readiness/composition packs only when those layers are in scope.
 - Security changes: add `security` plus the host/client/feature packs whose public boundary changes.
 - Desktop renderer styling: add `desktop-implementation` + `desktop-styling`.

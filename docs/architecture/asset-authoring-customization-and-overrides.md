@@ -1,45 +1,46 @@
-# Asset Authoring, Customization, and Override Management (Phase 8 Baseline)
+# Asset Authoring, Customization, and Override Management
 
-- Phase 9 follow-on baseline: `docs/architecture/effective-asset-projections.md` and ADR-0019 define how authored/customized records become workspace-scoped effective projections with explicit status/blockers.
+- Effective asset projections: `docs/architecture/effective-asset-projections.md` and ADR-0019 define how authored/customized records become workspace-scoped effective projections with explicit status/blockers.
+
 ## Purpose
 
-Phase 8 defines the architecture baseline for **asset authoring**, **safe customization**, and **explicit override management** without weakening Phase 6 workspace isolation or Phase 7 user-library reuse boundaries.
+Asset authoring/customization defines the architecture baseline for **asset authoring**, **safe customization**, and **explicit override management** without weakening workspace isolation or User Library reuse boundaries.
 
-This document is the canonical Phase 8 architecture reference for Prompts 1–9 and Reviews A–C.
+This document is the canonical architecture reference for asset authoring, customization, and override management.
 
-## Relationship to earlier phases
+## Relationship to upstream foundations
 
-- Phase 6 established explicit workspace scoping and isolation.
-- Phase 7 established explicit promote/link/copy/import relationships and conservative provenance/effective-source semantics.
-- Phase 8 extends these foundations with controlled authoring/customization vocabulary.
+- Workspace foundations established explicit workspace scoping and isolation.
+- User Library reuse established explicit promote/link/copy/import relationships and conservative provenance/effective-source semantics.
+- Asset authoring/customization extends these foundations with controlled authoring/customization vocabulary.
 
-Phase 8 depends on finalized Phase 7 closeout status documented in `docs/architecture/user-library-and-cross-workspace-reuse.md` and ADR-0017. If transport/UI composition claims in Phase 7 Review D risk checks regress, Phase 8 implementation prompts must treat those surfaces as prerequisites/deferrals and must not assume they are available. In particular, Prompt 11 closeout explicitly keeps promote/import UI flows unavailable and treats broader effective-source composition surfaces as conservative/minimal; Phase 8 must not imply those unavailable behaviors already exist. 
+Asset authoring/customization depends on User Library reuse status documented in `docs/architecture/user-library-and-cross-workspace-reuse.md` and ADR-0017. If transport/UI composition claims for User Library reuse regress, asset authoring/customization must treat those surfaces as prerequisites/deferrals and must not assume they are available. Promote/import UI flows and broader effective-source composition surfaces remain conservative; asset authoring/customization must not imply unavailable User Library behavior already exists.
 
 ## Vocabulary
 
 - **Authored asset**: an asset created by a user through explicit authoring workflows, with an owning scope and revision history.
 - **Workspace-authored asset**: an authored asset owned by a specific workspace.
-- **User-authored asset**: an authored asset owned directly by the User Library scope (deferred unless a later prompt explicitly introduces direct User Library authoring).
+- **User-authored asset**: an authored asset owned directly by the User Library scope (deferred unless a later canonical decision explicitly introduces direct User Library authoring).
 - **Customization**: a user-initiated, explicit change to safe editable fields of an existing asset context.
 - **Override**: a non-destructive customization layer applied against a base asset reference.
 - **Override record**: a durable workspace-scoped record capturing override intent, changed fields, status, and provenance.
 - **Customized asset**: the effective asset view produced by applying safe customizations/overrides to a base asset context.
 - **Derived asset**: a workspace-owned asset produced from another source (linked, copied, imported, or system-derived) with provenance to that source.
 - **Editable draft**: a mutable pre-publication authored/customization revision.
-- **Published authored asset**: an immutable published authored revision unless later prompts explicitly introduce controlled amendment.
+- **Published authored asset**: an immutable published authored revision unless later canonical decisions explicitly introduce controlled amendment.
 - **Asset revision**: an explicit revision/version unit for authored assets or override evolution.
 - **Base asset**: the source asset that customization/override targets.
 - **Customization target**: the specific asset relationship being customized (linked reference, detached copy, imported copy, or system-derived source).
-- **Override scope**: where an override is valid (Phase 8 baseline: workspace-local scope).
-- **Override status**: lifecycle state of an override (draft, published/active, superseded, conflicted, archived/deprecated as later prompts define).
+- **Override scope**: where an override is valid (asset authoring/customization baseline: workspace-local scope).
+- **Override status**: lifecycle state of an override (draft, published/active, superseded, conflicted, archived/deprecated as later canonical decisions define).
 - **Override provenance**: safe lineage metadata for override origin and transformation context.
 - **Detached customization**: customization on a detached workspace-owned copy.
 - **Linked customization**: customization applied against a linked reference via workspace-local override behavior.
 - **Conflict**: explicit mismatch between base version assumptions and current base state.
 - **Resolution**: explicit user-visible action to reconcile a conflict; never silent.
 - **Promotable authored asset**: a workspace-authored or customized asset revision eligible for explicit later promotion workflows.
-- **Safe editable fields**: explicitly allowlisted, validated, user-facing fields permitted in Phase 8 editing.
-- **Non-editable source fields**: protected fields and internals that cannot be modified in Phase 8 baseline.
+- **Safe editable fields**: explicitly allowlisted, validated, user-facing fields permitted in asset authoring/customization editing.
+- **Non-editable source fields**: protected fields and internals that cannot be modified in asset authoring/customization baseline.
 
 ## Scope definitions
 
@@ -81,7 +82,7 @@ Override records are durable, explicit, workspace-visible records that capture w
 10. Override records must be durable and safe.
 11. No hidden propagation execution.
 12. No live workspace-to-workspace linking.
-13. No collaboration permissions/multi-user auth model in Phase 8.
+13. No collaboration permissions/multi-user auth model in asset authoring/customization.
 14. No pack import/export or marketplace behavior.
 15. No hidden/default workspace behavior.
 16. No startup seeding.
@@ -98,12 +99,12 @@ Override records are durable, explicit, workspace-visible records that capture w
 
 ### User-library authored assets
 
-- Direct authoring into User Library is **deferred** in Phase 8 baseline unless later prompts explicitly scope it.
-- Phase 8 should assume workspace-first authoring and explicit later promotion patterns.
+- Direct authoring into User Library is **deferred** in asset authoring/customization baseline unless later canonical decisions explicitly scope it.
+- asset authoring/customization should assume workspace-first authoring and explicit later promotion patterns.
 
 ### Customizing linked user-library assets
 
-Phase 8 allows only explicit safe options:
+asset authoring/customization allows only explicit safe options:
 
 - create a workspace-local override record against the linked relationship; or
 - create a detached workspace copy and customize that copy; or
@@ -146,7 +147,7 @@ Authored assets should conceptually include:
 - validation diagnostics;
 - safe metadata.
 
-Phase 8 starts with conservative editing scope and does not permit arbitrary mutation of all asset internals.
+asset authoring/customization starts with conservative editing scope and does not permit arbitrary mutation of all asset internals.
 
 ## Override model (architectural shape)
 
@@ -171,8 +172,8 @@ Override records must **not** contain:
 - raw file bytes/blobs/base64;
 - raw local paths or storage roots;
 - provider payloads;
-- prompt text (until explicitly/safely designed in later prompt);
-- workflow JSON (until explicitly/safely designed in later prompt);
+- prompt text (until explicitly/safely designed in later canonical decision);
+- workflow JSON (until explicitly/safely designed in later canonical decision);
 - tokens/secrets;
 - stack traces;
 - command lines;
@@ -191,7 +192,7 @@ Override records must **not** contain:
 
 ### Custom asset type classification
 
-The Phase 8 creation UI uses the allowlisted `classification` editable field to capture the user's intended custom asset type without expanding the Asset Kernel contract surface. Supported UI classifications are:
+The asset authoring/customization creation UI uses the allowlisted `classification` editable field to capture the user's intended custom asset type without expanding the Asset Kernel contract surface. Supported UI classifications are:
 
 - `workflow-asset`: reusable workflow or process building block.
 - `system-asset`: reusable system or subsystem building block.
@@ -230,14 +231,14 @@ These remain deferred pending explicit schemas, validation, diagnostics, and tes
 
 Conservative defaults:
 
-- published revisions immutable unless later prompt defines controlled amendment;
+- published revisions immutable unless later canonical decision defines controlled amendment;
 - conflicts detected/surfaced, never silently resolved;
 - no hidden linked override propagation;
 - detached/imported copies do not auto-follow source updates.
 
 ## Effective-source relationship extension (vocabulary only)
 
-Phase 8 prepares effective-source classifications for future contracts/read-models, including:
+asset authoring/customization prepares effective-source classifications for future contracts/read-models, including:
 
 - `workspace-authored`;
 - `workspace-customized`;
@@ -246,47 +247,31 @@ Phase 8 prepares effective-source classifications for future contracts/read-mode
 - `linked-with-workspace-override`;
 - `imported-customized`.
 
-Prompt 1 defines vocabulary only; contract implementation is deferred.
+The architecture defines vocabulary and current boundaries. Implementation status must be checked against current code, canonical docs, and context packs when changing this area.
 
-## Implemented in Phase 8 vs deferred
+## Implemented in asset authoring/customization vs deferred
 
-### Phase 8 target scope
+### Asset authoring/customization target scope
 
 - Explicit architecture vocabulary for authoring/customization/override.
 - Conservative authored/override record conceptual models.
-- Application/persistence/use-case/transport/UI implementation delivered incrementally in prompts 2–9 with review gates.
+- Application, persistence, use-case, transport, and UI surfaces are available only where the current code exposes them.
 
-### Deferred beyond this prompt
+### Deferred scope
 
-- Contract and port implementations (Prompt 2/3 onward).
-- Persistence adapters/use cases/API/IPC/preload/UI behavior (later prompts).
 - Raw prompt/workflow editing, arbitrary internals editing, runtime-execution-linked editing.
 - Collaboration permissions/multi-user authorization.
 - Pack import/export, marketplace, live workspace-to-workspace linking.
 
-## Phase 8 implementation sequence
-
-1. Prompt 1 — Architecture baseline, ADR, docs, context pack.
-2. Prompt 2 — Asset authoring/customization contract vocabulary.
-3. Prompt 3 — Application ports and persistence adapters.
-4. Review A — Contract, boundary, persistence, and anti-drift review.
-5. Prompt 4 — Create/edit workspace-local authored asset use cases.
-6. Prompt 5 — Override/customization use cases for linked/copied/imported assets.
-7. Prompt 6 — Versioning, conflict, and provenance behavior.
-8. Review B — Use-case, provenance, versioning, and workspace isolation review.
-9. Prompt 7 — Effective-source/read-model integration for customized/overridden assets.
-10. Prompt 8 — API/IPC/preload/server exposure.
-11. Prompt 9 — Minimal desktop/thin-client UI.
-12. Review C — Final Phase 8 closeout review.
-
-## Phase 8 final closeout status (after Cleanup Prompt 2)
+## Asset authoring/customization current status
 
 - Implemented and available through API + IPC/preload + desktop/thin-client UI: workspace-authored asset listing, draft creation, draft update, draft publication, override listing, and override disabling.
+- Implemented through application use cases and API/IPC transport surfaces: override create, update, and disable operations.
 - Draft publication currently creates new workspace-authored assets only; publishing into an existing authored-asset revision chain is deferred.
 - Authored asset revision amendment flows are deferred.
 - Effective-summary support is transport-dependent and may return unavailable; UI must show an unavailable/deferred message when unavailable.
-- Override creation is intentionally deferred in UI and transport where safe target selection/validation is not implemented.
-- No workflow execution, no materialized effective-asset generation, no propagation execution, and no conflict rebase/resolution workflows in Phase 8.
+- Override creation requires a composed safe customization-target reader and a safe target-selection UX. Where those are unavailable, UI must not present create-override as supported and transport responses may truthfully return unavailable/not-found/unsupported outcomes.
+- No workflow execution, no materialized effective-asset generation, no propagation execution, and no conflict rebase/resolution workflows in asset authoring/customization.
 - No linked-source mutation and no `system.foundation` mutation/copy behavior.
 
 ### Required status checklist
@@ -298,11 +283,11 @@ Prompt 1 defines vocabulary only; contract implementation is deferred.
 5. Draft publication target: creates new authored assets only.
 6. Existing authored-asset revision publishing: deferred.
 7. Effective summaries: partial/deferred; unavailable is a valid final-state response.
-8. Override creation: deferred (safe target validation missing).
+8. Override creation: application/API/IPC operation implemented; user-facing availability is conditional on safe target selection and target-reader composition.
 9. Override listing: implemented.
 10. Override disabling: implemented.
-11. API exposure: implemented for current Phase 8 operations.
-12. IPC/preload exposure: implemented for current Phase 8 operations.
+11. API exposure: implemented for current asset authoring/customization operations.
+12. IPC/preload exposure: implemented for current asset authoring/customization operations.
 13. Desktop UI support: implemented for listing/draft actions/override disable + truthful deferred messaging.
 14. Thin-client UI support: implemented for listing/draft actions/override disable + truthful deferred messaging.
 15. Workflow execution from authored/customized assets: not implemented.
@@ -312,6 +297,6 @@ Prompt 1 defines vocabulary only; contract implementation is deferred.
 19. `system.foundation` mutation: not implemented.
 
 
-## Relationship to Phase 10 composition planning
+## Relationship to asset composition planning
 
-Authoring/customization records remain source-of-truth for edits. Phase 10 composition planning consumes effective projection summaries and must route users back to authoring/customization surfaces when source edits are needed.
+Authoring/customization records remain source-of-truth for edits. asset composition planning consumes effective projection summaries and must route users back to authoring/customization surfaces when source edits are needed.
