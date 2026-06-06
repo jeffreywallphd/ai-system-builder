@@ -31,19 +31,22 @@
 - When contract export/import discipline changes, update canonical docs and cross-family invariant guidance together so automation inherits one stable extension surface.
 - If implementation changes documented behavior, structure, boundaries, or standards and canonical docs are not updated, the work is incomplete.
 - Mark what is decided versus intentionally not finalized.
+- Run `npm run docs:check` after documentation-heavy work.
+- Every README must keep the AI documentation reminder that points updates toward related ADRs, architecture docs, context packs, and README files.
 
 ## Key Constraints
 
 - Do not introduce conflicting rules in context docs that bypass ADR/architecture/standards docs.
 - Do not leave PRs with behavior changes but stale docs.
 - Prefer template-aligned doc structures for consistency and scanability.
+- Do not remove the docs drift check or README reminder without replacing them with an equal or stronger guardrail.
 
 ## Canonical Source Docs
 
-- `docs/standards/documentation-standards.md` — canonical documentation hierarchy and update rules.
-- `docs/adr/README.md` — ADR lifecycle and status conventions.
-- `docs/architecture/README.md` — architecture docs role and maintenance expectations.
-- `docs/context/packs/pack.template.md` — context pack structure and brevity requirements.
+- `docs/standards/documentation-standards.md` - canonical documentation hierarchy and update rules.
+- `docs/adr/README.md` - ADR lifecycle and status conventions.
+- `docs/architecture/README.md` - architecture docs role and maintenance expectations.
+- `docs/context/packs/pack.template.md` - context pack structure and brevity requirements.
 
 ## Common Over-Inclusions to Avoid
 

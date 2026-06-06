@@ -1,5 +1,7 @@
 # Desktop host composition
 
+> AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
+
 `composeDesktopHost` wires desktop-host lifecycle dependencies while keeping Electron IPC transport thin.
 
 Current composition includes:

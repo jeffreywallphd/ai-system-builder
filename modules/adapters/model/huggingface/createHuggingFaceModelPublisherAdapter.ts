@@ -54,14 +54,16 @@ function validatePublishLayout(files: string[], fileContentByPath: ReadonlyMap<s
   const fileSet = new Set(files.map((file) => file.replace(/^\.\//, "")));
   const hasAdapterConfig = fileSet.has("adapter_config.json");
   const hasAdapterModel = fileSet.has("adapter_model.safetensors");
+  const hasDiffusersLoraModel = fileSet.has("pytorch_lora_weights.safetensors");
+  const hasAdapterWeights = hasAdapterModel || hasDiffusersLoraModel;
   const hasShardIndex = fileSet.has("model.safetensors.index.json");
   const shardFiles = files.filter((file) => /model-\d{5}-of-\d{5}\.safetensors$/.test(file));
   const hasSingleModelSafetensors = fileSet.has("model.safetensors");
   const hasConfig = fileSet.has("config.json");
 
-  if (hasAdapterConfig || hasAdapterModel) {
-    if (!hasAdapterConfig || !hasAdapterModel) {
-      throw new Error("Publishing adapter outputs requires both adapter_config.json and adapter_model.safetensors.");
+  if (hasAdapterConfig || hasAdapterWeights) {
+    if (!hasAdapterConfig || !hasAdapterWeights) {
+      throw new Error("Publishing adapter outputs requires adapter_config.json and adapter safetensors weights.");
     }
     return;
   }

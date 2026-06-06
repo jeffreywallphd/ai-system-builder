@@ -19,6 +19,7 @@ export class CreateAssetOverrideUseCase { constructor(private readonly d: Create
   async execute(command: CreateAssetOverrideCommand): Promise<CreateAssetOverrideResult> {
     let c; try { c = normalizeCreateAssetOverrideCommand(command); } catch { return fail("validation", "Create asset override command is invalid."); }
     if (c.targetWorkspaceId !== c.target.targetWorkspaceId) return fail("validation", "Target workspace id must match command workspace id.");
+    if (c.target.sourceKind === "customized-asset") return fail("unsupported", "Customized-asset target chaining is deferred.");
     let found; try { found = await this.d.targetReader.readCustomizationTargetByReference(c.targetWorkspaceId, c.target.effectiveAssetReference); } catch { return fail("unavailable", "Customization target reader is unavailable."); }
     if (!found) return fail("not-found", "Customization target relationship was not found.");
     const invalid = validateOverrideTargetSemantics(c.target, found); if (invalid) return fail(invalid.includes("deferred") ? "unsupported" : "conflict", invalid);

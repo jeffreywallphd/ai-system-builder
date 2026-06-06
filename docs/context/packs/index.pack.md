@@ -37,14 +37,14 @@
 - Resource-backed Asset Registry views are computed, sanitized, descriptor-only, and read-only unless an explicit controlled mutation workflow is in scope.
 - Runtime readiness is host-owned capability availability; it does not start/install/repair runtimes during read operations.
 - Security is layered and adapter-based; use ADR-0015 and `security.pack.md` for auth, route policy, TLS, token, audit, and sanitization work.
-- Phase-oriented historical details belong in canonical architecture/ADR docs or the relevant narrow pack, not in this baseline.
+- Historical implementation details belong in issues, PRs, or release notes, not in this reusable baseline.
 
 ## Key Constraints
 
 - This pack is a routing baseline, not a second source of truth.
 - Canonical docs win if this pack conflicts with ADRs, architecture docs, or standards.
 - This pack is never sufficient by itself for architecture-, standards-, structure-, or boundary-changing work.
-- Context packs should stay under 200 lines; split or summarize packs before they become prompt-history logs.
+- Context packs should stay under 200 lines; split or summarize packs before they become implementation-history logs.
 
 ## Canonical Source Docs
 
@@ -69,7 +69,7 @@ Use only the docs needed for the current task:
 - Loading every architecture or standards doc for narrow tasks.
 - Including both desktop and server packs when the task only touches one host.
 - Copying canonical docs into prompt payloads.
-- Keeping phase-by-phase implementation history in this baseline pack.
+- Keeping milestone-by-milestone implementation history in this baseline pack.
 
 ## Prompt Assembly Notes
 
@@ -77,4 +77,5 @@ Use only the docs needed for the current task:
 - Use `docs/context/prompt-routing.md` to choose companion packs.
 - Typical order: `index` -> task-specific pack(s) -> targeted canonical docs.
 - For debugging, add `debugging-error-handling` first, then the affected host/runtime/storage/UI pack.
-- For Asset Kernel, workspace, user-library, authoring, projection, composition, readiness, execution-plan, or conversational-execution work, include only the relevant phase pack chain named by prompt routing.
+- For Asset Kernel, workspace, user-library, authoring, projection, composition, readiness, execution-plan, or conversational-execution work, include only the relevant pack chain named by prompt routing.
+- Common planning chain paths: `docs/context/packs/effective-asset-projections.pack.md`, `docs/context/packs/asset-composition-planning.pack.md`, `docs/context/packs/runtime-readiness-binding.pack.md`, `docs/context/packs/execution-plan-preparation.pack.md`, `docs/context/packs/controlled-conversational-system-execution.pack.md`.

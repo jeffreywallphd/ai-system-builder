@@ -1,5 +1,7 @@
 # Documentation Map
 
+> AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
+
 This directory is organized into four documentation areas with distinct roles.
 
 ## Areas and Roles
@@ -8,8 +10,8 @@ This directory is organized into four documentation areas with distinct roles.
   - Architecture Decision Records (ADRs): major architectural decisions and rationale.
 - `docs/architecture/`
   - Current intended system structure, module boundaries, and operating model.
-  - `docs/architecture/user-library-and-cross-workspace-reuse.md` is the Phase 7 baseline for User Library reuse, explicit promote/link/copy/import relationships, provenance, and propagation constraints.
-  - `docs/architecture/asset-authoring-customization-and-overrides.md` is the Phase 8 baseline for workspace-scoped asset authoring, customization, and override architecture.
+  - `docs/architecture/user-library-and-cross-workspace-reuse.md` defines User Library reuse, explicit promote/link/copy/import relationships, provenance, and propagation constraints.
+  - `docs/architecture/asset-authoring-customization-and-overrides.md` defines workspace-scoped asset authoring, customization, and override architecture.
 - `docs/standards/`
   - Canonical implementation and documentation rules.
 - `docs/context/`
@@ -20,21 +22,19 @@ This directory is organized into four documentation areas with distinct roles.
 - Read ADRs for major decision history and constraints.
 - Read architecture docs for structure and boundary guidance.
 - Read standards docs for canonical rules to follow during implementation.
-- Use context docs to assemble task-relevant context without replacing canonical docs.
+- Use context docs to assemble task-relevant current context without replacing canonical docs.
 - If context docs conflict with ADR/architecture/standards docs, canonical docs take precedence.
 
+## Current Architecture Pointers
 
-## Current roadmap checkpoint
-
-- Phase 6 is **Workspace Foundations**. Workspace-owned operations must carry explicit workspace context through contracts, clients, transports, use cases, ports, providers, and persistence; UI gating alone is not sufficient.
-- Phase 7 is **User Library and Cross-Workspace Asset Reuse**.
-- Phase 8 is **Asset Authoring, Customization, and Override Management**.
-- Phase 9 is **Materialized / Effective Asset Projections**.
-- Phase 10 is **Asset Composition Planning**.
-- Phase 11 is **Runtime Readiness Binding**.
-- Phase 12 is **Execution Plan Preparation** (execution-oriented planning handoff, still non-executing unless explicitly expanded).
-
-See `docs/architecture/workspace-model.md` for the Phase 6 workspace model, including reference-only `system.foundation@1.0.0` activation and the no-hidden-workspace/no-auto-migration rule. See `docs/architecture/user-library-and-cross-workspace-reuse.md` and ADR-0017 for the finalized Phase 7 reuse closeout state and Phase 8 handoff constraints, then `docs/architecture/asset-authoring-customization-and-overrides.md` and ADR-0018 for Phase 8 authoring/customization/override baseline rules. See `docs/architecture/effective-asset-projections.md` and ADR-0019 for the finalized Phase 9 closeout baseline (readiness-for-planning, non-executing). See `docs/architecture/asset-composition-planning.md` and ADR-0020 for the Phase 10 composition-planning baseline (non-runtime, execution deferred). See `docs/architecture/runtime-readiness-binding.md` and ADR-0021 for the Phase 11 runtime-readiness-binding baseline (non-executing, capability-binding, Phase 12 handoff oriented).
+- Workspace model: `docs/architecture/workspace-model.md`, including reference-only `system.foundation@1.0.0` activation and the no-hidden-workspace/no-auto-migration rule.
+- User Library reuse: `docs/architecture/user-library-and-cross-workspace-reuse.md` and ADR-0017.
+- Asset authoring, customization, and overrides: `docs/architecture/asset-authoring-customization-and-overrides.md` and ADR-0018.
+- Effective asset projections: `docs/architecture/effective-asset-projections.md` and ADR-0019.
+- Asset composition planning: `docs/architecture/asset-composition-planning.md` and ADR-0020.
+- Runtime readiness binding: `docs/architecture/runtime-readiness-binding.md` and ADR-0021.
+- Execution plan preparation: `docs/architecture/execution-plan-preparation.md` and ADR-0022.
+- Controlled conversational execution: `docs/architecture/controlled-conversational-system-execution.md` and ADR-0023.
 
 ## Automation Note
 
@@ -43,15 +43,8 @@ See `docs/architecture/workspace-model.md` for the Phase 6 workspace model, incl
 - Include `docs/context/packs/persistence-storage.pack.md` for DB-vs-file/blob boundary work.
 
 
-## Phase 12 Reference
+## Execution Context References
 
-- Execution Plan Preparation architecture: `docs/architecture/execution-plan-preparation.md`.
-- Decision record: `docs/adr/ADR-0022-execution-plan-preparation.md`.
-- Context routing pack: `docs/context/packs/execution-plan-preparation.pack.md`.
-
-## Phase 13 Reference
-
-- Controlled conversational execution architecture: `docs/architecture/controlled-conversational-system-execution.md`.
-- Decision record: `docs/adr/ADR-0023-controlled-conversational-system-execution.md`.
-- Context routing pack: `docs/context/packs/controlled-conversational-system-execution.pack.md`.
-- Phase 13 follows Phase 12 preview-only planning; execution requires explicit approval plus supported runtime invocation boundaries.
+- Execution plan preparation pack: `docs/context/packs/execution-plan-preparation.pack.md`.
+- Controlled conversational execution pack: `docs/context/packs/controlled-conversational-system-execution.pack.md`.
+- Execution requires explicit approval plus supported runtime invocation boundaries.

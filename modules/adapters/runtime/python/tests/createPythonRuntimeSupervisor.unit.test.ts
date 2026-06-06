@@ -27,14 +27,21 @@ describe("createPythonRuntimeSupervisor", () => {
   it("starts and transitions to ready after health probing", async () => {
     const child = createMockChildProcess();
     const spawnImplementation = testDouble.fn(() => child as any);
-    const getHealthStatus = testDouble
-      .fn(async () => ({
+    let healthAttempt = 0;
+    const getHealthStatus = testDouble.fn(async () => {
+      healthAttempt += 1;
+      if (healthAttempt === 1) {
+        throw new Error("runtime unavailable");
+      }
+
+      return {
         healthy: true,
         status: {
           runtimeId: "python-sidecar",
           status: "ready",
         },
-      }));
+      };
+    });
 
     const supervisor = createPythonRuntimeSupervisor({
       command: "python",
@@ -143,18 +150,19 @@ describe("createPythonRuntimeSupervisor", () => {
       command: "python",
       args: ["main.py"],
       runtimeClient: { getHealthStatus },
-      spawnImplementation: (() => child as any) as any,
+      spawnImplementation: (() => {
+        queueMicrotask(() => {
+          child.stderr.write("ImportError: attempted relative import with no known parent package");
+          child.emit("exit", 1, null);
+        });
+        return child as any;
+      }) as any,
       startupTimeoutMs: 100,
       healthCheckIntervalMs: 1,
     });
 
-    queueMicrotask(() => {
-      child.stderr.write("ImportError: attempted relative import with no known parent package");
-      child.emit("exit", 1, null);
-    });
-
     await expect(supervisor.start()).rejects.toThrow(
-      "Python runtime exited before health check completed. Recent runtime output: ImportError",
+      /Python runtime exited before health check completed\.[\s\S]*Recent runtime output: ImportError/,
     );
   });
 
@@ -200,7 +208,7 @@ describe("createPythonRuntimeSupervisor", () => {
       .map((call) => call[0])
       .find((event) => event.type === "health-ready");
     expect(healthReadyEvent).toMatchObject({
-      detail: "Python runtime reported healthy startup state after 3 failed health probe attempt(s).",
+      detail: "Python runtime reported healthy startup state after 2 failed health probe attempt(s).",
     });
   });
 
@@ -210,10 +218,9 @@ describe("createPythonRuntimeSupervisor", () => {
       command: "python",
       args: ["main.py"],
       runtimeClient: {
-        getHealthStatus: async () => ({
-          healthy: true,
-          status: { runtimeId: "python-sidecar", status: "ready" },
-        }),
+        getHealthStatus: async () => {
+          throw new Error("runtime unavailable");
+        },
       },
       spawnImplementation: (() => {
         throw new Error("spawn EPERM");
@@ -239,14 +246,21 @@ describe("createPythonRuntimeSupervisor", () => {
     const child = createMockChildProcess();
     const prepareRuntimeEnvironment = testDouble.fn(async () => undefined);
     const spawnImplementation = testDouble.fn(() => child as any);
+    let healthAttempt = 0;
     const supervisor = createPythonRuntimeSupervisor({
       command: "python",
       args: ["main.py"],
       runtimeClient: {
-        getHealthStatus: async () => ({
+        getHealthStatus: async () => {
+          healthAttempt += 1;
+          if (healthAttempt === 1) {
+            throw new Error("runtime unavailable");
+          }
+          return {
           healthy: true,
           status: { runtimeId: "python-sidecar", status: "ready" },
-        }),
+          };
+        },
       },
       prepareRuntimeEnvironment,
       spawnImplementation: spawnImplementation as any,
@@ -269,10 +283,9 @@ describe("createPythonRuntimeSupervisor", () => {
       command: "python",
       args: ["main.py"],
       runtimeClient: {
-        getHealthStatus: async () => ({
-          healthy: true,
-          status: { runtimeId: "python-sidecar", status: "ready" },
-        }),
+        getHealthStatus: async () => {
+          throw new Error("runtime unavailable");
+        },
       },
       prepareRuntimeEnvironment,
       spawnImplementation: spawnImplementation as any,

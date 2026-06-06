@@ -1,5 +1,7 @@
 # API Contracts
 
+> AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
+
 API contracts specialize the shared transport core for server-facing API surfaces.
 
 - Build on `modules/contracts/transport` instead of redefining request/response/error semantics.

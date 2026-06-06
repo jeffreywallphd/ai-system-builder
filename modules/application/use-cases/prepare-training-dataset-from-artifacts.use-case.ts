@@ -20,6 +20,14 @@ import type {
   PrepareTrainingDatasetRequest,
   PrepareTrainingDatasetResult,
 } from "../../contracts/runtime";
+import {
+  DEFAULT_DATASET_PREPARATION_TASK_TYPE,
+  createDefaultDatasetPreparationTaskRecipe,
+  isDatasetPreparationTaskType,
+  resolveDatasetPreparationTaskProfileDefinition,
+  resolveDefaultDatasetPreparationPromptTemplate,
+  resolveDefaultDatasetPreparationTextGenerationModel,
+} from "../../contracts/runtime";
 
 import type { ApplicationRequestContext } from "../ports";
 import type { RuntimeTaskRegistryPort } from "../ports/runtime";
@@ -59,6 +67,7 @@ export interface PrepareTrainingDatasetFromArtifactsValue {
     recipe: PrepareTrainingDatasetRequest["recipe"];
     split: PrepareTrainingDatasetRequest["split"];
     output: PrepareTrainingDatasetRequest["output"];
+    datasetPreparationTask: Record<string, unknown>;
     generationModelId: string;
     summary: DatasetPreparationSummary;
   };
@@ -237,10 +246,20 @@ function buildDatasetMetadata(
   },
   runtimeMetadata: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
+  const taskRecipe = command.recipe.task ?? createDefaultDatasetPreparationTaskRecipe();
+  const taskProfile = resolveDatasetPreparationTaskProfileDefinition(taskRecipe.taskType);
   return {
     sourceArtifactIds: command.sourceArtifactIds,
     recipe: command.recipe,
     split: command.split,
+    datasetPreparationTask: {
+      taskType: taskProfile.taskType,
+      modelFamily: taskProfile.modelFamily,
+      outputSchema: taskProfile.outputSchema,
+      runtimeSupport: taskProfile.runtimeSupport,
+      compatibleTrainingMethods: [...taskProfile.compatibleTrainingMethods],
+      recipe: taskRecipe,
+    },
     generationModel: {
       provider: command.recipe.generation.model.provider,
       modelId: command.recipe.generation.model.modelId,
@@ -318,6 +337,55 @@ function isPrepareTrainingDatasetResult(value: unknown): value is PrepareTrainin
     && (output.metadata === undefined || isRecord(output.metadata)));
 }
 
+function normalizeDatasetPreparationCommand(
+  command: PrepareTrainingDatasetFromArtifactsCommand,
+): PrepareTrainingDatasetFromArtifactsCommand {
+  const rawTaskType = isRecord(command.recipe.task) && typeof command.recipe.task.taskType === "string"
+    ? command.recipe.task.taskType
+    : DEFAULT_DATASET_PREPARATION_TASK_TYPE;
+  const taskType = isDatasetPreparationTaskType(rawTaskType)
+    ? rawTaskType
+    : DEFAULT_DATASET_PREPARATION_TASK_TYPE;
+  const defaultTaskRecipe = createDefaultDatasetPreparationTaskRecipe(taskType);
+  const taskRecipe = isRecord(command.recipe.task)
+    ? { ...defaultTaskRecipe, ...command.recipe.task }
+    : defaultTaskRecipe;
+  const textInputMode = taskRecipe.textInputMode === "generate" || taskRecipe.textInputMode === "provided"
+    ? taskRecipe.textInputMode
+    : defaultTaskRecipe.textInputMode;
+  const defaultGenerationModel = resolveDefaultDatasetPreparationTextGenerationModel(taskType);
+  const shouldGenerateText = textInputMode === "generate";
+  const promptTemplate = shouldGenerateText
+    ? command.recipe.generation.promptTemplate?.trim() || resolveDefaultDatasetPreparationPromptTemplate(taskType)
+    : command.recipe.generation.promptTemplate;
+  const model = command.recipe.generation.model;
+  const modelId = model.modelId?.trim() || (shouldGenerateText ? defaultGenerationModel?.modelId : undefined) || model.modelId;
+
+  return {
+    ...command,
+    recipe: {
+      ...command.recipe,
+      task: {
+        ...taskRecipe,
+        textInputMode,
+      },
+      generation: {
+        ...command.recipe.generation,
+        promptTemplate,
+        model: {
+          ...model,
+          modelId,
+          inferenceMode: model.inferenceMode === "auto" && shouldGenerateText
+            ? defaultGenerationModel?.inferenceMode ?? model.inferenceMode
+            : model.inferenceMode,
+          device: model.device ?? (shouldGenerateText ? defaultGenerationModel?.device : undefined),
+          torchDtype: model.torchDtype ?? (shouldGenerateText ? defaultGenerationModel?.torchDtype : undefined),
+        },
+      },
+    },
+  };
+}
+
 export class PrepareTrainingDatasetFromArtifactsUseCase {
   private readonly runtimeTaskRegistry: RuntimeTaskRegistryPort;
   private readonly storageBindings: ArtifactStorageBindingPort;
@@ -359,7 +427,8 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
       throw error;
     }
 
-    const staged = await this.stageRuntimeInputs(command, context);
+    const normalizedCommand = normalizeDatasetPreparationCommand(command);
+    const staged = await this.stageRuntimeInputs(normalizedCommand, context);
     if (!staged.ok) {
       return staged;
     }
@@ -367,9 +436,9 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     const runtimeRequest: PrepareTrainingDatasetRequest = {
       workspaceId: context.workspaceId,
       sourceInputs: staged.value.sourceInputs,
-      recipe: command.recipe,
-      split: command.split,
-      output: command.output,
+      recipe: normalizedCommand.recipe,
+      split: normalizedCommand.split,
+      output: normalizedCommand.output,
       runtime: {
         runtimeWorkingDirectory: staged.value.runtimeWorkingDir,
       },
@@ -391,7 +460,7 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         );
       }
       this.runtimeWorkingDirsByRequestId.set(started.requestId, staged.value.runtimeWorkingDir);
-      this.commandByRequestId.set(started.requestId, command);
+      this.commandByRequestId.set(started.requestId, normalizedCommand);
       try {
         await this.taskPowerLifecycle.startTask(started.requestId, TaskType.DATASET_PREPARATION);
       } catch {
@@ -543,6 +612,8 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
     }
 
     await rm(datasetOutput.tempPath, { force: true });
+    const taskRecipe = command.recipe.task ?? createDefaultDatasetPreparationTaskRecipe();
+    const taskProfile = resolveDatasetPreparationTaskProfileDefinition(taskRecipe.taskType);
     return {
       outputs: resultOutputs,
       provenance: {
@@ -550,6 +621,14 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         recipe: command.recipe,
         split: command.split,
         output: command.output,
+        datasetPreparationTask: {
+          taskType: taskProfile.taskType,
+          modelFamily: taskProfile.modelFamily,
+          outputSchema: taskProfile.outputSchema,
+          runtimeSupport: taskProfile.runtimeSupport,
+          compatibleTrainingMethods: [...taskProfile.compatibleTrainingMethods],
+          recipe: taskRecipe,
+        },
         generationModelId: command.recipe.generation.model.modelId,
         summary: runtimeResult.summary,
       },
@@ -604,7 +683,15 @@ export class PrepareTrainingDatasetFromArtifactsUseCase {
         const resolvedOriginalName = metadataOriginalName ?? catalogOriginalName;
         const localPath = buildRuntimeSourceInputPath(runtimeWorkingDir, artifactId, mediaType, resolvedOriginalName, sourceIndex);
         await writeFile(localPath, Buffer.from(retrieveResult.value.content as Uint8Array));
-        sourceInputs.push({ artifactId, localPath, mediaType, originalName: resolvedOriginalName });
+        sourceInputs.push({
+          artifactId,
+          localPath,
+          mediaType,
+          originalName: resolvedOriginalName,
+          metadata: descriptorMetadata && typeof descriptorMetadata === "object" && !Array.isArray(descriptorMetadata)
+            ? descriptorMetadata as Record<string, unknown>
+            : undefined,
+        });
       }
       return createSuccessResult({ runtimeWorkingDir, sourceInputs }, context);
     } catch (error) {

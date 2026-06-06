@@ -74,7 +74,7 @@ function WorkspaceAwareThinClientApp() {
       case "settings":
         return <SettingsPage />;
       case "home":
-        return <HomePage onGoToArtifacts={() => setRoute("artifacts")} />;
+        return <HomePage onNavigate={setRoute} />;
       default:
         return <WorkspaceRequiredSurface />;
     }

@@ -5,6 +5,8 @@ import type {
   BrowseHuggingFaceDatasetParquetFilesUseCase,
   BrowseHuggingFaceNamespaceDatasetsCommand,
   BrowseHuggingFaceNamespaceDatasetsUseCase,
+  ImportHuggingFaceFilesCommand,
+  ImportHuggingFaceFilesUseCase,
   BrowseArtifactsUseCasePort,
   BrowseUnregisteredArtifactsUseCasePort,
   DeleteUnregisteredArtifactCommand,
@@ -117,12 +119,17 @@ import {
   DESKTOP_HUGGING_FACE_NAMESPACE_DATASETS_BROWSE_RESPONSE_CHANNEL,
   DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL,
   DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_RESPONSE_CHANNEL,
+  DESKTOP_HUGGING_FACE_FILES_IMPORT_REQUEST_CHANNEL,
+  DESKTOP_HUGGING_FACE_FILES_IMPORT_RESPONSE_CHANNEL,
   createDesktopHuggingFaceNamespaceDatasetsBrowseSuccessResponse,
   createDesktopHuggingFaceDatasetParquetFilesBrowseSuccessResponse,
+  createDesktopHuggingFaceFilesImportSuccessResponse,
   type DesktopHuggingFaceNamespaceDatasetsBrowseRequest,
   type DesktopHuggingFaceNamespaceDatasetsBrowseResponse,
   type DesktopHuggingFaceDatasetParquetFilesBrowseRequest,
   type DesktopHuggingFaceDatasetParquetFilesBrowseResponse,
+  type DesktopHuggingFaceFilesImportRequest,
+  type DesktopHuggingFaceFilesImportResponse,
 } from "../../../../contracts/ipc";
 import { normalizeArtifactFamily } from "../../../../domain/artifact";
 import type { IpcMainHandlePort } from "../ipcMainHandlePort";
@@ -144,6 +151,7 @@ export interface RegisterArtifactBrowserIpcDependencies {
   publishArtifactToRepoUseCase: Pick<PublishArtifactToRepoUseCase, "execute">;
   browseHuggingFaceNamespaceDatasetsUseCase: Pick<BrowseHuggingFaceNamespaceDatasetsUseCase, "execute">;
   browseHuggingFaceDatasetParquetFilesUseCase: Pick<BrowseHuggingFaceDatasetParquetFilesUseCase, "execute">;
+  importHuggingFaceFilesUseCase: Pick<ImportHuggingFaceFilesUseCase, "execute">;
   verifyPublishedArtifactBackingUseCase: Pick<VerifyPublishedArtifactBackingUseCase, "execute">;
   verifyImportedArtifactSourceBackingUseCase: Pick<VerifyImportedArtifactSourceBackingUseCase, "execute">;
   registerArtifactFromRepoUseCase: Pick<RegisterArtifactFromRepoUseCase, "execute">;
@@ -275,7 +283,7 @@ export function mapDesktopArtifactRequestContext(
 }
 
 function mapDesktopHuggingFaceBrowseRequestContext(
-  request: DesktopHuggingFaceNamespaceDatasetsBrowseRequest | DesktopHuggingFaceDatasetParquetFilesBrowseRequest,
+  request: DesktopHuggingFaceNamespaceDatasetsBrowseRequest | DesktopHuggingFaceDatasetParquetFilesBrowseRequest | DesktopHuggingFaceFilesImportRequest,
 ): { requestId?: string; correlationId?: string; workspaceId?: string } {
   const payload = request.payload as { workspaceId?: string } | undefined;
   return {
@@ -299,6 +307,15 @@ function mapDesktopHuggingFaceDatasetParquetFilesRequestToCommand(
   return {
     repository: request.payload.repository,
     revision: request.payload.revision,
+  };
+}
+
+function mapDesktopHuggingFaceFilesImportRequestToCommand(
+  request: DesktopHuggingFaceFilesImportRequest,
+): ImportHuggingFaceFilesCommand {
+  return {
+    repositories: request.payload.repositories,
+    files: request.payload.files,
   };
 }
 
@@ -527,6 +544,24 @@ function mapHuggingFaceDatasetParquetFilesFailure(
   return createIpcFailureResponse(
     createIpcError(
       DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_RESPONSE_CHANNEL,
+      mapIpcFailure(error.code),
+      error.message,
+      {
+        details: toMutableErrorDetails(error.details),
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+      },
+    ),
+  );
+}
+
+function mapHuggingFaceFilesImportFailure(
+  request: { requestId?: string; correlationId?: string },
+  error: { code: string; message: string; details?: Readonly<Record<string, unknown>> },
+): DesktopHuggingFaceFilesImportResponse {
+  return createIpcFailureResponse(
+    createIpcError(
+      DESKTOP_HUGGING_FACE_FILES_IMPORT_RESPONSE_CHANNEL,
       mapIpcFailure(error.code),
       error.message,
       {
@@ -861,6 +896,38 @@ export function createDesktopHuggingFaceDatasetParquetFilesBrowseIpcHandler(
   };
 }
 
+export function createDesktopHuggingFaceFilesImportIpcHandler(
+  importUseCase: Pick<ImportHuggingFaceFilesUseCase, "execute">,
+) {
+  return async (
+    _event: unknown,
+    request: DesktopHuggingFaceFilesImportRequest,
+  ): Promise<DesktopHuggingFaceFilesImportResponse> => {
+    let command: ImportHuggingFaceFilesCommand;
+    try {
+      command = mapDesktopHuggingFaceFilesImportRequestToCommand(request);
+    } catch (error) {
+      return mapHuggingFaceFilesImportFailure(request, {
+        code: "validation",
+        message: error instanceof Error ? error.message : "Invalid Hugging Face import request.",
+      });
+    }
+
+    const result = await importUseCase.execute(
+      command,
+      mapDesktopHuggingFaceBrowseRequestContext(request),
+    );
+    if (!result.ok) {
+      return mapHuggingFaceFilesImportFailure(request, result.error);
+    }
+
+    return createDesktopHuggingFaceFilesImportSuccessResponse(result.value, {
+      requestId: result.requestId ?? request.requestId,
+      correlationId: result.correlationId ?? request.correlationId,
+    });
+  };
+}
+
 
 function mapRegisterFromRepoFailure(
   request: { requestId?: string; correlationId?: string },
@@ -972,6 +1039,10 @@ export function registerArtifactBrowserIpc(
   dependencies.ipcMain.handle(
     DESKTOP_HUGGING_FACE_DATASET_PARQUET_FILES_BROWSE_REQUEST_CHANNEL.value,
     createDesktopHuggingFaceDatasetParquetFilesBrowseIpcHandler(dependencies.browseHuggingFaceDatasetParquetFilesUseCase),
+  );
+  dependencies.ipcMain.handle(
+    DESKTOP_HUGGING_FACE_FILES_IMPORT_REQUEST_CHANNEL.value,
+    createDesktopHuggingFaceFilesImportIpcHandler(dependencies.importHuggingFaceFilesUseCase),
   );
   dependencies.ipcMain.handle(
     DESKTOP_HUGGING_FACE_TOKEN_SET_REQUEST_CHANNEL.value,

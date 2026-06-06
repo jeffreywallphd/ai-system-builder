@@ -43,7 +43,7 @@
 
 - Do not claim unavailable user-library behavior is complete.
 - Do not replace Asset Kernel definitions, instances, references, compositions, resource-backed views, or system foundation packs.
-- Do not introduce hidden/default workspaces, startup seeding, system foundation mutation, or Phase 5 installer calls.
+- Do not introduce hidden/default workspaces, startup seeding, system foundation mutation, or installer calls during workspace creation.
 - Do not rely on UI gating alone as the workspace boundary.
 - Do not add direct live Workspace A to Workspace B links unless a later ADR accepts that model.
 - Do not expose raw bytes/content, paths, provider payloads, prompts, secrets, commands, env values, or stacks in provenance/effective summaries.
@@ -68,5 +68,5 @@
 ## Prompt Assembly Notes
 
 - Typical set: `index` + `user-library` + `asset-kernel`.
-- Add `asset-authoring` for Phase 8 customization/override work on top of reuse relationships.
-- Keep phase history in canonical docs; this pack should remain a compact routing surface.
+- Add `asset-authoring` for customization/override work on top of reuse relationships.
+- Keep implementation history out of reusable context; this pack should remain a compact routing surface.

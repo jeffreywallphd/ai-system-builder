@@ -17,8 +17,8 @@ function inMemory() {
       executionEventRepository: { appendExecutionEvent: async (r: any) => (events.push(r), r) },
       executionResultRepository: { saveExecutionResult: async (r: any) => (results.set(r.id, r), r) },
       operationRepository: { getConversationOperationById: async (w: string, s: string, o: string) => operations.get(`${w}:${s}:${o}`), saveConversationOperation: async (r: any) => (operations.set(`${r.workspaceId}:${r.conversationSessionId}:${r.operationId}`, r), r) },
-      runtimeReferenceRepository: { getExecutionRuntimeReferenceById: async () => ({ id: 'runtime.reference.1', runtimeKind: 'python-sidecar', capabilityKind: 'text-generation', status: 'active' }) },
-      approvalRepository: { getExecutionApprovalById: async () => ({ id: 'a1', approvalStatus: 'approved' }) },
+      runtimeReferenceRepository: { getExecutionRuntimeReferenceById: async () => ({ id: 'runtime.reference.1', runtimeKind: 'python-sidecar', capabilityKind: 'text-generation', status: 'supported' }) },
+      approvalRepository: { getExecutionApprovalById: async () => ({ id: 'a1', approvalStatus: 'granted' }) },
     },
   };
 }

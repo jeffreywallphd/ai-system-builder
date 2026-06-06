@@ -48,10 +48,12 @@ export interface ArtifactUploadClient {
     url: string;
     label?: string;
     mode?: WebsiteIngestionMode;
+    workspaceId: string;
   }) => Promise<WebsitePageIngestionClientResult>;
   ingestWebsitePagesBatch: (input: {
     targets: DesktopWebsiteIngestionTarget[];
     mode?: WebsiteIngestionMode;
+    workspaceId: string;
   }) => Promise<WebsitePagesBatchIngestionClientResult>;
 }
 
@@ -154,13 +156,43 @@ function toWebsitePagesBatchIngestionResult(response: unknown): WebsitePagesBatc
     };
   }
 
-  const value = (response.value as { result?: { items: DesktopWebsitePagesBatchItem[]; summary: DesktopWebsitePagesBatchSummary } } | undefined)?.result;
-  if (!value) {
+  const rawValue = (response.value as { result?: { items?: unknown[]; summary?: DesktopWebsitePagesBatchSummary } } | undefined)?.result;
+  if (!rawValue?.summary) {
     return {
       ok: false,
       error: { code: "internal", message: "Website batch ingestion response missing result payload." },
     };
   }
+
+  const value = {
+    items: (rawValue.items ?? []).map((item) => {
+      const rawItem = item as {
+        target: DesktopWebsiteIngestionTarget;
+        ok?: boolean;
+        result?: DesktopWebsitePageIngestionResult | {
+          ok?: boolean;
+          value?: DesktopWebsitePageIngestionResult;
+          error?: { code?: string; message?: string };
+        };
+        error?: { code?: string; message?: string };
+      };
+      if (typeof rawItem.ok === "boolean") {
+        return rawItem as DesktopWebsitePagesBatchItem;
+      }
+      const contractResult = rawItem.result as { ok?: boolean; value?: DesktopWebsitePageIngestionResult; error?: { code?: string; message?: string } } | undefined;
+      return contractResult?.ok
+        ? { target: rawItem.target, ok: true, result: contractResult.value }
+        : {
+          target: rawItem.target,
+          ok: false,
+          error: {
+            code: contractResult?.error?.code ?? "internal",
+            message: contractResult?.error?.message ?? "Website ingestion failed.",
+          },
+        };
+    }),
+    summary: rawValue.summary,
+  };
 
   return {
     ok: true,
@@ -192,13 +224,13 @@ export function createDesktopArtifactUploadClient(): ArtifactUploadClient {
       if (!desktopApi.ingestWebsitePage) {
         return { ok: false, error: { code: "unavailable", message: "Website ingestion is unavailable." } };
       }
-      return toWebsitePageIngestionResult(await desktopApi.ingestWebsitePage(input));
+      return toWebsitePageIngestionResult(await desktopApi.ingestWebsitePage(input, { workspaceId: input.workspaceId }));
     },
     async ingestWebsitePagesBatch(input) {
       if (!desktopApi.ingestWebsitePagesBatch) {
         return { ok: false, error: { code: "unavailable", message: "Website batch ingestion is unavailable." } };
       }
-      return toWebsitePagesBatchIngestionResult(await desktopApi.ingestWebsitePagesBatch(input));
+      return toWebsitePagesBatchIngestionResult(await desktopApi.ingestWebsitePagesBatch(input, { workspaceId: input.workspaceId }));
     },
   };
 }

@@ -77,10 +77,12 @@ describe("registerArtifactUploadIpc desktop artifact upload handler", () => {
       },
       {
         source: "desktop.renderer.artifact-upload.form",
+        workspaceId: "workspace.upload-test",
       },
       {
         requestId: "req-upload-1",
         correlationId: "corr-upload-1",
+        workspaceId: "workspace.upload-test",
       },
     );
     expect(response).toMatchObject({
@@ -221,10 +223,12 @@ describe("registerArtifactUploadIpc desktop artifact upload handler", () => {
       },
       {
         source: "desktop.renderer.artifact-upload.form",
+        workspaceId: "workspace.upload-test",
       },
       {
         requestId: "req-upload-3",
         correlationId: undefined,
+        workspaceId: "workspace.upload-test",
       },
     );
   });

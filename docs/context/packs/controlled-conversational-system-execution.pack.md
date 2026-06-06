@@ -1,10 +1,10 @@
-# Context Pack: Controlled Conversational System Execution (Phase 13)
+# Context Pack: Controlled Conversational System Execution
 
 - Pack name: `controlled-conversational-system-execution`
 
 ## Purpose
 
-Define and protect Phase 13 controlled execution orchestration for the first runnable composed-system slice: conversational system execution.
+Define and protect controlled execution orchestration for the first runnable composed-system slice: conversational system execution.
 
 ## Use When
 
@@ -16,11 +16,11 @@ Define and protect Phase 13 controlled execution orchestration for the first run
 - Text-generation runtime invocation boundaries.
 
 ## Canonical files to inspect
+
 - `docs/architecture/asset-kernel.md`
 - `docs/architecture/user-library-and-cross-workspace-reuse.md`
 - `docs/architecture/asset-authoring-customization-and-overrides.md`
 - `docs/architecture/effective-asset-projections.md`
-
 - `docs/architecture/controlled-conversational-system-execution.md`
 - `docs/adr/ADR-0023-controlled-conversational-system-execution.md`
 - `docs/architecture/execution-plan-preparation.md`
@@ -29,8 +29,7 @@ Define and protect Phase 13 controlled execution orchestration for the first run
 
 ## Core constraints
 
-- Phase 13 Prompt 1 is architecture/docs/context only.
-- Phase 12 remains non-executing.
+- Execution plan preparation remains non-executing.
 - No invocation without explicit approval.
 - Do not treat chatbot behavior as the universal runnable-system model.
 
@@ -39,10 +38,10 @@ Define and protect Phase 13 controlled execution orchestration for the first run
 - First runnable proof is conversational text-generation execution for composed systems.
 - Image-generation/ComfyUI is deferred to later dedicated slices.
 
-## Relationship to Phase 12
+## Relationship to Execution Plan Preparation
 
-- Derive start eligibility from reviewed Phase 12 plan + runtime readiness validity + explicit approval.
-- Do not mutate Phase 12 plan records for execution progress.
+- Derive start eligibility from reviewed execution plan + runtime readiness validity + explicit approval.
+- Do not mutate execution plan records for execution progress.
 
 ## Session/turn/run distinctions
 
@@ -57,13 +56,13 @@ Use explicit user action (`Test this system` / `Start chat`) before runtime invo
 
 ## Runtime adapter boundary
 
-Use narrow invocation/cancellation/progress/result ports; first adapter is supported text-generation runtime, chosen later.
+Use narrow invocation/cancellation/progress/result ports. The first supported adapter path is the Python conversational text-generation runtime adapter, selected through the conversational adapter catalog and guarded by runtime health/capability checks.
 
 ## Safe message/result/diagnostic constraints
 
 - No raw provider payloads in general execution records.
 - No raw runtime request/response exposure in diagnostics.
-- Conversation message/assistant-response contract records are defined in Phase 13 Prompt 2; persistence adapter behavior remains deferred to later corrective prompts.
+- Conversation message/assistant-response contract records are defined; persistence adapter availability must be verified against the host composition in scope.
 
 ## Anti-drift rules
 
@@ -72,7 +71,8 @@ Use narrow invocation/cancellation/progress/result ports; first adapter is suppo
 
 ## Transport prompt split rule
 
-Beginning with Phase 13, do not combine in one prompt:
+Keep these transport responsibilities separately scoped and reviewed:
+
 1. API/server-host exposure.
 2. IPC/preload/desktop-host exposure.
 3. Desktop/thin-client client/parity exposure.
@@ -81,32 +81,24 @@ Beginning with Phase 13, do not combine in one prompt:
 
 Tools/function-calling, retrieval/RAG, memory, multimodal IO, image generation/ComfyUI execution, arbitrary workflow execution, background/distributed execution, and streaming are deferred.
 
-## Review C Cleanup C1 boundary rules
+## Boundary rules
 
 - Conversational source/read summaries must rely on verified source evidence, not composition-plan ids, labels, summaries, runtime capability strings, or caller-provided display claims.
 - Session creation across API, IPC/preload, and clients carries only workspace scope and reviewed execution-plan identity. `systemLabel`, `systemSummary`, raw source claims, prompt materialization, runtime/model/provider overrides, and protected context are not accepted at the external boundary.
 - Current action availability comes from application eligibility/approval/readiness/runtime/host state. Provenance text alone must not enable submission.
 - Transcript is the intentional full visible-content read surface. Operational read models, activity, capability summaries, cancel/retry results, diagnostics, and errors stay content-safe.
 - Desktop and server hosts may expose only capabilities they actually compose. Cancel, retry, and streaming remain unsupported/deferred unless an application/runtime path genuinely supports them.
-- Run & Test UI correctness remains a C2 responsibility; C1 may only keep compilation aligned with repaired boundary/client types.
+- Run & Test UI correctness remains a distinct responsibility; boundary cleanup may only keep compilation aligned with repaired boundary/client types.
 
-## Phase 13 prompt ownership
+## Conversational Source Invariant
 
-1. Prompt 1 — architecture baseline + ADR + docs/context pack.
-2. Prompt 2 — contract vocabulary.
-3. Prompt 3 — ports/persistence adapters.
-4. Review A.
-5. Prompt 4 onward — approval/session creation, orchestration, adapter, lifecycle, monitoring, transports, UI, hardening, closeout.
-
-
-## Phase 13 corrective invariant (pre-Review A)
 - Preserve asset-kernel, `system.foundation`, user-library importability, asset-authoring overrides, effective projections, composition planning, runtime readiness, and execution-plan preparation while implementing conversational execution work.
-- Phase 13 conversational starter-system/run-surface changes must include asset/foundation/composition packs, not only execution packs.
+- Conversational starter-system/run-surface changes must include asset/foundation/composition packs, not only execution packs.
 - Runtime conversation/execution records are not reusable assets; reusable conversational assets must remain importable/customizable and lineage-linked to foundation primitives.
 
+## Current Adapter Status
 
-## Phase 13 Prompt 5 status
+Application-facing conversational invocation seams exist for protected context preparation, adapter catalog selection, runtime guard checks, single-turn orchestration, and the supported Python text-generation runtime adapter path. Approval/session eligibility, reviewed execution-plan identity, runtime readiness, and asset-derived source boundaries remain mandatory prerequisites.
 
-Application-facing conversational invocation seams now exist for protected context preparation, adapter catalog selection, runtime guard checks, single-turn orchestration, and the supported Python text-generation runtime adapter path. Approval/session eligibility and asset-derived source boundaries remain mandatory prerequisites.
-
-- Phase 13 Prompt 12 adds the first user-facing Assets-area **Run & Test** surface for composed conversational systems, using existing safe desktop/thin-client conversation clients and preserving approval/readiness/execution-plan boundaries.
+- The first user-facing Assets-area **Run & Test** surface for composed conversational systems uses existing safe desktop/thin-client conversation clients and preserves approval/readiness/execution-plan boundaries.
+- No fake response generator is allowed in production host composition. Hosts may expose only capabilities they actually compose; cancel, retry, and streaming stay unsupported unless implemented end to end.

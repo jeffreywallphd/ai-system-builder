@@ -141,4 +141,110 @@ describe("api artifact upload client", () => {
     expect(result).toEqual({ ok: false, error: { code: "validation", message: "Workspace id is required for artifact upload." } });
   });
 
+  it("sends website page ingestion requests with workspace context", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        ok: true,
+        operation: "artifact.ingest-website-page",
+        value: {
+          result: {
+            target: { url: "https://example.com" },
+            resolvedUrl: "https://example.com",
+            acquisitionMechanismUsed: "simple-http",
+            stagedArtifact: {
+              sourceKind: "scrape",
+              storage: { key: "workspaces/workspace-a/artifacts/files/uploads/example.html" },
+            },
+          },
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createApiArtifactUploadClient();
+    const result = await client.ingestWebsitePage?.({
+      url: "https://example.com",
+      mode: "automatic",
+      workspaceId: "workspace-a",
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/artifact/ingest-website-page");
+    expect(options.method).toBe("POST");
+    expect(JSON.parse(String(options.body))).toEqual({
+      workspaceId: "workspace-a",
+      source: "thin-client.artifact-upload.website-scrape",
+      request: {
+        url: "https://example.com",
+        mode: "automatic",
+      },
+    });
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        resolvedUrl: "https://example.com",
+        stagedArtifact: expect.objectContaining({
+          storage: { key: "workspaces/workspace-a/artifacts/files/uploads/example.html" },
+        }),
+      }),
+    });
+  });
+
+  it("normalizes website batch ingestion responses for the UI", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        ok: true,
+        operation: "artifact.ingest-website-pages-batch",
+        value: {
+          result: {
+            items: [
+              {
+                target: { url: "https://example.com/a" },
+                result: {
+                  ok: true,
+                  value: {
+                    target: { url: "https://example.com/a" },
+                    resolvedUrl: "https://example.com/a",
+                    acquisitionMechanismUsed: "simple-http",
+                    stagedArtifact: { sourceKind: "scrape", storage: { key: "a.html" } },
+                  },
+                },
+              },
+            ],
+            summary: { attempted: 1, succeeded: 1, failed: 0 },
+          },
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createApiArtifactUploadClient();
+    const result = await client.ingestWebsitePagesBatch?.({
+      targets: [{ url: "https://example.com/a" }],
+      mode: "automatic",
+      workspaceId: "workspace-a",
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/artifact/ingest-website-pages-batch",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        items: [
+          expect.objectContaining({
+            target: { url: "https://example.com/a" },
+            ok: true,
+            result: expect.objectContaining({ resolvedUrl: "https://example.com/a" }),
+          }),
+        ],
+        summary: { attempted: 1, succeeded: 1, failed: 0 },
+      },
+    });
+  });
+
 });

@@ -47,7 +47,7 @@
 .image-generation-maximized {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: var(--ui-modal-z-index, 1000);
   display: grid;
   place-items: center;
   padding: var(--space-lg);
@@ -66,10 +66,22 @@
   margin: 0;
   max-inline-size: min(92vw, 80rem);
   max-block-size: 92vh;
-  padding: var(--space-md);
+  overflow: hidden;
+  padding: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg-panel);
+  gap: 0;
+}
+
+.image-generation-maximized__content .ui-modal-header {
+  inline-size: 100%;
+}
+
+.image-generation-maximized__body {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  overflow: auto;
 }
 
 .image-generation-maximized__content img {

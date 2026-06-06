@@ -81,15 +81,15 @@ describe("registerArtifactBrowserApiRoutes", () => {
     };
 
     await postHandlers.get("/api/artifact/browse")?.(
-      { body: { artifactFamily: "image", source: "thin-client" }, headers: {} },
+      { body: { artifactFamily: "image", workspaceId: "workspace-a", source: "thin-client" }, headers: {} },
       response,
     );
     await postHandlers.get("/api/artifact/read")?.(
-      { body: { locator: { storageKey: "uploads/a.png" }, source: "thin-client" }, headers: {} },
+      { body: { locator: { storageKey: "uploads/a.png" }, workspaceId: "workspace-a", source: "thin-client" }, headers: {} },
       response,
     );
     await postHandlers.get("/api/artifact/content/read")?.(
-      { body: { locator: { storageKey: "uploads/a.png" }, source: "thin-client" }, headers: {} },
+      { body: { locator: { storageKey: "uploads/a.png" }, workspaceId: "workspace-a", source: "thin-client" }, headers: {} },
       response,
     );
     await postHandlers.get("/api/artifact/delete")?.(
@@ -103,15 +103,15 @@ describe("registerArtifactBrowserApiRoutes", () => {
 
     expect(dependencies.browseArtifactsUseCase.execute).toHaveBeenCalledWith(
       { artifactFamily: "image" },
-      { requestId: undefined, correlationId: undefined },
+      { requestId: undefined, correlationId: undefined, workspaceId: "workspace-a" },
     );
     expect(dependencies.readArtifactDetailUseCase.execute).toHaveBeenCalledWith(
       { locator: { storageKey: "uploads/a.png" } },
-      { requestId: undefined, correlationId: undefined },
+      { requestId: undefined, correlationId: undefined, workspaceId: "workspace-a" },
     );
     expect(dependencies.readArtifactContentUseCase.execute).toHaveBeenCalledWith(
       { locator: { storageKey: "uploads/a.png" } },
-      { requestId: undefined, correlationId: undefined },
+      { requestId: undefined, correlationId: undefined, workspaceId: "workspace-a" },
     );
     expect(dependencies.deleteRegisteredArtifactUseCase.execute).toHaveBeenCalledWith(
       { storageKey: "uploads/a.png" },
@@ -127,7 +127,7 @@ describe("registerArtifactBrowserApiRoutes", () => {
   it("maps api request payload and use case failure responses through explicit helpers", () => {
     expect(
       mapArtifactBrowseApiRequestToCommand(
-        { artifactFamily: "image", source: " thin-client.browser " },
+        { artifactFamily: "image", workspaceId: "workspace-a", source: " thin-client.browser " },
         { requestId: "req-1", correlationId: "corr-1" },
       ),
     ).toEqual({ artifactFamily: "image" });

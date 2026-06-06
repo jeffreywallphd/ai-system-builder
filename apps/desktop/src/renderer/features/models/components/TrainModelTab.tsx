@@ -1,8 +1,10 @@
 import { useState } from "react";
 
+import { TermWithHint } from "../../../../../../../modules/ui/shared";
 import { CollapsiblePanel } from "../../../components/ui/CollapsiblePanel";
 import { SettingsPanel } from "../../settings";
 import type { useModelTrainingFeature } from "../hooks/useModelTrainingFeature";
+import { MODEL_TRAINING_TASK_PROFILE_OPTIONS } from "../profiles/modelTrainingTaskProfiles";
 
 function toDatasetOptionLabel(storageKey: string, originalName?: string): string {
   if (originalName && originalName.trim().length > 0) {
@@ -25,7 +27,7 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
       <p>Current backend support: LoRA, QLoRA, and full fine-tuning when runtime dependencies are available.</p>
 
       <label className="ui-stack ui-stack--sm">
-        <span>Base model</span>
+        <span><TermWithHint termId="model">Base model</TermWithHint></span>
         <select className="ui-input" value={s.baseModelRecordId} onChange={(event) => s.setBaseModelRecordId(event.target.value)}>
           <option value="">Select model</option>
           {s.models.map((model) => (
@@ -37,7 +39,7 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
       </label>
 
       <label className="ui-stack ui-stack--sm">
-        <span>Training datasets (Parquet artifacts)</span>
+        <span><TermWithHint termId="trainingDataset">Training datasets</TermWithHint></span>
         <select
           className="ui-input"
           multiple
@@ -56,7 +58,18 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
       </label>
 
       <label className="ui-stack ui-stack--sm">
-        <span>Method</span>
+        <span><TermWithHint termId="trainingTask">Training task</TermWithHint></span>
+        <select className="ui-input" value={s.trainingTask} onChange={(event) => s.setTrainingTask(event.target.value as typeof s.trainingTask)}>
+          {MODEL_TRAINING_TASK_PROFILE_OPTIONS.map((option) => (
+            <option key={option.taskType} value={option.taskType}>
+              {option.label} - {option.statusLabel}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="ui-stack ui-stack--sm">
+        <span><TermWithHint termId="trainingMethod">Method</TermWithHint></span>
         <select className="ui-input" value={s.method} onChange={(event) => s.setMethod(event.target.value as "lora" | "qlora" | "full-finetune") }>
           <option value="lora">lora</option>
           <option value="qlora">qlora</option>
@@ -65,12 +78,12 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
       </label>
 
       <div className="ui-grid ui-grid--two">
-        <label className="ui-stack ui-stack--sm"><span>Epochs</span><input className="ui-input" value={s.numEpochs} onChange={(e) => s.setNumEpochs(e.target.value)} /></label>
-        <label className="ui-stack ui-stack--sm"><span>Max steps</span><input className="ui-input" value={s.maxSteps} onChange={(e) => s.setMaxSteps(e.target.value)} /></label>
-        <label className="ui-stack ui-stack--sm"><span>Batch size</span><input className="ui-input" value={s.batchSize} onChange={(e) => s.setBatchSize(e.target.value)} /></label>
-        <label className="ui-stack ui-stack--sm"><span>Learning rate</span><input className="ui-input" value={s.learningRate} onChange={(e) => s.setLearningRate(e.target.value)} /></label>
-        <label className="ui-stack ui-stack--sm"><span>Sequence length</span><input className="ui-input" value={s.maxSequenceLength} onChange={(e) => s.setMaxSequenceLength(e.target.value)} /></label>
-        <label className="ui-stack ui-stack--sm"><span>Seed</span><input className="ui-input" value={s.seed} onChange={(e) => s.setSeed(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="epoch">Epochs</TermWithHint></span><input className="ui-input" value={s.numEpochs} onChange={(e) => s.setNumEpochs(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="trainingStepLimit">Max steps</TermWithHint></span><input className="ui-input" value={s.maxSteps} onChange={(e) => s.setMaxSteps(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="batchSize">Batch size</TermWithHint></span><input className="ui-input" value={s.batchSize} onChange={(e) => s.setBatchSize(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="learningRate">Learning rate</TermWithHint></span><input className="ui-input" value={s.learningRate} onChange={(e) => s.setLearningRate(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="sequenceLength">Sequence length</TermWithHint></span><input className="ui-input" value={s.maxSequenceLength} onChange={(e) => s.setMaxSequenceLength(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="seed">Seed</TermWithHint></span><input className="ui-input" value={s.seed} onChange={(e) => s.setSeed(e.target.value)} /></label>
       </div>
 
       <button className="ui-button" type="button" onClick={() => s.setShowAdvanced(!s.showAdvanced)}>
@@ -79,20 +92,20 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
 
       {s.showAdvanced ? (
         <div className="ui-grid ui-grid--two">
-          <label className="ui-stack ui-stack--sm"><span>LoRA rank</span><input className="ui-input" value={s.loraRank} onChange={(e) => s.setLoraRank(e.target.value)} /></label>
-          <label className="ui-stack ui-stack--sm"><span>LoRA alpha</span><input className="ui-input" value={s.loraAlpha} onChange={(e) => s.setLoraAlpha(e.target.value)} /></label>
-          <label className="ui-stack ui-stack--sm"><span>LoRA dropout</span><input className="ui-input" value={s.loraDropout} onChange={(e) => s.setLoraDropout(e.target.value)} /></label>
-          <label className="ui-stack ui-stack--sm"><span>Target modules</span><input className="ui-input" value={s.loraTargetModules} onChange={(e) => s.setLoraTargetModules(e.target.value)} /></label>
-          <label className="ui-stack ui-stack--sm"><span>Grad accumulation</span><input className="ui-input" value={s.gradientAccumulationSteps} onChange={(e) => s.setGradientAccumulationSteps(e.target.value)} /></label>
-          <label className="ui-stack ui-stack--sm"><span>Checkpoint interval</span><input className="ui-input" value={s.checkpointIntervalSteps} onChange={(e) => s.setCheckpointIntervalSteps(e.target.value)} /></label>
-          <label className="ui-stack ui-stack--sm"><span>Eval interval</span><input className="ui-input" value={s.evalIntervalSteps} onChange={(e) => s.setEvalIntervalSteps(e.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="loraRank">LoRA rank</TermWithHint></span><input className="ui-input" value={s.loraRank} onChange={(e) => s.setLoraRank(e.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="loraAlpha">LoRA alpha</TermWithHint></span><input className="ui-input" value={s.loraAlpha} onChange={(e) => s.setLoraAlpha(e.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="loraDropout">LoRA dropout</TermWithHint></span><input className="ui-input" value={s.loraDropout} onChange={(e) => s.setLoraDropout(e.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="targetModules">Target modules</TermWithHint></span><input className="ui-input" value={s.loraTargetModules} onChange={(e) => s.setLoraTargetModules(e.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="gradientAccumulation">Grad accumulation</TermWithHint></span><input className="ui-input" value={s.gradientAccumulationSteps} onChange={(e) => s.setGradientAccumulationSteps(e.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="checkpointInterval">Checkpoint interval</TermWithHint></span><input className="ui-input" value={s.checkpointIntervalSteps} onChange={(e) => s.setCheckpointIntervalSteps(e.target.value)} /></label>
+          <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="evalInterval">Eval interval</TermWithHint></span><input className="ui-input" value={s.evalIntervalSteps} onChange={(e) => s.setEvalIntervalSteps(e.target.value)} /></label>
         </div>
       ) : null}
 
       <div className="ui-grid ui-grid--two">
-        <label className="ui-stack ui-stack--sm"><span>Output model name</span><input className="ui-input" value={s.outputModelName} onChange={(e) => s.setOutputModelName(e.target.value)} /></label>
-        <label className="ui-stack ui-stack--sm"><span>Generated model display name</span><input className="ui-input" value={s.generatedDisplayName} onChange={(e) => s.setGeneratedDisplayName(e.target.value)} /></label>
-        <label className="ui-stack ui-stack--sm"><span>Max safetensors shard size</span><input className="ui-input" value={s.maxShardSize} onChange={(e) => s.setMaxShardSize(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="outputModelName">Output model name</TermWithHint></span><input className="ui-input" value={s.outputModelName} onChange={(e) => s.setOutputModelName(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="assetDisplayName">Generated model display name</TermWithHint></span><input className="ui-input" value={s.generatedDisplayName} onChange={(e) => s.setGeneratedDisplayName(e.target.value)} /></label>
+        <label className="ui-stack ui-stack--sm"><span><TermWithHint termId="safetensors">Max safetensors shard size</TermWithHint></span><input className="ui-input" value={s.maxShardSize} onChange={(e) => s.setMaxShardSize(e.target.value)} /></label>
       </div>
 
       <section className="ui-stack ui-stack--sm">
@@ -114,7 +127,7 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
             checked={s.localDestinationEnabled}
             onChange={(event) => s.setLocalDestinationEnabled(event.target.checked)}
           />
-          Store locally
+          <TermWithHint termId="outputDestination">Store locally</TermWithHint>
         </label>
         <label>
           <input
@@ -122,12 +135,12 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
             checked={s.huggingFaceDestinationEnabled}
             onChange={(event) => s.setHuggingFaceDestinationEnabled(event.target.checked)}
           />
-          Publish to Hugging Face
+          <TermWithHint termId="huggingFace">Publish to Hugging Face</TermWithHint>
         </label>
         {s.huggingFaceDestinationEnabled ? (
           <div className="ui-grid ui-grid--two">
             <label className="ui-stack ui-stack--sm">
-              <span>Model repository name</span>
+              <span><TermWithHint termId="repository">Model repository name</TermWithHint></span>
               <input
                 className="ui-input"
                 value={s.huggingFaceRepository}
@@ -143,11 +156,11 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
               )}
             </label>
             <label className="ui-stack ui-stack--sm">
-              <span>Revision (optional)</span>
+              <span><TermWithHint termId="revision">Revision</TermWithHint> (optional)</span>
               <input className="ui-input" value={s.huggingFaceRevision} onChange={(event) => s.setHuggingFaceRevision(event.target.value)} />
             </label>
             <label className="ui-stack ui-stack--sm">
-              <span>Path prefix (optional)</span>
+              <span><TermWithHint termId="pathPrefix">Path prefix</TermWithHint> (optional)</span>
               <input className="ui-input" value={s.huggingFacePathPrefix} onChange={(event) => s.setHuggingFacePathPrefix(event.target.value)} />
             </label>
           </div>
@@ -155,7 +168,7 @@ export function TrainModelTab(props: { state: ModelTrainingState }) {
       </section>
 
       <label className="ui-stack ui-stack--sm">
-        <span>Validate after training</span>
+        <span><TermWithHint termId="validateAfterTraining">Validate after training</TermWithHint></span>
         <input type="checkbox" checked={s.validateAfterTraining} onChange={(event) => s.setValidateAfterTraining(event.target.checked)} />
       </label>
 

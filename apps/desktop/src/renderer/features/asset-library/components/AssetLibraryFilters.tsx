@@ -1,3 +1,4 @@
+import { TermWithHint } from "../../../../../../../modules/ui/shared";
 import type { AssetLibraryBuiltInFilter } from "../../../../../../../modules/ui/shared/asset-library";
 import type { AssetLibraryFilterValue, AssetLibraryFiltersState } from "../hooks/useAssetLibraryFeature";
 
@@ -95,7 +96,7 @@ export function AssetLibraryFilters({
   return (
     <form className="asset-library-toolbar" onSubmit={(event) => event.preventDefault()}>
       <label className="ui-stack ui-stack--sm">
-        <span className="ui-label">Search assets</span>
+        <span className="ui-label"><TermWithHint termId="assetSearchFilter">Search assets</TermWithHint></span>
         <input
           className="ui-input asset-library-toolbar__search"
           type="search"
@@ -106,7 +107,7 @@ export function AssetLibraryFilters({
       </label>
 
       <label className="ui-stack ui-stack--sm">
-        <span className="ui-label">Type</span>
+        <span className="ui-label"><TermWithHint termId="assetTypeFilter">Type</TermWithHint></span>
         <select className="ui-input" value={filters.assetType} onChange={(event) => onAssetTypeChange(event.currentTarget.value)}>
           <option value="all">All types</option>
           {ASSET_TYPE_OPTIONS.map((option) => (
@@ -116,7 +117,7 @@ export function AssetLibraryFilters({
       </label>
 
       <label className="ui-stack ui-stack--sm">
-        <span className="ui-label">Family</span>
+        <span className="ui-label"><TermWithHint termId="assetFamilyFilter">Family</TermWithHint></span>
         <select className="ui-input" value={filters.assetFamily} onChange={(event) => onAssetFamilyChange(event.currentTarget.value)}>
           <option value="all">All families</option>
           {ASSET_FAMILY_OPTIONS.map((option) => (
@@ -126,7 +127,7 @@ export function AssetLibraryFilters({
       </label>
 
       <label className="ui-stack ui-stack--sm">
-        <span className="ui-label">Status</span>
+        <span className="ui-label"><TermWithHint termId="assetStatusFilter">Status</TermWithHint></span>
         <select className="ui-input" value={filters.lifecycleStatus} onChange={(event) => onLifecycleStatusChange(event.currentTarget.value)}>
           <option value="all">All statuses</option>
           {LIFECYCLE_STATUS_OPTIONS.map((option) => (
@@ -136,7 +137,7 @@ export function AssetLibraryFilters({
       </label>
 
       <label className="ui-stack ui-stack--sm">
-        <span className="ui-label">Source</span>
+        <span className="ui-label"><TermWithHint termId="assetSourceFilter">Source</TermWithHint></span>
         <select
           className="ui-input"
           value={filters.builtIn}
@@ -149,7 +150,7 @@ export function AssetLibraryFilters({
       </label>
 
       <label className="ui-stack ui-stack--sm">
-        <span className="ui-label">Pack</span>
+        <span className="ui-label"><TermWithHint termId="assetPackFilter">Pack</TermWithHint></span>
         <select className="ui-input" value={filters.packId} onChange={(event) => onPackIdChange(event.currentTarget.value)}>
           <option value="all">All packs</option>
           <option value="system.foundation">System Foundation</option>
@@ -158,7 +159,7 @@ export function AssetLibraryFilters({
       </label>
 
       <label className="ui-stack ui-stack--sm">
-        <span className="ui-label">Layer</span>
+        <span className="ui-label"><TermWithHint termId="assetLayerFilter">Layer</TermWithHint></span>
         <select className="ui-input" value={filters.sourceLayer} onChange={(event) => onSourceLayerChange(event.currentTarget.value)}>
           <option value="all">All layers</option>
           {SOURCE_LAYER_OPTIONS.map((option) => (
@@ -168,7 +169,7 @@ export function AssetLibraryFilters({
       </label>
 
       <label className="ui-stack ui-stack--sm">
-        <span className="ui-label">Category</span>
+        <span className="ui-label"><TermWithHint termId="assetCategoryFilter">Category</TermWithHint></span>
         <select className="ui-input" value={filters.categoryId} onChange={(event) => onCategoryIdChange(event.currentTarget.value)}>
           <option value="all">All categories</option>
           {CATEGORY_OPTIONS.map(([value, label]) => (

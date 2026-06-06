@@ -13,6 +13,7 @@ from modules.adapters.runtime.python.worker.tasks.example_generation import (
     _GENERATOR_CACHE,
     _RESOLVED_MODEL_REFERENCES,
     ensure_generation_model_downloaded,
+    generate_text_value,
     generate_qa_examples_for_chunks,
 )
 from modules.adapters.runtime.python.worker.tasks.local_text_generation import _resolve_auto_inference_mode
@@ -114,6 +115,46 @@ class ExampleGenerationTests(unittest.TestCase):
                 )
             ],
         )
+
+    def test_custom_prompt_template_is_included_in_question_and_answer_prompts(self) -> None:
+        config = ExampleGenerationConfig.model_validate(
+            {
+                "mode": "qa",
+                "model": {"provider": "transformers", "modelId": "test-model"},
+                "promptTemplate": "Use a friendly classroom tone.",
+            }
+        )
+        fake_generator = _FakeGenerator(None, None)
+
+        with patch(
+            "modules.adapters.runtime.python.worker.tasks.example_generation.get_or_create_local_text_generator",
+            return_value=fake_generator,
+        ):
+            generate_qa_examples_for_chunks(
+                [MarkdownChunk(artifact_id="artifact-1", chunk_index=0, text="chunk text")],
+                config,
+            )
+
+        self.assertEqual(len(fake_generator.calls), 2)
+        self.assertTrue(all("Use a friendly classroom tone." in prompt for prompt in fake_generator.calls))
+
+    def test_generate_text_value_uses_local_generator(self) -> None:
+        config = ExampleGenerationConfig.model_validate(
+            {
+                "mode": "qa",
+                "model": {"provider": "transformers", "modelId": "test-model"},
+            }
+        )
+
+        class _ValueGenerator:
+            def generate_text(self, _prompt: str) -> str:
+                return "<think>draft</think>\n\nGenerated label"
+
+        with patch(
+            "modules.adapters.runtime.python.worker.tasks.example_generation.get_or_create_local_text_generator",
+            return_value=_ValueGenerator(),
+        ):
+            self.assertEqual(generate_text_value("Prompt", config), "Generated label")
 
     def test_local_model_inference_mode_validation_rejects_invalid_value(self) -> None:
         with self.assertRaisesRegex(ValueError, "inferenceMode"):

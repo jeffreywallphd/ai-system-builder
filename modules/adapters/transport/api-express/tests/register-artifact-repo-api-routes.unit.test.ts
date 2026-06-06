@@ -31,6 +31,15 @@ describe("registerArtifactRepoApiRoutes", () => {
     const browseHuggingFaceDatasetParquetFilesUseCase = {
       execute: testDouble.fn(async () => ({ ok: true, value: { repository: "openai/demo", revision: "main", files: [] } })),
     };
+    const importHuggingFaceFilesUseCase = {
+      execute: testDouble.fn(async () => ({
+        ok: true,
+        value: {
+          repositories: [],
+          summary: { attempted: 0, succeeded: 0, failed: 0 },
+        },
+      })),
+    };
     const storeArtifactInRepoUseCase = {
       execute: testDouble.fn(async () => ({
         ok: true,
@@ -152,6 +161,7 @@ describe("registerArtifactRepoApiRoutes", () => {
       hasArtifactInRepoUseCase,
       browseHuggingFaceNamespaceDatasetsUseCase,
       browseHuggingFaceDatasetParquetFilesUseCase,
+      importHuggingFaceFilesUseCase,
       storeArtifactInRepoUseCase,
       publishArtifactToRepoUseCase,
       verifyPublishedArtifactBackingUseCase,
@@ -160,11 +170,12 @@ describe("registerArtifactRepoApiRoutes", () => {
       localizeArtifactFromRepoUseCase,
     });
 
-    expect(app.post).toHaveBeenCalledTimes(10);
+    expect(app.post).toHaveBeenCalledTimes(11);
     expect(handlers.has("/api/artifact-repo/has")).toBe(true);
     expect(handlers.has("/api/artifact-repo/store")).toBe(true);
     expect(handlers.has("/api/huggingface/namespace/datasets")).toBe(true);
     expect(handlers.has("/api/huggingface/dataset/parquet-files")).toBe(true);
+    expect(handlers.has("/api/huggingface/files/import")).toBe(true);
     expect(handlers.has("/api/artifact/publish")).toBe(true);
     expect(handlers.has("/api/artifact/publish/verify")).toBe(true);
     expect(handlers.has("/api/artifact/source/verify")).toBe(true);
@@ -298,6 +309,7 @@ describe("registerArtifactRepoApiRoutes", () => {
       hasArtifactInRepoUseCase: { execute: testDouble.fn() },
       browseHuggingFaceNamespaceDatasetsUseCase: { execute: testDouble.fn() },
       browseHuggingFaceDatasetParquetFilesUseCase: { execute: testDouble.fn() },
+      importHuggingFaceFilesUseCase: { execute: testDouble.fn() },
       storeArtifactInRepoUseCase: { execute: testDouble.fn() },
       publishArtifactToRepoUseCase: { execute: testDouble.fn() },
       verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
@@ -353,6 +365,7 @@ describe("registerArtifactRepoApiRoutes", () => {
       hasArtifactInRepoUseCase: { execute: testDouble.fn() },
       browseHuggingFaceNamespaceDatasetsUseCase: { execute: testDouble.fn() },
       browseHuggingFaceDatasetParquetFilesUseCase: { execute: testDouble.fn() },
+      importHuggingFaceFilesUseCase: { execute: testDouble.fn() },
       storeArtifactInRepoUseCase: { execute: testDouble.fn() },
       publishArtifactToRepoUseCase: { execute: testDouble.fn() },
       verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
@@ -388,6 +401,83 @@ describe("registerArtifactRepoApiRoutes", () => {
       operation: "artifact.publish",
       error: {
         code: "validation",
+      },
+    });
+  });
+
+  it("imports selected Hugging Face files through the batch import use case", async () => {
+    const handlers = new Map<string, Parameters<ArtifactRepoExpressRoutePort["post"]>[1]>();
+    const app: ArtifactRepoExpressRoutePort = {
+      post: testDouble.fn((routePath, handler) => {
+        handlers.set(routePath, handler);
+      }),
+    };
+    const importHuggingFaceFilesUseCase = {
+      execute: testDouble.fn(async () => ({
+        ok: true,
+        value: {
+          repositories: [{
+            repository: "openai/demo",
+            revision: "main",
+            status: "succeeded",
+            files: [{
+              repository: "openai/demo",
+              revision: "main",
+              path: "data/train.parquet",
+              status: "registered",
+              artifactId: "artifacts/20260418000000-import001",
+            }],
+          }],
+          summary: { attempted: 1, succeeded: 1, failed: 0 },
+        },
+      })),
+    };
+
+    registerArtifactRepoApiRoutes({
+      app,
+      getHuggingFaceTokenStatus: () => ({ configured: false }),
+      setHuggingFaceToken: () => ({ configured: true, maskedToken: "â€¢â€¢â€¢â€¢1234" }),
+      clearHuggingFaceToken: () => ({ configured: false }),
+      hasArtifactInRepoUseCase: { execute: testDouble.fn() },
+      browseHuggingFaceNamespaceDatasetsUseCase: { execute: testDouble.fn() },
+      browseHuggingFaceDatasetParquetFilesUseCase: { execute: testDouble.fn() },
+      importHuggingFaceFilesUseCase,
+      storeArtifactInRepoUseCase: { execute: testDouble.fn() },
+      publishArtifactToRepoUseCase: { execute: testDouble.fn() },
+      verifyPublishedArtifactBackingUseCase: { execute: testDouble.fn() },
+      verifyImportedArtifactSourceBackingUseCase: { execute: testDouble.fn() },
+      registerArtifactFromRepoUseCase: { execute: testDouble.fn() },
+      localizeArtifactFromRepoUseCase: { execute: testDouble.fn() },
+    });
+
+    const response = {
+      status: testDouble.fn(() => response),
+      json: testDouble.fn(),
+    };
+
+    await handlers.get("/api/huggingface/files/import")?.(
+      {
+        body: {
+          files: [{ repository: "openai/demo", path: "data/train.parquet", revision: "main" }],
+          source: "thin-client.artifact-browser",
+        },
+        headers: {},
+      },
+      response,
+    );
+
+    expect(importHuggingFaceFilesUseCase.execute).toHaveBeenCalledWith(
+      {
+        repositories: [],
+        files: [{ repository: "openai/demo", path: "data/train.parquet", revision: "main", mediaType: undefined }],
+      },
+      { requestId: undefined, correlationId: undefined },
+    );
+    expect(response.status).toHaveBeenCalledWith(200);
+    expect((response.json as ReturnType<typeof testDouble.fn>).mock.calls[0]?.[0]).toMatchObject({
+      ok: true,
+      value: {
+        summary: { attempted: 1, succeeded: 1, failed: 0 },
       },
     });
   });

@@ -3,11 +3,10 @@ import { ArtifactIngestionFeature } from "../features/artifact-upload";
 import { TabbedPanel } from "../components/ui/TabbedPanel";
 
 export interface WorkspaceScopedPageProps { workspaceId: string; workspaceName: string; }
-export function ArtifactsPage({ workspaceId, workspaceName }: WorkspaceScopedPageProps) {
+export function ArtifactsPage({ workspaceId }: WorkspaceScopedPageProps) {
   return (
-    <section className="ui-stack ui-stack--sm" data-workspace-name={workspaceName}>
+    <section className="ui-stack ui-stack--sm">
       <h1>Data Management</h1>
-      <p>Showing records for: {workspaceName}</p>
       <TabbedPanel
         tabListAriaLabel="Artifact workspace panels"
         defaultTabId="ingestion"
@@ -15,12 +14,12 @@ export function ArtifactsPage({ workspaceId, workspaceName }: WorkspaceScopedPag
           {
             id: "ingestion",
             label: "Artifact Ingestion",
-            content: <ArtifactIngestionFeature key={`ingest-${workspaceId}`} workspaceId={workspaceId} workspaceName={workspaceName} />,
+            content: <ArtifactIngestionFeature key={`ingest-${workspaceId}`} workspaceId={workspaceId} />,
           },
           {
             id: "browser",
             label: "Artifact Browser",
-            content: <ArtifactBrowserFeature key={`browser-${workspaceId}`} workspaceId={workspaceId} workspaceName={workspaceName} />,
+            content: <ArtifactBrowserFeature key={`browser-${workspaceId}`} workspaceId={workspaceId} />,
           },
         ]}
       />

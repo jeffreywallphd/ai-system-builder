@@ -141,6 +141,7 @@ describe("model contracts", () => {
 
   it("supports model training request/result and validation report shapes", () => {
     const request: ModelTrainingRequest = {
+      trainingTask: "llm-classification",
       baseModel: {
         provider: "huggingface",
         modelId: "mistralai/Mistral-7B-Instruct-v0.2",
@@ -176,6 +177,7 @@ describe("model contracts", () => {
     };
 
     expect(request.method).toBe("qlora");
+    expect(request.trainingTask).toBe("llm-classification");
     expect(result.status).toBe("queued");
     expect(MODEL_TRAINING_METHODS).toEqual(["lora", "qlora", "full-finetune"]);
     expect(MODEL_TRAINING_STATUSES).toEqual(["queued", "running", "succeeded", "failed", "cancelled"]);

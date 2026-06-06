@@ -102,6 +102,21 @@ describe("SettingsPanel", () => {
     expect(readSettings).toHaveBeenCalledWith({ category: undefined, keys: ["runtime.python.defaultDevice", "models.default"] });
   });
 
+  it("does not reload settings when equivalent key arrays are recreated", async () => {
+    await renderPanel({ keys: ["huggingface.defaultNamespace"] as never });
+
+    expect(listDefinitions).toHaveBeenCalledTimes(1);
+    expect(readSettings).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      root?.render(<SettingsPanel title="Test" keys={["huggingface.defaultNamespace"] as never} />);
+      await Promise.resolve();
+    });
+
+    expect(listDefinitions).toHaveBeenCalledTimes(1);
+    expect(readSettings).toHaveBeenCalledTimes(1);
+  });
+
   it("updates string, select, and boolean settings", async () => {
     await renderPanel();
 

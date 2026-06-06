@@ -1,6 +1,7 @@
 import type { AssetMutationActor } from "./asset-mutation-actor";
 import type { AssetMutationApproval } from "./asset-mutation-approval";
 import type { AssetMutationOperation } from "./asset-mutation-operation";
+import type { AssetMetadata } from "./asset-metadata";
 import type { AssetProvenance } from "./asset-provenance";
 import type { AssetReviewStatus } from "./asset-review-status";
 import type { AssetSourceIdentity } from "./asset-source-identity";
@@ -28,5 +29,5 @@ export interface AssetMutationProvenance {
    * secrets, tokens, signed URLs, bytes/base64, prompt text, workflow JSON,
    * stack traces, command lines, environment values, or provider payloads.
    */
-  readonly sourceSnapshot?: Record<string, unknown>;
+  readonly sourceSnapshot?: AssetMetadata;
 }

@@ -10,6 +10,8 @@ RECURRENT_KEY_PATTERNS = ("recurrent", "gru", "lstm")
 
 
 def _detect_format(output_dir: Path) -> str:
+    if (output_dir / "pytorch_lora_weights.safetensors").exists():
+        return "diffusers-lora-safetensors"
     if (output_dir / "adapter_model.safetensors").exists():
         return "adapter-safetensors"
     if (output_dir / "model.safetensors.index.json").exists():
@@ -148,13 +150,16 @@ def validate_model_output(
             "validatedAt": datetime.now(timezone.utc).isoformat(),
         }
     format_name = _detect_format(output_dir)
-    tensor_checks_required = format_name in {"safetensors", "sharded-safetensors", "adapter-safetensors"}
+    tensor_checks_required = format_name in {"safetensors", "sharded-safetensors", "adapter-safetensors", "diffusers-lora-safetensors"}
     tensor_checks_completed = True
 
     has_config = (output_dir / "config.json").exists()
     has_tokenizer = any((output_dir / name).exists() for name in ["tokenizer.json", "tokenizer_config.json"])
+    has_processor = any((output_dir / name).exists() for name in ["preprocessor_config.json", "image_processor_config.json", "processor_config.json", "feature_extractor_config.json"])
     has_adapter_config = (output_dir / "adapter_config.json").exists()
     has_adapter_model = (output_dir / "adapter_model.safetensors").exists()
+    has_diffusers_lora_model = (output_dir / "pytorch_lora_weights.safetensors").exists()
+    has_adapter_weights = has_adapter_model or has_diffusers_lora_model
 
     weight_map, missing_shards, index_error = _read_safetensors_index(output_dir)
     if index_error:
@@ -167,16 +172,16 @@ def validate_model_output(
     tensor_shape_summary: dict[str, list[int]] = {}
 
     # Adapter outputs must be complete.
-    if has_adapter_config != has_adapter_model:
-        errors.append("Adapter output is partial; both adapter_config.json and adapter_model.safetensors are required.")
+    if has_adapter_config != has_adapter_weights:
+        errors.append("Adapter output is partial; adapter_config.json and adapter safetensors weights are required.")
 
     # Full model outputs should include config.
-    is_adapter_output = has_adapter_config and has_adapter_model
+    is_adapter_output = has_adapter_config and has_adapter_weights
     if format_name in {"safetensors", "sharded-safetensors"} and not is_adapter_output and not has_config:
         errors.append("config.json is required for full-model safetensors outputs.")
 
-    if format_name in {"safetensors", "sharded-safetensors", "adapter-safetensors"} and not has_tokenizer:
-        warnings.append("Tokenizer files were not found (tokenizer.json or tokenizer_config.json).")
+    if format_name in {"safetensors", "sharded-safetensors", "adapter-safetensors", "diffusers-lora-safetensors"} and not has_tokenizer and not has_processor and not is_adapter_output:
+        warnings.append("Tokenizer or processor files were not found.")
 
     if missing_shards:
         errors.append(f"Missing safetensors shards referenced by index: {', '.join(missing_shards)}")
@@ -226,13 +231,24 @@ def validate_model_output(
             else:
                 warnings.append(shard_warning)
 
+    if has_diffusers_lora_model:
+        present_keys, shapes, shard_warning = _read_safetensors_tensors(output_dir / "pytorch_lora_weights.safetensors")
+        all_tensor_keys.update(present_keys)
+        tensor_shape_summary.update(shapes)
+        if shard_warning:
+            tensor_checks_completed = False
+            if validation_strictness == "publish":
+                errors.append(shard_warning)
+            else:
+                warnings.append(shard_warning)
+
     if tensor_checks_required and not tensor_checks_completed and validation_strictness == "publish":
         errors.append("Tensor-level safetensors checks are required for publish-bound validation.")
 
     if missing_tensor_keys:
         errors.append(f"Missing tensor keys referenced by index: {', '.join(missing_tensor_keys)}")
 
-    detected_lora = has_adapter_config or has_adapter_model
+    detected_lora = has_adapter_config or has_adapter_weights
     detected_lora_keys = sorted([key for key in all_tensor_keys if any(pattern in key for pattern in lora_key_patterns)])
     if detected_lora_keys:
         detected_lora = True
@@ -273,8 +289,9 @@ def validate_model_output(
         "hfCompatibility": {
             "config": has_config,
             "tokenizer": has_tokenizer,
-            "safetensors": format_name in {"safetensors", "sharded-safetensors", "adapter-safetensors"},
-            "adapterFiles": has_adapter_config and has_adapter_model,
+            "processor": has_processor,
+            "safetensors": format_name in {"safetensors", "sharded-safetensors", "adapter-safetensors", "diffusers-lora-safetensors"},
+            "adapterFiles": has_adapter_config and has_adapter_weights,
         },
         "tensorChecksCompleted": tensor_checks_completed if tensor_checks_required else True,
         "validationStrictness": validation_strictness,

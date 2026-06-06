@@ -1,6 +1,7 @@
 import type { AssetValidationIssue } from "./asset-validation-issue";
 import type { AssetMutationDiagnostic } from "./asset-mutation-diagnostic";
 import type { AssetMutationOperation } from "./asset-mutation-operation";
+import type { AssetMetadata } from "./asset-metadata";
 
 export const ASSET_MUTATION_FAILURE_CODES = [
   "validation",
@@ -22,7 +23,7 @@ export interface AssetMutationFailure {
   readonly operation: AssetMutationOperation;
   readonly validationIssues?: readonly AssetValidationIssue[];
   readonly diagnostics?: readonly AssetMutationDiagnostic[];
-  readonly safeDetails?: Record<string, unknown>;
+  readonly safeDetails?: AssetMetadata;
 }
 
 export function isAssetMutationFailureCode(

@@ -1,9 +1,11 @@
 import { describe, expect, it, testDouble } from "../../../../testing/node-test";
 import { TaskType } from "../../../../contracts/runtime";
+import { createWorkspaceId } from "../../../../contracts/workspace";
 
 import { createComfyUiImageGenerationRuntimeAdapter } from "../createComfyUiImageGenerationRuntimeAdapter";
 
 describe("createComfyUiImageGenerationRuntimeAdapter", () => {
+  const workspaceId = createWorkspaceId("workspace.test");
   const baseSupervisor = {
     start: testDouble.fn(async () => {}),
     getRecentRuntimeOutput: testDouble.fn(() => []),
@@ -15,7 +17,7 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
     const client = { submitPrompt: testDouble.fn(async () => ({ prompt_id: "p1", number: 1 })), getQueue: testDouble.fn(), getHistory: testDouble.fn() };
     const adapter = createComfyUiImageGenerationRuntimeAdapter({ supervisor, client, mapperOptions: { defaultCheckpoint: "sdxl" }, now: () => "2026-04-30T00:00:00.000Z" });
 
-    const result = await adapter.startTask({ taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
+    const result = await adapter.startTask({ workspaceId, taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
     expect(supervisor.start).toHaveBeenCalledOnce();
     expect(client.submitPrompt).toHaveBeenCalledOnce();
     expect(result).toMatchObject({ requestId: "r1", status: "queued", metadata: { engine: "comfyui", comfyUiPromptId: "p1" } });
@@ -32,6 +34,7 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
 
     const result = await adapter.startTask({
       taskType: TaskType.IMAGE_GENERATION,
+      workspaceId,
       payload: { prompt: "cat", engineHints: { runtimeDeviceMode: "cuda" } },
       requestId: "r1",
     });
@@ -53,6 +56,7 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
 
     await adapter.startTask({
       taskType: TaskType.IMAGE_GENERATION,
+      workspaceId,
       payload: { prompt: "portrait", faceId: { enabled: true, references: [{ artifactId: "uploads/face.png" }] } },
       requestId: "r-face",
     });
@@ -75,7 +79,7 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
         getHistory: testDouble.fn(async () => ({})),
       }, mapperOptions: { defaultCheckpoint: "sdxl" },
     });
-    await adapter.startTask({ taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
+    await adapter.startTask({ workspaceId, taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
     const record = await adapter.getTaskStatus("r1");
     expect(record.status).toBe("running");
   });
@@ -89,10 +93,10 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
         getHistory: testDouble.fn(async () => ({ p1: { outputs: { "7": { images: [{ filename: "x.png", subfolder: "", type: "output", data: "raw" }] } } } })),
       }, mapperOptions: { defaultCheckpoint: "sdxl" },
     });
-    await adapter.startTask({ taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
+    await adapter.startTask({ workspaceId, taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
     const record = await adapter.getTaskStatus("r1");
     expect(record.status).toBe("succeeded");
-    expect(record.data).toEqual({ outputs: [{ fileName: "x.png", subfolder: undefined, type: "image", promptId: "p1", engine: "comfyui" }] });
+    expect(record.data).toEqual({ outputs: [{ fileName: "x.png", subfolder: undefined, type: "image", promptId: "p1", engine: "comfyui", workspaceId }] });
     const unknown = await adapter.getTaskStatus("nope");
     expect(unknown.status).toBe("unknown");
   });
@@ -106,7 +110,7 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
         getHistory: testDouble.fn(async () => ({ p1: { outputs: {} } })),
       }, mapperOptions: { defaultCheckpoint: "sdxl" },
     });
-    await adapter.startTask({ taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
+    await adapter.startTask({ workspaceId, taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
     const record = await adapter.getTaskStatus("r1");
     expect(record.status).toBe("failed");
     expect(record.error?.message).toBe("ComfyUI history entry did not contain image outputs.");
@@ -121,7 +125,7 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
         getHistory: testDouble.fn(async () => ({ p1: { outputs: {}, status: { status_str: "error", messages: [["execution_error", { exception_message: "OOM on node", node_id: "12", node_type: "KSampler", traceback: ["a", "b", "c"] }]] } } })),
       }, mapperOptions: { defaultCheckpoint: "sdxl" },
     });
-    await adapter.startTask({ taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
+    await adapter.startTask({ workspaceId, taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
     const record = await adapter.getTaskStatus("r1");
     expect(record.status).toBe("failed");
     expect(record.error?.message).toContain("OOM on node");
@@ -141,7 +145,7 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
         getHistory: testDouble.fn(async () => ({ p1: { outputs: {}, status: { status_str: "error" } } })),
       }, mapperOptions: { defaultCheckpoint: "sdxl" },
     });
-    await adapter.startTask({ taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
+    await adapter.startTask({ workspaceId, taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
     const record = await adapter.getTaskStatus("r1");
     expect(record.status).toBe("failed");
     expect(record.error?.message).toContain("ComfyUI failed during DirectML execution");
@@ -167,7 +171,7 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
         getHistory: testDouble.fn(async () => ({})),
       }, mapperOptions: { defaultCheckpoint: "sdxl" },
     });
-    await adapter.startTask({ taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
+    await adapter.startTask({ workspaceId, taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
     const record = await adapter.getTaskStatus("r1");
     expect(record.status).toBe("unknown");
     expect(record.error).toEqual({ code: "comfyui_task_missing", message: "ComfyUI prompt was not found in queue or history." });
@@ -188,7 +192,7 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
       mapperOptions: { defaultCheckpoint: "sdxl" },
     });
 
-    await adapter.startTask({ taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
+    await adapter.startTask({ workspaceId, taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r1" });
     const record = await adapter.getTaskStatus("r1");
 
     expect(record.status).toBe("failed");
@@ -214,8 +218,8 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
     };
     const adapter = createComfyUiImageGenerationRuntimeAdapter({ supervisor, client, mapperOptions: { defaultCheckpoint: "sdxl" }, now: () => "2026-05-06T00:00:00.000Z" });
 
-    await adapter.startTask({ taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r-list" });
-    const result = await adapter.listTasks({ taskTypes: [TaskType.IMAGE_GENERATION] });
+    await adapter.startTask({ workspaceId, taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r-list" });
+    const result = await adapter.listTasks({ workspaceId, taskTypes: [TaskType.IMAGE_GENERATION] });
 
     expect(result.tasks.length).toBe(1);
     expect(result.tasks[0]).toMatchObject({ requestId: "r-list", taskType: TaskType.IMAGE_GENERATION, status: "queued", metadata: { comfyUiPromptId: "p-list" } });
@@ -235,10 +239,10 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
       now: () => "2026-05-06T00:00:00.000Z",
     });
 
-    await adapter.startTask({ taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r-final" });
+    await adapter.startTask({ workspaceId, taskType: TaskType.IMAGE_GENERATION, payload: { prompt: "cat" }, requestId: "r-final" });
     await adapter.getTaskStatus("r-final");
-    const withoutCompleted = await adapter.listTasks({});
-    const withCompleted = await adapter.listTasks({ includeCompleted: true });
+    const withoutCompleted = await adapter.listTasks({ workspaceId });
+    const withCompleted = await adapter.listTasks({ workspaceId, includeCompleted: true });
 
     expect(withoutCompleted.tasks).toEqual([]);
     expect(withCompleted.tasks.length).toBe(1);
@@ -276,3 +280,4 @@ describe("createComfyUiImageGenerationRuntimeAdapter", () => {
   });
 
 });
+

@@ -2,7 +2,7 @@ import type {
   WorkspaceId,
 } from "../../../contracts/workspace";
 import type { UserLibraryEffectiveSourceSummary } from "../../../contracts/user-library";
-import type { AssetAuthoringEffectiveSourceSummary } from "../../../contracts/asset-authoring/asset-authoring-effective-source";
+import type { AssetAuthoringEffectiveSourceSummary } from "../../../contracts/asset-authoring";
 import type {
   AssetBinding,
   AssetComposition,

@@ -9,12 +9,12 @@ const basePlan = {
   planId,
   targetWorkspaceId: workspaceId,
   status: "valid",
-  nodes: [{ nodeId: "node.a", requiredCapabilities: [{ capabilityKind: "text-generation-runtime", capabilityKey: "text-generation-runtime", isRequired: true }] }],
+  nodes: [{ nodeId: "node.a", requiredCapabilities: [{ kind: "model", key: "model", direction: "required" }] }],
   relationships: [],
   selectedProjections: [], blockers: [], compatibilityDiagnostics: [], createdAt: "2026-05-21T00:00:00.000Z", updatedAt: "2026-05-21T00:00:00.000Z", provenance: [], planningSummary: { selectedProjectionCount: 0, nodeCount: 1, relationshipCount: 0, requiredCapabilityCount: 1, missingCapabilityCount: 0, conflictCount: 0, blockerCount: 0, warningCount: 0, planningReadiness: "planning-ready" },
 } as any;
 
-const inventory = { targetWorkspaceId: workspaceId, inventorySourceId: "inventory.main", inventorySourceKind: "manual", inventoryStatus: "checked", discoveredProviderCandidates: [{ providerCandidateId: "provider.main", providerKind: "manual", inventorySourceId: "inventory.main", capabilities: [{ capabilityId: "cap.main", capabilityKind: "text-generation-runtime", capabilityKey: "text-generation-runtime", label: "cap", availabilityStatus: "available", diagnostics: [], blockers: [] }], availabilityStatus: "available", displayLabel: "provider", diagnostics: [], blockers: [] }], discoveredCapabilities: [], diagnostics: [], blockers: [], checkedAt: "2026-05-21T00:00:00.000Z" } as any;
+const inventory = { targetWorkspaceId: workspaceId, inventorySourceId: "inventory.main", inventorySourceKind: "manual", inventoryStatus: "checked", discoveredProviderCandidates: [{ providerCandidateId: "provider.main", providerKind: "manual", inventorySourceId: "inventory.main", capabilities: [{ capabilityId: "cap.main", capabilityKind: "model", capabilityKey: "model", label: "cap", availabilityStatus: "available", diagnostics: [], blockers: [] }], availabilityStatus: "available", displayLabel: "provider", diagnostics: [], blockers: [] }], discoveredCapabilities: [], diagnostics: [], blockers: [], checkedAt: "2026-05-21T00:00:00.000Z" } as any;
 
 test("creates readiness binding for validated plan", async () => {
   const saved: any[] = [];

@@ -3,10 +3,18 @@ import { normalizeEffectiveAssetProjectionBlocker, normalizeEffectiveAssetProjec
 
 export class EffectiveAssetProjectionDiagnosticsService {
   createDiagnostic(code: EffectiveAssetProjectionDiagnosticCode, metadata?: EffectiveAssetProjectionDiagnostic["metadata"]): EffectiveAssetProjectionDiagnostic {
-    return normalizeEffectiveAssetProjectionDiagnostic({ code, message: "", metadata });
+    try {
+      return normalizeEffectiveAssetProjectionDiagnostic({ code, message: "", metadata });
+    } catch {
+      return normalizeEffectiveAssetProjectionDiagnostic({ code, message: "" });
+    }
   }
   createBlocker(code: EffectiveAssetProjectionDiagnosticCode, metadata?: EffectiveAssetProjectionBlocker["metadata"]): EffectiveAssetProjectionBlocker {
-    return normalizeEffectiveAssetProjectionBlocker({ code, message: "", metadata });
+    try {
+      return normalizeEffectiveAssetProjectionBlocker({ code, message: "", metadata });
+    } catch {
+      return normalizeEffectiveAssetProjectionBlocker({ code, message: "" });
+    }
   }
 }
 

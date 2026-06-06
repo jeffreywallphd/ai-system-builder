@@ -54,6 +54,7 @@ describe("desktop artifact upload IPC integration", () => {
         fileName: "cat.png",
         mediaType: "image/png",
         bytes: new Uint8Array([137, 80, 78, 71]),
+        workspaceId: "workspace-a",
         boundary: {
           host: "desktop",
           source: "desktop.renderer.artifact-upload.form",
@@ -106,6 +107,7 @@ describe("desktop artifact upload IPC integration", () => {
         fileName: "brochure.zip",
         mediaType: "application/zip",
         bytes: new Uint8Array([1, 2, 3]),
+        workspaceId: "workspace-a",
         boundary: {
           host: "desktop",
           source: "desktop.renderer.artifact-upload.form",

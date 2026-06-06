@@ -8,7 +8,7 @@ function baseDependencies(app: any) {
     storeArtifactUploadUseCase: { execute:testDouble.fn(), getAcceptedUploadPolicy:testDouble.fn(()=>({acceptedMediaTypes:[],acceptedExtensions:[]}))},
     browseArtifactsUseCase: { execute:testDouble.fn() }, readArtifactDetailUseCase: { execute:testDouble.fn() }, readArtifactContentUseCase: { execute:testDouble.fn() },
     artifactMediaViewRetrieval: { retrieve:testDouble.fn() }, deleteRegisteredArtifactUseCase:{ execute:testDouble.fn() }, hasArtifactInRepoUseCase:{ execute:testDouble.fn() },
-    browseHuggingFaceNamespaceDatasetsUseCase:{ execute:testDouble.fn() }, browseHuggingFaceDatasetParquetFilesUseCase:{ execute:testDouble.fn() },
+    browseHuggingFaceNamespaceDatasetsUseCase:{ execute:testDouble.fn() }, browseHuggingFaceDatasetParquetFilesUseCase:{ execute:testDouble.fn() }, importHuggingFaceFilesUseCase:{ execute:testDouble.fn() },
     storeArtifactInRepoUseCase:{ execute:testDouble.fn() }, publishArtifactToRepoUseCase:{ execute:testDouble.fn() },
     verifyPublishedArtifactBackingUseCase:{ execute:testDouble.fn() }, verifyImportedArtifactSourceBackingUseCase:{ execute:testDouble.fn() },
     registerArtifactFromRepoUseCase:{ execute:testDouble.fn() }, localizeArtifactFromRepoUseCase:{ execute:testDouble.fn() },

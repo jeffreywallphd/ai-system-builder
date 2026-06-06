@@ -77,6 +77,7 @@ export interface DesktopArtifactBrowseItem {
   artifactFamily: ArtifactBrowseContractItem["artifactFamily"];
   mediaType?: string;
   sizeBytes?: number;
+  sourceKind?: ArtifactBrowseContractItem["sourceKind"];
   originalName?: string;
   createdAt?: string;
   metadata?: {
@@ -403,17 +404,21 @@ interface DesktopApiBridge {
   clearHuggingFaceToken: () => Promise<unknown>;
   browseHuggingFaceNamespaceDatasets: (input: { namespace: string }) => Promise<unknown>;
   browseHuggingFaceDatasetParquetFiles: (input: { repository: string; revision?: string }) => Promise<unknown>;
+  importHuggingFaceFiles?: (input: {
+    repositories?: Array<{ repository: string; revision?: string }>;
+    files?: Array<{ repository: string; path: string; revision?: string; mediaType?: string }>;
+  }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   uploadArtifact: (input: DesktopArtifactUploadInput) => Promise<unknown>;
   getArtifactUploadPolicy: () => Promise<unknown>;
   ingestWebsitePage?: (input: {
     url: string;
     label?: string;
     mode?: "automatic" | "rendered";
-  }) => Promise<unknown>;
+  }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   ingestWebsitePagesBatch?: (input: {
     targets: DesktopWebsiteIngestionTarget[];
     mode?: "automatic" | "rendered";
-  }) => Promise<unknown>;
+  }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   startPrepareTrainingDataset?: (input: DesktopPrepareTrainingDatasetInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   cancelPrepareTrainingDatasetTask?: (input: { requestId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
@@ -531,6 +536,31 @@ export interface DesktopHuggingFaceDatasetParquetFile {
   path: string;
   revision: string;
   sizeBytes?: number;
+}
+
+export interface DesktopHuggingFaceFilesImportResult {
+  repositories: Array<{
+    repository: string;
+    revision: string;
+    status: "succeeded" | "partial" | "failed";
+    message?: string;
+    code?: "validation" | "not-found" | "unavailable" | "internal";
+    files: Array<{
+      repository: string;
+      path: string;
+      revision: string;
+      mediaType?: string;
+      status: "registered" | "failed";
+      artifactId?: string;
+      message?: string;
+      code?: "validation" | "not-found" | "unavailable" | "internal";
+    }>;
+  }>;
+  summary: {
+    attempted: number;
+    succeeded: number;
+    failed: number;
+  };
 }
 
 

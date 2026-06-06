@@ -47,7 +47,10 @@ This ADR remains the canonical architecture decision. Current implementation is 
   - Explicitly insecure/noisy mode for local development only.
 - `lan-https-token` (implemented)
   - HTTPS required.
-  - `AI_SYSTEM_BUILDER_TLS_CERT_PATH` and `AI_SYSTEM_BUILDER_TLS_KEY_PATH` are required.
+  - `AI_SYSTEM_BUILDER_TLS_CERT_MODE` selects `manual`, `auto-self-signed`, or `auto-local-ca`.
+  - Manual TLS mode requires readable `AI_SYSTEM_BUILDER_TLS_CERT_PATH` and `AI_SYSTEM_BUILDER_TLS_KEY_PATH`.
+  - Generated TLS modes create/reuse certificate material under the server security store or configured TLS certificate directory.
+  - `auto-local-ca` supports local/dev/LAN testing with manual trust installation; no automatic trust-store installation is performed.
   - `SERVER_TOKEN_HASH_SECRET` is required.
   - Protected APIs require `Authorization: Bearer <opaque-token>`.
   - Server persists token hashes only in server-side security store data.
@@ -71,7 +74,7 @@ Current limitations / required follow-up:
 - Pairing endpoints should be rate-limited as hardening follow-up (not complete in current implementation).
 - Audit logging is an architectural requirement/follow-up; not yet complete as a dedicated security-audit subsystem.
 - Storage security and resource-level authorization are next-phase beyond current route-level scope checks.
-- mTLS, external TLS termination mode, API-key mode, OAuth, encryption at rest, and public-internet hardening remain future adapter/phased work.
+- mTLS, external TLS termination mode, API-key mode, OAuth, encryption at rest, and public-internet hardening remain future adapter work.
 
 ## Security domains
 
@@ -326,6 +329,7 @@ Initial capabilities:
   - loud startup warning
 - `lan-https-token`
   - HTTPS required
+  - TLS certificate mode may be manual, generated self-signed, or generated local-CA-backed
   - LAN pairing issues bearer device token
   - non-public APIs require `Authorization: Bearer <token>`
   - token is random opaque token
@@ -430,14 +434,14 @@ Representative audit events:
 - Host composition becomes more explicit.
 - Central route policy requires ongoing maintenance.
 - Token lifecycle and credential storage need careful testing.
-- HTTPS certificate setup requires user/admin configuration.
+- HTTPS certificate trust/setup may require user/admin configuration, especially for manual and generated local-development certificates.
 - Redaction/audit diagnostics work increases.
 
 ## Non-goals
 
 - Do not implement OAuth now.
 - Do not implement mTLS now.
-- Do not implement full PKI automation now.
+- Do not implement public web-CA/ACME automation or trust-store automation now.
 - Do not implement full encryption-at-rest now.
 - Do not implement multi-user RBAC UI now.
 - Do not move every feature into security folders.

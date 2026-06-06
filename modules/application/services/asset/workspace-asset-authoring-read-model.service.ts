@@ -1,7 +1,5 @@
 import type { AssetReference } from "../../../contracts/asset";
-import type { AssetAuthoringEffectiveSourceSummary } from "../../../contracts/asset-authoring/asset-authoring-effective-source";
-import type { AssetAuthoringDiagnostic } from "../../../contracts/asset-authoring/asset-authoring-diagnostics";
-import type { AssetOverrideRecord } from "../../../contracts/asset-authoring/asset-authoring-models";
+import type { AssetAuthoringDiagnostic, AssetAuthoringEffectiveSourceSummary, AssetOverrideRecord } from "../../../contracts/asset-authoring";
 import type { WorkspaceId } from "../../../contracts/workspace";
 import type { AssetCustomizationTargetReaderPort, AssetDraftRepositoryPort, AssetOverrideRepositoryPort, AssetRevisionRepositoryPort, AuthoredAssetRepositoryPort } from "../../ports/asset-authoring";
 

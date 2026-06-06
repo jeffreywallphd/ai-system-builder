@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { TermWithHint } from "../../../../../../modules/ui/shared";
 import { useActiveWorkspace } from "../hooks/useActiveWorkspace";
 
 export interface WorkspaceCreateFormProps {
@@ -27,12 +28,12 @@ export function WorkspaceCreateForm({ compact = false, onCreated }: WorkspaceCre
     }}>
       <h3>{compact ? "Create workspace" : "Create a workspace"}</h3>
       <label className="ui-field">
-        <span>Name</span>
+        <span><TermWithHint termId="workspaceName">Name</TermWithHint></span>
         <input name="workspaceName" value={workspaceName} onChange={(event) => setWorkspaceName(event.currentTarget.value)} placeholder="My Project" />
       </label>
       <label className="ui-checkbox">
         <input type="checkbox" checked={includeFoundation} onChange={(event) => setIncludeFoundation(event.currentTarget.checked)} />
-        <span>Include System Foundation assets</span>
+        <span><TermWithHint termId="includeSystemAssets">Include System Foundation assets</TermWithHint></span>
       </label>
       {!compact ? <p className="ui-text-muted">Adds reusable UI, form, display, workflow, and system shell assets to this workspace.</p> : null}
       <button className="ui-button ui-button--primary" type="submit">Create workspace</button>

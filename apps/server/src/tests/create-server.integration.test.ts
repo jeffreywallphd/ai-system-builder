@@ -11,7 +11,7 @@ import { createServer } from "../createServer";
 const tempRoots: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempRoots.map(async (root) => rm(root, { recursive: true, force: true })));
+  await Promise.all(tempRoots.map(async (root) => rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })));
   tempRoots.splice(0, tempRoots.length);
 });
 

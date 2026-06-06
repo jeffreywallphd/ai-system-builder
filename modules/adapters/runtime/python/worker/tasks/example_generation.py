@@ -25,19 +25,30 @@ class GeneratedQaExample:
     generation_mode: str = "qa"
 
 
-def _build_question_prompt(chunk: MarkdownChunk) -> str:
+def _with_prompt_template(base_prompt: str, config: ExampleGenerationConfig) -> str:
+    prompt_template = (config.promptTemplate or "").strip()
+    if not prompt_template:
+        return base_prompt
     return (
+        f"System prompt:\n{prompt_template}\n\n"
+        f"Task instructions:\n{base_prompt}"
+    )
+
+
+def _build_question_prompt(chunk: MarkdownChunk, config: ExampleGenerationConfig) -> str:
+    return _with_prompt_template(
         "You are creating supervised training data.\n"
         "Write exactly one clear user question answerable only from the context.\n"
         "The question should be specific, natural, and grounded in the context.\n"
         "The context is the source material, not a list of generation examples.\n"
         "Return only the question.\n\n"
-        f"Context:\n{chunk.text}"
+        f"Context:\n{chunk.text}",
+        config,
     )
 
 
-def _build_answer_prompt(question: str, chunk: MarkdownChunk) -> str:
-    return (
+def _build_answer_prompt(question: str, chunk: MarkdownChunk, config: ExampleGenerationConfig) -> str:
+    return _with_prompt_template(
         "You are creating supervised training data.\n"
         "Answer the user question using only facts in the context.\n"
         "Write in a conversational tone while staying concise and faithful.\n"
@@ -45,7 +56,8 @@ def _build_answer_prompt(question: str, chunk: MarkdownChunk) -> str:
         "The context is the source material, not a list of generation examples.\n"
         "Return only the answer.\n\n"
         f"Question:\n{question}\n\n"
-        f"Context:\n{chunk.text}"
+        f"Context:\n{chunk.text}",
+        config,
     )
 
 
@@ -186,6 +198,11 @@ def _extract_single_answer(text: str, question: str) -> str:
     return candidate
 
 
+def generate_text_value(prompt: str, config: ExampleGenerationConfig) -> str:
+    generator = get_or_create_local_text_generator(config)
+    return _strip_reasoning_blocks(generator.generate_text(prompt).strip()).strip()
+
+
 def generate_qa_examples_for_chunks(
     chunks: list[MarkdownChunk],
     config: ExampleGenerationConfig,
@@ -197,14 +214,14 @@ def generate_qa_examples_for_chunks(
 
     examples: list[GeneratedQaExample] = []
     for chunk in chunks:
-        question_prompt = _build_question_prompt(chunk)
+        question_prompt = _build_question_prompt(chunk, config)
         answer_prompt = ""
         raw_question_output = ""
         raw_answer_output = ""
         try:
             raw_question_output = generator.generate_text(question_prompt).strip()
             question = _extract_single_question(raw_question_output, question_prompt)
-            answer_prompt = _build_answer_prompt(question, chunk)
+            answer_prompt = _build_answer_prompt(question, chunk, config)
             raw_answer_output = generator.generate_text(answer_prompt).strip()
             answer = _extract_single_answer(
                 raw_answer_output,

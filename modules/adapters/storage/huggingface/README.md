@@ -1,5 +1,7 @@
 # Hugging Face artifact-repo storage adapter
 
+> AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
+
 This module contains the first concrete artifact-repo storage provider adapter.
 
 ## Scope in this slice

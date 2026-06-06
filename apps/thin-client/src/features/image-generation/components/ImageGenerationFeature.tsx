@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { formatImageGenerationModelDropdownLabel } from "../../../../../../modules/ui/shared";
+import { formatImageGenerationModelDropdownLabel, TermWithHint } from "../../../../../../modules/ui/shared";
 import { LoadingSpinner } from "../../../components/ui/LoadingSpinner";
 import { secureFetch } from "../../../security/secureFetch";
 import { useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
@@ -45,12 +45,39 @@ function GeneratedImagePreview({ src, alt }: { src: string; alt: string }) {
   return <img src={objectUrl} alt={alt} />;
 }
 
+function renderImageGenerationNumericLabel(label: string) {
+  if (label.startsWith("Seed")) {
+    return <><TermWithHint termId="seed">Seed</TermWithHint> (optional)</>;
+  }
+  if (label === "Steps") {
+    return <TermWithHint termId="steps">Steps</TermWithHint>;
+  }
+  if (label === "Width") {
+    return <TermWithHint termId="width">Width</TermWithHint>;
+  }
+  if (label === "Height") {
+    return <TermWithHint termId="height">Height</TermWithHint>;
+  }
+  if (label === "CFG") {
+    return <TermWithHint termId="cfg">CFG</TermWithHint>;
+  }
+  if (label === "Sampler") {
+    return <TermWithHint termId="sampler">Sampler</TermWithHint>;
+  }
+  if (label === "Scheduler") {
+    return <TermWithHint termId="scheduler">Scheduler</TermWithHint>;
+  }
+  if (label === "Number of Images") {
+    return <TermWithHint termId="numberOfImages">Number of Images</TermWithHint>;
+  }
+  return label;
+}
+
 export function ImageGenerationFeature({
   onGenerated,
   onNavigateToArtifacts,
   onNavigateToModels,
   workspaceId,
-  workspaceName,
 }: {
   onGenerated?: () => void;
   onNavigateToArtifacts?: () => void;
@@ -70,12 +97,11 @@ export function ImageGenerationFeature({
   return (
     <section className="ui-panel ui-stack ui-stack--sm" aria-label="Image Generation">
       <h2>Image Generation</h2>
-      <p>Workspace: {workspaceName ?? "No workspace selected"}</p>
       <p className="ui-text-muted">Generate images from a prompt. Completed generations are registered in Artifacts automatically.</p>
 
       <section className="ui-stack ui-stack--sm">
         <div className="ui-stack ui-stack--xs">
-          <label htmlFor="image-generation-model-record">Model (server inventory)</label>
+          <label htmlFor="image-generation-model-record"><TermWithHint termId="modelInventory">Model</TermWithHint> (server inventory)</label>
           <div>
             <select
               className="ui-input"
@@ -127,7 +153,7 @@ export function ImageGenerationFeature({
         </div>
 
         <div className="ui-stack ui-stack--xs">
-          <label htmlFor="image-generation-runtime-mode">Runtime mode</label>
+          <label htmlFor="image-generation-runtime-mode"><TermWithHint termId="runtime">Runtime mode</TermWithHint></label>
           <select
             className="ui-input"
             id="image-generation-runtime-mode"
@@ -142,7 +168,7 @@ export function ImageGenerationFeature({
         </div>
 
         <div className="ui-stack ui-stack--xs">
-          <label htmlFor="image-generation-latent-source">Latent source</label>
+          <label htmlFor="image-generation-latent-source"><TermWithHint termId="latentSourceArtifact">Latent source</TermWithHint></label>
           <div>
             <select
               className="ui-input"
@@ -164,23 +190,23 @@ export function ImageGenerationFeature({
           {feature.imageArtifactsError ? <p role="alert">{feature.imageArtifactsError}</p> : null}
         </div>
         <label className="ui-stack ui-stack--xs">
-          <span>Enable FaceID (optional)</span>
+          <span><TermWithHint termId="faceId">Enable FaceID</TermWithHint> (optional)</span>
           <input type="checkbox" checked={feature.form.faceIdEnabled} onChange={(event) => feature.setForm((current) => ({ ...current, faceIdEnabled: event.target.checked }))} />
         </label>
         {feature.form.faceIdEnabled ? (
           <div className="ui-stack ui-stack--xs">
             <p className="ui-text-muted">FaceID supports 1-3 image artifacts. You can reuse the same artifact in multiple slots.</p>
-            <label className="ui-stack ui-stack--xs"><span>Face reference image 1</span><select className="ui-input" value={feature.form.faceIdArtifactId1} onChange={(event) => setFormValue("faceIdArtifactId1", (event.target as HTMLSelectElement).value)}><option value="">Select image artifact</option>{feature.imageArtifacts.map((artifact) => <option key={`face1-${artifact.storageKey}`} value={artifact.storageKey}>{artifact.originalName ?? artifact.storageKey}</option>)}</select></label>
-            <label className="ui-stack ui-stack--xs"><span>Face reference image 2 (optional)</span><select className="ui-input" value={feature.form.faceIdArtifactId2} onChange={(event) => setFormValue("faceIdArtifactId2", (event.target as HTMLSelectElement).value)}><option value="">Select image artifact</option>{feature.imageArtifacts.map((artifact) => <option key={`face2-${artifact.storageKey}`} value={artifact.storageKey}>{artifact.originalName ?? artifact.storageKey}</option>)}</select></label>
-            <label className="ui-stack ui-stack--xs"><span>Face reference image 3 (optional)</span><select className="ui-input" value={feature.form.faceIdArtifactId3} onChange={(event) => setFormValue("faceIdArtifactId3", (event.target as HTMLSelectElement).value)}><option value="">Select image artifact</option>{feature.imageArtifacts.map((artifact) => <option key={`face3-${artifact.storageKey}`} value={artifact.storageKey}>{artifact.originalName ?? artifact.storageKey}</option>)}</select></label>
-            <label className="ui-stack ui-stack--xs"><span>Face identity strength</span><input className="ui-input" type="number" step="0.01" value={feature.form.faceIdIdentityStrength} onInput={(event) => setFormValue("faceIdIdentityStrength", (event.target as HTMLInputElement).value)} /></label>
-            <label className="ui-stack ui-stack--xs"><span>Face structure strength</span><input className="ui-input" type="number" step="0.01" value={feature.form.faceIdStructureStrength} onInput={(event) => setFormValue("faceIdStructureStrength", (event.target as HTMLInputElement).value)} /></label>
-            <label className="ui-stack ui-stack--xs"><span>Face noise</span><input className="ui-input" type="number" step="0.01" value={feature.form.faceIdNoise} onInput={(event) => setFormValue("faceIdNoise", (event.target as HTMLInputElement).value)} /></label>
+            <label className="ui-stack ui-stack--xs"><span><TermWithHint termId="faceReferenceImage">Face reference image 1</TermWithHint></span><select className="ui-input" value={feature.form.faceIdArtifactId1} onChange={(event) => setFormValue("faceIdArtifactId1", (event.target as HTMLSelectElement).value)}><option value="">Select image artifact</option>{feature.imageArtifacts.map((artifact) => <option key={`face1-${artifact.storageKey}`} value={artifact.storageKey}>{artifact.originalName ?? artifact.storageKey}</option>)}</select></label>
+            <label className="ui-stack ui-stack--xs"><span><TermWithHint termId="faceReferenceImage">Face reference image 2</TermWithHint> (optional)</span><select className="ui-input" value={feature.form.faceIdArtifactId2} onChange={(event) => setFormValue("faceIdArtifactId2", (event.target as HTMLSelectElement).value)}><option value="">Select image artifact</option>{feature.imageArtifacts.map((artifact) => <option key={`face2-${artifact.storageKey}`} value={artifact.storageKey}>{artifact.originalName ?? artifact.storageKey}</option>)}</select></label>
+            <label className="ui-stack ui-stack--xs"><span><TermWithHint termId="faceReferenceImage">Face reference image 3</TermWithHint> (optional)</span><select className="ui-input" value={feature.form.faceIdArtifactId3} onChange={(event) => setFormValue("faceIdArtifactId3", (event.target as HTMLSelectElement).value)}><option value="">Select image artifact</option>{feature.imageArtifacts.map((artifact) => <option key={`face3-${artifact.storageKey}`} value={artifact.storageKey}>{artifact.originalName ?? artifact.storageKey}</option>)}</select></label>
+            <label className="ui-stack ui-stack--xs"><span><TermWithHint termId="faceIdentityWeight">Face identity strength</TermWithHint></span><input className="ui-input" type="number" step="0.01" value={feature.form.faceIdIdentityStrength} onInput={(event) => setFormValue("faceIdIdentityStrength", (event.target as HTMLInputElement).value)} /></label>
+            <label className="ui-stack ui-stack--xs"><span><TermWithHint termId="faceStructureWeight">Face structure strength</TermWithHint></span><input className="ui-input" type="number" step="0.01" value={feature.form.faceIdStructureStrength} onInput={(event) => setFormValue("faceIdStructureStrength", (event.target as HTMLInputElement).value)} /></label>
+            <label className="ui-stack ui-stack--xs"><span><TermWithHint termId="faceNoise">Face noise</TermWithHint></span><input className="ui-input" type="number" step="0.01" value={feature.form.faceIdNoise} onInput={(event) => setFormValue("faceIdNoise", (event.target as HTMLInputElement).value)} /></label>
           </div>
         ) : null}
 
         <div className="ui-stack ui-stack--xs">
-          <label htmlFor="image-generation-prompt">Prompt</label>
+          <label htmlFor="image-generation-prompt"><TermWithHint termId="prompt">Prompt</TermWithHint></label>
           <textarea
             className="ui-input ui-textarea"
             id="image-generation-prompt"
@@ -190,7 +216,7 @@ export function ImageGenerationFeature({
         </div>
 
         <div className="ui-stack ui-stack--xs">
-          <label htmlFor="image-generation-negativePrompt">Negative Prompt (optional)</label>
+          <label htmlFor="image-generation-negativePrompt"><TermWithHint termId="negativePrompt">Negative Prompt</TermWithHint> (optional)</label>
           <textarea
             className="ui-input ui-textarea"
             id="image-generation-negativePrompt"
@@ -213,7 +239,7 @@ export function ImageGenerationFeature({
           const id = `image-generation-${String(key)}`;
           return (
             <div key={id} className="ui-stack ui-stack--xs">
-              <label htmlFor={id}>{label}</label>
+              <label htmlFor={id}>{renderImageGenerationNumericLabel(label)}</label>
               <input
                 className="ui-input"
                 id={id}
@@ -226,7 +252,7 @@ export function ImageGenerationFeature({
         })}
 
         <div className="ui-stack ui-stack--xs">
-          <label htmlFor="image-generation-denoise">Denoise</label>
+          <label htmlFor="image-generation-denoise"><TermWithHint termId="denoise">Denoise</TermWithHint></label>
           <input
             className="ui-input"
             id="image-generation-denoise"
@@ -243,7 +269,7 @@ export function ImageGenerationFeature({
         <details>
           <summary>Advanced: Manual model/checkpoint override (optional)</summary>
           <div className="ui-stack ui-stack--xs">
-            <label htmlFor="image-generation-model">Manual model/checkpoint</label>
+            <label htmlFor="image-generation-model">Manual <TermWithHint termId="model">model/checkpoint</TermWithHint></label>
             <input
               className="ui-input"
               id="image-generation-model"

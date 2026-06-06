@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createWorkspaceId } from '../../../../contracts/workspace';
@@ -21,6 +21,7 @@ test('persists valid plain-text message and preserves workspace isolation', asyn
 
 test('malformed JSON and manifest mismatch are rejected', async()=>{const {root,a}=await setup();
   const dir=join(root,'conversations');
+  await mkdir(dir,{recursive:true});
   await writeFile(join(dir,'conversations-manifest.json'),'{"schemaVersion":2,"storeKind":"conversations-local-store"}');
   await assert.rejects(()=>a.conversationSessionRepository.listConversationSessions({workspaceId:wsA}));
   await writeFile(join(dir,'conversations-manifest.json'),'{"schemaVersion":1,"storeKind":"conversations-local-store"}');

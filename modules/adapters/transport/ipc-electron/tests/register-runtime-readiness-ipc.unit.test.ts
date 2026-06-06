@@ -3,6 +3,13 @@ import { describe, expect, it, testDouble } from "../../../../testing/node-test"
 import {
   DESKTOP_RUNTIME_CAPABILITY_STATUS_READ_REQUEST_CHANNEL,
   DESKTOP_RUNTIME_READINESS_READ_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_CREATE_BINDING_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_LIST_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_READ_LATEST_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_REFRESH_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_SUMMARIZE_INVENTORY_REQUEST_CHANNEL,
+  DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL,
   createDesktopRuntimeCapabilityStatusReadRequest,
   createDesktopRuntimeReadinessReadRequest,
 } from "../../../../contracts/ipc";
@@ -235,13 +242,13 @@ describe("registerRuntimeReadinessIpc", () => {
       },
     });
 
-    expect(channels).toContain("runtime-readiness:refresh-inventory");
-    expect(channels).toContain("runtime-readiness:list-inventory");
-    expect(channels).toContain("runtime-readiness:read-inventory");
-    expect(channels).toContain("runtime-readiness:read-latest-inventory");
-    expect(channels).toContain("runtime-readiness:summarize-inventory");
-    expect(channels).toContain("runtime-readiness:create-binding");
-    expect(channels).toContain("runtime-readiness:validate-binding");
+    expect(channels).toContain(DESKTOP_RUNTIME_READINESS_REFRESH_INVENTORY_REQUEST_CHANNEL.value);
+    expect(channels).toContain(DESKTOP_RUNTIME_READINESS_LIST_INVENTORY_REQUEST_CHANNEL.value);
+    expect(channels).toContain(DESKTOP_RUNTIME_READINESS_READ_INVENTORY_REQUEST_CHANNEL.value);
+    expect(channels).toContain(DESKTOP_RUNTIME_READINESS_READ_LATEST_INVENTORY_REQUEST_CHANNEL.value);
+    expect(channels).toContain(DESKTOP_RUNTIME_READINESS_SUMMARIZE_INVENTORY_REQUEST_CHANNEL.value);
+    expect(channels).toContain(DESKTOP_RUNTIME_READINESS_CREATE_BINDING_REQUEST_CHANNEL.value);
+    expect(channels).toContain(DESKTOP_RUNTIME_READINESS_VALIDATE_BINDING_REQUEST_CHANNEL.value);
   });
 
 });

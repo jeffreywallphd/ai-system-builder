@@ -26,7 +26,7 @@ class DocumentNormalizationResult:
     warnings: list[DatasetPreparationWarning]
 
 
-_SUPPORTED_SUFFIXES = {".txt", ".md", ".html", ".htm", ".pdf", ".docx"}
+_SUPPORTED_SUFFIXES = {".txt", ".md", ".html", ".htm", ".pdf", ".docx", ".csv", ".json", ".jsonl"}
 
 _UNSUPPORTED_BUT_COMMON_SUFFIXES = {".doc"}
 
@@ -97,7 +97,7 @@ def _normalize_source_to_markdown(source: DatasetPreparationSourceInput) -> str:
     if extension == ".md":
         return _read_text(path)
 
-    if extension == ".txt":
+    if extension in {".txt", ".csv", ".json", ".jsonl"}:
         return _read_text(path)
 
     if extension in {".html", ".htm"}:

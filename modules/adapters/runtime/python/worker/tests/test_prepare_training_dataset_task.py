@@ -42,6 +42,10 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
                         "mode": "qa",
                         "model": {"provider": "transformers", "modelId": "test-model"},
                     },
+                    "task": {
+                        "taskType": "llm-instruction",
+                        "promptStyle": "instruction-response",
+                    },
                 },
                 "split": {"trainRatio": 0.5, "testRatio": 0.5, "shuffle": False},
                 "output": {"format": output_format, "destinations": {"local": {"enabled": True}}},
@@ -50,6 +54,10 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
 
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
+        self.model_availability_patcher = patch(
+            "modules.adapters.runtime.python.worker.tasks.prepare_training_dataset.ensure_generation_model_is_available",
+        )
+        self.model_availability_patcher.start()
         first = Path(self.temp_dir.name) / "first.txt"
         second = Path(self.temp_dir.name) / "second.unsupported"
         first.write_text("abcdefghij", encoding="utf-8")
@@ -58,6 +66,7 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
         self.second_path = str(second)
 
     def tearDown(self) -> None:
+        self.model_availability_patcher.stop()
         self.temp_dir.cleanup()
 
     def test_returns_generated_examples_summary_and_warning_from_normalization(self) -> None:
@@ -241,8 +250,11 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
         def failing_generator(_chunks, _config):
             raise RuntimeError("cannot generate")
 
-        with self.assertRaisesRegex(RuntimeError, "cannot generate"):
+        with self.assertRaisesRegex(ValueError, "cannot generate") as context:
             prepare_training_dataset(payload, example_generator=failing_generator)
+
+        self.assertEqual(getattr(context.exception, "stage", None), "generation")
+        self.assertEqual(getattr(context.exception, "error_code", None), "generation_failed")
 
     def test_enforces_max_chunk_count_guardrail(self) -> None:
         payload = self._build_payload("jsonl")
@@ -373,6 +385,27 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
 
     def test_single_generated_row_can_be_written_to_one_dataset_file(self) -> None:
         payload = self._build_payload("jsonl")
+        payload.recipe.generation.failurePolicy = "skip"
+
+        def one_row_generator(chunks, _config):
+            return [
+                GeneratedQaExample(
+                    artifact_id="doc-1",
+                    chunk_index=0,
+                    question="Q0",
+                    answer="A0",
+                )
+                for chunk in chunks
+                if chunk.chunk_index == 0
+            ]
+
+        result = prepare_training_dataset(payload, example_generator=one_row_generator)
+
+        self.assertEqual(result.summary.datasetRowCount, 1)
+        self.assertEqual(len(result.outputs), 1)
+
+    def test_records_dataset_preparation_task_metadata_on_outputs(self) -> None:
+        payload = self._build_payload("jsonl")
 
         def one_row_generator(_chunks, _config):
             return [
@@ -386,8 +419,189 @@ class PrepareTrainingDatasetTaskTests(unittest.TestCase):
 
         result = prepare_training_dataset(payload, example_generator=one_row_generator)
 
-        self.assertEqual(result.summary.datasetRowCount, 1)
-        self.assertEqual(len(result.outputs), 1)
+        dataset_output = next(output for output in result.outputs if output.role == "dataset")
+        self.assertEqual(
+            dataset_output.metadata["datasetPreparationTask"]["taskType"],
+            "llm-instruction",
+        )
+        self.assertEqual(
+            dataset_output.metadata["datasetPreparationTask"]["recipe"]["promptStyle"],
+            "instruction-response",
+        )
+
+    def test_prepares_structured_classification_rows_without_generation(self) -> None:
+        payload = self._build_payload("jsonl")
+        csv_path = Path(self.temp_dir.name) / "classification.csv"
+        csv_path.write_text("text,label\nA billing question,billing\nA bug report,bug\n", encoding="utf-8")
+        payload_dict = payload.model_dump(mode="json")
+        payload_dict["sourceInputs"] = [
+            {
+                "artifactId": "classification-source",
+                "localPath": str(csv_path),
+                "mediaType": "text/csv",
+                "originalName": "classification.csv",
+            }
+        ]
+        payload_dict["recipe"]["task"] = {
+            "taskType": "llm-classification",
+            "textField": "text",
+            "labelField": "label",
+        }
+        payload = PrepareTrainingDatasetRequest.model_validate(payload_dict)
+
+        result = prepare_training_dataset(
+            payload,
+            example_generator=lambda _chunks, _config: (_ for _ in ()).throw(AssertionError("generation should not run")),
+        )
+
+        output = next(output for output in result.outputs if output.role == "dataset")
+        rows = [json.loads(line) for line in Path(output.tempPath).read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(rows[0]["text"], "A billing question")
+        self.assertEqual(rows[0]["label"], "billing")
+        self.assertEqual(output.metadata["datasetPreparationTask"]["taskType"], "llm-classification")
+
+    def test_prepares_diffusion_lora_manifest_from_image_metadata(self) -> None:
+        payload = self._build_payload("jsonl")
+        image_path = Path(self.temp_dir.name) / "widget.png"
+        image_path.write_bytes(b"fake-png")
+        payload_dict = payload.model_dump(mode="json")
+        payload_dict["sourceInputs"] = [
+            {
+                "artifactId": "image-1",
+                "localPath": str(image_path),
+                "mediaType": "image/png",
+                "originalName": "widget.png",
+                "metadata": {"caption": "a product photo of a blue widget"},
+            }
+        ]
+        payload_dict["recipe"]["task"] = {
+            "taskType": "diffusion-lora",
+            "conceptKind": "subject",
+            "imageField": "image",
+            "captionField": "caption",
+            "triggerToken": "asbwidget",
+        }
+        payload = PrepareTrainingDatasetRequest.model_validate(payload_dict)
+
+        result = prepare_training_dataset(
+            payload,
+            example_generator=lambda _chunks, _config: (_ for _ in ()).throw(AssertionError("generation should not run")),
+        )
+
+        output = next(output for output in result.outputs if output.role == "dataset")
+        row = json.loads(Path(output.tempPath).read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(row["image"], "image-1")
+        self.assertEqual(row["caption"], "a product photo of a blue widget")
+        self.assertEqual(row["triggerToken"], "asbwidget")
+        self.assertEqual(output.metadata["datasetPreparationTask"]["taskType"], "diffusion-lora")
+
+    def test_prepares_diffusion_lora_manifest_with_generated_caption(self) -> None:
+        payload = self._build_payload("jsonl")
+        image_path = Path(self.temp_dir.name) / "widget.png"
+        image_path.write_bytes(b"fake-png")
+        payload_dict = payload.model_dump(mode="json")
+        payload_dict["sourceInputs"] = [
+            {
+                "artifactId": "image-1",
+                "localPath": str(image_path),
+                "mediaType": "image/png",
+                "originalName": "widget.png",
+                "metadata": {"description": "blue product photo"},
+            }
+        ]
+        payload_dict["recipe"]["generation"]["promptTemplate"] = "Write concise product training captions."
+        payload_dict["recipe"]["task"] = {
+            "taskType": "diffusion-lora",
+            "textInputMode": "generate",
+            "conceptKind": "subject",
+            "imageField": "image",
+            "captionField": "caption",
+            "triggerToken": "asbwidget",
+        }
+        payload = PrepareTrainingDatasetRequest.model_validate(payload_dict)
+        prompts: list[str] = []
+
+        def text_generator(prompt, _config):
+            prompts.append(prompt)
+            return "a blue product widget on a clean background"
+
+        result = prepare_training_dataset(
+            payload,
+            example_generator=lambda _chunks, _config: (_ for _ in ()).throw(AssertionError("chunk generation should not run")),
+            text_value_generator=text_generator,
+        )
+
+        output = next(output for output in result.outputs if output.role == "dataset")
+        row = json.loads(Path(output.tempPath).read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(row["caption"], "a blue product widget on a clean background")
+        self.assertIn("Write concise product training captions.", prompts[0])
+        self.assertIn("widget.png", prompts[0])
+        self.assertIn("asbwidget", prompts[0])
+
+    def test_prepares_vision_classification_manifest_with_generated_allowed_label(self) -> None:
+        payload = self._build_payload("jsonl")
+        image_path = Path(self.temp_dir.name) / "billing.png"
+        image_path.write_bytes(b"fake-png")
+        payload_dict = payload.model_dump(mode="json")
+        payload_dict["sourceInputs"] = [
+            {
+                "artifactId": "image-3",
+                "localPath": str(image_path),
+                "mediaType": "image/png",
+                "originalName": "billing.png",
+                "metadata": {"description": "screen capture of a billing workflow"},
+            }
+        ]
+        payload_dict["recipe"]["generation"]["promptTemplate"] = "Choose the best image category."
+        payload_dict["recipe"]["task"] = {
+            "taskType": "vision-classification",
+            "textInputMode": "generate",
+            "imageField": "image",
+            "labelField": "label",
+            "labelSet": ["billing", "support"],
+        }
+        payload = PrepareTrainingDatasetRequest.model_validate(payload_dict)
+        prompts: list[str] = []
+
+        def text_generator(prompt, _config):
+            prompts.append(prompt)
+            return "billing workflow"
+
+        result = prepare_training_dataset(
+            payload,
+            example_generator=lambda _chunks, _config: (_ for _ in ()).throw(AssertionError("chunk generation should not run")),
+            text_value_generator=text_generator,
+        )
+
+        output = next(output for output in result.outputs if output.role == "dataset")
+        row = json.loads(Path(output.tempPath).read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(row["label"], "billing")
+        self.assertEqual(row["labelSet"], ["billing", "support"])
+        self.assertIn("Allowed labels: billing, support", prompts[0])
+
+    def test_detection_manifest_requires_annotations(self) -> None:
+        payload = self._build_payload("jsonl")
+        image_path = Path(self.temp_dir.name) / "object.png"
+        image_path.write_bytes(b"fake-png")
+        payload_dict = payload.model_dump(mode="json")
+        payload_dict["sourceInputs"] = [
+            {
+                "artifactId": "image-2",
+                "localPath": str(image_path),
+                "mediaType": "image/png",
+                "originalName": "object.png",
+            }
+        ]
+        payload_dict["recipe"]["task"] = {"taskType": "vision-detection", "boxFormat": "coco"}
+        payload = PrepareTrainingDatasetRequest.model_validate(payload_dict)
+
+        with self.assertRaises(ValueError) as context:
+            prepare_training_dataset(payload, example_generator=lambda _chunks, _config: [])
+
+        error = context.exception
+        self.assertEqual(getattr(error, "stage", None), "generation")
+        self.assertEqual(getattr(error, "error_code", None), "dataset_preparation_no_manifest_rows")
+        self.assertEqual(getattr(error, "details", {}).get("taskType"), "vision-detection")
 
 
 if __name__ == "__main__":

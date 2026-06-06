@@ -1,5 +1,7 @@
 # Filesystem Storage Adapters
 
+> AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
+
 This module provides concrete storage adapters that map logical storage keys
 to host-local filesystem paths for real artifact persistence.
 

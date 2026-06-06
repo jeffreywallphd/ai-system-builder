@@ -40,7 +40,7 @@ export class AssetMutationProvenanceService {
       },
       createdProvenance,
       reviewStatus: "reviewed",
-      sourceSnapshot: {
+      sourceSnapshot: sanitizeAssetMetadata({
         viewId: input.sourceIdentity.sourceViewId,
         viewKind: input.sourceView.viewKind,
         assetType: input.sourceView.assetType,
@@ -58,7 +58,7 @@ export class AssetMutationProvenanceService {
             }
           : undefined,
         metadata: sanitizeAssetMetadata(input.sourceView.metadata),
-      },
+      }),
     };
   }
 
@@ -101,7 +101,7 @@ export class AssetMutationProvenanceService {
       },
       createdProvenance,
       reviewStatus: "reviewed",
-      sourceSnapshot: {
+      sourceSnapshot: sanitizeAssetMetadata({
         viewId: input.sourceIdentity.sourceViewId,
         viewKind: input.sourceView.viewKind,
         outputId: input.sourceView.generatedOutput?.outputId,
@@ -115,7 +115,7 @@ export class AssetMutationProvenanceService {
         }),
         finalizedImage: sanitizeAssetMetadata(input.finalizedImage),
         metadata: sanitizeAssetMetadata(input.sourceView.metadata),
-      },
+      }),
     };
   }
 
@@ -156,7 +156,7 @@ export class AssetMutationProvenanceService {
       },
       createdProvenance,
       reviewStatus: "reviewed",
-      sourceSnapshot: {
+      sourceSnapshot: sanitizeAssetMetadata({
         viewId: input.sourceIdentity.sourceViewId,
         viewKind: input.sourceView.viewKind,
         assetType: input.sourceView.assetType,
@@ -186,7 +186,7 @@ export class AssetMutationProvenanceService {
           importedOrLocalizedDeduplicationKey: input.importedOrLocalizedIdentity?.deduplicationKey,
         }),
         metadata: sanitizeAssetMetadata(input.sourceView.metadata),
-      },
+      }),
     };
   }
 

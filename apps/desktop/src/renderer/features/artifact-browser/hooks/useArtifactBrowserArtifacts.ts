@@ -7,6 +7,7 @@ import type {
   DesktopUnregisteredArtifactBrowseItem,
 } from "../../../lib/desktopApi";
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
+import { isGeneratedArtifact, isUploadedArtifact } from "../helpers/artifactStorageGrouping";
 
 interface UseArtifactBrowserArtifactsParams {
   client: DesktopArtifactBrowserClient;
@@ -46,10 +47,10 @@ export function useArtifactBrowserArtifacts({
 
       const filteredByStorage = browseItems.filter((item) => {
         if (selectedStorageFilter === "uploaded") {
-          return item.storageKey.startsWith("uploads/");
+          return isUploadedArtifact(item);
         }
         if (selectedStorageFilter === "generated") {
-          return item.storageKey.startsWith("generated/");
+          return isGeneratedArtifact(item);
         }
         return true;
       });
@@ -69,8 +70,8 @@ export function useArtifactBrowserArtifacts({
     }
   }, [client, selectedArtifactFamily, selectedStorageFilter, setViewState, workspaceId]);
 
-  const uploadedItems = items.filter((item) => item.storageKey.startsWith("uploads/"));
-  const generatedItems = items.filter((item) => item.storageKey.startsWith("generated/"));
+  const uploadedItems = items.filter(isUploadedArtifact);
+  const generatedItems = items.filter(isGeneratedArtifact);
 
   return {
     items,

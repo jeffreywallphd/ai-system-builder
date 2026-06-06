@@ -1,12 +1,12 @@
-# Execution Plan Preparation (Phase 12)
+# Execution Plan Preparation (execution plan preparation)
 
 ## Purpose
 
-Phase 12 defines **Execution Plan Preparation** as a workspace-scoped, non-executing planning layer.
+execution plan preparation defines **Execution Plan Preparation** as a workspace-scoped, non-executing planning layer.
 
-> Phase 12 introduces workspace-scoped execution plan preparation that transforms a ready Phase 11 runtime readiness binding into a safe, inspectable, non-executing execution plan candidate. Execution plan preparation identifies planned steps, dependencies, inputs, outputs, provider adapter references, safety gates, resource estimates, and blockers without invoking providers, running workflows, loading models, starting runtimes, or generating executable payloads.
+> execution plan preparation introduces workspace-scoped execution plan preparation that transforms a ready runtime readiness binding into a safe, inspectable, non-executing execution plan candidate. Execution plan preparation identifies planned steps, dependencies, inputs, outputs, provider adapter references, safety gates, resource estimates, and blockers without invoking providers, running workflows, loading models, starting runtimes, or generating executable payloads.
 
-Phase 12 prepares future execution. Phase 12 does not execute.
+execution plan preparation prepares future execution. execution plan preparation does not execute.
 
 ## Core definitions
 
@@ -25,13 +25,13 @@ Phase 12 prepares future execution. Phase 12 does not execute.
 - **Execution preflight**: non-executing validation of plan completeness and gate readiness.
 - **Dry-run plan**: non-executing preview pass across plan structure and safety gates.
 - **Execution preview**: user-inspectable rendering of the plan candidate.
-- **Execution blocker**: condition that prevents safe handoff toward execution orchestration.
+- **Execution blocker**: condition that prevents safe preparation for execution orchestration.
 - **Execution diagnostic**: sanitized reason/details explaining state, risk, or blocker.
 - **Execution resource estimate**: optional planning-only estimate categories.
 - **Execution ordering**: explicit ordering intent derived from dependencies.
 - **Execution dependency graph**: graph of step/input/output dependencies used for planning and review.
-- **Execution handoff**: transfer of prepared plan metadata to a future execution orchestration phase.
-- **Execution deferred**: explicit statement that invocation does not occur in Phase 12.
+- **Execution output boundary**: prepared plan metadata that a later execution orchestration area may consume.
+- **Execution deferred**: explicit statement that invocation does not occur in execution plan preparation.
 - **Executable payload deferred**: executable workflow/provider payload generation is deferred.
 - **Provider invocation deferred**: provider calls are deferred.
 - **Runtime invocation deferred**: runtime startup/task invocation is deferred.
@@ -111,7 +111,7 @@ UI wording should stay simpler (for example: “Preview plan”, “Check execut
 - **no raw local paths**
 - **no command lines**
 
-All Phase 12 records are planning metadata only.
+All execution plan preparation records are planning metadata only.
 
 ## Status model (conservative)
 
@@ -137,14 +137,14 @@ Clarifications:
 - `needs-setup` means setup/readiness metadata is insufficient.
 - `missing-inputs` means required inputs cannot be safely planned.
 - `missing-outputs` means safe output destination planning is incomplete.
-- `provider-setup-required` means Phase 11 setup/readiness is insufficient or stale.
+- `provider-setup-required` means runtime readiness binding setup/readiness is insufficient or stale.
 - `safety-review-required` means plan description exists but must not be handed to execution yet.
-- `blocked` means safe handoff cannot proceed.
+- `blocked` means safe output preparation cannot proceed.
 - `stale` means source composition/readiness changed and re-preparation is required.
 
-Disallowed status language for Phase 12: `execution-ready`, `ready-to-run`, `running`, `completed`, `executed`, `deployed`, `launched`.
+Disallowed status language for execution plan preparation: `execution-ready`, `ready-to-run`, `running`, `completed`, `executed`, `deployed`, `launched`.
 
-## Initial step kinds (Phase 12 baseline vocabulary)
+## Initial step kinds (execution plan preparation baseline vocabulary)
 
 - `prepare-input`
 - `transform-data`
@@ -161,7 +161,7 @@ Disallowed status language for Phase 12: `execution-ready`, `ready-to-run`, `run
 - `provider-setup-check`
 - `runtime-setup-check`
 
-This is intentionally modest. Later phases may refine step kinds for concrete slices (for example ComfyUI-oriented flows).
+This is intentionally modest. Later areas may refine step kinds for concrete slices (for example ComfyUI-oriented flows).
 
 ## Safety gates, preflight, and dry-run boundary
 
@@ -176,11 +176,11 @@ Safety gates are non-executing checks/review points. Examples:
 - model/provider policy check required
 - resource estimate within safe bounds
 - execution preview reviewed
-- credentials not embedded
+- sensitive access material not embedded
 - no raw path exposure
-- no executable payload generated in Phase 12
+- no runnable material generated in execution plan preparation
 
-Execution preflight / dry-run in Phase 12 means metadata validation and gate evaluation only. No runtime/provider/workflow execution is allowed.
+Execution preflight / dry-run in execution plan preparation means metadata validation and gate evaluation only. No runtime/provider/workflow execution is allowed.
 
 ## Resource estimates (optional, safe summaries)
 
@@ -199,41 +199,41 @@ Must not include secrets, raw paths, environment values, provider payloads, comm
 
 ## Dependencies and boundaries
 
-### Dependency on Phase 11 runtime readiness
+### Dependency on runtime readiness binding runtime readiness
 
-Phase 12 depends on workspace-scoped readiness bindings and may read only safe readiness metadata (workspace, binding, source composition reference, readiness status, selected setup choices, safe provider/capability references, unresolved requirements, blockers/diagnostics, inventory/provenance summaries).
+execution plan preparation depends on workspace-scoped readiness bindings and may read only safe readiness metadata (workspace, binding, source composition reference, readiness status, selected setup choices, safe provider/capability references, unresolved requirements, blockers/diagnostics, inventory/provenance summaries).
 
-If readiness is missing/stale/blocked/invalid/archived/provider-unavailable/etc., Phase 12 must produce plan blockers and conservative statuses (`needs-setup`, `provider-setup-required`, `blocked`, `stale`, `invalid`) instead of bypassing readiness.
+If readiness is missing/stale/blocked/invalid/archived/provider-unavailable/etc., execution plan preparation must produce plan blockers and conservative statuses (`needs-setup`, `provider-setup-required`, `blocked`, `stale`, `invalid`) instead of bypassing readiness.
 
-### Relationship to Phase 10 and Phase 9
+### Relationship to asset composition planning and effective asset projections
 
-- Phase 12 normally consumes Phase 11 binding references to Phase 10 composition plans.
-- Phase 12 may consult composition summaries for safe step labels/source references.
-- Phase 12 does not reconstruct Phase 9 projection internals.
-- Phase 12 does not mutate projections, composition plans, readiness bindings, authoring records, user library records, asset kernel definitions, or `system.foundation`.
+- execution plan preparation normally consumes runtime readiness binding binding references to asset composition planning composition plans.
+- execution plan preparation may consult composition summaries for safe step labels/source references.
+- execution plan preparation does not reconstruct effective asset projections projection internals.
+- execution plan preparation does not mutate projections, composition plans, readiness bindings, authoring records, user library records, asset kernel definitions, or `system.foundation`.
 
 ### Relationship to runtime/provider adapters
 
-Phase 12 may reference safe adapter kinds/references from readiness. Phase 12 must not execute adapters, invoke providers/models, start runtimes, run shell commands, install dependencies, download models, inspect raw env/credential values, or generate provider invocation payloads.
+execution plan preparation may reference safe adapter kinds/references from readiness. execution plan preparation must not execute adapters, invoke providers/models, start runtimes, run shell commands, install dependencies, download models, inspect raw env/credential values, or generate provider invocation payloads.
 
 ### Relationship to hosts
 
 - Desktop host may display execution previews and route plan-preparation requests.
 - Server host may expose plan-preparation API surfaces.
 - Thin client must not inspect local runtime/provider resources directly.
-- No host executes workflows in Phase 12.
+- No host executes workflows in execution plan preparation.
 
-## What Phase 12 implements vs defers
+## What execution plan preparation implements vs defers
 
-Phase 12 implements planning metadata preparation and inspectable previews.
+execution plan preparation implements planning metadata preparation and inspectable previews.
 
-Phase 12 defers runtime/provider/workflow execution concerns, including executable payload generation, invocation lifecycle, progress, cancellation, artifact production, runtime logs, and execution sandboxing.
+execution plan preparation defers runtime/provider/workflow execution concerns, including executable payload generation, invocation lifecycle, progress, cancellation, artifact production, runtime logs, and execution sandboxing.
 
-## Phase 13 handoff
+## controlled conversational execution boundary
 
-Phase 13 is expected to handle **Execution Orchestration and Controlled Runtime Invocation**.
+controlled conversational execution is expected to handle **Execution Orchestration and Controlled Runtime Invocation**.
 
-Phase 12 handoff target (conceptual only):
+execution plan output target (conceptual only):
 
 ```ts
 PreparedExecutionPlan {
@@ -252,37 +252,18 @@ PreparedExecutionPlan {
 }
 ```
 
-## Explicit non-goals (Phase 12 Prompt 1 baseline)
+## Explicit non-goals
 
 No runtime/workflow/model/ComfyUI execution, provider invocation, dependency install, model download, credential/secret creation or storage, shell/env mutation, executable workflow or provider payload generation, artifact generation, execution job lifecycle/progress/cancellation/runtime logs, pack import/export, marketplace/collaboration/live sync behavior, or source-record mutation.
 
-## Phase 12 implementation sequence
+## Execution Plan Output Exclusions
 
-1. Prompt 1 — Execution planning architecture baseline, ADR, docs, context pack.
-2. Prompt 2 — Execution plan contract vocabulary.
-3. Prompt 3 — Application ports and persistence adapters for execution plans.
-4. Review A — Contracts, ports, persistence, and no-execution-boundary review.
-5. Prompt 4 — Convert runtime-ready composition bindings into execution requirements/steps.
-6. Prompt 5 — Provider-specific execution plan adapters, still non-executing.
-7. Prompt 6 — Safety gates, dry-run validation, resource estimates, and blocker diagnostics.
-8. Review B — Plan materialization semantics, safety gates, no-runtime-execution review.
-9. Prompt 7 — Execution plan read model integration.
-10. Prompt 8 — API/IPC/preload/client exposure.
-11. Prompt 9 — Minimal UI inside Assets / Plans / Setup showing execution plan preview.
-12. Prompt 10 — Docs closeout and Phase 12 final hardening.
-13. Review C — Final Phase 12 closeout review.
-
-Prompt 8 may later split into 8a/8b/8c if transport scope grows.
+execution plan output excludes credentials, secrets, raw env values, shell commands, command output, local paths, storage roots, raw workflow/provider payloads, runnable graph JSON, executable payloads, bytes/blobs/base64, and signed URLs.
 
 
-## Phase 12 handoff exclusions
+## controlled conversational execution boundary note
 
-Phase 12 handoff excludes credentials, secrets, raw env values, shell commands, command output, local paths, storage roots, raw workflow/provider payloads, runnable graph JSON, executable payloads, bytes/blobs/base64, and signed URLs.
-
-
-## Phase 13 handoff note
-
-Phase 12 remains preview-only and non-executing. The next phase is controlled conversational-system execution with explicit approval and supported runtime invocation boundaries; see `docs/architecture/controlled-conversational-system-execution.md` and ADR-0023.
+execution plan preparation remains preview-only and non-executing. Controlled conversational execution follows this planning layer with explicit approval and supported runtime invocation boundaries; see `docs/architecture/controlled-conversational-system-execution.md` and ADR-0023.
 
 
-Phase 13 handoff correction: execution plans that feed conversational execution must originate from asset-derived conversational system composition (foundation-referenced reusable assets), not from ad hoc runtime session structures.
+controlled conversational execution boundary correction: execution plans that feed conversational execution must originate from asset-derived conversational system composition (foundation-referenced reusable assets), not from ad hoc runtime session structures.

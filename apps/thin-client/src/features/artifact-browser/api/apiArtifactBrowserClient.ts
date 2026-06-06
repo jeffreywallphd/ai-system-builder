@@ -121,17 +121,47 @@ export interface ThinClientHuggingFaceDatasetParquetFile {
   sizeBytes?: number;
 }
 
+export interface ThinClientHuggingFaceFilesImportResult {
+  repositories: Array<{
+    repository: string;
+    revision: string;
+    status: "succeeded" | "partial" | "failed";
+    message?: string;
+    code?: "validation" | "not-found" | "unavailable" | "internal";
+    files: Array<{
+      repository: string;
+      path: string;
+      revision: string;
+      mediaType?: string;
+      status: "registered" | "failed";
+      artifactId?: string;
+      message?: string;
+      code?: "validation" | "not-found" | "unavailable" | "internal";
+    }>;
+  }>;
+  summary: {
+    attempted: number;
+    succeeded: number;
+    failed: number;
+  };
+}
+
 export interface ArtifactBrowserApiClient {
   getHuggingFaceTokenStatus: () => Promise<{ configured: boolean; maskedToken?: string }>;
   setHuggingFaceToken: (input: { token: string }) => Promise<{ configured: boolean; maskedToken?: string }>;
   clearHuggingFaceToken: () => Promise<{ configured: boolean; maskedToken?: string }>;
   browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<ThinClientHuggingFaceNamespaceDataset[]>;
   browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<ThinClientHuggingFaceDatasetParquetFile[]>;
+  importHuggingFaceFiles?: (input: {
+    repositories?: Array<{ repository: string; revision?: string }>;
+    files?: Array<{ repository: string; path: string; revision?: string; mediaType?: string }>;
+  }) => Promise<ThinClientHuggingFaceFilesImportResult>;
   browseArtifacts: (input?: { artifactFamily?: ThinClientArtifactFamily; workspaceId?: string }) => Promise<ThinClientArtifactBrowseItem[]>;
   readArtifactDetail: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<ThinClientArtifactDetail>;
   readArtifactContent: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<ThinClientArtifactContentDescriptor>;
   deleteRegisteredArtifact: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<{ storageKey: string }>;
   createArtifactMediaViewUrl: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => string;
+  readArtifactMedia?: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<{ mediaType?: string; bytes: Uint8Array }>;
   publishArtifactToHuggingFace: (input: {
     artifactId: string;
     repository: string;
@@ -247,6 +277,28 @@ export function createApiArtifactBrowserClient(
       });
     },
 
+    async importHuggingFaceFiles(input) {
+      const response = await secureFetch(createApiUrl(apiBaseUrl, "/huggingface/files/import"), {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          repositories: input.repositories,
+          files: input.files,
+          source,
+        }),
+      });
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, response.status, createApiUrl(apiBaseUrl, "/huggingface/files/import"), (value) => {
+        const result = value as ThinClientHuggingFaceFilesImportResult;
+        if (!result || typeof result !== "object" || !("summary" in result)) {
+          throw new Error("Hugging Face import response is missing summary information.");
+        }
+        return result;
+      });
+    },
+
     async browseArtifacts(input = {}): Promise<ThinClientArtifactBrowseItem[]> {
       const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/browse"), {
         method: "POST",
@@ -332,6 +384,22 @@ export function createApiArtifactBrowserClient(
         query.set("workspaceId", input.workspaceId);
       }
       return createApiUrl(apiBaseUrl, `/artifact/media/view?${query.toString()}`);
+    },
+
+    async readArtifactMedia(locator: ArtifactBrowserLocator, input = {}): Promise<{ mediaType?: string; bytes: Uint8Array }> {
+      const query = new URLSearchParams({ storageKey: locator.storageKey });
+      if (input.workspaceId) {
+        query.set("workspaceId", input.workspaceId);
+      }
+      const response = await secureFetch(createApiUrl(apiBaseUrl, `/artifact/media/view?${query.toString()}`), { method: "GET" });
+      if (!response.ok) {
+        throw new ArtifactBrowserApiError("Failed to read artifact preview media.", undefined, undefined, response.status);
+      }
+
+      return {
+        mediaType: response.headers.get("content-type") ?? undefined,
+        bytes: new Uint8Array(await response.arrayBuffer()),
+      };
     },
 
     async publishArtifactToHuggingFace(input): Promise<ThinClientPublishedBacking> {

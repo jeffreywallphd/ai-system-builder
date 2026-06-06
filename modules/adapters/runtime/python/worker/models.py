@@ -184,6 +184,7 @@ class ExampleGenerationConfig(BaseModel):
 
 
 class DatasetPreparationRecipe(BaseModel):
+    task: dict[str, Any] | None = None
     normalization: DocumentNormalizationConfig
     chunking: MarkdownChunkingConfig
     generation: ExampleGenerationConfig
@@ -259,9 +260,11 @@ class TrainModelDatasetInput(BaseModel):
     splitRole: Literal["train", "validation", "test"]
     format: str | None = None
     path: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class TrainModelTaskRequest(BaseModel):
+    trainingTask: str | None = None
     baseModel: TrainModelBaseModelInput
     datasets: list[TrainModelDatasetInput]
     method: Literal["lora", "qlora", "full-finetune"]

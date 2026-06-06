@@ -20,6 +20,7 @@ export interface DesktopArtifactRemoteIpcFeature {
   publishArtifactToRepoUseCase: RegisterArtifactBrowserIpcDependencies["publishArtifactToRepoUseCase"];
   browseHuggingFaceNamespaceDatasetsUseCase: RegisterArtifactBrowserIpcDependencies["browseHuggingFaceNamespaceDatasetsUseCase"];
   browseHuggingFaceDatasetParquetFilesUseCase: RegisterArtifactBrowserIpcDependencies["browseHuggingFaceDatasetParquetFilesUseCase"];
+  importHuggingFaceFilesUseCase: RegisterArtifactBrowserIpcDependencies["importHuggingFaceFilesUseCase"];
   verifyPublishedArtifactBackingUseCase: RegisterArtifactBrowserIpcDependencies["verifyPublishedArtifactBackingUseCase"];
   verifyImportedArtifactSourceBackingUseCase: RegisterArtifactBrowserIpcDependencies["verifyImportedArtifactSourceBackingUseCase"];
   registerArtifactFromRepoUseCase: RegisterArtifactBrowserIpcDependencies["registerArtifactFromRepoUseCase"];
@@ -56,6 +57,7 @@ export function registerDesktopArtifactIpc(dependencies: RegisterDesktopArtifact
     publishArtifactToRepoUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.publishArtifactToRepoUseCase, dependencies.remoteLifecycle),
     browseHuggingFaceNamespaceDatasetsUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.browseHuggingFaceNamespaceDatasetsUseCase, dependencies.remoteLifecycle),
     browseHuggingFaceDatasetParquetFilesUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.browseHuggingFaceDatasetParquetFilesUseCase, dependencies.remoteLifecycle),
+    importHuggingFaceFilesUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.importHuggingFaceFilesUseCase, dependencies.remoteLifecycle),
     verifyPublishedArtifactBackingUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.verifyPublishedArtifactBackingUseCase, dependencies.remoteLifecycle),
     verifyImportedArtifactSourceBackingUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.verifyImportedArtifactSourceBackingUseCase, dependencies.remoteLifecycle),
     registerArtifactFromRepoUseCase: lazyProvidedObject(dependencies.getArtifactRemoteFeature, (feature) => feature.registerArtifactFromRepoUseCase, dependencies.remoteLifecycle),

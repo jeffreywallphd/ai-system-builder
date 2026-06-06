@@ -15,7 +15,7 @@ import { ExecutionPlanStatusService } from './execution-plan-status.service';
 export class ValidateExecutionPlanUseCase {
   public constructor(private readonly d: { executionPlanRepository: ExecutionPlanRepositoryPort; runtimeReadinessBindingRepository?: RuntimeReadinessBindingRepositoryPort; compositionPlanRepository?: AssetCompositionPlanRepositoryPort; preflightValidationService: ExecutionPlanPreflightValidationService; safetyGateValidationService: ExecutionPlanSafetyGateValidationService; resourceEstimateService: ExecutionPlanResourceEstimateService; statusService: ExecutionPlanStatusService; now?: () => string }) {}
   public async execute(command: ValidateExecutionPlanCommand): Promise<ValidateExecutionPlanResult> {
-    let c; try { c = normalizeValidateExecutionPlanCommand(command); } catch { return executionPlanFailure('validation','execution-plan-command-invalid'); }
+    let c; try { c = normalizeValidateExecutionPlanCommand(command); } catch { return executionPlanFailure('validation','execution-plan-request-invalid'); }
     const now = (this.d.now ?? (() => new Date().toISOString()))();
     try {
       const record = await this.d.executionPlanRepository.getExecutionPlanById(c.workspaceId, c.executionPlanId);

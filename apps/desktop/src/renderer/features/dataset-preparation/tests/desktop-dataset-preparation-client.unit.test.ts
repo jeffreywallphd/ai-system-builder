@@ -57,7 +57,18 @@ describe("desktop dataset preparation client", () => {
     hostWindow.window.desktopApi = {
       uploadArtifact: async () => ({ ok: false }),
       getArtifactUploadPolicy: async () => ({ ok: false }),
-      browseArtifacts: async () => ({ ok: true, value: { items: [{ artifactId: "artifact-1", storageKey: "stored/a1.jsonl", artifactFamily: "structured-text" }] } }),
+      browseArtifacts: async () => ({
+        ok: true,
+        value: {
+          items: [{
+            artifactId: "artifact-1",
+            storageKey: "workspaces/workspace-1/artifacts/files/uploads/a1.jsonl",
+            artifactFamily: "structured-text",
+            mediaType: "application/x-ndjson",
+            sourceKind: "upload",
+          }],
+        },
+      }),
       readArtifactDetail: async () => ({ ok: false }),
       readArtifactContentDescriptor: async () => ({ ok: false }),
       readArtifactViewerMedia: async () => ({ ok: false }),
@@ -70,7 +81,7 @@ describe("desktop dataset preparation client", () => {
     };
 
     const client = createDesktopDatasetPreparationClient();
-    const browseResult = await client.browseSourceArtifacts();
+    const browseResult = await client.browseSourceArtifacts("workspace-1");
     const started = await client.startPrepareTrainingDataset({
       sourceArtifactIds: ["artifact-1"],
       recipe: {
@@ -88,7 +99,13 @@ describe("desktop dataset preparation client", () => {
       requestId: "req-123",
     });
 
-    expect(browseResult).toEqual([{ artifactId: "artifact-1", label: "stored/a1.jsonl", storageKey: "stored/a1.jsonl" }]);
+    expect(browseResult).toEqual([{
+      artifactId: "artifact-1",
+      label: "workspaces/workspace-1/artifacts/files/uploads/a1.jsonl",
+      storageKey: "workspaces/workspace-1/artifacts/files/uploads/a1.jsonl",
+      mediaType: "application/x-ndjson",
+      sourceKind: "upload",
+    }]);
     expect(started).toEqual({ requestId: "req-123" });
     const response = await client.readPrepareTrainingDatasetTask("req-123");
     expect(response.ok).toBe(true);
@@ -203,7 +220,7 @@ describe("desktop dataset preparation client", () => {
 
     const client = createDesktopDatasetPreparationClient();
 
-    await expect(client.browseSourceArtifacts()).rejects.toThrow(
+    await expect(client.browseSourceArtifacts("workspace-1")).rejects.toThrow(
       "Artifact browse item is missing artifactId.",
     );
   });
@@ -230,7 +247,7 @@ describe("desktop dataset preparation client", () => {
 
     const client = createDesktopDatasetPreparationClient();
 
-    await expect(client.browseSourceArtifacts()).rejects.toThrow(
+    await expect(client.browseSourceArtifacts("workspace-1")).rejects.toThrow(
       "Artifact browse item is missing storageKey.",
     );
   });

@@ -1,6 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import type { ModelDefaultInferenceMode } from "../../../../../../../modules/contracts/settings";
+import { createWorkspaceId } from "../../../../../../../modules/contracts/workspace";
+import type {
+  DatasetPreparationTaskType,
+  DatasetPreparationTextInputMode,
+} from "../../../../../../../modules/contracts/runtime";
+import {
+  DATASET_PREPARATION_TEXT_GENERATION_MODEL_PRESETS,
+  createDefaultDatasetPreparationTaskRecipe,
+  isDatasetPreparationTaskType,
+  resolveDatasetPreparationTaskProfileDefinition,
+  resolveDefaultDatasetPreparationPromptTemplate,
+  resolveDefaultDatasetPreparationTextGenerationParameterDefaults,
+  resolveDefaultDatasetPreparationTextGenerationModel,
+} from "../../../../../../../modules/contracts/runtime";
 import { createDesktopApplicationSettingsClient, type DesktopApplicationSettingsClient } from "../../settings";
 import { createDesktopPythonRuntimeClient, type DesktopPythonRuntimeClient } from "../../python-runtime/api/desktopPythonRuntimeClient";
 import type { DesktopDatasetPreparationClient } from "../api/desktopDatasetPreparationClient";
@@ -10,6 +24,14 @@ import {
 } from "./datasetPreparationRequestValidation";
 import { useDatasetPreparationClient } from "./useDatasetPreparationClient";
 import { resolveUserFacingDatasetPreparationErrorMessage } from "./datasetPreparationTransport";
+import { createDesktopModelsClient, type DesktopModelsClient } from "../../models/api/desktopModelsClient";
+import type { DesktopModelInventoryRecord } from "../../../lib/desktopApi";
+import {
+  filterGeneratedDatasetPreparationArtifacts,
+  filterTaskRelevantDatasetPreparationArtifacts,
+  filterUploadedDatasetPreparationArtifacts,
+  type DatasetPreparationSourceArtifact,
+} from "../helpers/datasetPreparationArtifactGrouping";
 
 interface DatasetPreparationStatus {
   kind: "idle" | "loading" | "success" | "error";
@@ -24,6 +46,17 @@ interface DatasetPreparationResultSummary {
 interface DatasetPreparationPageState {
   selectedArtifactStorageFilter: DatasetPreparationArtifactStorageFilter;
   selectedArtifactIds: string[];
+  taskType: DatasetPreparationTaskType;
+  labelSet: string;
+  multiLabel: boolean;
+  extractionStrictSchema: boolean;
+  diffusionConceptKind: "subject" | "style" | "concept";
+  diffusionTriggerToken: string;
+  diffusionRegularizationClass: string;
+  detectionBoxFormat: "coco" | "xyxy" | "xywh";
+  segmentationMaskFormat: "png" | "coco-rle" | "polygon";
+  textInputMode: DatasetPreparationTextInputMode;
+  textGenerationPrompt: string;
   unsupportedDocumentPolicy: "" | "fail" | "skip";
   normalizationMode: "" | "best-effort" | "strict";
   chunkSize: string;
@@ -60,13 +93,43 @@ interface DatasetPreparationPageState {
 
 export type DatasetPreparationArtifactStorageFilter = "all" | "uploaded" | "generated";
 
+type DatasetPreparationTrainingSettingsSnapshot = Omit<
+  DatasetPreparationPageState,
+  | "selectedArtifactStorageFilter"
+  | "selectedArtifactIds"
+  | "status"
+  | "resultSummary"
+  | "activeTaskRequestId"
+  | "activeTaskType"
+  | "activeTaskStartedAt"
+>;
+
+export interface SavedDatasetPreparationTrainingSettings {
+  id: string;
+  label: string;
+  savedAt: string;
+  settings: DatasetPreparationTrainingSettingsSnapshot;
+}
+
 export interface UseDatasetPreparationFeatureResult {
-  artifacts: Array<{ artifactId: string; label: string; storageKey: string }>;
-  filteredArtifacts: Array<{ artifactId: string; label: string; storageKey: string }>;
-  uploadedArtifacts: Array<{ artifactId: string; label: string; storageKey: string }>;
-  generatedArtifacts: Array<{ artifactId: string; label: string; storageKey: string }>;
+  artifacts: DatasetPreparationSourceArtifact[];
+  allArtifactCount: number;
+  filteredArtifacts: DatasetPreparationSourceArtifact[];
+  uploadedArtifacts: DatasetPreparationSourceArtifact[];
+  generatedArtifacts: DatasetPreparationSourceArtifact[];
   selectedArtifactStorageFilter: DatasetPreparationArtifactStorageFilter;
   selectedArtifactIds: string[];
+  taskType: DatasetPreparationTaskType;
+  labelSet: string;
+  multiLabel: boolean;
+  extractionStrictSchema: boolean;
+  diffusionConceptKind: "subject" | "style" | "concept";
+  diffusionTriggerToken: string;
+  diffusionRegularizationClass: string;
+  detectionBoxFormat: "coco" | "xyxy" | "xywh";
+  segmentationMaskFormat: "png" | "coco-rle" | "polygon";
+  textInputMode: DatasetPreparationTextInputMode;
+  textGenerationPrompt: string;
   unsupportedDocumentPolicy: "" | "fail" | "skip";
   normalizationMode: "" | "best-effort" | "strict";
   chunkSize: string;
@@ -101,8 +164,26 @@ export interface UseDatasetPreparationFeatureResult {
   canUnloadModel: boolean;
   stopTrainingInFlight: boolean;
   unloadModelInFlight: boolean;
+  selectedGenerationModelAvailable: boolean;
+  generationModelAvailabilityChecked: boolean;
+  modelDownloadInFlight: boolean;
+  modelDownloadStatus: DatasetPreparationStatus;
+  savedTrainingSettings: SavedDatasetPreparationTrainingSettings[];
+  selectedSavedTrainingSettingsId: string;
+  hasTrainingSettingsChanges: boolean;
   onToggleArtifact: (artifactId: string) => void;
   setSelectedArtifactStorageFilter: (value: DatasetPreparationArtifactStorageFilter) => void;
+  setTaskType: (value: DatasetPreparationTaskType) => void;
+  setLabelSet: (value: string) => void;
+  setMultiLabel: (value: boolean) => void;
+  setExtractionStrictSchema: (value: boolean) => void;
+  setDiffusionConceptKind: (value: "subject" | "style" | "concept") => void;
+  setDiffusionTriggerToken: (value: string) => void;
+  setDiffusionRegularizationClass: (value: string) => void;
+  setDetectionBoxFormat: (value: "coco" | "xyxy" | "xywh") => void;
+  setSegmentationMaskFormat: (value: "png" | "coco-rle" | "polygon") => void;
+  setTextInputMode: (value: DatasetPreparationTextInputMode) => void;
+  setTextGenerationPrompt: (value: string) => void;
   setUnsupportedDocumentPolicy: (value: "" | "fail" | "skip") => void;
   setNormalizationMode: (value: "" | "best-effort" | "strict") => void;
   setChunkSize: (value: string) => void;
@@ -130,38 +211,75 @@ export interface UseDatasetPreparationFeatureResult {
   setHuggingFaceRepository: (value: string) => void;
   setHuggingFaceRevision: (value: string) => void;
   setHuggingFacePathPrefix: (value: string) => void;
+  setSelectedSavedTrainingSettingsId: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onStopTraining: () => Promise<void>;
   onUnloadModel: () => Promise<void>;
+  onDownloadGenerationModel: () => Promise<void>;
+  onSaveTrainingSettings: () => void;
+  onLoadTrainingSettings: () => void;
 }
 
 export interface UseDatasetPreparationFeatureOptions {
   client?: DesktopDatasetPreparationClient;
   settingsClient?: DesktopApplicationSettingsClient;
+  modelsClient?: DesktopModelsClient;
   runtimeStatusClient?: Pick<DesktopPythonRuntimeClient, "readStatus" | "controlRuntime">;
   onPrepared?: () => void;
   workspaceId?: string;
 }
 
+const DATASET_PREPARATION_TRAINING_SETTINGS_STORAGE_KEY = "ai-system-builder.datasetPreparation.trainingSettings.v1";
+
+function stringifyDefaultNumber(value: number | undefined): string {
+  return typeof value === "number" ? String(value) : "";
+}
+
+function resolveDefaultGenerationParameterState(taskType: DatasetPreparationTaskType) {
+  const defaults = resolveDefaultDatasetPreparationTextGenerationParameterDefaults(taskType);
+  return {
+    maxExamplesPerChunk: stringifyDefaultNumber(defaults?.maxExamplesPerChunk),
+    batchSize: stringifyDefaultNumber(defaults?.batchSize),
+    failurePolicy: (defaults?.failurePolicy ?? "skip") as "" | "fail" | "skip",
+    generationTemperature: stringifyDefaultNumber(defaults?.temperature),
+    generationTopP: stringifyDefaultNumber(defaults?.topP),
+    generationMaxNewTokens: stringifyDefaultNumber(defaults?.maxNewTokens),
+  };
+}
+
+const defaultTaskGenerationParameters = resolveDefaultGenerationParameterState("llm-instruction");
+const defaultTaskGenerationModel = resolveDefaultDatasetPreparationTextGenerationModel("llm-instruction");
+
 const defaultDatasetPreparationPageState: DatasetPreparationPageState = {
   selectedArtifactStorageFilter: "all",
   selectedArtifactIds: [],
+  taskType: "llm-instruction",
+  labelSet: "",
+  multiLabel: false,
+  extractionStrictSchema: true,
+  diffusionConceptKind: "subject",
+  diffusionTriggerToken: "",
+  diffusionRegularizationClass: "",
+  detectionBoxFormat: "coco",
+  segmentationMaskFormat: "png",
+  textInputMode: "generate",
+  textGenerationPrompt: resolveDefaultDatasetPreparationPromptTemplate("llm-instruction") ?? "",
   unsupportedDocumentPolicy: "",
   normalizationMode: "",
   chunkSize: "1000",
   chunkOverlap: "200",
   preserveDocumentBoundaries: true,
   maxChunkCount: "",
-  modelId: "",
-  modelInferenceMode: "auto",
-  modelDevice: "auto",
-  modelTorchDtype: "",
-  maxExamplesPerChunk: "4",
-  batchSize: "4",
-  failurePolicy: "skip",
-  generationTemperature: "",
-  generationTopP: "",
-  generationMaxNewTokens: "",
+  modelId: defaultTaskGenerationModel?.modelId ?? "",
+  modelInferenceMode: defaultTaskGenerationModel?.inferenceMode ?? "auto",
+  modelDevice: defaultTaskGenerationModel?.device ?? "auto",
+  modelTorchDtype: defaultTaskGenerationModel?.torchDtype ?? "",
+  maxExamplesPerChunk: defaultTaskGenerationParameters.maxExamplesPerChunk,
+  batchSize: defaultTaskGenerationParameters.batchSize,
+  failurePolicy: defaultTaskGenerationParameters.failurePolicy,
+  generationTemperature: defaultTaskGenerationParameters.generationTemperature,
+  generationTopP: defaultTaskGenerationParameters.generationTopP,
+  generationMaxNewTokens: defaultTaskGenerationParameters.generationMaxNewTokens,
   trainRatio: "0.8",
   testRatio: "0.2",
   seed: "",
@@ -184,6 +302,13 @@ let cachedDatasetPreparationPageState: DatasetPreparationPageState = { ...defaul
 
 export function resetDatasetPreparationPageStateForTests(): void {
   cachedDatasetPreparationPageState = { ...defaultDatasetPreparationPageState };
+  try {
+    if (typeof window !== "undefined") {
+      window.localStorage?.removeItem(DATASET_PREPARATION_TRAINING_SETTINGS_STORAGE_KEY);
+    }
+  } catch {
+    // Tests and restricted browser contexts may not expose localStorage.
+  }
 }
 
 function createDatasetPreparationRequestId(): string {
@@ -192,6 +317,123 @@ function createDatasetPreparationRequestId(): string {
   }
 
   return `dataset-preparation-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function createSavedTrainingSettingsId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `training-settings-${crypto.randomUUID()}`;
+  }
+
+  return `training-settings-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function readSavedTrainingSettingsFromStorage(): SavedDatasetPreparationTrainingSettings[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage?.getItem(DATASET_PREPARATION_TRAINING_SETTINGS_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter((entry): entry is SavedDatasetPreparationTrainingSettings => {
+      if (typeof entry !== "object" || entry === null) {
+        return false;
+      }
+      const candidate = entry as SavedDatasetPreparationTrainingSettings;
+      return typeof candidate.id === "string"
+        && typeof candidate.label === "string"
+        && typeof candidate.savedAt === "string"
+        && typeof candidate.settings === "object"
+        && candidate.settings !== null
+        && isDatasetPreparationTaskType((candidate.settings as { taskType?: string }).taskType ?? "");
+    });
+  } catch {
+    return [];
+  }
+}
+
+function writeSavedTrainingSettingsToStorage(settings: SavedDatasetPreparationTrainingSettings[]): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage?.setItem(DATASET_PREPARATION_TRAINING_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // Saved settings are a convenience feature; the form still works if browser storage is unavailable.
+  }
+}
+
+function createDefaultTrainingSettingsSnapshot(
+  taskType: DatasetPreparationTaskType,
+): DatasetPreparationTrainingSettingsSnapshot {
+  const profile = resolveDatasetPreparationTaskProfileDefinition(taskType);
+  const taskModelDefault = resolveDefaultDatasetPreparationTextGenerationModel(taskType);
+  const generationParameters = resolveDefaultGenerationParameterState(taskType);
+  return {
+    taskType,
+    labelSet: "",
+    multiLabel: false,
+    extractionStrictSchema: true,
+    diffusionConceptKind: "subject",
+    diffusionTriggerToken: "",
+    diffusionRegularizationClass: "",
+    detectionBoxFormat: "coco",
+    segmentationMaskFormat: "png",
+    textInputMode: resolveDefaultTextInputMode(taskType),
+    textGenerationPrompt: resolveDefaultDatasetPreparationPromptTemplate(taskType) ?? "",
+    unsupportedDocumentPolicy: "",
+    normalizationMode: "",
+    chunkSize: defaultDatasetPreparationPageState.chunkSize,
+    chunkOverlap: defaultDatasetPreparationPageState.chunkOverlap,
+    preserveDocumentBoundaries: defaultDatasetPreparationPageState.preserveDocumentBoundaries,
+    maxChunkCount: "",
+    modelId: taskModelDefault?.modelId ?? "",
+    modelInferenceMode: taskModelDefault?.inferenceMode ?? "auto",
+    modelDevice: taskModelDefault?.device ?? "auto",
+    modelTorchDtype: taskModelDefault?.torchDtype ?? "",
+    maxExamplesPerChunk: generationParameters.maxExamplesPerChunk,
+    batchSize: generationParameters.batchSize,
+    failurePolicy: generationParameters.failurePolicy,
+    generationTemperature: generationParameters.generationTemperature,
+    generationTopP: generationParameters.generationTopP,
+    generationMaxNewTokens: generationParameters.generationMaxNewTokens,
+    trainRatio: defaultDatasetPreparationPageState.trainRatio,
+    testRatio: defaultDatasetPreparationPageState.testRatio,
+    seed: "",
+    shuffle: defaultDatasetPreparationPageState.shuffle,
+    outputFormat: profile.preferredOutputFormat,
+    outputBaseName: "",
+    localDestinationEnabled: true,
+    huggingFaceDestinationEnabled: false,
+    huggingFaceRepository: "",
+    huggingFaceRevision: "",
+    huggingFacePathPrefix: "",
+  };
+}
+
+function serializeTrainingSettingsSnapshot(snapshot: DatasetPreparationTrainingSettingsSnapshot): string {
+  return JSON.stringify(snapshot);
+}
+
+function resolveDefaultTextInputMode(taskType: DatasetPreparationTaskType): DatasetPreparationTextInputMode {
+  return createDefaultDatasetPreparationTaskRecipe(taskType).textInputMode ?? "provided";
+}
+
+function normalizeModelIdentity(value: string | undefined): string {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function isUsableGenerationModelRecord(record: DesktopModelInventoryRecord, selectedModelId: string): boolean {
+  const lifecycleStatus = record.lifecycleStatus;
+  return normalizeModelIdentity(record.modelId) === normalizeModelIdentity(selectedModelId)
+    && (lifecycleStatus === "downloaded" || lifecycleStatus === "generated" || lifecycleStatus === "validated");
 }
 
 function appendErrorDetailsMessage(message: string, details: Record<string, unknown> | undefined): string {
@@ -224,6 +466,16 @@ export function useDatasetPreparationFeature(
   const onPrepared = options.onPrepared;
   const workspaceId = options.workspaceId;
   const datasetClient = useDatasetPreparationClient(options.client);
+  const modelClient = useMemo<DesktopModelsClient | undefined>(() => {
+    if (options.modelsClient) {
+      return options.modelsClient;
+    }
+    try {
+      return createDesktopModelsClient();
+    } catch {
+      return undefined;
+    }
+  }, [options.modelsClient]);
   const settingsClient = useMemo(() => {
     if (options.settingsClient) {
       return options.settingsClient;
@@ -244,10 +496,21 @@ export function useDatasetPreparationFeature(
       return undefined;
     }
   }, [options.runtimeStatusClient]);
-  const [artifacts, setArtifacts] = useState<Array<{ artifactId: string; label: string; storageKey: string }>>([]);
+  const [artifacts, setArtifacts] = useState<DatasetPreparationSourceArtifact[]>([]);
   const [selectedArtifactStorageFilter, setSelectedArtifactStorageFilter] =
     useState<DatasetPreparationArtifactStorageFilter>(cachedDatasetPreparationPageState.selectedArtifactStorageFilter);
   const [selectedArtifactIds, setSelectedArtifactIds] = useState<string[]>(cachedDatasetPreparationPageState.selectedArtifactIds);
+  const [taskType, setTaskType] = useState<DatasetPreparationTaskType>(cachedDatasetPreparationPageState.taskType);
+  const [labelSet, setLabelSet] = useState(cachedDatasetPreparationPageState.labelSet);
+  const [multiLabel, setMultiLabel] = useState(cachedDatasetPreparationPageState.multiLabel);
+  const [extractionStrictSchema, setExtractionStrictSchema] = useState(cachedDatasetPreparationPageState.extractionStrictSchema);
+  const [diffusionConceptKind, setDiffusionConceptKind] = useState<"subject" | "style" | "concept">(cachedDatasetPreparationPageState.diffusionConceptKind);
+  const [diffusionTriggerToken, setDiffusionTriggerToken] = useState(cachedDatasetPreparationPageState.diffusionTriggerToken);
+  const [diffusionRegularizationClass, setDiffusionRegularizationClass] = useState(cachedDatasetPreparationPageState.diffusionRegularizationClass);
+  const [detectionBoxFormat, setDetectionBoxFormat] = useState<"coco" | "xyxy" | "xywh">(cachedDatasetPreparationPageState.detectionBoxFormat);
+  const [segmentationMaskFormat, setSegmentationMaskFormat] = useState<"png" | "coco-rle" | "polygon">(cachedDatasetPreparationPageState.segmentationMaskFormat);
+  const [textInputMode, setTextInputMode] = useState<DatasetPreparationTextInputMode>(cachedDatasetPreparationPageState.textInputMode);
+  const [textGenerationPrompt, setTextGenerationPrompt] = useState(cachedDatasetPreparationPageState.textGenerationPrompt);
   const [unsupportedDocumentPolicy, setUnsupportedDocumentPolicy] = useState<"" | "fail" | "skip">(cachedDatasetPreparationPageState.unsupportedDocumentPolicy);
   const [normalizationMode, setNormalizationMode] = useState<"" | "best-effort" | "strict">(cachedDatasetPreparationPageState.normalizationMode);
   const [chunkSize, setChunkSize] = useState(cachedDatasetPreparationPageState.chunkSize);
@@ -284,10 +547,17 @@ export function useDatasetPreparationFeature(
   const [runtimeActiveTaskCount, setRuntimeActiveTaskCount] = useState(0);
   const [stopTrainingInFlight, setStopTrainingInFlight] = useState(false);
   const [unloadModelInFlight, setUnloadModelInFlight] = useState(false);
+  const [generationModelRecords, setGenerationModelRecords] = useState<DesktopModelInventoryRecord[]>([]);
+  const [generationModelAvailabilityChecked, setGenerationModelAvailabilityChecked] = useState(false);
+  const [modelDownloadStatus, setModelDownloadStatus] = useState<DatasetPreparationStatus>({ kind: "idle" });
+  const [savedTrainingSettings, setSavedTrainingSettings] = useState<SavedDatasetPreparationTrainingSettings[]>(() =>
+    readSavedTrainingSettingsFromStorage());
+  const [selectedSavedTrainingSettingsId, setSelectedSavedTrainingSettingsId] = useState("");
   const stopTrainingRequestedRef = useRef(false);
   const activePollingRequestIdRef = useRef<string | undefined>(undefined);
   const pollingSessionIdRef = useRef(0);
   const isMountedRef = useRef(false);
+  const suppressNextTaskDefaultResetRef = useRef(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -302,6 +572,17 @@ export function useDatasetPreparationFeature(
     cachedDatasetPreparationPageState = {
       selectedArtifactStorageFilter,
       selectedArtifactIds,
+      taskType,
+      labelSet,
+      multiLabel,
+      extractionStrictSchema,
+      diffusionConceptKind,
+      diffusionTriggerToken,
+      diffusionRegularizationClass,
+      detectionBoxFormat,
+      segmentationMaskFormat,
+      textInputMode,
+      textGenerationPrompt,
       unsupportedDocumentPolicy,
       normalizationMode,
       chunkSize,
@@ -338,6 +619,17 @@ export function useDatasetPreparationFeature(
   }, [
     selectedArtifactStorageFilter,
     selectedArtifactIds,
+    taskType,
+    labelSet,
+    multiLabel,
+    extractionStrictSchema,
+    diffusionConceptKind,
+    diffusionTriggerToken,
+    diffusionRegularizationClass,
+    detectionBoxFormat,
+    segmentationMaskFormat,
+    textInputMode,
+    textGenerationPrompt,
     unsupportedDocumentPolicy,
     normalizationMode,
     chunkSize,
@@ -370,6 +662,30 @@ export function useDatasetPreparationFeature(
     activeTaskRequestId,
     activeTaskStartedAt,
   ]);
+
+  useEffect(() => {
+    if (suppressNextTaskDefaultResetRef.current) {
+      suppressNextTaskDefaultResetRef.current = false;
+      return;
+    }
+
+    const profile = resolveDatasetPreparationTaskProfileDefinition(taskType);
+    const taskModelDefault = resolveDefaultDatasetPreparationTextGenerationModel(taskType);
+    const generationParameters = resolveDefaultGenerationParameterState(taskType);
+    setOutputFormat(profile.preferredOutputFormat);
+    setTextInputMode(resolveDefaultTextInputMode(taskType));
+    setTextGenerationPrompt(resolveDefaultDatasetPreparationPromptTemplate(taskType) ?? "");
+    setModelId(taskModelDefault?.modelId ?? "");
+    setModelInferenceMode(taskModelDefault?.inferenceMode ?? "auto");
+    setModelDevice(taskModelDefault?.device ?? "auto");
+    setModelTorchDtype(taskModelDefault?.torchDtype ?? "");
+    setMaxExamplesPerChunk(generationParameters.maxExamplesPerChunk);
+    setBatchSize(generationParameters.batchSize);
+    setFailurePolicy(generationParameters.failurePolicy);
+    setGenerationTemperature(generationParameters.generationTemperature);
+    setGenerationTopP(generationParameters.generationTopP);
+    setGenerationMaxNewTokens(generationParameters.generationMaxNewTokens);
+  }, [taskType]);
 
   const setStatusWarningMessage = useCallback((warningMessage: string) => {
     setStatus((current) => {
@@ -421,6 +737,34 @@ export function useDatasetPreparationFeature(
       // Runtime status is best-effort for model lifecycle controls.
     }
   }, [runtimeStatusClient]);
+
+  const refreshGenerationModelAvailability = useCallback(async () => {
+    const selectedModelId = modelId.trim();
+    if (!modelClient || !workspaceId || !selectedModelId || textInputMode !== "generate") {
+      setGenerationModelRecords([]);
+      setGenerationModelAvailabilityChecked(Boolean(selectedModelId) && textInputMode === "generate");
+      return;
+    }
+
+    setGenerationModelAvailabilityChecked(false);
+    try {
+      const listed = await modelClient.listModels({
+        workspaceId: createWorkspaceId(workspaceId),
+        search: selectedModelId,
+        limit: 50,
+        includeSharedStorage: true,
+      });
+      setGenerationModelRecords(listed);
+    } catch {
+      setGenerationModelRecords([]);
+    } finally {
+      setGenerationModelAvailabilityChecked(true);
+    }
+  }, [modelClient, modelId, textInputMode, workspaceId]);
+
+  useEffect(() => {
+    void refreshGenerationModelAvailability();
+  }, [refreshGenerationModelAvailability]);
 
   const isPollingStillActive = useCallback((requestId: string, sessionId: number): boolean => {
     return isMountedRef.current
@@ -515,18 +859,6 @@ export function useDatasetPreparationFeature(
       return;
     }
 
-    void settingsClient.resolveModelDefault({
-      taskKey: "qaGeneration",
-      featureKey: "datasetPreparation",
-    }).then((result) => {
-      setModelId((current) => current || result.resolved.modelId);
-      setModelInferenceMode(result.resolved.inferenceMode);
-      setModelDevice(result.resolved.device ?? "auto");
-      setModelTorchDtype(result.resolved.torchDtype ?? "");
-    }).catch(() => {
-      setStatusWarningMessage("Using built-in model defaults because settings could not be loaded.");
-    });
-
     void settingsClient.readSettings({ keys: ["huggingface.defaultNamespace"] }).then((result) => {
       const namespace = result.values.find((value) => value.key === "huggingface.defaultNamespace")?.value;
       if (typeof namespace === "string" && namespace.trim().length > 0) {
@@ -555,13 +887,17 @@ export function useDatasetPreparationFeature(
         : [...current, artifactId]);
   }, []);
 
+  const taskRelevantArtifacts = useMemo(
+    () => filterTaskRelevantDatasetPreparationArtifacts(artifacts, taskType),
+    [artifacts, taskType],
+  );
   const uploadedArtifacts = useMemo(
-    () => artifacts.filter((artifact) => artifact.storageKey.startsWith("uploads/")),
-    [artifacts],
+    () => filterUploadedDatasetPreparationArtifacts(taskRelevantArtifacts),
+    [taskRelevantArtifacts],
   );
   const generatedArtifacts = useMemo(
-    () => artifacts.filter((artifact) => artifact.storageKey.startsWith("generated/")),
-    [artifacts],
+    () => filterGeneratedDatasetPreparationArtifacts(taskRelevantArtifacts),
+    [taskRelevantArtifacts],
   );
   const filteredArtifacts = useMemo(() => {
     if (selectedArtifactStorageFilter === "uploaded") {
@@ -570,14 +906,177 @@ export function useDatasetPreparationFeature(
     if (selectedArtifactStorageFilter === "generated") {
       return generatedArtifacts;
     }
-    return artifacts;
-  }, [artifacts, generatedArtifacts, selectedArtifactStorageFilter, uploadedArtifacts]);
+    return taskRelevantArtifacts;
+  }, [generatedArtifacts, selectedArtifactStorageFilter, taskRelevantArtifacts, uploadedArtifacts]);
+
+  useEffect(() => {
+    setSelectedArtifactIds((current) => {
+      const relevantArtifactIds = new Set(taskRelevantArtifacts.map((artifact) => artifact.artifactId));
+      return current.filter((artifactId) => relevantArtifactIds.has(artifactId));
+    });
+  }, [taskRelevantArtifacts]);
+
+  const currentTrainingSettingsSnapshot = useMemo<DatasetPreparationTrainingSettingsSnapshot>(() => ({
+    taskType,
+    labelSet,
+    multiLabel,
+    extractionStrictSchema,
+    diffusionConceptKind,
+    diffusionTriggerToken,
+    diffusionRegularizationClass,
+    detectionBoxFormat,
+    segmentationMaskFormat,
+    textInputMode,
+    textGenerationPrompt,
+    unsupportedDocumentPolicy,
+    normalizationMode,
+    chunkSize,
+    chunkOverlap,
+    preserveDocumentBoundaries,
+    maxChunkCount,
+    modelId,
+    modelInferenceMode,
+    modelDevice,
+    modelTorchDtype,
+    maxExamplesPerChunk,
+    batchSize,
+    failurePolicy,
+    generationTemperature,
+    generationTopP,
+    generationMaxNewTokens,
+    trainRatio,
+    testRatio,
+    seed,
+    shuffle,
+    outputFormat,
+    outputBaseName,
+    localDestinationEnabled,
+    huggingFaceDestinationEnabled,
+    huggingFaceRepository,
+    huggingFaceRevision,
+    huggingFacePathPrefix,
+  }), [
+    taskType,
+    labelSet,
+    multiLabel,
+    extractionStrictSchema,
+    diffusionConceptKind,
+    diffusionTriggerToken,
+    diffusionRegularizationClass,
+    detectionBoxFormat,
+    segmentationMaskFormat,
+    textInputMode,
+    textGenerationPrompt,
+    unsupportedDocumentPolicy,
+    normalizationMode,
+    chunkSize,
+    chunkOverlap,
+    preserveDocumentBoundaries,
+    maxChunkCount,
+    modelId,
+    modelInferenceMode,
+    modelDevice,
+    modelTorchDtype,
+    maxExamplesPerChunk,
+    batchSize,
+    failurePolicy,
+    generationTemperature,
+    generationTopP,
+    generationMaxNewTokens,
+    trainRatio,
+    testRatio,
+    seed,
+    shuffle,
+    outputFormat,
+    outputBaseName,
+    localDestinationEnabled,
+    huggingFaceDestinationEnabled,
+    huggingFaceRepository,
+    huggingFaceRevision,
+    huggingFacePathPrefix,
+  ]);
+
+  const hasTrainingSettingsChanges = useMemo(() =>
+    serializeTrainingSettingsSnapshot(currentTrainingSettingsSnapshot)
+      !== serializeTrainingSettingsSnapshot(createDefaultTrainingSettingsSnapshot(taskType)),
+  [currentTrainingSettingsSnapshot, taskType]);
+
+  const applyTrainingSettingsSnapshot = useCallback((settings: DatasetPreparationTrainingSettingsSnapshot) => {
+    suppressNextTaskDefaultResetRef.current = settings.taskType !== taskType;
+    setTaskType(settings.taskType);
+    setLabelSet(settings.labelSet);
+    setMultiLabel(settings.multiLabel);
+    setExtractionStrictSchema(settings.extractionStrictSchema);
+    setDiffusionConceptKind(settings.diffusionConceptKind);
+    setDiffusionTriggerToken(settings.diffusionTriggerToken);
+    setDiffusionRegularizationClass(settings.diffusionRegularizationClass);
+    setDetectionBoxFormat(settings.detectionBoxFormat);
+    setSegmentationMaskFormat(settings.segmentationMaskFormat);
+    setTextInputMode(settings.textInputMode);
+    setTextGenerationPrompt(settings.textGenerationPrompt);
+    setUnsupportedDocumentPolicy(settings.unsupportedDocumentPolicy);
+    setNormalizationMode(settings.normalizationMode);
+    setChunkSize(settings.chunkSize);
+    setChunkOverlap(settings.chunkOverlap);
+    setPreserveDocumentBoundaries(settings.preserveDocumentBoundaries);
+    setMaxChunkCount(settings.maxChunkCount);
+    setModelId(settings.modelId);
+    setModelInferenceMode(settings.modelInferenceMode);
+    setModelDevice(settings.modelDevice);
+    setModelTorchDtype(settings.modelTorchDtype);
+    setMaxExamplesPerChunk(settings.maxExamplesPerChunk);
+    setBatchSize(settings.batchSize);
+    setFailurePolicy(settings.failurePolicy);
+    setGenerationTemperature(settings.generationTemperature);
+    setGenerationTopP(settings.generationTopP);
+    setGenerationMaxNewTokens(settings.generationMaxNewTokens);
+    setTrainRatio(settings.trainRatio);
+    setTestRatio(settings.testRatio);
+    setSeed(settings.seed);
+    setShuffle(settings.shuffle);
+    setOutputFormat(settings.outputFormat);
+    setOutputBaseName(settings.outputBaseName);
+    setLocalDestinationEnabled(settings.localDestinationEnabled);
+    setHuggingFaceDestinationEnabled(settings.huggingFaceDestinationEnabled);
+    setHuggingFaceRepository(settings.huggingFaceRepository);
+    setHuggingFaceRevision(settings.huggingFaceRevision);
+    setHuggingFacePathPrefix(settings.huggingFacePathPrefix);
+  }, [taskType]);
+
+  const onSaveTrainingSettings = useCallback(() => {
+    const profile = resolveDatasetPreparationTaskProfileDefinition(currentTrainingSettingsSnapshot.taskType);
+    const savedAt = new Date().toISOString();
+    const label = `${profile.taskType.replaceAll("-", " ")} settings - ${new Date(savedAt).toLocaleString()}`;
+    const record: SavedDatasetPreparationTrainingSettings = {
+      id: createSavedTrainingSettingsId(),
+      label,
+      savedAt,
+      settings: currentTrainingSettingsSnapshot,
+    };
+    setSavedTrainingSettings((current) => {
+      const next = [record, ...current].slice(0, 25);
+      writeSavedTrainingSettingsToStorage(next);
+      return next;
+    });
+    setSelectedSavedTrainingSettingsId(record.id);
+    setStatus({ kind: "idle", message: "Training settings saved." });
+  }, [currentTrainingSettingsSnapshot]);
+
+  const onLoadTrainingSettings = useCallback(() => {
+    const selected = savedTrainingSettings.find((settings) => settings.id === selectedSavedTrainingSettingsId);
+    if (!selected) {
+      return;
+    }
+    applyTrainingSettingsSnapshot(selected.settings);
+    setStatus({ kind: "idle", message: "Training settings loaded." });
+  }, [applyTrainingSettingsSnapshot, savedTrainingSettings, selectedSavedTrainingSettingsId]);
 
   const onSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const validationResult = validateAndParseDatasetPreparationInputs({
       selectedArtifactIds,
+      taskType,
       chunkSize,
       chunkOverlap,
       maxChunkCount,
@@ -602,22 +1101,32 @@ export function useDatasetPreparationFeature(
     }
 
     stopTrainingRequestedRef.current = false;
-    setStatus({ kind: "loading", message: "Resolving generation model settings..." });
+    setStatus({ kind: "loading", message: "Preparing training dataset request..." });
     setResultSummary(undefined);
 
-    const resolvedDefault = await (settingsClient?.resolveModelDefault({
-      taskKey: "qaGeneration",
-      featureKey: "datasetPreparation",
-    }) ?? Promise.reject(new Error("settings unavailable"))).then((result) => result.resolved).catch(() => ({
+    const taskModelDefault = resolveDefaultDatasetPreparationTextGenerationModel(taskType);
+    const fallbackModelDefault = DATASET_PREPARATION_TEXT_GENERATION_MODEL_PRESETS[0].model;
+    const resolvedDefault = {
       provider: "transformers" as const,
-      modelId: "google/flan-t5-base",
-      inferenceMode: "auto" as const,
+      modelId: taskModelDefault?.modelId ?? fallbackModelDefault.modelId,
+      inferenceMode: (taskModelDefault?.inferenceMode ?? fallbackModelDefault.inferenceMode ?? "auto") as ModelDefaultInferenceMode,
       source: "builtin" as const,
-      device: undefined,
-      torchDtype: undefined,
-    }));
+      device: taskModelDefault?.device ?? fallbackModelDefault.device,
+      torchDtype: taskModelDefault?.torchDtype ?? fallbackModelDefault.torchDtype,
+    };
     const request = buildDatasetPreparationRequest({
       selectedArtifactIds,
+      taskType,
+      labelSet,
+      multiLabel,
+      extractionStrictSchema,
+      diffusionConceptKind,
+      diffusionTriggerToken,
+      diffusionRegularizationClass,
+      detectionBoxFormat,
+      segmentationMaskFormat,
+      textInputMode,
+      textGenerationPrompt,
       unsupportedDocumentPolicy,
       normalizationMode,
       preserveDocumentBoundaries,
@@ -659,6 +1168,17 @@ export function useDatasetPreparationFeature(
     await pollDatasetPreparationTask(started.requestId);
   }, [
     selectedArtifactIds,
+    taskType,
+    labelSet,
+    multiLabel,
+    extractionStrictSchema,
+    diffusionConceptKind,
+    diffusionTriggerToken,
+    diffusionRegularizationClass,
+    detectionBoxFormat,
+    segmentationMaskFormat,
+    textInputMode,
+    textGenerationPrompt,
     unsupportedDocumentPolicy,
     normalizationMode,
     chunkSize,
@@ -689,7 +1209,6 @@ export function useDatasetPreparationFeature(
     huggingFacePathPrefix,
     datasetClient,
     workspaceId,
-    settingsClient,
     pollDatasetPreparationTask,
     setActiveDatasetPreparationTask,
   ]);
@@ -735,14 +1254,66 @@ export function useDatasetPreparationFeature(
   }, [refreshRuntimeModelStatus, runtimeStatusClient, status.kind]);
 
   const canUnloadModel = loadedModelCount > 0 && runtimeActiveTaskCount === 0 && status.kind !== "loading";
+  const selectedGenerationModelAvailable = useMemo(() =>
+    generationModelRecords.some((record) => isUsableGenerationModelRecord(record, modelId)),
+  [generationModelRecords, modelId]);
+  const modelDownloadInFlight = modelDownloadStatus.kind === "loading";
+
+  const onDownloadGenerationModel = useCallback(async () => {
+    const selectedModelId = modelId.trim();
+    if (!selectedModelId) {
+      setModelDownloadStatus({ kind: "error", message: "Enter a model ID before downloading." });
+      return;
+    }
+    if (!workspaceId) {
+      setModelDownloadStatus({ kind: "error", message: "Select a workspace before downloading models." });
+      return;
+    }
+    if (!modelClient) {
+      setModelDownloadStatus({ kind: "error", message: "Model download is not available in this environment." });
+      return;
+    }
+
+    setModelDownloadStatus({ kind: "loading", message: `Downloading ${selectedModelId}...` });
+    try {
+      await modelClient.downloadModel({
+        workspaceId,
+        modelId: selectedModelId,
+        displayName: selectedModelId,
+        inferenceMode: modelInferenceMode === "auto" ? undefined : modelInferenceMode,
+        artifactForm: "full-model",
+        taskTags: ["chat", "text-generation"],
+        metadata: {
+          source: "dataset-preparation",
+          usage: "text-field-generation",
+        },
+      });
+      setModelDownloadStatus({ kind: "success", message: "Model downloaded and recorded in model management." });
+      await refreshGenerationModelAvailability();
+    } catch (error) {
+      setModelDownloadStatus({ kind: "error", message: error instanceof Error ? error.message : "Failed to download model." });
+    }
+  }, [modelClient, modelId, modelInferenceMode, refreshGenerationModelAvailability, workspaceId]);
 
   return {
-    artifacts,
+    artifacts: taskRelevantArtifacts,
+    allArtifactCount: artifacts.length,
     filteredArtifacts,
     uploadedArtifacts,
     generatedArtifacts,
     selectedArtifactStorageFilter,
     selectedArtifactIds,
+    taskType,
+    labelSet,
+    multiLabel,
+    extractionStrictSchema,
+    diffusionConceptKind,
+    diffusionTriggerToken,
+    diffusionRegularizationClass,
+    detectionBoxFormat,
+    segmentationMaskFormat,
+    textInputMode,
+    textGenerationPrompt,
     unsupportedDocumentPolicy,
     normalizationMode,
     chunkSize,
@@ -777,8 +1348,26 @@ export function useDatasetPreparationFeature(
     canUnloadModel,
     stopTrainingInFlight,
     unloadModelInFlight,
+    selectedGenerationModelAvailable,
+    generationModelAvailabilityChecked,
+    modelDownloadInFlight,
+    modelDownloadStatus,
+    savedTrainingSettings,
+    selectedSavedTrainingSettingsId,
+    hasTrainingSettingsChanges,
     onToggleArtifact,
     setSelectedArtifactStorageFilter,
+    setTaskType,
+    setLabelSet,
+    setMultiLabel,
+    setExtractionStrictSchema,
+    setDiffusionConceptKind,
+    setDiffusionTriggerToken,
+    setDiffusionRegularizationClass,
+    setDetectionBoxFormat,
+    setSegmentationMaskFormat,
+    setTextInputMode,
+    setTextGenerationPrompt,
     setUnsupportedDocumentPolicy,
     setNormalizationMode,
     setChunkSize,
@@ -806,8 +1395,12 @@ export function useDatasetPreparationFeature(
     setHuggingFaceRepository,
     setHuggingFaceRevision,
     setHuggingFacePathPrefix,
+    setSelectedSavedTrainingSettingsId,
     onSubmit,
     onStopTraining,
     onUnloadModel,
+    onDownloadGenerationModel,
+    onSaveTrainingSettings,
+    onLoadTrainingSettings,
   };
 }

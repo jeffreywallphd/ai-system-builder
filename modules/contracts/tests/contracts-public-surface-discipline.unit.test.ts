@@ -11,6 +11,7 @@ const CONTRACT_FAMILIES = [
   "artifactBrowser",
   "config",
   "dataset",
+  "effectiveAssetProjections",
   "executionPlans",
   "host",
   "artifactUpload",

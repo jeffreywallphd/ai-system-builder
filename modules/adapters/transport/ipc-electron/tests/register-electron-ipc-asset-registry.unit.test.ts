@@ -28,6 +28,7 @@ function createDependencies(overrides: Partial<RegisterElectronIpcDependencies> 
     publishArtifactToRepoUseCase: { execute },
     browseHuggingFaceNamespaceDatasetsUseCase: { execute },
     browseHuggingFaceDatasetParquetFilesUseCase: { execute },
+    importHuggingFaceFilesUseCase: { execute },
     verifyPublishedArtifactBackingUseCase: { execute },
     verifyImportedArtifactSourceBackingUseCase: { execute },
     registerArtifactFromRepoUseCase: { execute },

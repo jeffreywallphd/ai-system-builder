@@ -40,6 +40,7 @@ export const API_ROUTE_POLICIES: ReadonlyMap<string, ApiRoutePolicy> = new Map<s
   ["POST /api/artifact-repo/has", { public: false, scopes: ["artifact:read"] }],
   ["POST /api/huggingface/namespace/datasets", { public: false, scopes: ["artifact:read"] }],
   ["POST /api/huggingface/dataset/parquet-files", { public: false, scopes: ["artifact:read"] }],
+  ["POST /api/huggingface/files/import", { public: false, scopes: ["artifact:write"] }],
   ["POST /api/artifact-repo/store", { public: false, scopes: ["artifact:write"] }],
   ["POST /api/artifact/publish", { public: false, scopes: ["artifact:write"] }],
   ["POST /api/artifact/publish/verify", { public: false, scopes: ["artifact:read"] }],
@@ -54,6 +55,8 @@ export const API_ROUTE_POLICIES: ReadonlyMap<string, ApiRoutePolicy> = new Map<s
   ["GET /api/artifact/media/view", { public: false, scopes: ["artifact:read"] }],
   ["GET /api/artifact/upload/policy", { public: false, scopes: ["artifact:write"] }],
   ["POST /api/artifact/upload", { public: false, scopes: ["artifact:write"] }],
+  ["POST /api/artifact/ingest-website-page", { public: false, scopes: ["artifact:write"] }],
+  ["POST /api/artifact/ingest-website-pages-batch", { public: false, scopes: ["artifact:write"] }],
 
   ["GET /api/assets/definitions", { public: false, scopes: ["asset:read"] }],
   ["GET /api/assets/definitions/:definitionId", { public: false, scopes: ["asset:read"] }],

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "../../testing/node-test";
 
 import {
+  DATASET_PREPARATION_TEXT_GENERATION_MODEL_PRESETS,
+  DATASET_PREPARATION_TASK_PROFILE_DEFINITIONS,
+  DATASET_PREPARATION_TASK_TYPES,
+  DEFAULT_DATASET_PREPARATION_TASK_TYPE,
+  createDefaultDatasetPreparationTaskRecipe,
   type DatasetOutputConfig,
   type DatasetPreparationRecipe,
   type DatasetPreparationSourceInput,
@@ -42,8 +47,10 @@ import {
   createRuntimeExecutionRequest,
   createRuntimeExecutionSuccessResult,
   createRuntimeTarget,
+  isDatasetPreparationTaskType,
   isRuntimeDiagnosticEvent,
   mapRuntimeDiagnosticToStructuredLogEvent,
+  normalizeDatasetPreparationTaskType,
   normalizeRuntimeDiagnosticEvent,
   isKnownRuntimeKind,
   isRuntimeCapabilityId,
@@ -53,6 +60,10 @@ import {
   normalizeRuntimeOperation,
   normalizeRuntimeReadinessAction,
   normalizeRuntimeReadinessStatus,
+  resolveDatasetPreparationTaskProfileDefinition,
+  resolveDefaultDatasetPreparationPromptTemplate,
+  resolveDefaultDatasetPreparationTextGenerationParameterDefaults,
+  resolveDefaultDatasetPreparationTextGenerationModel,
   resolveRuntimeKind,
 } from ".";
 
@@ -534,6 +545,7 @@ describe("python sidecar runtime contracts", () => {
       { artifactId: "artifact-2", localPath: "/tmp/b.pdf", mediaType: "application/pdf", originalName: "b.pdf" },
     ];
     const recipe: DatasetPreparationRecipe = {
+      task: createDefaultDatasetPreparationTaskRecipe("llm-instruction"),
       normalization: {
         targetFormat: "markdown",
         unsupportedDocumentPolicy: "skip",
@@ -624,6 +636,7 @@ describe("python sidecar runtime contracts", () => {
     };
 
     expect(request.recipe.generation.mode).toBe("qa");
+    expect(request.recipe.task?.taskType).toBe("llm-instruction");
     expect(request.recipe.generation.model.inferenceMode).toBe("chat");
     expect(request.recipe.normalization.targetFormat).toBe("markdown");
     expect(request.recipe.chunking.strategy).toBe("character");
@@ -634,6 +647,91 @@ describe("python sidecar runtime contracts", () => {
     expect(result.outputs.map((output) => output.role)).toEqual(["dataset"]);
     expect(result.summary.datasetRowCount).toBe(56);
     expect(result.warnings?.[0]?.code).toBe("source_media_type_inferred");
+  });
+
+  it("defines first-tier dataset preparation task profiles as shared contract vocabulary", () => {
+    expect(DATASET_PREPARATION_TASK_TYPES).toEqual([
+      "llm-instruction",
+      "llm-classification",
+      "llm-extraction",
+      "llm-embedding",
+      "llm-reranker",
+      "diffusion-lora",
+      "vision-classification",
+      "vision-detection",
+      "vision-segmentation",
+    ]);
+    expect(DATASET_PREPARATION_TASK_PROFILE_DEFINITIONS.map((profile) => profile.taskType)).toEqual(
+      DATASET_PREPARATION_TASK_TYPES,
+    );
+    expect(DEFAULT_DATASET_PREPARATION_TASK_TYPE).toBe("llm-instruction");
+    expect(isDatasetPreparationTaskType("llm-reranker")).toBe(true);
+    expect(isDatasetPreparationTaskType("speech-transcription")).toBe(false);
+    expect(normalizeDatasetPreparationTaskType(undefined)).toBe("llm-instruction");
+    expect(() => normalizeDatasetPreparationTaskType("speech-transcription")).toThrow(
+      "Unknown dataset preparation task type",
+    );
+
+    const supported = DATASET_PREPARATION_TASK_PROFILE_DEFINITIONS.filter((profile) => profile.runtimeSupport === "supported");
+    expect(supported.map((profile) => profile.taskType)).toEqual(DATASET_PREPARATION_TASK_TYPES);
+    expect(resolveDatasetPreparationTaskProfileDefinition("diffusion-lora")).toMatchObject({
+      modelFamily: "diffusion",
+      outputSchema: "image-caption-manifest",
+      runtimeSupport: "supported",
+      compatibleTrainingMethods: ["lora"],
+    });
+    expect(resolveDatasetPreparationTaskProfileDefinition("vision-classification")).toMatchObject({
+      modelFamily: "vision",
+      outputSchema: "image-classification-manifest",
+      runtimeSupport: "supported",
+      compatibleTrainingMethods: ["lora", "full-finetune"],
+    });
+  });
+
+  it("creates default task-specific dataset preparation recipe fragments", () => {
+    expect(createDefaultDatasetPreparationTaskRecipe("llm-classification")).toEqual({
+      taskType: "llm-classification",
+      textInputMode: "generate",
+      textField: "text",
+      labelField: "label",
+      multiLabel: false,
+    });
+    expect(createDefaultDatasetPreparationTaskRecipe("vision-detection")).toEqual({
+      taskType: "vision-detection",
+      textInputMode: "provided",
+      imageField: "image",
+      boundingBoxField: "boundingBoxes",
+      labelField: "labels",
+      boxFormat: "coco",
+    });
+    expect(createDefaultDatasetPreparationTaskRecipe()).toMatchObject({
+      taskType: "llm-instruction",
+      textInputMode: "generate",
+      promptStyle: "instruction-response",
+    });
+    expect(resolveDefaultDatasetPreparationPromptTemplate("diffusion-lora")).toContain("captions");
+    expect(resolveDefaultDatasetPreparationTextGenerationModel("llm-instruction")).toMatchObject({
+      modelId: "Qwen/Qwen2.5-7B-Instruct",
+      inferenceMode: "chat",
+    });
+    expect(resolveDefaultDatasetPreparationTextGenerationModel("vision-classification")).toMatchObject({
+      modelId: "Qwen/Qwen2.5-7B-Instruct",
+      inferenceMode: "chat",
+    });
+    expect(resolveDefaultDatasetPreparationTextGenerationParameterDefaults("llm-instruction")).toMatchObject({
+      temperature: 0.7,
+      topP: 0.8,
+      maxNewTokens: 512,
+    });
+    expect(resolveDefaultDatasetPreparationTextGenerationParameterDefaults("vision-classification")).toMatchObject({
+      temperature: 0.2,
+      topP: 0.8,
+      maxNewTokens: 64,
+    });
+    expect(DATASET_PREPARATION_TEXT_GENERATION_MODEL_PRESETS.map((preset) => preset.model.modelId)).toEqual([
+      "Qwen/Qwen2.5-7B-Instruct",
+      "Qwen/Qwen2.5-3B-Instruct",
+    ]);
   });
 
   it("restricts local model inference mode to explicit supported literals", () => {
@@ -679,6 +777,7 @@ describe("python sidecar runtime contracts", () => {
 describe("train-model runtime contracts", () => {
   it("defines python-friendly train-model request/result shapes", () => {
     const request: import(".").TrainModelTaskRequest = {
+      trainingTask: "llm-classification",
       baseModel: { modelRecordId: "base-1", modelId: "org/base" },
       datasets: [{ artifactId: "dataset-1", splitRole: "train", format: "jsonl" }],
       method: "lora",
@@ -695,6 +794,7 @@ describe("train-model runtime contracts", () => {
     };
 
     expect(request.method).toBe("lora");
+    expect(request.trainingTask).toBe("llm-classification");
     expect(result.error?.code).toBe("unsupported_method");
   });
 });

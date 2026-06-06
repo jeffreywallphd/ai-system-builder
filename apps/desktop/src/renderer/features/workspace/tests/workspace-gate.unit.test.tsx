@@ -38,7 +38,7 @@ describe("desktop WorkspaceGate", () => {
     await act(async () => { container!.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
     await act(async () => {});
     expect(workspaceClient.createWorkspace).toHaveBeenCalledWith({ name: "My Project", includeSystemFoundationAssets: true });
-    expect(container!.textContent).toContain("Active workspace: My Project");
+    expect(container!.textContent).toContain("Feature client content");
     expect(JSON.stringify((workspaceClient.createWorkspace as any).mock.calls)).not.toContain("my-project");
   });
 
@@ -60,17 +60,21 @@ describe("desktop WorkspaceGate", () => {
     await act(async () => { root!.render(<ActiveWorkspaceProvider client={workspaceClient}><WorkspaceSwitcher /></ActiveWorkspaceProvider>); });
     await act(async () => {});
 
-    expect(container!.textContent).toContain("Workspace: Alpha Project");
+    expect(container!.textContent).toContain("Current workspace: Alpha Project");
     expect(container!.textContent).not.toContain("workspace.alpha");
     const selector = container!.querySelector("select") as HTMLSelectElement;
     await act(async () => {
       Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value")!.set!.call(selector, "workspace.beta");
       selector.dispatchEvent(new Event("change", { bubbles: true }));
     });
+    const changeButton = Array.from(container!.querySelectorAll("button")).find((button) => button.textContent === "Change workspace");
+    await act(async () => {
+      changeButton?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
     await act(async () => {});
 
     expect(workspaceClient.saveActiveWorkspaceSelection).toHaveBeenCalledWith("workspace.beta");
-    expect(container!.textContent).toContain("Workspace: Beta Project");
+    expect(container!.textContent).toContain("Current workspace: Beta Project");
     expect(container!.textContent).not.toContain("workspace.beta");
   });
 

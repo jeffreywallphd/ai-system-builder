@@ -1,5 +1,7 @@
 # Desktop App
 
+> AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
+
 ## Toolchain
 
 - Host runtime: Electron
@@ -48,6 +50,12 @@ Current methods:
   - maps UI localize payload into the `artifact.localize.from-repo` IPC request envelope
   - invokes only `ipc.artifact.localize.from-repo.request`
   - returns structured localize result/failure envelope
+- `ingestWebsitePage(input, context?)`
+  - maps UI website-scrape payload into the `artifact.ingest-website-page` IPC request envelope
+  - forwards explicit `context.workspaceId` to the desktop host use case for workspace-scoped artifact catalog writes
+- `ingestWebsitePagesBatch(input, context?)`
+  - maps UI batch website-scrape payload into the `artifact.ingest-website-pages-batch` IPC request envelope
+  - forwards explicit `context.workspaceId` to the desktop host use case for workspace-scoped artifact catalog writes
 
 Design constraints:
 
@@ -58,14 +66,22 @@ Design constraints:
 
 `src/renderer/App.tsx` provides an Artifacts workflow with upload + artifact browser + publish:
 
-- selects one file from a native file input (`accept="image/*"`)
+- selects one or more files from a native file input using the accepted artifact upload policy
 - reads file bytes in the renderer (`File.arrayBuffer()` -> `Uint8Array`)
 - calls preload bridge methods (`window.desktopApi.*`) through feature-local clients/hooks
+- uploads selected files as independent artifact-upload requests so one rejected file does not stop the rest of the batch
+- reports a per-file result list, keeps successful stored keys visible, and lets users cancel queued files before or during a batch
 - renders browse/detail/content preview and Hugging Face publish success/error feedback
 - supports published-backing re-check and last-verified display from durable binding metadata
 - supports imported-source re-check and separate source verification status display
 - supports imported-source inspection and explicit localize/download action when local bytes are missing
+- supports website scraping through desktop preload/IPC with active workspace context
+- opens the Data Management Hugging Face import card directly to namespace browsing and repository/path registration controls
 - surfaces artifact-first backing-state cues (`Remote only`, `Localized`, `Published`) plus local object availability/localization state
+- exposes Dataset Preparation training-task profiles from shared runtime contracts and submits executable first-tier dataset-preparation profiles to the local runtime, including LLM text rows and diffusion/vision image manifest rows
+- lets Dataset Preparation choose provided source text or generated text fields in the Automated Data Formatting card, with editable prompts, task-scoped generation parameters, quality/compact local model presets, and an inline model download action that still records downloads through model management
+- filters Dataset Preparation source artifacts by selected task family and lets users save/load changed training settings without preserving stale source-artifact selections
+- exposes the selected training task in Train Model requests; LLM text tasks run through causal-LM training, diffusion image-caption manifests run through LoRA adapter training, and vision manifests run through LoRA adapter or full-finetune classification, detection, or segmentation training
 - reuses shared cross-host publish/re-check hook logic from `modules/ui/shared`
 
 Renderer constraints for this slice:
@@ -73,6 +89,15 @@ Renderer constraints for this slice:
 - no direct filesystem access from UI
 - no direct IPC channel usage from UI
 - no styling expansion beyond the existing minimal renderer structure
+
+## Renderer Shell And Workspace UI
+
+- Desktop primary navigation is exposed through a plain hamburger menu in the right side of the header, directly before the themed settings gear.
+- The header centers a compact **Current Workspace** selector with an explicit **Change** action between the brand area and the right-side menu/settings actions.
+- The Home page keeps the fuller workspace card in a compact responsive equal-width two-column layout, with change-workspace controls on the left and create-workspace controls on the right.
+- Workspace-required pages should rely on the header for current workspace display and should not repeat current workspace labels in each feature panel.
+- Data Management tab content uses the shared sectioned panel header style for Data Artifact Ingester, Artifact Browser, and Dataset Preparation; panel headers stay title-only, body content uses grouped sections and card/list controls, and actions such as Artifact Browser refresh belong in the body.
+- Artifact Browser and Dataset Preparation source lists classify uploaded/generated artifacts by storage path segments and `sourceKind`, so workspace-prefixed keys such as `workspaces/.../artifacts/files/uploads/...` still appear in the uploaded group.
 
 ## Hugging Face auth behavior
 

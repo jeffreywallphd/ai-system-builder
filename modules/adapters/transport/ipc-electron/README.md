@@ -1,5 +1,7 @@
 # IPC Electron Transport Adapter
 
+> AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
+
 This adapter registers thin Electron IPC handlers that translate IPC transport
 requests into application use-case calls and return structured IPC contract
 responses.

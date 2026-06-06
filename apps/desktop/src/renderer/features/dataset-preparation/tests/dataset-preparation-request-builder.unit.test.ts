@@ -6,6 +6,7 @@ describe("datasetPreparationRequestBuilder", () => {
   it("includes optional numeric values when provided", () => {
     const request = buildDatasetPreparationRequest({
       selectedArtifactIds: ["artifact-1"],
+      taskType: "llm-instruction",
       unsupportedDocumentPolicy: "",
       normalizationMode: "",
       preserveDocumentBoundaries: true,
@@ -47,11 +48,17 @@ describe("datasetPreparationRequestBuilder", () => {
 
     expect(request.recipe.generation.model).toMatchObject({
       provider: "transformers",
-      modelId: "google/flan-t5-base",
-      inferenceMode: "text2text",
+      modelId: "Qwen/Qwen2.5-7B-Instruct",
+      inferenceMode: "chat",
       device: "auto",
       torchDtype: "auto",
     });
+    expect(request.recipe.task).toMatchObject({
+      taskType: "llm-instruction",
+      textInputMode: "generate",
+      promptStyle: "instruction-response",
+    });
+    expect(request.recipe.generation.promptTemplate).toContain("instruction-tuning");
     expect(request.recipe.chunking.maxChunkCount).toBe(20);
     expect(request.recipe.generation.maxExamplesPerChunk).toBe(4);
     expect(request.recipe.generation.batchSize).toBe(4);
@@ -67,6 +74,7 @@ describe("datasetPreparationRequestBuilder", () => {
   it("omits optional numeric values when undefined", () => {
     const request = buildDatasetPreparationRequest({
       selectedArtifactIds: ["artifact-1"],
+      taskType: "llm-instruction",
       unsupportedDocumentPolicy: "",
       normalizationMode: "",
       preserveDocumentBoundaries: true,
@@ -117,9 +125,65 @@ describe("datasetPreparationRequestBuilder", () => {
     expect(request.split.seed).toBeUndefined();
   });
 
+  it("builds task-specific recipe settings", () => {
+    const request = buildDatasetPreparationRequest({
+      selectedArtifactIds: ["artifact-1"],
+      taskType: "llm-classification",
+      labelSet: "billing, support, bug",
+      multiLabel: true,
+      unsupportedDocumentPolicy: "",
+      normalizationMode: "",
+      preserveDocumentBoundaries: true,
+      modelId: "",
+      modelInferenceMode: "text2text",
+      modelDevice: "",
+      modelTorchDtype: "",
+      failurePolicy: "skip",
+      shuffle: true,
+      outputFormat: "parquet",
+      outputBaseName: "",
+      localDestinationEnabled: true,
+      huggingFaceDestinationEnabled: false,
+      huggingFaceRepository: "",
+      huggingFaceRevision: "",
+      huggingFacePathPrefix: "",
+      parsed: {
+        chunkSize: 1000,
+        chunkOverlap: 200,
+        maxChunkCount: undefined,
+        maxExamplesPerChunk: undefined,
+        batchSize: undefined,
+        generationTemperature: undefined,
+        generationTopP: undefined,
+        generationMaxNewTokens: undefined,
+        trainRatio: 0.8,
+        testRatio: 0.2,
+        seed: undefined,
+      },
+      resolvedDefault: {
+        provider: "transformers",
+        modelId: "google/flan-t5-base",
+        inferenceMode: "text2text",
+        source: "global",
+        device: "auto",
+        torchDtype: "auto",
+      },
+    });
+
+    expect(request.recipe.task).toEqual({
+      taskType: "llm-classification",
+      textInputMode: "generate",
+      textField: "text",
+      labelField: "label",
+      labelSet: ["billing", "support", "bug"],
+      multiLabel: true,
+    });
+  });
+
   it("includes causal inferenceMode", () => {
     const request = buildDatasetPreparationRequest({
       selectedArtifactIds: ["artifact-1"],
+      taskType: "llm-instruction",
       unsupportedDocumentPolicy: "",
       normalizationMode: "",
       preserveDocumentBoundaries: true,
@@ -165,6 +229,7 @@ describe("datasetPreparationRequestBuilder", () => {
   it("includes auto inferenceMode so the runtime can resolve model architecture", () => {
     const request = buildDatasetPreparationRequest({
       selectedArtifactIds: ["artifact-1"],
+      taskType: "llm-instruction",
       unsupportedDocumentPolicy: "",
       normalizationMode: "",
       preserveDocumentBoundaries: true,
@@ -210,6 +275,7 @@ describe("datasetPreparationRequestBuilder", () => {
   it("falls back to resolved default inference mode when input inference mode is invalid", () => {
     const request = buildDatasetPreparationRequest({
       selectedArtifactIds: ["artifact-1"],
+      taskType: "llm-instruction",
       unsupportedDocumentPolicy: "",
       normalizationMode: "",
       preserveDocumentBoundaries: true,
@@ -255,6 +321,7 @@ describe("datasetPreparationRequestBuilder", () => {
   it("prefixes default namespace and normalizes backslash repository separators", () => {
     const withNameOnly = buildDatasetPreparationRequest({
       selectedArtifactIds: ["artifact-1"],
+      taskType: "llm-instruction",
       unsupportedDocumentPolicy: "",
       normalizationMode: "",
       preserveDocumentBoundaries: true,
@@ -298,6 +365,7 @@ describe("datasetPreparationRequestBuilder", () => {
     expect(withNameOnly.output.destinations.huggingFace?.repository).toBe("OpenFinAL/AISysBuilderTest");
     const withBackslashes = buildDatasetPreparationRequest({
       selectedArtifactIds: ["artifact-1"],
+      taskType: "llm-instruction",
       unsupportedDocumentPolicy: "",
       normalizationMode: "",
       preserveDocumentBoundaries: true,

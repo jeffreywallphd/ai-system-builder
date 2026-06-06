@@ -1,14 +1,14 @@
 import { normalizeExecutionAdapterReferenceId, type ExecutionAdapterReference, type ExecutionAdapterReferenceKind, type ExecutionAdapterReferenceStatus, type ExecutionBlocker, type ExecutionDiagnostic, type ExecutionStep } from '../../../contracts/execution-plans';
-import type { RuntimeReadinessBinding } from '../../../contracts/runtime-readiness';
+import type { RuntimeCapabilityKind, RuntimeReadinessBinding } from '../../../contracts/runtime-readiness';
 
 const needsProvider = new Set<ExecutionStep['kind']>(['generate-image','generate-text','embed-content','call-api','store-artifact','read-artifact']);
 
-const inferCapability = (stepKind: ExecutionStep['kind']): string => {
-  if (stepKind === 'generate-image') return 'image-generation';
-  if (stepKind === 'generate-text') return 'text-generation';
-  if (stepKind === 'embed-content') return 'embeddings';
-  if (stepKind === 'store-artifact' || stepKind === 'read-artifact') return 'storage';
-  if (stepKind === 'call-api') return 'api';
+const inferCapability = (stepKind: ExecutionStep['kind']): RuntimeCapabilityKind | '' => {
+  if (stepKind === 'generate-image') return 'image-generation-runtime';
+  if (stepKind === 'generate-text') return 'text-generation-runtime';
+  if (stepKind === 'embed-content') return 'embedding-runtime';
+  if (stepKind === 'store-artifact' || stepKind === 'read-artifact') return 'artifact-storage';
+  if (stepKind === 'call-api') return 'api-service';
   return '';
 };
 

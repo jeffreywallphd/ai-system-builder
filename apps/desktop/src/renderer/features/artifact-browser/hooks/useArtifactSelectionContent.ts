@@ -1,12 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { ArtifactBrowserViewState } from "../../../../../../../modules/ui/shared";
+import {
+  createIdleArtifactPreview,
+  createCompressedImagePreviewObjectUrl,
+  createLoadingArtifactPreview,
+  createMediaArtifactPreview,
+  createTextArtifactPreview,
+  createUnavailableArtifactPreview,
+  createUnsupportedArtifactPreview,
+  describeArtifactPreview,
+  isMediaArtifactPreviewKind,
+  isTextArtifactPreviewKind,
+  type ArtifactBrowserViewState,
+  type ArtifactPreviewSource,
+  type ArtifactPreviewView,
+} from "../../../../../../../modules/ui/shared";
 import type {
   DesktopArtifactContentDescriptor,
   DesktopArtifactDetail,
 } from "../../../lib/desktopApi";
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
-import { decodeHtmlArtifactPreview } from "../helpers/htmlArtifactPreview";
 import { recordRendererMemorySnapshot } from "../../../diagnostics/rendererMemoryDiagnostics";
 
 export interface UseArtifactSelectionContentResult {
@@ -15,6 +28,7 @@ export interface UseArtifactSelectionContentResult {
   content?: DesktopArtifactContentDescriptor;
   imageViewUrl?: string;
   htmlPreview?: string;
+  artifactPreview: ArtifactPreviewView;
   selectArtifact: (storageKey: string) => Promise<void>;
   clearSelectedArtifact: () => void;
 }
@@ -29,7 +43,8 @@ export function useArtifactSelectionContent(
   const [content, setContent] = useState<DesktopArtifactContentDescriptor | undefined>(undefined);
   const [imageViewUrl, setImageViewUrl] = useState<string | undefined>(undefined);
   const [htmlPreview, setHtmlPreview] = useState<string | undefined>(undefined);
-  const activeImageViewUrl = useRef<string | undefined>(undefined);
+  const [artifactPreview, setArtifactPreview] = useState<ArtifactPreviewView>(() => createIdleArtifactPreview());
+  const activePreviewMediaUrl = useRef<string | undefined>(undefined);
 
   const revokeObjectUrl = useCallback((url: string) => {
     if (typeof URL.revokeObjectURL === "function") {
@@ -42,11 +57,11 @@ export function useArtifactSelectionContent(
     }
   }, []);
 
-  const setManagedImageViewUrl = useCallback((nextUrl?: string) => {
-    if (activeImageViewUrl.current && activeImageViewUrl.current !== nextUrl) {
-      revokeObjectUrl(activeImageViewUrl.current);
+  const setManagedPreviewMediaUrl = useCallback((nextUrl?: string) => {
+    if (activePreviewMediaUrl.current && activePreviewMediaUrl.current !== nextUrl) {
+      revokeObjectUrl(activePreviewMediaUrl.current);
     }
-    activeImageViewUrl.current = nextUrl;
+    activePreviewMediaUrl.current = nextUrl;
     setImageViewUrl(nextUrl);
   }, [revokeObjectUrl]);
 
@@ -54,12 +69,24 @@ export function useArtifactSelectionContent(
     setSelectedStorageKey(undefined);
     setDetail(undefined);
     setContent(undefined);
-    setManagedImageViewUrl(undefined);
+    setManagedPreviewMediaUrl(undefined);
     setHtmlPreview(undefined);
-  }, [setManagedImageViewUrl]);
+    setArtifactPreview(createIdleArtifactPreview());
+  }, [setManagedPreviewMediaUrl]);
+
+  const createPreviewSource = useCallback((
+    artifactDetail: DesktopArtifactDetail,
+    contentDescriptor?: DesktopArtifactContentDescriptor,
+  ): ArtifactPreviewSource => ({
+    storageKey: artifactDetail.locator.storageKey,
+    originalName: artifactDetail.originalName,
+    mediaType: contentDescriptor?.mediaType ?? artifactDetail.mediaType,
+    artifactFamily: artifactDetail.artifactFamily,
+  }), []);
 
   const selectArtifact = useCallback(async (storageKey: string) => {
     setSelectedStorageKey(storageKey);
+    setArtifactPreview(createLoadingArtifactPreview({ storageKey }));
     setViewState({ status: "loading", message: `Loading ${storageKey}...` });
 
     try {
@@ -72,29 +99,62 @@ export function useArtifactSelectionContent(
         const contentDescriptor = await client.readArtifactContent(locator, { workspaceId });
         setContent(contentDescriptor);
         setHtmlPreview(undefined);
+        const previewSource = createPreviewSource(artifactDetail, contentDescriptor);
+        const previewDescriptor = describeArtifactPreview(previewSource);
 
-        if (contentDescriptor.mediaType?.startsWith("image/")) {
+        if (contentDescriptor.availability !== "available") {
+          setManagedPreviewMediaUrl(undefined);
+          setArtifactPreview(createUnavailableArtifactPreview(previewSource));
+        } else if (isMediaArtifactPreviewKind(previewDescriptor.kind)) {
           try {
-            const nextImageViewUrl = await client.createArtifactMediaViewUrl(locator, { workspaceId });
-            setManagedImageViewUrl(nextImageViewUrl);
+            if (previewDescriptor.kind === "image") {
+              try {
+                const media = await client.readArtifactMedia(locator, { workspaceId });
+                const nextPreviewMediaUrl = await createCompressedImagePreviewObjectUrl(
+                  media.bytes,
+                  media.mediaType ?? previewSource.mediaType,
+                );
+                setManagedPreviewMediaUrl(nextPreviewMediaUrl);
+                setArtifactPreview(createMediaArtifactPreview(
+                  { ...previewSource, mediaType: media.mediaType ?? previewSource.mediaType },
+                  nextPreviewMediaUrl,
+                ));
+              } catch {
+                const fallbackPreviewMediaUrl = await client.createArtifactMediaViewUrl(locator, { workspaceId });
+                setManagedPreviewMediaUrl(fallbackPreviewMediaUrl);
+                setArtifactPreview(createMediaArtifactPreview(previewSource, fallbackPreviewMediaUrl));
+              }
+            } else {
+              const nextPreviewMediaUrl = await client.createArtifactMediaViewUrl(locator, { workspaceId });
+              setManagedPreviewMediaUrl(nextPreviewMediaUrl);
+              setArtifactPreview(createMediaArtifactPreview(previewSource, nextPreviewMediaUrl));
+            }
           } catch {
-            setManagedImageViewUrl(undefined);
+            setManagedPreviewMediaUrl(undefined);
+            setArtifactPreview(createUnavailableArtifactPreview(previewSource, "Preview could not be prepared for this artifact."));
+          }
+        } else if (isTextArtifactPreviewKind(previewDescriptor.kind)) {
+          setManagedPreviewMediaUrl(undefined);
+          try {
+            const media = await client.readArtifactMedia(locator, { workspaceId });
+            const nextPreview = createTextArtifactPreview(
+              { ...previewSource, mediaType: media.mediaType ?? previewSource.mediaType },
+              media.bytes,
+            );
+            setArtifactPreview(nextPreview);
+            setHtmlPreview(nextPreview.text);
+          } catch {
+            setArtifactPreview(createUnavailableArtifactPreview(previewSource, "Preview text could not be prepared for this artifact."));
           }
         } else {
-          setManagedImageViewUrl(undefined);
-          if (contentDescriptor.availability === "available" && contentDescriptor.mediaType === "text/html") {
-            try {
-              const media = await client.readArtifactMedia(locator, { workspaceId });
-              setHtmlPreview(decodeHtmlArtifactPreview(media.bytes));
-            } catch {
-              setHtmlPreview(undefined);
-            }
-          }
+          setManagedPreviewMediaUrl(undefined);
+          setArtifactPreview(createUnsupportedArtifactPreview(previewSource));
         }
       } catch {
         setContent({ locator, availability: "unavailable", retrieval: "deferred" });
-        setManagedImageViewUrl(undefined);
+        setManagedPreviewMediaUrl(undefined);
         setHtmlPreview(undefined);
+        setArtifactPreview(createUnavailableArtifactPreview({ storageKey }));
       }
 
       setViewState({ status: "success", message: `Loaded ${storageKey}.` });
@@ -105,7 +165,7 @@ export function useArtifactSelectionContent(
         message: error instanceof Error ? error.message : "Failed to load artifact detail.",
       });
     }
-  }, [clearSelectedArtifact, client, setManagedImageViewUrl, setViewState, workspaceId]);
+  }, [clearSelectedArtifact, client, createPreviewSource, setManagedPreviewMediaUrl, setViewState, workspaceId]);
 
 
   useEffect(() => {
@@ -113,9 +173,9 @@ export function useArtifactSelectionContent(
   }, [clearSelectedArtifact, workspaceId]);
 
   useEffect(() => () => {
-    if (activeImageViewUrl.current) {
-      revokeObjectUrl(activeImageViewUrl.current);
-      activeImageViewUrl.current = undefined;
+    if (activePreviewMediaUrl.current) {
+      revokeObjectUrl(activePreviewMediaUrl.current);
+      activePreviewMediaUrl.current = undefined;
     }
   }, [revokeObjectUrl]);
 
@@ -125,6 +185,7 @@ export function useArtifactSelectionContent(
     content,
     imageViewUrl,
     htmlPreview,
+    artifactPreview,
     selectArtifact,
     clearSelectedArtifact,
   };

@@ -10,6 +10,10 @@ import {
   registerArtifactRepoApiRoutes,
   type RegisterArtifactRepoApiRoutesDependencies,
 } from "./artifact-repo/registerArtifactRepoApiRoutes";
+import {
+  registerWebsiteIngestionApiRoutes,
+  type RegisterWebsiteIngestionApiRoutesDependencies,
+} from "./website-ingestion/registerWebsiteIngestionApiRoutes";
 import { registerImageGenerationApiRoutes, type RegisterImageGenerationApiRoutesDependencies } from "./image-generation/registerImageGenerationApiRoutes";
 import { registerModelManagementApiRoutes, type RegisterModelManagementApiRoutesDependencies } from "./model/registerModelManagementApiRoutes";
 import { registerApplicationSettingsApiRoutes, type RegisterApplicationSettingsApiRoutesDependencies } from "./settings/registerApplicationSettingsApiRoutes";
@@ -29,6 +33,7 @@ export interface RegisterExpressApiDependencies {
   app: RegisterArtifactUploadApiRouteDependencies["app"]
     & RegisterArtifactBrowserApiRoutesDependencies["app"]
     & RegisterArtifactRepoApiRoutesDependencies["app"]
+    & RegisterWebsiteIngestionApiRoutesDependencies["app"]
     & RegisterImageGenerationApiRoutesDependencies["app"]
     & RegisterModelManagementApiRoutesDependencies["app"]
     & RegisterApplicationSettingsApiRoutesDependencies["app"]
@@ -47,6 +52,8 @@ export interface RegisterExpressApiDependencies {
   setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];
   storeArtifactUploadUseCase: RegisterArtifactUploadApiRouteDependencies["storeArtifactUploadUseCase"];
+  ingestWebsitePageUseCase?: RegisterWebsiteIngestionApiRoutesDependencies["ingestWebsitePageUseCase"];
+  ingestWebsitePagesBatchUseCase?: RegisterWebsiteIngestionApiRoutesDependencies["ingestWebsitePagesBatchUseCase"];
   browseArtifactsUseCase: RegisterArtifactBrowserApiRoutesDependencies["browseArtifactsUseCase"];
   readArtifactDetailUseCase: RegisterArtifactBrowserApiRoutesDependencies["readArtifactDetailUseCase"];
   readArtifactContentUseCase: RegisterArtifactBrowserApiRoutesDependencies["readArtifactContentUseCase"];
@@ -55,6 +62,7 @@ export interface RegisterExpressApiDependencies {
   hasArtifactInRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["hasArtifactInRepoUseCase"];
   browseHuggingFaceNamespaceDatasetsUseCase: RegisterArtifactRepoApiRoutesDependencies["browseHuggingFaceNamespaceDatasetsUseCase"];
   browseHuggingFaceDatasetParquetFilesUseCase: RegisterArtifactRepoApiRoutesDependencies["browseHuggingFaceDatasetParquetFilesUseCase"];
+  importHuggingFaceFilesUseCase: RegisterArtifactRepoApiRoutesDependencies["importHuggingFaceFilesUseCase"];
   storeArtifactInRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["storeArtifactInRepoUseCase"];
   publishArtifactToRepoUseCase: RegisterArtifactRepoApiRoutesDependencies["publishArtifactToRepoUseCase"];
   verifyPublishedArtifactBackingUseCase: RegisterArtifactRepoApiRoutesDependencies["verifyPublishedArtifactBackingUseCase"];
@@ -117,6 +125,7 @@ export function registerExpressApi(
     hasArtifactInRepoUseCase: dependencies.hasArtifactInRepoUseCase,
     browseHuggingFaceNamespaceDatasetsUseCase: dependencies.browseHuggingFaceNamespaceDatasetsUseCase,
     browseHuggingFaceDatasetParquetFilesUseCase: dependencies.browseHuggingFaceDatasetParquetFilesUseCase,
+    importHuggingFaceFilesUseCase: dependencies.importHuggingFaceFilesUseCase,
     storeArtifactInRepoUseCase: dependencies.storeArtifactInRepoUseCase,
     publishArtifactToRepoUseCase: dependencies.publishArtifactToRepoUseCase,
     verifyPublishedArtifactBackingUseCase: dependencies.verifyPublishedArtifactBackingUseCase,
@@ -124,6 +133,14 @@ export function registerExpressApi(
     registerArtifactFromRepoUseCase: dependencies.registerArtifactFromRepoUseCase,
     localizeArtifactFromRepoUseCase: dependencies.localizeArtifactFromRepoUseCase,
   });
+
+  if (dependencies.ingestWebsitePageUseCase && dependencies.ingestWebsitePagesBatchUseCase) {
+    registerWebsiteIngestionApiRoutes({
+      app: dependencies.app,
+      ingestWebsitePageUseCase: dependencies.ingestWebsitePageUseCase,
+      ingestWebsitePagesBatchUseCase: dependencies.ingestWebsitePagesBatchUseCase,
+    });
+  }
 
   registerModelManagementApiRoutes({
     app: dependencies.app,

@@ -17,7 +17,7 @@ import { ExecutionPlanResourceEstimateService } from './execution-plan-resource-
 export class CreateExecutionPlanUseCase {
   public constructor(private readonly d: { executionPlanRepository: ExecutionPlanRepositoryPort; runtimeReadinessBindingRepository: RuntimeReadinessBindingRepositoryPort; compositionPlanRepository: AssetCompositionPlanRepositoryPort; stepPlanningService: ExecutionPlanStepPlanningService; statusService: ExecutionPlanStatusService; providerPlanningService: ExecutionPlanProviderPlanningService; inputOutputPlanningService: ExecutionPlanInputOutputPlanningService; dependencyPlanningService: ExecutionPlanDependencyPlanningService; safetyGatePlanningService: ExecutionPlanSafetyGatePlanningService; resourceEstimateService: ExecutionPlanResourceEstimateService; nextExecutionPlanId: () => string; nextExecutionStepId: () => string; nextExecutionInputId: () => string; nextExecutionOutputId: () => string; nextExecutionDependencyId: () => string; nextExecutionAdapterReferenceId: () => string; nextExecutionSafetyGateId: () => string; now?: () => string; }) {}
   public async execute(command: CreateExecutionPlanCommand): Promise<CreateExecutionPlanResult> {
-    let c; try { c = normalizeCreateExecutionPlanCommand(command); } catch { return executionPlanFailure("validation", "execution-plan-command-invalid"); }
+    let c; try { c = normalizeCreateExecutionPlanCommand(command); } catch { return executionPlanFailure("validation", "execution-plan-request-invalid"); }
     const now = (this.d.now ?? (() => new Date().toISOString()))();
     try {
       const readinessBindingId = normalizeRuntimeReadinessBindingId(c.runtimeReadinessBindingId);
