@@ -11,7 +11,7 @@ import {
   type UpdateApplicationSettingRequest,
 } from "../../../contracts/settings";
 import type { ApplicationSettingsPort } from "../../../application/ports/settings";
-import { readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../shared";
+import { mutateDocumentRecord, readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../shared";
 
 interface SettingsFileShape {
   settings?: Record<string, ApplicationSettingPrimitiveValue>;
@@ -72,20 +72,20 @@ export function createLocalApplicationSettingsAdapter(
   }
 
   async function updateSetting(key: string, value: ApplicationSettingPrimitiveValue | undefined): Promise<void> {
-    const document = await readDocument();
-    const currentSettings = document.settings ?? {};
-    const nextSettings = { ...currentSettings };
-
-    if (value === undefined) {
-      delete nextSettings[key];
-    } else {
-      nextSettings[key] = value;
+    if (options.documents) {
+      await mutateDocumentRecord(
+        { rootDirectory: options.rootDirectory ?? dirname(options.filePath), documents: options.documents },
+        "application-settings/application-settings.json",
+        { settings: {} } as SettingsFileShape,
+        (document) => ({
+          value: withUpdatedSetting(document, key, value),
+          result: undefined,
+        }),
+      );
+      return;
     }
-
-    await writeDocument({
-      ...document,
-      settings: nextSettings,
-    });
+    const document = await readDocument();
+    await writeDocument(withUpdatedSetting(document, key, value));
   }
 
   function selectDefinitions(request: ReadApplicationSettingsRequest = {}): ApplicationSettingDefinition[] {
@@ -151,4 +151,15 @@ export function createLocalApplicationSettingsAdapter(
       };
     },
   };
+}
+
+function withUpdatedSetting(
+  document: SettingsFileShape,
+  key: string,
+  value: ApplicationSettingPrimitiveValue | undefined,
+): SettingsFileShape {
+  const nextSettings = { ...(document.settings ?? {}) };
+  if (value === undefined) delete nextSettings[key];
+  else nextSettings[key] = value;
+  return { ...document, settings: nextSettings };
 }

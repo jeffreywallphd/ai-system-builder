@@ -6,7 +6,7 @@ import {
   isWorkspaceStatus,
 } from "../../../contracts/workspace";
 import { LocalWorkspacePersistenceError } from "./localWorkspacePersistenceErrors";
-import { cloneJson, readJsonDocument, writeJsonDocument } from "./localWorkspacePersistenceJson";
+import { cloneJson, mutateJsonDocument, readJsonDocument, writeJsonDocument } from "./localWorkspacePersistenceJson";
 import {
   resolveWorkspaceIndexFile,
   resolveWorkspaceRecordFile,
@@ -31,25 +31,36 @@ export function createLocalWorkspaceRepository(options: LocalWorkspaceRepository
     return sortWorkspaces(value.map(assertWorkspaceRecord));
   }
 
-  async function writeIndex(records: readonly WorkspaceRecord[], target = persistence): Promise<void> {
-    await writeJsonDocument(resolveWorkspaceIndexFile(rootDirectory), sortWorkspaces(records), "workspace-persistence-write-failed", target);
-  }
-
   async function writeWorkspaceRecord(workspace: WorkspaceRecord, target = persistence): Promise<void> {
     await writeJsonDocument(resolveWorkspaceRecordFile(rootDirectory, workspace.workspaceId), workspace, "workspace-persistence-write-failed", target);
   }
 
-  async function writeWorkspaceAndIndex(workspace: WorkspaceRecord, index: readonly WorkspaceRecord[]): Promise<void> {
+  async function writeWorkspaceAndIndex(
+    workspace: WorkspaceRecord,
+    updateIndex: (index: readonly WorkspaceRecord[]) => WorkspaceRecord[],
+  ): Promise<void> {
     if (options.documents) {
       await options.documents.runInTransaction(async (transaction) => {
         const target = { rootDirectory, documents: transaction };
         await writeWorkspaceRecord(workspace, target);
-        await writeIndex(index, target);
+        await mutateJsonDocument(
+          resolveWorkspaceIndexFile(rootDirectory),
+          [] as WorkspaceRecord[],
+          "workspace-persistence-write-failed",
+          (current) => ({ value: updateIndex(current.map(assertWorkspaceRecord)), result: undefined }),
+          target,
+        );
       });
       return;
     }
     await writeWorkspaceRecord(workspace);
-    await writeIndex(index);
+    const current = await readIndex();
+    await writeJsonDocument(
+      resolveWorkspaceIndexFile(rootDirectory),
+      updateIndex(current),
+      "workspace-persistence-write-failed",
+      persistence,
+    );
   }
 
   return {
@@ -71,8 +82,7 @@ export function createLocalWorkspaceRepository(options: LocalWorkspaceRepository
 
     async saveWorkspace(workspace: WorkspaceRecord): Promise<void> {
       const validWorkspace = assertWorkspaceRecord(workspace);
-      const index = await readIndex();
-      await writeWorkspaceAndIndex(validWorkspace, upsertWorkspace(index, validWorkspace));
+      await writeWorkspaceAndIndex(validWorkspace, (index) => upsertWorkspace(index, validWorkspace));
     },
 
     async updateWorkspace(workspace: WorkspaceRecord): Promise<void> {
@@ -81,9 +91,7 @@ export function createLocalWorkspaceRepository(options: LocalWorkspaceRepository
       if (!existing) {
         throw new LocalWorkspacePersistenceError("workspace-persistence-missing-record");
       }
-      const index = await readIndex();
-      const updatedIndex = replaceWorkspace(index, validWorkspace);
-      await writeWorkspaceAndIndex(validWorkspace, updatedIndex);
+      await writeWorkspaceAndIndex(validWorkspace, (index) => replaceWorkspace(index, validWorkspace));
     },
 
     async archiveWorkspace(workspaceId: WorkspaceId, archivedAt: string): Promise<WorkspaceRecord | undefined> {

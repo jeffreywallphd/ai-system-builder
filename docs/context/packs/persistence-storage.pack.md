@@ -59,9 +59,16 @@
 - Both engines provide version-1 migrations, transactions, revisions, health,
   and portable exports. SQLite adds online backup/validated restore. Managed
   PostgreSQL backup/restore remains an operator/platform responsibility.
+- Database-backed collection mutations use bounded revision compare-and-swap;
+  PostgreSQL transactions use bounded full-callback retries at Serializable
+  isolation. Mutation callbacks must remain pure because they may run again.
 - JSON compatibility remains only for an unshaped non-production server. Import
   is allowlisted, rollback-preserving, activation-marked, and fail-closed on
   changed source; never add silent fallback, split-write, or implicit re-import.
+- Managed deployment qualification uses digest-pinned database/application
+  images, a restricted single-replica Compose/Kubernetes posture, separate
+  liveness/readiness semantics, and retained scan/smoke/render evidence. Do not
+  increase replicas before identity/tenancy and target-platform qualification.
 - Artifact-object storage owns key/byte/checksum/metadata behavior.
 - Artifact-repo storage owns provider/repository/revision/path import and publish behavior; Hugging Face is one provider adapter, not the whole storage family.
 - Hugging Face token configuration is host-side persisted config, not client-only state.
@@ -88,6 +95,8 @@
   transaction, health, backup, and restore behavior.
 - `docs/adr/ADR-0027-managed-postgresql-runtime.md` - managed pool, TLS,
   migration lock, server selection, import, and shutdown behavior.
+- `docs/adr/ADR-0028-atomic-structured-document-mutations.md` - revision
+  compare-and-swap, retryable callback purity, and PostgreSQL retry policy.
 - `docs/adr/ADR-0008-ingestion-and-staged-artifact-semantic-model.md` - staged artifact intake model.
 - `docs/architecture/persistence-and-storage.md` - boundary model and implementation guidance.
 - `docs/architecture/workspace-model.md` - workspace scoping and active selection.

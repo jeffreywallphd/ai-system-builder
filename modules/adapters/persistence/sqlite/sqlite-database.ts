@@ -303,6 +303,12 @@ function createStore(database: SqliteDatabaseLike, now: () => string, insideTran
             revision = structured_documents.revision + 1,
             updated_at = excluded.updated_at
         `).run(namespace, key, payload, updatedAt).changes;
+      } else if (options.expectedRevision === 0) {
+        changes = database.prepare(`
+          INSERT INTO structured_documents (namespace, document_key, payload_json, revision, updated_at)
+          VALUES (?, ?, ?, 1, ?)
+          ON CONFLICT(namespace, document_key) DO NOTHING
+        `).run(namespace, key, payload, updatedAt).changes;
       } else {
         changes = database.prepare(`
           UPDATE structured_documents

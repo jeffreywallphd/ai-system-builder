@@ -1,6 +1,14 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Dirent } from "node:fs";
-import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readFile,
+  readdir,
+  rename,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { basename, dirname, extname, join } from "node:path";
 
 import {
@@ -22,7 +30,12 @@ import {
 import { isWorkspaceId } from "../../../contracts/workspace";
 import type { WorkspaceId } from "../../../contracts/workspace";
 import type { ModelRegistryPort } from "../../../application/ports/model";
-import { readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../shared";
+import {
+  mutateDocumentRecord,
+  readDocumentRecord,
+  writeDocumentRecord,
+  type StructuredDocumentStore,
+} from "../shared";
 
 interface ModelRegistryFileShape {
   models?: ModelInventoryRecord[];
@@ -30,7 +43,8 @@ interface ModelRegistryFileShape {
 }
 
 type DirectoryEntry = Dirent<string>;
-type SharedModelDiscoveryRootProvider = string[] | (() => string[] | Promise<string[]>);
+type SharedModelDiscoveryRootProvider =
+  string[] | (() => string[] | Promise<string[]>);
 
 export interface LocalModelRegistryAdapterOptions {
   filePath: string;
@@ -66,14 +80,25 @@ function normalizeOptionalPath(value: string | undefined): string | undefined {
   return normalized;
 }
 
-export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapterOptions): ModelRegistryPort {
+export function createLocalModelRegistryAdapter(
+  options: LocalModelRegistryAdapterOptions,
+): ModelRegistryPort {
   const now = options.now ?? (() => new Date().toISOString());
   const discoveryEnabled = options.discovery?.enabled !== false;
   let registryWriteQueue: Promise<void> = Promise.resolve();
 
   async function readDocument(): Promise<ModelRegistryFileShape> {
     if (options.documents) {
-      return (await readDocumentRecord({ rootDirectory: options.rootDirectory ?? dirname(options.filePath), documents: options.documents }, "model-registry/models.json", { models: [] })).value;
+      return (
+        await readDocumentRecord(
+          {
+            rootDirectory: options.rootDirectory ?? dirname(options.filePath),
+            documents: options.documents,
+          },
+          "model-registry/models.json",
+          { models: [] },
+        )
+      ).value;
     }
     try {
       const json = await readFile(options.filePath, "utf8");
@@ -96,9 +121,18 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     }
   }
 
-  async function writeDocumentNow(document: ModelRegistryFileShape): Promise<void> {
+  async function writeDocumentNow(
+    document: ModelRegistryFileShape,
+  ): Promise<void> {
     if (options.documents) {
-      await writeDocumentRecord({ rootDirectory: options.rootDirectory ?? dirname(options.filePath), documents: options.documents }, "model-registry/models.json", document);
+      await writeDocumentRecord(
+        {
+          rootDirectory: options.rootDirectory ?? dirname(options.filePath),
+          documents: options.documents,
+        },
+        "model-registry/models.json",
+        document,
+      );
       return;
     }
     await mkdir(dirname(options.filePath), { recursive: true });
@@ -112,22 +146,20 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     }
   }
 
-  async function writeDocument(document: ModelRegistryFileShape): Promise<void> {
-    const writeOperation = registryWriteQueue.then(
-      () => writeDocumentNow(document),
-      () => writeDocumentNow(document),
-    );
-    registryWriteQueue = writeOperation.catch(() => undefined);
-    await writeOperation;
-  }
-
-  function assertWorkspaceId(workspaceId: WorkspaceId | string | undefined): asserts workspaceId is WorkspaceId {
+  function assertWorkspaceId(
+    workspaceId: WorkspaceId | string | undefined,
+  ): asserts workspaceId is WorkspaceId {
     if (!isWorkspaceId(workspaceId)) {
-      throw new Error("Workspace id is required for model registry operations.");
+      throw new Error(
+        "Workspace id is required for model registry operations.",
+      );
     }
   }
 
-  function matchesFilters(record: ModelInventoryRecord, request: ListModelsRequest): boolean {
+  function matchesFilters(
+    record: ModelInventoryRecord,
+    request: ListModelsRequest,
+  ): boolean {
     if (record.workspaceId !== request.workspaceId) {
       return false;
     }
@@ -135,7 +167,10 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
       return false;
     }
 
-    if (request.lifecycleStatus && record.lifecycleStatus !== request.lifecycleStatus) {
+    if (
+      request.lifecycleStatus &&
+      record.lifecycleStatus !== request.lifecycleStatus
+    ) {
       return false;
     }
 
@@ -156,7 +191,8 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
 
     const search = toTrimmedText(request.search)?.toLowerCase();
     if (search) {
-      const haystack = `${record.displayName} ${record.modelId ?? ""} ${record.modelRecordId}`.toLowerCase();
+      const haystack =
+        `${record.displayName} ${record.modelId ?? ""} ${record.modelRecordId}`.toLowerCase();
       if (!haystack.includes(search)) {
         return false;
       }
@@ -165,18 +201,43 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     return true;
   }
 
-  async function updateDocument(update: (document: ModelRegistryFileShape) => ModelRegistryFileShape): Promise<ModelRegistryFileShape> {
-    const current = await readDocument();
-    const next = update(current);
-    await writeDocument(next);
-    return next;
+  async function updateDocument<TResult>(
+    update: (document: ModelRegistryFileShape) => {
+      document: ModelRegistryFileShape;
+      result: TResult;
+    },
+  ): Promise<TResult> {
+    if (options.documents) {
+      return mutateDocumentRecord(
+        {
+          rootDirectory: options.rootDirectory ?? dirname(options.filePath),
+          documents: options.documents,
+        },
+        "model-registry/models.json",
+        { models: [] } as ModelRegistryFileShape,
+        (current) => {
+          const next = update(current);
+          return { value: next.document, result: next.result };
+        },
+      );
+    }
+    let result!: TResult;
+    const operation = registryWriteQueue.then(async () => {
+      const next = update(await readDocument());
+      result = next.result;
+      await writeDocumentNow(next.document);
+    });
+    registryWriteQueue = operation.catch(() => undefined);
+    await operation;
+    return result;
   }
 
   async function resolveDiscoveryRoots(): Promise<string[]> {
     const roots = new Set<string>();
-    const configuredRoots = typeof options.discovery?.searchRoots === "function"
-      ? await options.discovery.searchRoots()
-      : options.discovery?.searchRoots ?? [];
+    const configuredRoots =
+      typeof options.discovery?.searchRoots === "function"
+        ? await options.discovery.searchRoots()
+        : (options.discovery?.searchRoots ?? []);
     for (const configuredRoot of configuredRoots) {
       const normalized = normalizeOptionalPath(configuredRoot);
       if (normalized) {
@@ -186,7 +247,9 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     return [...roots];
   }
 
-  function toModelIdFromRepoDirectoryName(directoryName: string): string | undefined {
+  function toModelIdFromRepoDirectoryName(
+    directoryName: string,
+  ): string | undefined {
     if (!directoryName.startsWith("models--")) {
       return undefined;
     }
@@ -235,7 +298,9 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     return CHECKPOINT_EXTENSIONS.has(extname(fileName).toLowerCase());
   }
 
-  async function firstCheckpointFile(path: string): Promise<string | undefined> {
+  async function firstCheckpointFile(
+    path: string,
+  ): Promise<string | undefined> {
     let entries: DirectoryEntry[];
     try {
       entries = await readdir(path, { withFileTypes: true });
@@ -261,7 +326,9 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
     const timestamp = now();
     return normalizeModelInventoryRecord({
       workspaceId: input.workspaceId,
-      modelRecordId: buildStableModelRecordId(`shared:${input.recordSeedPath ?? input.localPath}`),
+      modelRecordId: buildStableModelRecordId(
+        `shared:${input.recordSeedPath ?? input.localPath}`,
+      ),
       displayName: input.displayName,
       source: "local",
       lifecycleStatus: "downloaded",
@@ -270,24 +337,39 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
       modelId: input.modelId,
       localPath: input.localPath,
       createdAt: timestamp,
-      inferenceMode: input.artifactForm === "checkpoint" ? "text-to-image" : undefined,
-      taskTags: input.artifactForm === "checkpoint" ? ["text-to-image"] : undefined,
+      inferenceMode:
+        input.artifactForm === "checkpoint" ? "text-to-image" : undefined,
+      taskTags:
+        input.artifactForm === "checkpoint" ? ["text-to-image"] : undefined,
       storageScope: "shared",
       metadata: {
-        discovery: input.modelId ? "huggingface-cache" : "shared-model-directory",
+        discovery: input.modelId
+          ? "huggingface-cache"
+          : "shared-model-directory",
         storageScope: "shared",
         checkpointFile: input.checkpointFile,
       },
     });
   }
 
-  async function discoverSharedModels(existing: ModelInventoryRecord[], workspaceId: WorkspaceId): Promise<ModelInventoryRecord[]> {
+  async function discoverSharedModels(
+    existing: ModelInventoryRecord[],
+    workspaceId: WorkspaceId,
+  ): Promise<ModelInventoryRecord[]> {
     if (!discoveryEnabled) {
       return [];
     }
 
-    const knownPaths = new Set(existing.map((record) => normalizeOptionalPath(record.localPath)).filter((value): value is string => Boolean(value)));
-    const knownModelIds = new Set(existing.map((record) => normalizeOptionalPath(record.modelId)).filter((value): value is string => Boolean(value)));
+    const knownPaths = new Set(
+      existing
+        .map((record) => normalizeOptionalPath(record.localPath))
+        .filter((value): value is string => Boolean(value)),
+    );
+    const knownModelIds = new Set(
+      existing
+        .map((record) => normalizeOptionalPath(record.modelId))
+        .filter((value): value is string => Boolean(value)),
+    );
     const discovered: ModelInventoryRecord[] = [];
     const seenDiscoveredPaths = new Set<string>();
 
@@ -311,14 +393,16 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
           if (knownPaths.has(localPath) || seenDiscoveredPaths.has(seedPath)) {
             continue;
           }
-          discovered.push(createSharedModelRecord({
-            workspaceId,
-            localPath,
-            recordSeedPath: seedPath,
-            displayName: basename(entry.name, extname(entry.name)),
-            artifactForm: "checkpoint",
-            checkpointFile: entry.name,
-          }));
+          discovered.push(
+            createSharedModelRecord({
+              workspaceId,
+              localPath,
+              recordSeedPath: seedPath,
+              displayName: basename(entry.name, extname(entry.name)),
+              artifactForm: "checkpoint",
+              checkpointFile: entry.name,
+            }),
+          );
           seenDiscoveredPaths.add(seedPath);
           continue;
         }
@@ -327,7 +411,9 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
 
         const repoRoot = join(cacheRoot, entry.name);
         const modelId = toModelIdFromRepoDirectoryName(entry.name);
-        const snapshotRoot = modelId ? await newestDirectory(join(repoRoot, "snapshots")) : undefined;
+        const snapshotRoot = modelId
+          ? await newestDirectory(join(repoRoot, "snapshots"))
+          : undefined;
         const localPath = snapshotRoot ?? repoRoot;
         const checkpoint = await firstCheckpointFile(localPath);
         const artifactForm = checkpoint ? "checkpoint" : "full-model";
@@ -339,13 +425,15 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
           continue;
         }
 
-        discovered.push(createSharedModelRecord({
-          workspaceId,
-          localPath,
-          displayName,
-          modelId,
-          artifactForm,
-        }));
+        discovered.push(
+          createSharedModelRecord({
+            workspaceId,
+            localPath,
+            displayName,
+            modelId,
+            artifactForm,
+          }),
+        );
         seenDiscoveredPaths.add(localPath);
       }
     }
@@ -358,33 +446,59 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
       assertWorkspaceId(request.workspaceId);
       const document = await readDocument();
       const limit = request.limit ?? 50;
-      const normalizedModels = (document.models ?? []).map(normalizeModelInventoryRecord);
-      const includeSharedStorage = request.includeDiscovered !== false || request.includeSharedStorage === true;
+      const normalizedModels = (document.models ?? []).map(
+        normalizeModelInventoryRecord,
+      );
+      const includeSharedStorage =
+        request.includeDiscovered !== false ||
+        request.includeSharedStorage === true;
       const sharedModels = includeSharedStorage
         ? await discoverSharedModels(normalizedModels, request.workspaceId)
         : [];
       const allModels = [...normalizedModels, ...sharedModels];
 
-      const filtered = allModels.filter((model) => matchesFilters(model, request));
+      const filtered = allModels.filter((model) =>
+        matchesFilters(model, request),
+      );
       return {
         models: filtered.slice(0, limit),
-        nextCursor: filtered.length > limit ? filtered[limit]?.modelRecordId : undefined,
+        nextCursor:
+          filtered.length > limit ? filtered[limit]?.modelRecordId : undefined,
       };
     },
 
-    async getModelRecord(workspaceId: WorkspaceId, modelRecordId: string): Promise<ModelInventoryRecord | undefined> {
+    async getModelRecord(
+      workspaceId: WorkspaceId,
+      modelRecordId: string,
+    ): Promise<ModelInventoryRecord | undefined> {
       assertWorkspaceId(workspaceId);
       const document = await readDocument();
-      const persisted = (document.models ?? []).map(normalizeModelInventoryRecord).find((record) => record.workspaceId === workspaceId && record.modelRecordId === modelRecordId);
+      const persisted = (document.models ?? [])
+        .map(normalizeModelInventoryRecord)
+        .find(
+          (record) =>
+            record.workspaceId === workspaceId &&
+            record.modelRecordId === modelRecordId,
+        );
       if (persisted) return persisted;
-      return (await discoverSharedModels((document.models ?? []).map(normalizeModelInventoryRecord), workspaceId)).find((record) => record.modelRecordId === modelRecordId);
+      return (
+        await discoverSharedModels(
+          (document.models ?? []).map(normalizeModelInventoryRecord),
+          workspaceId,
+        )
+      ).find((record) => record.modelRecordId === modelRecordId);
     },
 
-    async saveModelReference(request: SaveModelReferenceRequest): Promise<SaveModelReferenceResult> {
+    async saveModelReference(
+      request: SaveModelReferenceRequest,
+    ): Promise<SaveModelReferenceResult> {
       assertWorkspaceId(request.workspaceId);
       const timestamp = now();
-      const modelRecordId = request.modelRecordId
-        ?? buildStableModelRecordId(`save:${request.provider}:${request.modelId}:${request.displayName ?? ""}`);
+      const modelRecordId =
+        request.modelRecordId ??
+        buildStableModelRecordId(
+          `save:${request.provider}:${request.modelId}:${request.displayName ?? ""}`,
+        );
       const record = normalizeModelInventoryRecord({
         modelRecordId,
         workspaceId: request.workspaceId,
@@ -402,18 +516,33 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
       });
 
       await updateDocument((document) => ({
-        ...document,
-        models: [...(document.models ?? []).filter((model) => model.workspaceId !== record.workspaceId || model.modelRecordId !== record.modelRecordId), record],
+        document: {
+          ...document,
+          models: [
+            ...(document.models ?? []).filter(
+              (model) =>
+                model.workspaceId !== record.workspaceId ||
+                model.modelRecordId !== record.modelRecordId,
+            ),
+            record,
+          ],
+        },
+        result: undefined,
       }));
 
       return { model: record };
     },
 
-    async registerDownloadedModel(request: RegisterDownloadedModelRequest): Promise<RegisterDownloadedModelResult> {
+    async registerDownloadedModel(
+      request: RegisterDownloadedModelRequest,
+    ): Promise<RegisterDownloadedModelResult> {
       assertWorkspaceId(request.workspaceId);
       const timestamp = now();
-      const modelRecordId = request.modelRecordId
-        ?? buildStableModelRecordId(`downloaded:${request.provider}:${request.modelId ?? request.localPath ?? request.displayName}`);
+      const modelRecordId =
+        request.modelRecordId ??
+        buildStableModelRecordId(
+          `downloaded:${request.provider}:${request.modelId ?? request.localPath ?? request.displayName}`,
+        );
       const record = normalizeModelInventoryRecord({
         modelRecordId,
         workspaceId: request.workspaceId,
@@ -432,7 +561,8 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
         taskTags: request.taskTags,
         baseModelId: request.baseModelId,
         adapterOfModelId: request.adapterOfModelId,
-        serializationFormat: request.serializationFormat as ModelInventoryRecord["serializationFormat"],
+        serializationFormat:
+          request.serializationFormat as ModelInventoryRecord["serializationFormat"],
         sizeBytes: request.sizeBytes,
         createdAt: timestamp,
         metadata: request.metadata,
@@ -440,17 +570,32 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
       });
 
       await updateDocument((document) => ({
-        ...document,
-        models: [...(document.models ?? []).filter((model) => model.workspaceId !== record.workspaceId || model.modelRecordId !== record.modelRecordId), record],
+        document: {
+          ...document,
+          models: [
+            ...(document.models ?? []).filter(
+              (model) =>
+                model.workspaceId !== record.workspaceId ||
+                model.modelRecordId !== record.modelRecordId,
+            ),
+            record,
+          ],
+        },
+        result: undefined,
       }));
       return { model: record };
     },
 
-    async registerGeneratedModel(request: RegisterGeneratedModelRequest): Promise<RegisterGeneratedModelResult> {
+    async registerGeneratedModel(
+      request: RegisterGeneratedModelRequest,
+    ): Promise<RegisterGeneratedModelResult> {
       assertWorkspaceId(request.workspaceId);
       const timestamp = now();
-      const modelRecordId = request.modelRecordId
-        ?? buildStableModelRecordId(`generated:${request.generatedFromRunId ?? "no-run"}:${request.displayName}:${request.modelId ?? ""}`);
+      const modelRecordId =
+        request.modelRecordId ??
+        buildStableModelRecordId(
+          `generated:${request.generatedFromRunId ?? "no-run"}:${request.displayName}:${request.modelId ?? ""}`,
+        );
       const record = normalizeModelInventoryRecord({
         modelRecordId,
         workspaceId: request.workspaceId,
@@ -468,7 +613,8 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
         baseModelId: request.baseModelId,
         adapterOfModelId: request.adapterOfModelId,
         generatedFromRunId: request.generatedFromRunId,
-        serializationFormat: request.serializationFormat as ModelInventoryRecord["serializationFormat"],
+        serializationFormat:
+          request.serializationFormat as ModelInventoryRecord["serializationFormat"],
         sizeBytes: request.sizeBytes,
         createdAt: timestamp,
         metadata: request.metadata,
@@ -476,34 +622,55 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
       });
 
       await updateDocument((document) => ({
-        ...document,
-        models: [...(document.models ?? []).filter((model) => model.workspaceId !== record.workspaceId || model.modelRecordId !== record.modelRecordId), record],
+        document: {
+          ...document,
+          models: [
+            ...(document.models ?? []).filter(
+              (model) =>
+                model.workspaceId !== record.workspaceId ||
+                model.modelRecordId !== record.modelRecordId,
+            ),
+            record,
+          ],
+        },
+        result: undefined,
       }));
       return { model: record };
     },
 
-    async updateModelRecord(request: UpdateModelRecordRequest): Promise<UpdateModelRecordResult> {
+    async updateModelRecord(
+      request: UpdateModelRecordRequest,
+    ): Promise<UpdateModelRecordResult> {
       assertWorkspaceId(request.workspaceId);
-      let updated: ModelInventoryRecord | undefined;
-      await updateDocument((document) => {
-        const models = (document.models ?? []).map((candidate) => {
-          const normalized = normalizeModelInventoryRecord(candidate);
-          if (normalized.workspaceId !== request.workspaceId || normalized.modelRecordId !== request.modelRecordId) {
-            return normalized;
-          }
+      const updatedAt = now();
+      const updated = await updateDocument<ModelInventoryRecord | undefined>(
+        (document) => {
+          let updatedRecord: ModelInventoryRecord | undefined;
+          const models = (document.models ?? []).map((candidate) => {
+            const normalized = normalizeModelInventoryRecord(candidate);
+            if (
+              normalized.workspaceId !== request.workspaceId ||
+              normalized.modelRecordId !== request.modelRecordId
+            ) {
+              return normalized;
+            }
 
-          updated = normalizeModelInventoryRecord({
-            ...normalized,
-            ...request.patch,
-            modelRecordId: normalized.modelRecordId,
-            createdAt: normalized.createdAt,
-            updatedAt: now(),
+            updatedRecord = normalizeModelInventoryRecord({
+              ...normalized,
+              ...request.patch,
+              modelRecordId: normalized.modelRecordId,
+              createdAt: normalized.createdAt,
+              updatedAt,
+            });
+            return updatedRecord;
           });
-          return updated;
-        });
 
-        return { ...document, models };
-      });
+          return {
+            document: { ...document, models },
+            result: updatedRecord,
+          };
+        },
+      );
 
       if (!updated) {
         throw new Error(`Model record ${request.modelRecordId} was not found.`);
@@ -512,20 +679,27 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
       return { model: updated };
     },
 
-    async deleteModelRecord(request: DeleteModelRecordRequest): Promise<DeleteModelRecordResult> {
+    async deleteModelRecord(
+      request: DeleteModelRecordRequest,
+    ): Promise<DeleteModelRecordResult> {
       assertWorkspaceId(request.workspaceId);
-      let deleted = false;
-      await updateDocument((document) => {
+      const deleted = await updateDocument((document) => {
+        let deletedRecord = false;
         const models = (document.models ?? []).filter((candidate) => {
           const normalized = normalizeModelInventoryRecord(candidate);
-          const keep = normalized.workspaceId !== request.workspaceId || normalized.modelRecordId !== request.modelRecordId;
+          const keep =
+            normalized.workspaceId !== request.workspaceId ||
+            normalized.modelRecordId !== request.modelRecordId;
           if (!keep) {
-            deleted = true;
+            deletedRecord = true;
           }
           return keep;
         });
 
-        return { ...document, models };
+        return {
+          document: { ...document, models },
+          result: deletedRecord,
+        };
       });
 
       if (!deleted) {

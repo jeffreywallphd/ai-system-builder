@@ -10,14 +10,18 @@ export function createLocalUserLibraryAssetRepositoryAdapter(options: LocalUserL
   return {
     async saveUserLibraryAssetRecord(record: UserLibraryAssetRecord): Promise<UserLibraryAssetRecord> {
       const validRecord = normalizeUserLibraryAssetRecord(record);
-      const assets = await store.readCollection("assets");
-      await store.writeCollection("assets", sortAssets(upsertRecord(assets, validRecord, assetStorageKey)));
+      await store.mutateCollection("assets", (assets) => ({
+        records: sortAssets(upsertRecord(assets, validRecord, assetStorageKey)),
+        result: undefined,
+      }));
       return cloneJson(validRecord);
     },
     async updateUserLibraryAssetRecord(record: UserLibraryAssetRecord): Promise<UserLibraryAssetRecord> {
       const validRecord = normalizeUserLibraryAssetRecord(record);
-      const assets = await store.readCollection("assets");
-      await store.writeCollection("assets", sortAssets(replaceRecord(assets, validRecord, assetStorageKey, "User-library asset record does not exist.")));
+      await store.mutateCollection("assets", (assets) => ({
+        records: sortAssets(replaceRecord(assets, validRecord, assetStorageKey, "User-library asset record does not exist.")),
+        result: undefined,
+      }));
       return cloneJson(validRecord);
     },
     async readUserLibraryAssetRecord(reference: UserLibraryAssetReference): Promise<UserLibraryAssetRecord | undefined> {

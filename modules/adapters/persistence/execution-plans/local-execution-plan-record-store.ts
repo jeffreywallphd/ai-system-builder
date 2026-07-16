@@ -3,9 +3,15 @@ import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { ExecutionPlanRecord } from "../../../contracts/execution-plans";
-import { readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../shared";
+import {
+  mutateDocumentRecord,
+  readDocumentRecord,
+  writeDocumentRecord,
+  type StructuredDocumentStore,
+} from "../shared";
 
-export const EXECUTION_PLAN_LOCAL_STORE_KIND = "execution-plan-local-store" as const;
+export const EXECUTION_PLAN_LOCAL_STORE_KIND =
+  "execution-plan-local-store" as const;
 export const EXECUTION_PLAN_LOCAL_SCHEMA_VERSION = 1 as const;
 
 export interface LocalExecutionPlanManifest {
@@ -47,7 +53,9 @@ export class LocalExecutionPlanRecordStore {
 
   public async readManifest(): Promise<LocalExecutionPlanManifest> {
     await this.ensureStoreFiles();
-    return validateManifest(await this.readJsonFile("manifest.json", this.createManifest()));
+    return validateManifest(
+      await this.readJsonFile("manifest.json", this.createManifest()),
+    );
   }
 
   public async readPlans(): Promise<readonly ExecutionPlanRecord[]> {
@@ -55,7 +63,9 @@ export class LocalExecutionPlanRecordStore {
     return this.readJsonFile("execution-plans.json", []);
   }
 
-  public async writePlans(records: readonly ExecutionPlanRecord[]): Promise<void> {
+  public async writePlans(
+    records: readonly ExecutionPlanRecord[],
+  ): Promise<void> {
     const operation = this.writeQueue.then(
       () => this.writePlansNow(records),
       () => this.writePlansNow(records),
@@ -64,7 +74,35 @@ export class LocalExecutionPlanRecordStore {
     await operation;
   }
 
-  private async writePlansNow(records: readonly ExecutionPlanRecord[]): Promise<void> {
+  public async mutatePlans<TResult>(
+    mutation: (records: readonly ExecutionPlanRecord[]) => {
+      records: readonly ExecutionPlanRecord[];
+      result: TResult;
+    },
+  ): Promise<TResult> {
+    await this.ensureStoreFiles();
+    const result = await mutateDocumentRecord(
+      { rootDirectory: this.rootDir, documents: this.documents },
+      "execution-plans/execution-plans.json",
+      [] as ExecutionPlanRecord[],
+      (current) => {
+        if (!Array.isArray(current)) {
+          throw new LocalExecutionPlanRecordStoreError(
+            "Execution plan local store collection is invalid.",
+          );
+        }
+        const next = mutation(cloneJson(current));
+        assertJsonCompatible(next.records);
+        return { value: cloneJson([...next.records]), result: next.result };
+      },
+    );
+    await this.writeJsonFile("manifest.json", this.createManifest());
+    return result;
+  }
+
+  private async writePlansNow(
+    records: readonly ExecutionPlanRecord[],
+  ): Promise<void> {
     await this.ensureStoreFiles();
     assertJsonCompatible(records);
     await this.writeJsonFile("execution-plans.json", cloneJson(records));
@@ -79,9 +117,16 @@ export class LocalExecutionPlanRecordStore {
 
   private async ensureJsonFile(file: string, fallback: unknown): Promise<void> {
     if (this.documents) {
-      const result = await readDocumentRecord({ rootDirectory: this.rootDir, documents: this.documents }, `execution-plans/${file}`, fallback);
+      const result = await readDocumentRecord(
+        { rootDirectory: this.rootDir, documents: this.documents },
+        `execution-plans/${file}`,
+        fallback,
+      );
       if (file === "manifest.json") validateManifest(result.value);
-      else if (!Array.isArray(result.value)) throw new LocalExecutionPlanRecordStoreError("Execution plan local store collection is invalid.");
+      else if (!Array.isArray(result.value))
+        throw new LocalExecutionPlanRecordStoreError(
+          "Execution plan local store collection is invalid.",
+        );
       if (!result.found) await this.writeJsonFile(file, fallback);
       return;
     }
@@ -89,7 +134,9 @@ export class LocalExecutionPlanRecordStore {
     if (file === "manifest.json") {
       validateManifest(value);
     } else if (!Array.isArray(value)) {
-      throw new LocalExecutionPlanRecordStoreError("Execution plan local store collection is invalid.");
+      throw new LocalExecutionPlanRecordStoreError(
+        "Execution plan local store collection is invalid.",
+      );
     }
 
     try {
@@ -104,10 +151,18 @@ export class LocalExecutionPlanRecordStore {
 
   private async readJsonFile<T>(file: string, fallback: T): Promise<T> {
     if (this.documents) {
-      return (await readDocumentRecord({ rootDirectory: this.rootDir, documents: this.documents }, `execution-plans/${file}`, fallback)).value;
+      return (
+        await readDocumentRecord(
+          { rootDirectory: this.rootDir, documents: this.documents },
+          `execution-plans/${file}`,
+          fallback,
+        )
+      ).value;
     }
     try {
-      return cloneJson(JSON.parse(await readFile(this.path(file), "utf8")) as unknown) as T;
+      return cloneJson(
+        JSON.parse(await readFile(this.path(file), "utf8")) as unknown,
+      ) as T;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return cloneJson(fallback);
@@ -127,7 +182,11 @@ export class LocalExecutionPlanRecordStore {
 
   private async writeJsonFile(file: string, value: unknown): Promise<void> {
     if (this.documents) {
-      await writeDocumentRecord({ rootDirectory: this.rootDir, documents: this.documents }, `execution-plans/${file}`, value);
+      await writeDocumentRecord(
+        { rootDirectory: this.rootDir, documents: this.documents },
+        `execution-plans/${file}`,
+        value,
+      );
       return;
     }
     const path = this.path(file);
@@ -159,7 +218,9 @@ export class LocalExecutionPlanRecordStore {
 
 function validateManifest(value: unknown): LocalExecutionPlanManifest {
   if (!value || typeof value !== "object") {
-    throw new LocalExecutionPlanRecordStoreError("Execution plan local store manifest is invalid.");
+    throw new LocalExecutionPlanRecordStoreError(
+      "Execution plan local store manifest is invalid.",
+    );
   }
 
   const manifest = value as Record<string, unknown>;
@@ -168,7 +229,9 @@ function validateManifest(value: unknown): LocalExecutionPlanManifest {
     manifest.storeKind !== EXECUTION_PLAN_LOCAL_STORE_KIND ||
     typeof manifest.updatedAt !== "string"
   ) {
-    throw new LocalExecutionPlanRecordStoreError("Execution plan local store manifest is invalid.");
+    throw new LocalExecutionPlanRecordStoreError(
+      "Execution plan local store manifest is invalid.",
+    );
   }
 
   return {

@@ -8,8 +8,10 @@ export function createLocalAssetInstanceRepositoryAdapter(options: LocalAssetRec
 
   return {
     async saveInstance(instance: AssetInstance): Promise<AssetInstance> {
-      const instances = await store.readCollection("instances");
-      await store.writeCollection("instances", upsertRecord(instances, instance, instanceStorageKey));
+      await store.mutateCollection("instances", (instances) => ({
+        records: upsertRecord(instances, instance, instanceStorageKey),
+        result: undefined,
+      }));
       return cloneJson(instance);
     },
 
@@ -30,7 +32,10 @@ export function createLocalAssetInstanceRepositoryAdapter(options: LocalAssetRec
 
     async deleteInstance(reference: AssetReference): Promise<void> {
       if (reference.kind !== "asset-instance") return;
-      await store.writeCollection("instances", deleteRecord(await store.readCollection("instances"), String(reference.id), instanceStorageKey));
+      await store.mutateCollection("instances", (instances) => ({
+        records: deleteRecord(instances, String(reference.id), instanceStorageKey),
+        result: undefined,
+      }));
     },
   };
 }

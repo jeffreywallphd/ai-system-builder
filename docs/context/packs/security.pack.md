@@ -42,6 +42,9 @@
   - `AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed`
 - Thin-client secure fetch adds `Authorization: Bearer` when a paired token exists.
 - Token hashes are persisted; raw bearer tokens and hash secrets must never be committed or logged.
+- The tracked npm lockfile is used by CI and server-image builds; the dependency
+  security gate requires a clean production tree, rejects critical development
+  toolchain advisories, and validates a production SPDX SBOM.
 
 ## Layered Enforcement Model
 
@@ -96,6 +99,8 @@
 - `docs/architecture/persistence-and-storage.md` - storage containment and credential/storage separation.
 - `docs/standards/logging-standards.md` - structured logging and redaction expectations.
 - `docs/standards/coding-standards.md` - safe implementation discipline.
+- `docs/standards/dependency-supply-chain-standards.md` - lockfile, advisory,
+  SBOM, and workflow-integrity policy.
 
 ## Companion Packs
 

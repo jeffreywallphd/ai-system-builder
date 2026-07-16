@@ -6,7 +6,7 @@ import {
   isWorkspaceSystemPackActivationStatus,
 } from "../../../contracts/workspace";
 import { LocalWorkspacePersistenceError } from "./localWorkspacePersistenceErrors";
-import { cloneJson, readJsonDocument, writeJsonDocument } from "./localWorkspacePersistenceJson";
+import { cloneJson, mutateJsonDocument, readJsonDocument } from "./localWorkspacePersistenceJson";
 import { resolveWorkspaceSystemPackActivationsFile } from "./localWorkspacePersistencePaths";
 import type { StructuredDocumentStore } from "../shared";
 
@@ -36,15 +36,19 @@ export function createLocalWorkspaceSystemPackActivationRepository(
     return sortActivations(value.map((activation) => assertActivation(activation, safeWorkspaceId)));
   }
 
-  async function writeWorkspaceActivations(
+  async function mutateWorkspaceActivations(
     workspaceId: WorkspaceId,
-    activations: readonly WorkspaceSystemPackActivation[],
+    mutation: (activations: readonly WorkspaceSystemPackActivation[]) => WorkspaceSystemPackActivation[],
   ): Promise<void> {
     const safeWorkspaceId = assertWorkspaceId(workspaceId);
-    await writeJsonDocument(
+    await mutateJsonDocument(
       resolveWorkspaceSystemPackActivationsFile(rootDirectory, safeWorkspaceId),
-      sortActivations(activations),
+      [] as WorkspaceSystemPackActivation[],
       "workspace-activation-persistence-write-failed",
+      (current) => ({
+        value: mutation(current.map((activation) => assertActivation(activation, safeWorkspaceId))),
+        result: undefined,
+      }),
       persistence,
     );
   }
@@ -64,14 +68,12 @@ export function createLocalWorkspaceSystemPackActivationRepository(
 
     async saveWorkspaceSystemPackActivation(activation: WorkspaceSystemPackActivation): Promise<void> {
       const validActivation = assertActivation(activation, activation.workspaceId);
-      const activations = await readWorkspaceActivations(validActivation.workspaceId);
-      await writeWorkspaceActivations(validActivation.workspaceId, upsertActivation(activations, validActivation));
+      await mutateWorkspaceActivations(validActivation.workspaceId, (activations) => upsertActivation(activations, validActivation));
     },
 
     async updateWorkspaceSystemPackActivation(activation: WorkspaceSystemPackActivation): Promise<void> {
       const validActivation = assertActivation(activation, activation.workspaceId);
-      const activations = await readWorkspaceActivations(validActivation.workspaceId);
-      await writeWorkspaceActivations(validActivation.workspaceId, replaceActivation(activations, validActivation));
+      await mutateWorkspaceActivations(validActivation.workspaceId, (activations) => replaceActivation(activations, validActivation));
     },
   };
 }

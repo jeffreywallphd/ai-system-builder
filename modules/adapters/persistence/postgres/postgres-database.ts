@@ -204,7 +204,14 @@ function createStore(
               updated_at = EXCLUDED.updated_at
             RETURNING namespace, document_key, payload_json, revision, updated_at
           `, [namespace, key, JSON.stringify(payload), updatedAt])
-        : await queryable.query(`
+        : options.expectedRevision === 0
+          ? await queryable.query(`
+              INSERT INTO structured_documents (namespace, document_key, payload_json, revision, updated_at)
+              VALUES ($1, $2, $3::jsonb, 1, $4::timestamptz)
+              ON CONFLICT (namespace, document_key) DO NOTHING
+              RETURNING namespace, document_key, payload_json, revision, updated_at
+            `, [namespace, key, JSON.stringify(payload), updatedAt])
+          : await queryable.query(`
             UPDATE structured_documents
             SET payload_json = $3::jsonb, revision = revision + 1, updated_at = $4::timestamptz
             WHERE namespace = $1 AND document_key = $2 AND revision = $5
@@ -226,24 +233,33 @@ function createStore(
     },
     async runInTransaction<T>(work: (transaction: StructuredDocumentStore) => Promise<T>) {
       if (insideTransaction) return work(this);
-      const client = await pool.connect();
-      try {
-        await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ");
-        const result = await work(createStore(pool, client, now, true));
-        await client.query("COMMIT");
-        return result;
-      } catch (error) {
+      for (let attempt = 1; attempt <= 4; attempt += 1) {
+        const client = await pool.connect();
         try {
-          await client.query("ROLLBACK");
-        } catch {
-          // Preserve the work failure.
+          await client.query("BEGIN ISOLATION LEVEL SERIALIZABLE");
+          const result = await work(createStore(pool, client, now, true));
+          await client.query("COMMIT");
+          return result;
+        } catch (error) {
+          try {
+            await client.query("ROLLBACK");
+          } catch {
+            // Preserve the work failure.
+          }
+          if (!isRetryablePostgresTransactionError(error) || attempt === 4) throw error;
+        } finally {
+          (client as PoolClient).release();
         }
-        throw error;
-      } finally {
-        (client as PoolClient).release();
       }
+      throw new Error("PostgreSQL transaction retry loop ended unexpectedly.");
     },
   };
+}
+
+export function isRetryablePostgresTransactionError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = (error as { code?: unknown }).code;
+  return code === "40001" || code === "40P01";
 }
 
 function mapDocument<T>(row: Record<string, unknown>): StructuredDocument<T> {

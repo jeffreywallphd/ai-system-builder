@@ -73,7 +73,7 @@ npm run persistence:postgres -- export --destination <portable.ndjson>
 
 Health reports only schema compatibility, query latency, pool counts, and
 sanitized idle-client error counters/timestamps. Export
-runs under a repeatable-read transaction and writes the same versioned NDJSON
+runs under a transactionally consistent transaction and writes the same versioned NDJSON
 format as SQLite. Neither command prints the connection string.
 
 Use the database platform's physical or managed backup service for disaster
@@ -94,6 +94,25 @@ the source server major version; see the official
 Restore first to an isolated target, run the application's health and live
 conformance test, compare representative counts/identities, and only then change
 traffic or connection configuration.
+
+Repository CI also runs a destructive logical-recovery drill against its
+disposable PostgreSQL 18 service:
+
+```text
+RECOVERY_POSTGRES_CONTAINER=<disposable-container-id> \
+RECOVERY_POSTGRES_DATABASE=<disposable-database> \
+RECOVERY_POSTGRES_USER=<qualification-user> \
+TEST_POSTGRES_URL=<qualification-url> \
+npm run test:postgres-recovery
+```
+
+The command seeds deterministic application records, writes and inspects a
+custom-format dump, copies the dump outside the database container, force-drops
+and recreates the disposable source database, restores it with `pg_restore`,
+runs application health and marker checks, and compares the canonical portable
+export count and SHA-256 digest. It writes sanitized timing/checksum evidence
+under `artifacts/qualification/postgres-recovery`. Never point this command at a
+shared, staging, or production database: destruction is intentional.
 
 ## Upgrade and rollback
 
@@ -150,3 +169,8 @@ a deployment production-qualified. At least quarterly or at the approved cadence
 
 No value for those objectives is assumed by this repository because the decision
 register intentionally leaves them to the owning deployment organization.
+
+The CI drill measures logical recovery time but does not declare an RTO or RPO.
+Logical dumps are portable recovery evidence; high-reliability managed shapes
+still need the owning platform's tested physical backup/PITR path and matching
+artifact-store recovery.

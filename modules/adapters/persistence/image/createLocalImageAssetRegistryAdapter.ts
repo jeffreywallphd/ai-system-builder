@@ -12,7 +12,7 @@ import type {
   ImageAssetRegistryPort,
   RegisterImageAssetInput,
 } from "../../../application/ports/image";
-import { readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../shared";
+import { mutateDocumentRecord, readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../shared";
 
 interface ImageAssetRegistryDocument {
   assets?: Record<string, ImageAsset>;
@@ -90,11 +90,24 @@ export function createLocalImageAssetRegistryAdapter(
   return {
     async registerImageAsset(input) {
       assertWorkspaceId(input.workspaceId);
-      const document = await readDocument(options.filePath, options.documents, options.rootDirectory);
-      const assets = document.assets ?? {};
       const asset = toImageAsset(input);
-      assets[asset.assetId] = asset;
-      await writeDocument(options.filePath, { ...document, assets }, options.documents, options.rootDirectory);
+      if (options.documents) {
+        await mutateDocumentRecord(
+          { rootDirectory: options.rootDirectory ?? dirname(options.filePath), documents: options.documents },
+          ".catalog/image-assets.json",
+          { assets: {} } as ImageAssetRegistryDocument,
+          (document) => ({
+            value: { ...document, assets: { ...(document.assets ?? {}), [asset.assetId]: asset } },
+            result: undefined,
+          }),
+        );
+      } else {
+        const document = await readDocument(options.filePath);
+        await writeDocument(options.filePath, {
+          ...document,
+          assets: { ...(document.assets ?? {}), [asset.assetId]: asset },
+        });
+      }
       return { assetId: asset.assetId };
     },
     async getImageAsset(workspaceId, assetId) {

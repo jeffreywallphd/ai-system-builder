@@ -23,10 +23,15 @@ import { assertNoSourceTreeJavaScriptArtifacts } from "./source-tree-contaminati
 const runnerDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(runnerDir, "../../..");
 
-const reportRelativePath = "artifacts/test-reports/non-browser-test-report.json";
+const reportRelativePath =
+  "artifacts/test-reports/non-browser-test-report.json";
 const reportPath = path.resolve(repoRoot, reportRelativePath);
-const runtimeRoot = path.resolve(repoRoot, "artifacts/test-runtime/non-browser");
-const runnerRelativePath = "dev-tools/scripts/testing/run-non-browser-tests.mjs";
+const runtimeRoot = path.resolve(
+  repoRoot,
+  "artifacts/test-runtime/non-browser",
+);
+const runnerRelativePath =
+  "dev-tools/scripts/testing/run-non-browser-tests.mjs";
 
 const discoveryRoots = [
   "modules",
@@ -37,13 +42,16 @@ const discoveryRoots = [
   "dev-tools/scripts/agent-support",
   "dev-tools/scripts/architecture",
   "dev-tools/scripts/docs",
+  "dev-tools/scripts/deployment",
   "dev-tools/scripts/server",
+  "dev-tools/scripts/security",
   "dev-tools/scripts/thin-client",
   "dev-tools/scripts/testing",
 ];
 const validTestFilePattern = /\.test\.[cm]?[jt]sx?$/i;
 const browserOnlyTestPattern = /\.(ui|e2e)\.test\.[cm]?[jt]sx?$/i;
-const browserAppPathPattern = /^(apps\/desktop\/src\/renderer\/|apps\/thin-client\/src\/)/i;
+const browserAppPathPattern =
+  /^(apps\/desktop\/src\/renderer\/|apps\/thin-client\/src\/)/i;
 const ignoredDirectories = new Set([
   ".git",
   ".turbo",
@@ -158,14 +166,18 @@ const serializeError = (value) => {
 
   return {
     name: typeof maybeError.name === "string" ? maybeError.name : "Error",
-    message: typeof maybeError.message === "string" ? maybeError.message : String(value),
+    message:
+      typeof maybeError.message === "string"
+        ? maybeError.message
+        : String(value),
     stack: typeof maybeError.stack === "string" ? maybeError.stack : undefined,
     code: typeof maybeError.code === "string" ? maybeError.code : undefined,
     cause:
       cause && typeof cause === "object"
         ? {
             name: typeof cause.name === "string" ? cause.name : undefined,
-            message: typeof cause.message === "string" ? cause.message : String(cause),
+            message:
+              typeof cause.message === "string" ? cause.message : String(cause),
             stack: typeof cause.stack === "string" ? cause.stack : undefined,
             code: typeof cause.code === "string" ? cause.code : undefined,
           }
@@ -183,12 +195,18 @@ const resolveRuntimeSpecifier = (specifier, runtimeAbsolutePath) => {
     return specifier;
   }
 
-  const canonicalSpecifier = specifier.endsWith("/") ? specifier.slice(0, -1) : specifier;
+  const canonicalSpecifier = specifier.endsWith("/")
+    ? specifier.slice(0, -1)
+    : specifier;
   const runtimeDir = path.dirname(runtimeAbsolutePath);
   const resolvedBase = path.resolve(runtimeDir, canonicalSpecifier);
   const specifierExtension = path.extname(canonicalSpecifier).toLowerCase();
 
-  if (specifierExtension === ".js" || specifierExtension === ".mjs" || specifierExtension === ".cjs") {
+  if (
+    specifierExtension === ".js" ||
+    specifierExtension === ".mjs" ||
+    specifierExtension === ".cjs"
+  ) {
     return canonicalSpecifier;
   }
 
@@ -216,15 +234,24 @@ const resolveRuntimeSpecifier = (specifier, runtimeAbsolutePath) => {
     return `${canonicalSpecifier}.cjs`;
   }
 
-  if (isDirectoryPath(resolvedBase) && pathExists(path.join(resolvedBase, "index.js"))) {
+  if (
+    isDirectoryPath(resolvedBase) &&
+    pathExists(path.join(resolvedBase, "index.js"))
+  ) {
     return `${canonicalSpecifier}/index.js`;
   }
 
-  if (isDirectoryPath(resolvedBase) && pathExists(path.join(resolvedBase, "index.mjs"))) {
+  if (
+    isDirectoryPath(resolvedBase) &&
+    pathExists(path.join(resolvedBase, "index.mjs"))
+  ) {
     return `${canonicalSpecifier}/index.mjs`;
   }
 
-  if (isDirectoryPath(resolvedBase) && pathExists(path.join(resolvedBase, "index.cjs"))) {
+  if (
+    isDirectoryPath(resolvedBase) &&
+    pathExists(path.join(resolvedBase, "index.cjs"))
+  ) {
     return `${canonicalSpecifier}/index.cjs`;
   }
 
@@ -237,7 +264,10 @@ const rewriteRuntimeImportsInFile = (runtimeAbsolutePath) => {
   const rewrittenFromImports = sourceText.replace(
     /(from\s+)(["'])(\.[^"'()]+)\2/g,
     (match, prefix, quote, specifier) => {
-      const resolvedSpecifier = resolveRuntimeSpecifier(specifier, runtimeAbsolutePath);
+      const resolvedSpecifier = resolveRuntimeSpecifier(
+        specifier,
+        runtimeAbsolutePath,
+      );
       return `${prefix}${quote}${resolvedSpecifier}${quote}`;
     },
   );
@@ -245,7 +275,10 @@ const rewriteRuntimeImportsInFile = (runtimeAbsolutePath) => {
   const rewrittenDynamicImports = rewrittenFromImports.replace(
     /(import\(\s*)(["'])(\.[^"'()]+)\2(\s*\))/g,
     (match, prefix, quote, specifier, suffix) => {
-      const resolvedSpecifier = resolveRuntimeSpecifier(specifier, runtimeAbsolutePath);
+      const resolvedSpecifier = resolveRuntimeSpecifier(
+        specifier,
+        runtimeAbsolutePath,
+      );
       return `${prefix}${quote}${resolvedSpecifier}${quote}${suffix}`;
     },
   );
@@ -313,7 +346,9 @@ const transpileToRuntimeFile = (sourceAbsolutePath, runtimeAbsolutePath) => {
     });
   } catch (error) {
     const details = serializeError(error);
-    throw new Error(`Failed to transpile ${normalizeToPosixPath(path.relative(repoRoot, sourceAbsolutePath))}: ${details.message}`);
+    throw new Error(
+      `Failed to transpile ${normalizeToPosixPath(path.relative(repoRoot, sourceAbsolutePath))}: ${details.message}`,
+    );
   }
 
   writeRuntimeOutput(runtimeAbsolutePath, transpileResult.outputText);
@@ -348,7 +383,10 @@ const walkAndBuildRuntime = (startPath) => {
     const relativeRuntimePath = mapOutputExtension(relativeSourcePath);
     const runtimeAbsolutePath = path.resolve(runtimeRoot, relativeRuntimePath);
 
-    if (transpileEligiblePattern.test(entry.name) && !declarationFilePattern.test(entry.name)) {
+    if (
+      transpileEligiblePattern.test(entry.name) &&
+      !declarationFilePattern.test(entry.name)
+    ) {
       transpileToRuntimeFile(absolutePath, runtimeAbsolutePath);
     } else if (
       (entry.name.endsWith(".json") && entry.name !== "package.json") ||
@@ -359,7 +397,10 @@ const walkAndBuildRuntime = (startPath) => {
       continue;
     }
 
-    runtimeToSourceFile.set(path.resolve(runtimeAbsolutePath), normalizedSourcePath);
+    runtimeToSourceFile.set(
+      path.resolve(runtimeAbsolutePath),
+      normalizedSourcePath,
+    );
 
     if (
       validTestFilePattern.test(entry.name) &&
@@ -410,7 +451,10 @@ const resolveSourcePath = (maybeRuntimeFile) => {
 
   const normalized = path.resolve(maybeRuntimeFile);
   const sourcePath = runtimeToSourceFile.get(normalized);
-  return sourcePath ?? normalizeToPosixPath(path.relative(repoRoot, maybeRuntimeFile));
+  return (
+    sourcePath ??
+    normalizeToPosixPath(path.relative(repoRoot, maybeRuntimeFile))
+  );
 };
 
 try {
@@ -433,7 +477,10 @@ try {
     const event = streamEvent?.data ?? streamEvent;
 
     if (eventType === "test:diagnostic") {
-      const didApply = applyDiagnosticSummaryMetric(report.summary, event?.message);
+      const didApply = applyDiagnosticSummaryMetric(
+        report.summary,
+        event?.message,
+      );
       if (didApply) {
         continue;
       }
@@ -480,7 +527,7 @@ try {
   process.exitCode = 1;
   report.startupError = serializeError(error);
 
-  if(
+  if (
     report.summary.counts.tests === 0 &&
     report.summary.counts.suites === 0 &&
     report.failures.length === 0
@@ -491,5 +538,7 @@ try {
   }
 } finally {
   writeReport();
-  console.log("Review test report for failure details: artifacts/test-reports/non-browser-test-report.json");
+  console.log(
+    "Review test report for failure details: artifacts/test-reports/non-browser-test-report.json",
+  );
 }

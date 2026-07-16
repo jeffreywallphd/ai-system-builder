@@ -4,6 +4,9 @@ metadata:
   name: ai-system-builder
 spec:
   replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: ai-system-builder
@@ -12,11 +15,25 @@ spec:
       labels:
         app: ai-system-builder
     spec:
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: server
-          image: REPLACE_WITH_PINNED_AI_SYSTEM_BUILDER_IMAGE
+          image: registry.example.invalid/ai-system-builder@sha256:REPLACE_WITH_64_HEX_DIGEST
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           ports:
             - name: https
               containerPort: 3010
@@ -77,6 +94,13 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 3
             failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
           volumeMounts:
             - name: tls
               mountPath: /run/tls
@@ -85,6 +109,8 @@ spec:
               mountPath: /var/lib/ai-system-builder/artifacts
             - name: runtime-storage
               mountPath: /var/lib/ai-system-builder/runtime
+            - name: temporary-storage
+              mountPath: /tmp
       volumes:
         - name: tls
           secret:
@@ -94,6 +120,9 @@ spec:
             claimName: ai-system-builder-artifacts
         - name: runtime-storage
           emptyDir: {}
+        - name: temporary-storage
+          emptyDir:
+            sizeLimit: 64Mi
 ---
 apiVersion: v1
 kind: Service

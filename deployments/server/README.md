@@ -2,6 +2,10 @@
 
 > AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
 
+The image build consumes the repository's tracked `package-lock.json` through
+`npm ci`. Dependency resolution must therefore be reviewed before the image is
+built; the image build does not create or update a dependency tree.
+
 These templates package the server host for the `campus-server`,
 `corporate-server`, and `cloud` deployment shapes. They preserve the architecture
 boundary: PostgreSQL stores structured records, `SERVER_STORAGE_ROOT` stores
@@ -10,14 +14,18 @@ replaceable runtime installations and caches.
 
 ## Files
 
-- `Dockerfile` builds the server with Node.js 24 LTS and runs as an unprivileged
-  user.
+- `Dockerfile` builds the server from a digest-pinned Node.js 24 LTS base and
+  runs as an unprivileged user.
 - `compose.qualification.yaml` is an isolated PostgreSQL 18 qualification stack.
   It disables database TLS only on the private Compose network and is not a
-  production manifest.
+  production manifest. Its database image is digest-pinned and its application
+  container uses a read-only root filesystem, no new privileges, no Linux
+  capabilities, and bounded temporary storage.
 - `kubernetes-deployment.example.yaml` is a production-oriented starting point
   with secret references, TLS mounts, a durable artifact volume, ephemeral
   runtime storage, graceful termination, and distinct liveness/readiness probes.
+  It is intentionally `Recreate` plus one replica until identity/tenancy and
+  multi-replica operation are accepted and qualified.
 - `config/environments/server/*.env.example` are shape-specific environment
   profiles. They intentionally omit secret values.
 
@@ -34,3 +42,8 @@ The repository does not choose organization tenancy, retention, RPO, RTO, high
 availability, or backup schedules. Operators must obtain those approved values
 and apply the procedures in `docs/operations/persistence-operations.md` before a
 shape can be declared production-qualified.
+
+CI continuously exercises a destructive custom-format PostgreSQL logical backup
+and restore against a disposable service and retains sanitized evidence. Repeat
+that procedure against the target PostgreSQL toolchain, then separately qualify
+the platform's physical/PITR service and the matching artifact-store recovery.

@@ -3,7 +3,7 @@ import { dirname, relative } from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { LocalWorkspacePersistenceError, type LocalWorkspacePersistenceErrorCode } from "./localWorkspacePersistenceErrors";
-import { readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../shared";
+import { mutateDocumentRecord, readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../shared";
 
 export interface WorkspaceDocumentPersistenceOptions {
   readonly rootDirectory: string;
@@ -37,6 +37,32 @@ export async function writeJsonDocument(filePath: string, value: unknown, writeE
     await rename(temporaryPath, filePath);
   } catch (error) {
     await unlink(temporaryPath).catch(() => undefined);
+    throw new LocalWorkspacePersistenceError(writeErrorCode, { cause: error });
+  }
+}
+
+export async function mutateJsonDocument<T, TResult>(
+  filePath: string,
+  fallback: T,
+  writeErrorCode: LocalWorkspacePersistenceErrorCode,
+  mutation: (current: T) => { value: T; result: TResult },
+  persistence?: WorkspaceDocumentPersistenceOptions,
+): Promise<TResult> {
+  try {
+    if (persistence?.documents) {
+      return await mutateDocumentRecord(
+        persistence,
+        relative(persistence.rootDirectory, filePath),
+        fallback,
+        mutation,
+      );
+    }
+    const current = await readJsonDocument(filePath, fallback, writeErrorCode, persistence);
+    const next = mutation(current);
+    await writeJsonDocument(filePath, next.value, writeErrorCode, persistence);
+    return next.result;
+  } catch (error) {
+    if (error instanceof LocalWorkspacePersistenceError) throw error;
     throw new LocalWorkspacePersistenceError(writeErrorCode, { cause: error });
   }
 }

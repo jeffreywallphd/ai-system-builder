@@ -1,23 +1,23 @@
-FROM node:24-bookworm-slim AS build
+FROM node:24-bookworm-slim@sha256:b31e7a42fdf8b8aa5f5ed477c72d694301273f1069c5a2f71d53c6482e99a2fc AS build
 
 WORKDIR /app
-COPY package.json ./
+COPY package.json package-lock.json ./
 COPY apps/server/package.json apps/server/package.json
 COPY apps/thin-client/package.json apps/thin-client/package.json
-RUN npm install --ignore-scripts --package-lock=false
+RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY tsconfig.json ./
 COPY apps/server apps/server
 COPY modules modules
 RUN npm run build:server
 
-FROM node:24-bookworm-slim AS runtime
+FROM node:24-bookworm-slim@sha256:b31e7a42fdf8b8aa5f5ed477c72d694301273f1069c5a2f71d53c6482e99a2fc AS runtime
 
 ENV NODE_ENV=production
 WORKDIR /app
-COPY package.json ./
+COPY package.json package-lock.json ./
 COPY apps/server/package.json apps/server/package.json
 COPY apps/thin-client/package.json apps/thin-client/package.json
-RUN npm install --omit=dev --ignore-scripts --package-lock=false && npm cache clean --force
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/modules/adapters/runtime/python/worker ./modules/adapters/runtime/python/worker
 RUN mkdir -p /var/lib/ai-system-builder/artifacts /var/lib/ai-system-builder/runtime \

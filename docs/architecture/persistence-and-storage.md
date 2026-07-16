@@ -1,7 +1,7 @@
 # Persistence and Storage
 
 - Status: current
-- Related decisions: `docs/adr/ADR-0004-persistence-and-storage-separation.md`, `docs/adr/ADR-0025-deployment-shaped-structured-persistence.md`, `docs/adr/ADR-0026-local-sqlite-runtime.md`, `docs/adr/ADR-0027-managed-postgresql-runtime.md`
+- Related decisions: `docs/adr/ADR-0004-persistence-and-storage-separation.md`, `docs/adr/ADR-0025-deployment-shaped-structured-persistence.md`, `docs/adr/ADR-0026-local-sqlite-runtime.md`, `docs/adr/ADR-0027-managed-postgresql-runtime.md`, `docs/adr/ADR-0028-atomic-structured-document-mutations.md`
 - Verification: `docs/architecture/architecture-verification.md`
 
 ## Asset Kernel relationship
@@ -108,6 +108,23 @@ Selecting PostgreSQL does not claim those capabilities are already implemented.
   consistent NDJSON export with a versioned manifest, document count, and digest.
   This is a portability/inspection artifact, not a replacement for engine-native
   disaster-recovery backup.
+
+### Atomic mutation and retry policy
+
+Database-backed repository collection changes use revision compare-and-swap,
+including insert-if-absent revision `0`, so independent server processes cannot
+silently replace an entire collection with a stale copy. Repository adapters
+must use record-store mutation methods; a fitness test rejects direct collection
+writes from repository factories. Mutation callbacks are pure computation and
+may be re-evaluated after a conflict. The default conflict budget is bounded at
+64 attempts.
+
+PostgreSQL application transactions run at Serializable isolation and retry the
+complete callback, up to four attempts, for serialization failure (`40001`) and
+deadlock detected (`40P01`). JSON compatibility mode serializes same-file
+mutations only within one Node process and is not valid shared-server
+persistence. These mechanics prevent collection-wide lost updates; they do not
+invent domain merge rules for two writers replacing the same logical record.
 
 ### Operational boundary
 

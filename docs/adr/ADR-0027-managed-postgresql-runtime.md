@@ -48,8 +48,11 @@ database-specific lifecycle and SQL stay behind the PostgreSQL adapter boundary.
 - Production server shapes require the existing HTTPS/token security mode.
   Liveness remains process-only; readiness combines sanitized database
   schema/latency/pool state with artifact-storage access and capacity.
-- Portable export enumerates adapter-internal documents under repeatable-read
-  isolation. Disaster-recovery backup/restore remains owned by the PostgreSQL
+- Application transactions use Serializable isolation and retry the complete
+  callback for bounded serialization/deadlock failures. Whole-document writes
+  use revision compare-and-swap as specified by ADR-0028.
+- Portable export enumerates adapter-internal documents under transactionally
+  consistent isolation. Disaster-recovery backup/restore remains owned by the PostgreSQL
   platform and its approved operator runbook.
 
 ## Consequences

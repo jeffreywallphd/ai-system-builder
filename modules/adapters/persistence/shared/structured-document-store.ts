@@ -7,6 +7,7 @@ export interface StructuredDocument<T = unknown> {
 }
 
 export interface StructuredDocumentWriteOptions {
+  /** Revision 0 means insert only when the document is still absent. */
   readonly expectedRevision?: number;
   readonly updatedAt?: string;
 }
@@ -37,6 +38,10 @@ export class StructuredDocumentConflictError extends Error {
     super(`Structured document revision conflict for ${namespace}/${key}; expected revision ${expectedRevision}.`);
     this.name = "StructuredDocumentConflictError";
   }
+}
+
+export function isStructuredDocumentConflict(error: unknown): error is StructuredDocumentConflictError {
+  return error instanceof StructuredDocumentConflictError;
 }
 
 export function cloneStructuredJson<T>(value: T): T {

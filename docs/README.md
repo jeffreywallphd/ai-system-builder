@@ -14,6 +14,8 @@ This directory separates canonical system guidance from downstream task context 
   - `docs/architecture/asset-authoring-customization-and-overrides.md` defines workspace-scoped asset authoring, customization, and override architecture.
 - `docs/standards/`
   - Canonical implementation and documentation rules.
+  - `docs/standards/dependency-supply-chain-standards.md` defines lockfile,
+    advisory, SBOM, and workflow-integrity requirements.
 - `docs/context/`
   - Downstream context-assembly support for implementation work; it summarizes canonical sources but does not replace them.
 

@@ -9,17 +9,48 @@ This is a delivery tracker, not a canonical architecture source. If this plan
 conflicts with an accepted ADR, architecture document, or standard, the canonical
 source wins and this plan must be corrected.
 
+## Production-readiness continuation (recommendations 1-7)
+
+The dependency order is supply-chain integrity, continuously exercised live
+PostgreSQL, atomic concurrency, recoverability, deployment artifact
+qualification, accepted tenancy/identity design, then tenant-aware object
+storage. This prevents later qualification from being built on an untrusted
+artifact, an unexercised database, or an undecided ownership boundary.
+
+| Order | Recommendation                                                             | Status                       | Exit evidence                                                                                                                                                                   |
+| ----- | -------------------------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | Reproducible dependency and supply-chain baseline                          | verified                     | Committed lockfile, clean `npm ci`, runtime/toolchain audit policy, production SBOM validation, pinned CI actions, Dependabot                                                   |
+| 2     | Continuous disposable PostgreSQL qualification                             | verified in CI configuration | Health-checked PostgreSQL 18 service runs the live migration, rollback, revision, isolation, namespace, and health suite on each change                                         |
+| 3     | Atomic mutations and multi-process concurrency                             | verified at repository level | Revision-zero insert, bounded compare-and-swap, Serializable PostgreSQL retry, pure mutation seam, independent-adapter and multi-pool contention tests, anti-drift fitness test |
+| 4     | Automated backup/restore and recovery drills                               | verified in CI configuration | Destructive disposable custom-format restore drill, digest/count reconciliation, retained sanitized evidence, documented RPO/RTO measurement                                    |
+| 5     | OCI, Compose, and Kubernetes single-replica qualification                  | verified in CI configuration | Digest-pinned non-root image build/scan, restricted Compose managed-shape smoke, static Kubernetes policy and syntax validation, immutable image guidance                       |
+| 6     | Accepted identity, organization tenancy, authorization, and audit decision | proposal awaiting acceptance | ADR-0029 records researched options, recommends pooled organization tenancy with OIDC and PostgreSQL row security, and defines the acceptance-dependent implementation sequence |
+| 7     | Tenant-aware object storage                                                | blocked by recommendation 6  | Workspace/tenant-prefixed object keys, ownership authorization, object-service adapter, lifecycle/retention, cross-tenant denial and integration tests                          |
+
 ## Target deployment shapes
 
-| Shape | Structured persistence target | Artifact/resource storage | Operational posture |
-| --- | --- | --- | --- |
-| Local | SQLite in desktop application data | Local filesystem plus configured repository providers | Zero-service, single-host |
-| Campus server | PostgreSQL | Mounted filesystem or institution service plus repository providers | Institution-operated |
-| Corporate server | PostgreSQL | Managed volume/object service plus repository providers | Enterprise-operated |
-| Cloud | Managed PostgreSQL | Object/blob service plus repository providers | Cloud-operated |
+| Shape            | Structured persistence target      | Artifact/resource storage                                           | Operational posture       |
+| ---------------- | ---------------------------------- | ------------------------------------------------------------------- | ------------------------- |
+| Local            | SQLite in desktop application data | Local filesystem plus configured repository providers               | Zero-service, single-host |
+| Campus server    | PostgreSQL                         | Mounted filesystem or institution service plus repository providers | Institution-operated      |
+| Corporate server | PostgreSQL                         | Managed volume/object service plus repository providers             | Enterprise-operated       |
+| Cloud            | Managed PostgreSQL                 | Object/blob service plus repository providers                       | Cloud-operated            |
 
 Runtime installations and caches remain outside both structured persistence and
 artifact storage. Secrets remain in environment/credential-store boundaries.
+
+## Recommendation 6 decision checkpoint
+
+ADR-0029 is intentionally `proposed`. It recommends organization-as-tenant,
+pooled managed PostgreSQL with an explicit partition key and forced row-level
+security, OIDC identity for managed hosts, an explicit local organization and
+principal for desktop, deny-by-default application authorization, and separate
+structured audit records. Alternatives and their isolation/operating tradeoffs
+are recorded in the ADR.
+
+Acceptance is required before public request contracts, durable tenancy schema,
+identity adapters, authorization semantics, or tenant-aware storage keys are
+implemented. Recommendation 7 remains blocked until this checkpoint is resolved.
 
 ## Current baseline
 
@@ -32,9 +63,22 @@ artifact storage. Secrets remain in environment/credential-store boundaries.
   SQLite runtime, version-1 migration, transactions, health, backup, restore,
   portable export, and active desktop repository composition.
 - `modules/adapters/persistence/postgres` provides a bounded `pg` pool,
-  advisory-locked migration, JSONB document repository seam, repeatable-read
+  advisory-locked migration, JSONB document repository seam, transactionally consistent
   export, health, readiness data, and graceful drain; a live service remains
   necessary for environment qualification.
+- Whole-document repository writes now use bounded revision compare-and-swap;
+  PostgreSQL application transactions use Serializable full-callback retry for
+  retryable SQLSTATEs, and a fitness test prevents adapters from returning to
+  stale read-then-write collection updates.
+- The continuous PostgreSQL job now creates a custom-format logical backup,
+  inspects it, drops and recreates the disposable database, restores it, runs
+  application health and marker checks, and compares canonical export count and
+  digest. Sanitized timing and checksum evidence is retained as a CI artifact.
+- The deployment-artifact job builds the digest-pinned non-root server image,
+  starts the read-only/capability-dropped Compose stack to healthy readiness,
+  smokes separate liveness/readiness endpoints, parses the restricted
+  single-replica Kubernetes resources, blocks fixed critical image findings,
+  and retains static, runtime, image, scan, and rendered-manifest evidence.
 - Existing allowlisted JSON data has inventory, rollback-preserving import,
   reconciliation, activation marking, and source-divergence rejection.
 - Managed environment profiles, OCI/Compose/Kubernetes templates, maintenance

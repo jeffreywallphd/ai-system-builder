@@ -7,7 +7,7 @@ import {
   normalizeArtifactStorageBinding,
   type ArtifactStorageBinding,
 } from "../../../../contracts/storage";
-import { readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../../../persistence/shared";
+import { mutateDocumentRecord, readDocumentRecord, type StructuredDocumentStore } from "../../../persistence/shared";
 
 const DEFAULT_BINDINGS_FILE = ".catalog/artifact-storage-bindings.ndjson";
 
@@ -119,20 +119,39 @@ export function createLocalArtifactStorageBindingAdapter(
     return Array.from(latestByCompositeKey.values());
   }
 
+  async function mutateBindings<TResult>(
+    mutation: (bindings: ArtifactStorageBinding[]) => { bindings: ArtifactStorageBinding[]; result: TResult },
+  ): Promise<TResult> {
+    if (!options.documents) throw new Error("Structured document storage is required for atomic binding mutation.");
+    return mutateDocumentRecord(
+      { rootDirectory, documents: options.documents },
+      bindingsFile,
+      [] as ArtifactStorageBindingLine[],
+      (stored) => {
+        const bindings = stored
+          .map((entry) => parseBindingLine(JSON.stringify(entry)))
+          .filter((entry): entry is ArtifactStorageBinding => Boolean(entry && !("deletedAt" in entry)));
+        const next = mutation(bindings);
+        return { value: next.bindings, result: next.result };
+      },
+    );
+  }
+
   return {
     async upsertArtifactStorageBinding(request, context = {}) {
       try {
         const normalizedBinding = normalizeArtifactStorageBinding(request.binding);
         if (options.documents) {
-          const bindings = await readBindings();
-          const next = [...bindings.filter((entry) => !(
-            entry.workspaceId === normalizedBinding.workspaceId &&
-            entry.artifactId === normalizedBinding.artifactId &&
-            entry.role === normalizedBinding.role &&
-            entry.backing.provider === normalizedBinding.backing.provider &&
-            entry.backing.locator === normalizedBinding.backing.locator
-          )), normalizedBinding];
-          await writeDocumentRecord({ rootDirectory, documents: options.documents }, bindingsFile, next);
+          await mutateBindings((bindings) => ({
+            bindings: [...bindings.filter((entry) => !(
+              entry.workspaceId === normalizedBinding.workspaceId &&
+              entry.artifactId === normalizedBinding.artifactId &&
+              entry.role === normalizedBinding.role &&
+              entry.backing.provider === normalizedBinding.backing.provider &&
+              entry.backing.locator === normalizedBinding.backing.locator
+            )), normalizedBinding],
+            result: undefined,
+          }));
           return createSuccessResult({ binding: normalizedBinding }, context);
         }
         await mkdir(path.dirname(bindingsPath), { recursive: true });
@@ -175,20 +194,17 @@ export function createLocalArtifactStorageBindingAdapter(
 
       try {
         const workspaceId = request.workspaceId?.trim();
-        const bindings = await readBindings();
-        const exists = bindings.some((entry) => entry.artifactId === artifactId && (!workspaceId || entry.workspaceId === workspaceId));
-        if (!exists) {
-          return createSuccessResult({ deleted: false }, context);
+        if (options.documents) {
+          const deleted = await mutateBindings((bindings) => ({
+            bindings: bindings.filter((entry) => entry.artifactId !== artifactId || (workspaceId && entry.workspaceId !== workspaceId)),
+            result: bindings.some((entry) => entry.artifactId === artifactId && (!workspaceId || entry.workspaceId === workspaceId)),
+          }));
+          return createSuccessResult({ deleted }, context);
         }
 
-        if (options.documents) {
-          await writeDocumentRecord(
-            { rootDirectory, documents: options.documents },
-            bindingsFile,
-            bindings.filter((entry) => entry.artifactId !== artifactId || (workspaceId && entry.workspaceId !== workspaceId)),
-          );
-          return createSuccessResult({ deleted: true }, context);
-        }
+        const bindings = await readBindings();
+        const exists = bindings.some((entry) => entry.artifactId === artifactId && (!workspaceId || entry.workspaceId === workspaceId));
+        if (!exists) return createSuccessResult({ deleted: false }, context);
 
         await mkdir(path.dirname(bindingsPath), { recursive: true });
         await appendFile(bindingsPath, `${JSON.stringify({ workspaceId, artifactId, deletedAt: new Date().toISOString() })}\n`, "utf8");

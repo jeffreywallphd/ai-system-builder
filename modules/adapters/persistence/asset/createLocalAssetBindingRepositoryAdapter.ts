@@ -8,8 +8,10 @@ export function createLocalAssetBindingRepositoryAdapter(options: LocalAssetReco
 
   return {
     async saveBinding(binding: AssetBinding): Promise<AssetBinding> {
-      const bindings = await store.readCollection("bindings");
-      await store.writeCollection("bindings", upsertRecord(bindings, binding, bindingStorageKey));
+      await store.mutateCollection("bindings", (bindings) => ({
+        records: upsertRecord(bindings, binding, bindingStorageKey),
+        result: undefined,
+      }));
       return cloneJson(binding);
     },
 
@@ -30,7 +32,10 @@ export function createLocalAssetBindingRepositoryAdapter(options: LocalAssetReco
 
     async deleteBinding(reference: AssetReference): Promise<void> {
       if (reference.kind !== "asset-binding") return;
-      await store.writeCollection("bindings", deleteRecord(await store.readCollection("bindings"), String(reference.id), bindingStorageKey));
+      await store.mutateCollection("bindings", (bindings) => ({
+        records: deleteRecord(bindings, String(reference.id), bindingStorageKey),
+        result: undefined,
+      }));
     },
   };
 }

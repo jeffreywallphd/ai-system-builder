@@ -14,6 +14,7 @@ import {
   openPostgresDatabase,
   POSTGRES_MIGRATION_0001,
   POSTGRES_MIGRATION_LOCK_KEY,
+  createPostgresStructuredDocumentStore,
 } from "../postgres-database";
 
 test("PostgreSQL config is fail-closed and TLS-verifying by default", () => {
@@ -117,6 +118,40 @@ test("idle pool errors are consumed and surfaced only as sanitized health counte
   assert.equal(health.pool.lastIdleClientErrorAt, "2026-07-16T14:00:00.000Z");
   assert.equal(JSON.stringify(health).includes("secret"), false);
   await database.close();
+});
+
+test("serializable transactions retry the complete callback after serialization failure", async () => {
+  let attempts = 0;
+  const lifecycle: string[] = [];
+  const client = {
+    async query(text: string) {
+      lifecycle.push(text);
+      return queryResult([]);
+    },
+    release() { lifecycle.push("release"); },
+  };
+  const pool = {
+    totalCount: 1,
+    idleCount: 1,
+    waitingCount: 0,
+    async connect() { return client; },
+    async query() { return queryResult([]); },
+    async end() {},
+  } as unknown as PostgresPoolLike;
+
+  const store = createPostgresStructuredDocumentStore(pool);
+  const value = await store.runInTransaction(async () => {
+    attempts += 1;
+    if (attempts === 1) throw Object.assign(new Error("retry"), { code: "40001" });
+    return "committed";
+  });
+
+  assert.equal(value, "committed");
+  assert.equal(attempts, 2);
+  assert.equal(lifecycle.filter((entry) => entry === "BEGIN ISOLATION LEVEL SERIALIZABLE").length, 2);
+  assert.equal(lifecycle.filter((entry) => entry === "ROLLBACK").length, 1);
+  assert.equal(lifecycle.filter((entry) => entry === "COMMIT").length, 1);
+  assert.equal(lifecycle.filter((entry) => entry === "release").length, 2);
 });
 
 function queryResult<T extends Record<string, unknown>>(rows: T[]): QueryResult<T> {

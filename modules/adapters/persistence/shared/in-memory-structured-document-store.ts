@@ -30,7 +30,10 @@ export function createInMemoryStructuredDocumentStore(
     async writeDocument<T>(namespace: string, key: string, value: T, options: StructuredDocumentWriteOptions = {}) {
       const mapKey = identity(namespace, key);
       const current = target.get(mapKey);
-      if (options.expectedRevision !== undefined && current?.revision !== options.expectedRevision) {
+      if (
+        options.expectedRevision !== undefined &&
+        (options.expectedRevision === 0 ? current !== undefined : current?.revision !== options.expectedRevision)
+      ) {
         throw new StructuredDocumentConflictError(namespace, key, options.expectedRevision);
       }
       const document: StructuredDocument<T> = {

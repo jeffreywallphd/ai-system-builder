@@ -5,8 +5,8 @@
 PostgreSQL is the structured persistence target for campus, corporate, and cloud
 server deployment shapes. This family owns the bounded `pg` pool, TLS and timeout
 configuration, startup validation, advisory-locked migrations, transactional
-JSONB document implementation, optimistic revisions, repeatable-read portable
-export, sanitized health/readiness data, and graceful drain behind existing
+JSONB document implementation, optimistic revisions, Serializable transaction
+retry, transactionally consistent portable export, sanitized health/readiness data, and graceful drain behind existing
 application ports.
 
 The pool installs an idle-client error listener so an EventEmitter `error` does
@@ -15,7 +15,10 @@ health; raw driver error content remains private.
 
 Explicit managed deployment shapes select this adapter before API registration
 and run the rollback-preserving legacy import. A selected PostgreSQL target never
-falls back to JSON. The optional live integration test requires
-`TEST_POSTGRES_URL`; it is part of environment qualification.
+falls back to JSON. The live integration test requires `TEST_POSTGRES_URL`. CI
+runs it continuously against a health-checked disposable PostgreSQL 18 service,
+including concurrent migration startup, transactional rollback, revision,
+multi-pool atomic mutation, isolation, and health behavior. Operator qualification must still repeat it
+against the owning environment's PostgreSQL service and TLS boundary.
 Connection strings, credentials, SQL, pools, transactions, and driver errors must
 remain within composition and adapter boundaries.

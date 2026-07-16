@@ -29,7 +29,10 @@ AI System Builder is a TypeScript platform for composing, running, and managing 
 
 ## Local validation
 
-Install dependencies with `npm install`, then use:
+Install dependencies from the tracked lockfile with `npm ci`, then use:
+
+- `npm run security:dependencies` — production and toolchain advisory policy
+  plus production SPDX SBOM validation.
 
 - `npm run docs:check` — documentation and context drift checks.
 - `npm run architecture:check` — enforced module dependency direction.
