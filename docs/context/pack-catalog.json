@@ -61,6 +61,14 @@
       "verification": ["npm test"]
     },
     {
+      "id": "system-builder",
+      "path": "docs/context/packs/system-builder.pack.md",
+      "description": "Workspace-owned composed systems, System Builder records, and Systems/Software status placement.",
+      "taskSignals": ["system builder", "composed system", "systems page", "system record", "software status"],
+      "pathSignals": ["modules/contracts/system-builder/", "apps/desktop/src/renderer/pages/SystemBuilderPage.tsx", "apps/desktop/src/renderer/features/settings/components/SoftwareStatusSection.tsx"],
+      "verification": ["npm run architecture:check", "npm test"]
+    },
+    {
       "id": "runtime-readiness-binding",
       "path": "docs/context/packs/runtime-readiness-binding.pack.md",
       "description": "Runtime capability inventory, readiness bindings, matching, and non-executing checks.",

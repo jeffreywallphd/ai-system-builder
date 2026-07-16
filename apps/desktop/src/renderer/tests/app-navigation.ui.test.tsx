@@ -54,7 +54,7 @@ describe("desktop renderer page composition", () => {
     mountedContainer = undefined;
   });
 
-  it("renders landing Home page by default and switches to Data/Settings/System pages", async () => {
+  it("renders Home and switches between workspace pages, Settings, and Systems", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -123,7 +123,7 @@ describe("desktop renderer page composition", () => {
     await waitForText(container, "Choose your working context");
     expect(container.textContent).toContain("Choose your working context");
     expect(container.querySelector("header")?.textContent).toContain("AI System Builder");
-    expect(container.textContent).toContain("Open System");
+    expect(container.textContent).toContain("Open Systems");
     expect(container.querySelector("header")?.textContent).not.toContain("Create workspace");
 
     const menu = container.querySelector(".ui-shell__menu") as HTMLDetailsElement | null;
@@ -145,7 +145,7 @@ describe("desktop renderer page composition", () => {
       artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("Create a workspace to use Assets, Artifacts, Data, Models, and Images.");
+    expect(container.textContent).toContain("Create a workspace to use Systems, Assets, Artifacts, Data, Models, and Images.");
     expect(container.textContent).toContain("Create workspace");
     expect(container.textContent).not.toContain("Data Artifact Ingester");
     expect(window.desktopApi?.browseArtifacts).not.toHaveBeenCalled();
@@ -182,19 +182,22 @@ describe("desktop renderer page composition", () => {
     });
     await waitForText(container, "Settings");
     expect(container.textContent).toContain("Settings");
+    expect(container.textContent).toContain("Software status");
     expect(container.querySelector("button[aria-current='page']")?.getAttribute("aria-label")).toBe("Settings");
 
-    const systemButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "System",
+    const systemsButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Systems",
     );
-    expect(systemButton).toBeDefined();
+    expect(systemsButton).toBeDefined();
 
     await act(async () => {
-      systemButton?.dispatchEvent(new Event("click", { bubbles: true }));
+      systemsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    await waitForText(container, "Basic diagnostics");
-    expect(container.textContent).toContain("Basic diagnostics");
-    expect(container.querySelector("button[aria-current='page']")?.textContent).toBe("System");
+    await waitForText(container, "System Builder");
+    expect(container.textContent).toContain("System Builder");
+    expect(container.textContent).not.toContain("Basic diagnostics");
+    expect(window.desktopApi?.readPythonRuntimeStatus).not.toHaveBeenCalled();
+    expect(container.querySelector("button[aria-current='page']")?.textContent).toBe("Systems");
   });
 });

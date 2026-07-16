@@ -167,6 +167,17 @@
       "acceptanceSignals": ["Compatibility and readiness remain separate non-executing records with explicit blockers."]
     },
     {
+      "id": "system-builder-status-boundary",
+      "task": "Prepare a composed-system contract and Systems page without putting software or runtime status on the system record.",
+      "affectedPaths": ["modules/contracts/system-builder/", "apps/desktop/src/renderer/pages/SystemBuilderPage.tsx", "apps/desktop/src/renderer/features/settings/components/SoftwareStatusSection.tsx"],
+      "expectedPacks": ["system-builder", "desktop-implementation"],
+      "forbiddenPacks": ["server-host", "runtime-installer"],
+      "requiredSources": ["docs/adr/ADR-0024-system-builder-area-and-software-status-placement.md", "docs/architecture/system-builder.md"],
+      "requiredChecks": ["npm run architecture:check", "npm test"],
+      "decisionExpectation": "proceed",
+      "acceptanceSignals": ["Systems is workspace-scoped, records specialize AssetComposition, and Software status remains under Settings."]
+    },
+    {
       "id": "execution-plan-preflight",
       "task": "Add a regression test for an execution plan preflight safety gate without invoking a provider.",
       "affectedPaths": ["modules/application/use-cases/execution-plans/"],

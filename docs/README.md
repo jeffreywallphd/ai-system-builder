@@ -49,6 +49,7 @@ If context guidance conflicts with an ADR, architecture document, or standard, t
 - Asset authoring, customization, and overrides: `docs/architecture/asset-authoring-customization-and-overrides.md` and ADR-0018.
 - Effective asset projections: `docs/architecture/effective-asset-projections.md` and ADR-0019.
 - Asset composition planning: `docs/architecture/asset-composition-planning.md` and ADR-0020.
+- System Builder: `docs/architecture/system-builder.md` and ADR-0024; Systems is workspace-scoped while builder-application status belongs to Settings / Software status.
 - Runtime readiness binding: `docs/architecture/runtime-readiness-binding.md` and ADR-0021.
 - Execution plan preparation: `docs/architecture/execution-plan-preparation.md` and ADR-0022.
 - Controlled conversational execution: `docs/architecture/controlled-conversational-system-execution.md` and ADR-0023.

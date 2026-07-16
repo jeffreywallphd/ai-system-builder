@@ -35,6 +35,7 @@
 - Workspace-owned operations must carry explicit workspace context through contracts, clients, transports, use cases, ports, providers, and persistence.
 - System Foundation is system-owned and made available to a workspace through a `system.foundation@1.0.0` activation reference.
 - Resource-backed Asset Registry views are computed, sanitized, descriptor-only, and read-only unless an explicit controlled mutation workflow is in scope.
+- Systems is the workspace-scoped System Builder area for composed systems; builder-application and runtime status belongs to Settings / Software status.
 - Runtime readiness is host-owned capability availability; it does not start/install/repair runtimes during read operations.
 - Security is layered and adapter-based; use ADR-0015 and `security.pack.md` for auth, route policy, TLS, token, audit, and sanitization work.
 - Historical implementation details belong in issues, PRs, or release notes, not in this reusable baseline.
@@ -54,6 +55,7 @@ Use only the docs needed for the current task:
 - `docs/architecture/module-dependency-rules.md` - dependency direction and boundary constraints.
 - `docs/architecture/system-overview.md` - repository shape and packaging posture.
 - `docs/architecture/asset-kernel.md` - canonical Asset Kernel terminology and boundaries.
+- `docs/architecture/system-builder.md` - composed-system records, vocabulary, and product-area placement.
 - `docs/architecture/workspace-model.md` - workspace identity, selection, scoping, and activation semantics.
 - `docs/architecture/persistence-and-storage.md` - persistence/storage separation and artifact storage rules.
 - `docs/architecture/runtime-model.md` - runtime ownership, capability, and execution model.

@@ -108,6 +108,7 @@ Use this pack for tasks involving:
 - `runtime-readiness-binding` for runtime capability matching.
 - `execution-plan-preparation` for executable plan candidates.
 - `controlled-conversational-system-execution` for runnable conversational systems.
+- `system-builder` for workspace-owned composed-system records and Systems/Software status placement.
 - `persistence-storage`, `desktop-host`, `server-host`, `ipc-electron`, `security`, and `testing` when their boundaries are directly touched.
 
 ## Anti-Drift Rules

@@ -118,7 +118,7 @@ describe("desktop app workspace route boundary", () => {
     await act(async () => {});
 
     expect(container.textContent).toContain("Workspace required");
-    expect(container.textContent).toContain("Create a workspace to use Assets, Artifacts, Data, Models, and Images.");
+    expect(container.textContent).toContain("Create a workspace to use Systems, Assets, Artifacts, Data, Models, and Images.");
     expect(container.textContent).not.toContain("Model Management");
     expect(window.desktopApi?.listModels).not.toHaveBeenCalled();
     expect(container.querySelector("button[aria-current='page']")?.textContent).not.toBe("Models");

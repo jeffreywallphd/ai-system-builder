@@ -278,7 +278,7 @@ Workspace system-pack activation records reference system packs such as `system.
 
 ### Workspace-gated product surfaces
 
-Workspace-scoped UI surfaces are unavailable without an active workspace. Asset, artifact/data, model, image-generation, generated-output, and other resource-backed pages must show a workspace-required call to action rather than empty global records when no workspace is active. Global-safe pages such as home, settings, security diagnostics, and system/about-style views may remain available when they do not expose workspace-owned resources.
+Workspace-scoped UI surfaces are unavailable without an active workspace. Systems, asset, artifact/data, model, image-generation, generated-output, and other workspace-owned pages must show a workspace-required call to action rather than empty global records when no workspace is active. Global-safe pages such as home, Settings, and security/software diagnostics may remain available when they do not expose workspace-owned resources.
 
 Workspace creation may offer `system.foundation@1.0.0` activation by reference via the user-facing "Include System Foundation assets" choice. This does not expose the system pack installer, copy system pack definitions, add pack import/export/install UI, or bypass workspace effective-view/resource scoping.
 
@@ -292,7 +292,7 @@ Artifact and upload isolation requires workspace pages and transports to send an
 
 ### Workspace-aware desktop and thin-client surfaces
 
-Desktop and thin-client users can see the active workspace in the shell and on workspace-scoped pages. Assets, Artifacts/Data, Models, Images, generated-output/data/model surfaces remain gated without an active workspace; Settings, safe diagnostics, and system/status pages remain globally accessible when they do not display workspace-owned records.
+Desktop and thin-client users can see the active workspace in the shell and on their implemented workspace-scoped pages. The desktop Systems destination and the shared Assets, Artifacts/Data, Models, Images, and generated-output/data/model surfaces remain gated without an active workspace. Settings and safe security/software diagnostics remain globally accessible when they do not display workspace-owned records; thin-client System Builder parity is deferred.
 
 The UI uses real workspace clients/transports for create/select/switch, never derives workspace ids from display names, and never creates a hidden default workspace. Creating a workspace may include System Foundation assets via a `system.foundation@1.0.0` activation reference. Workspace-scoped feature clients must include the active workspace id and must not fall back to global records. User-library/cross-workspace reuse, collaboration, invites, sync, and marketplace/pack-management behavior remain out of scope.
 
@@ -315,13 +315,20 @@ Asset Composition Planning is defined in `docs/architecture/asset-composition-pl
 
 ### Asset composition planning UI status
 
-- Composition planning is exposed inside the **Assets** area as a `Plans` tab, not as a separate top-level page.
+- General composition planning is exposed inside the **Assets** area as a `Plans` tab.
+- The top-level **Systems** area owns future system-specific assembly and System Builder records while reusing these planning and Asset Kernel contracts.
 - The asset composition planning UI is structured form/list planning (plans, assets in plan, connections, check plan), not visual canvas authoring.
 - `valid` means **Ready for planning** only; it does not mean runtime-ready or execution-ready.
 - Runtime-readiness binding and workflow/runtime/model execution remain separate responsibilities.
 - API/IPC/preload/client exposure is the boundary used by UI operations; unsupported operations must render as unavailable in UI.
 
 Effective asset projection infrastructure enriches the **Assets** experience; it is not a separate primary navigation destination in normal user flows.
+
+## System Builder
+
+System Builder is defined in `docs/architecture/system-builder.md` and ADR-0024. The workspace-scoped **Systems** destination is reserved for constructing systems from Asset Kernel definitions, instances, bindings, and compositions. The initial contract family and desktop preparation shell do not imply CRUD, persistence, transport, editing, runtime, or execution support.
+
+Builder-application diagnostics, feature lifecycle state, Python controls, ComfyUI install/repair status, and resource utilization are **Software status** concerns under **Settings**. They must not be modeled as a composed system or stored on System Builder records.
 
 ## Runtime Readiness Binding
 

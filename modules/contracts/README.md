@@ -11,6 +11,7 @@ Current contract families include:
 - `transport` plus `api` and `ipc` specializations
 - `artifact-browser` read-side operation and read-model contracts
 - `runtime`, `persistence`, `storage`, and `ingestion`
+- `system-builder` for workspace-owned composed-system design records that specialize Asset Kernel compositions
 - `artifact`, `transform`, `lineage`, and `dataset` for ELT-style data flow
 - `host` context metadata
 - `logging` vocabulary
@@ -19,6 +20,7 @@ Current contract families include:
 ## Terminology Guardrails
 
 - Use **asset** terminology for composable system parts and built-system units.
+- Use **System Builder** and **composed system** for workspace-owned system construction; use **software status**, **host status**, or **runtime status** for operational builder-application state.
 - Use **artifact** terminology for ELT-side stored/flowing data objects.
 - Use **ingestion** for the intake semantic layer.
 - Use **staged artifact** for inbound content that has entered ingestion/staging.

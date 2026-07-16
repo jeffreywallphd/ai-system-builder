@@ -1,17 +1,18 @@
 import { useState } from "react";
 
 import { CollapsiblePanel } from "../components/ui/CollapsiblePanel";
-import { SettingsPanel } from "../features/settings";
+import { SettingsPanel, SoftwareStatusSection } from "../features/settings";
 
 export function SettingsPage() {
   const [runtimeExpanded, setRuntimeExpanded] = useState(false);
   const [datasetExpanded, setDatasetExpanded] = useState(false);
   const [publishingExpanded, setPublishingExpanded] = useState(false);
+  const [softwareStatusExpanded, setSoftwareStatusExpanded] = useState(false);
 
   return (
     <section className="ui-stack ui-stack--sm">
       <h1>Settings</h1>
-      <p className="ui-text-muted">Manage global desktop defaults used by feature workflows.</p>
+      <p className="ui-text-muted">Manage global desktop defaults and inspect operational software status.</p>
       <SettingsPanel title="Hugging Face" category="huggingface" />
       <SettingsPanel title="Models" category="models" />
       <CollapsiblePanel
@@ -34,6 +35,13 @@ export function SettingsPage() {
         onToggle={() => setPublishingExpanded((expanded) => !expanded)}
       >
         {publishingExpanded ? <SettingsPanel title="Publishing" category="publishing" /> : <p>Open this section to load publishing defaults.</p>}
+      </CollapsiblePanel>
+      <CollapsiblePanel
+        title="Software status"
+        isExpanded={softwareStatusExpanded}
+        onToggle={() => setSoftwareStatusExpanded((expanded) => !expanded)}
+      >
+        {softwareStatusExpanded ? <SoftwareStatusSection /> : <p>Open this section to inspect the desktop builder, host features, and local runtimes.</p>}
       </CollapsiblePanel>
     </section>
   );

@@ -33,6 +33,7 @@ const CONTRACT_FAMILIES = [
   "userLibrary",
   "assetAuthoring",
   "assetComposition",
+  "systemBuilder",
   "runtimeReadiness",
   "executionRuns",
   "conversations",

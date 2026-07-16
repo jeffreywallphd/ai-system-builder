@@ -22,6 +22,7 @@ Use this guide to select **minimum-sufficient** context packs. Start with `index
 | custom asset creation, authored drafts, revisions, overrides, promotion readiness | `docs/context/packs/asset-authoring.pack.md` |
 | effective/materialized projections, projection readiness, blockers, diagnostics | `docs/context/packs/effective-asset-projections.pack.md` |
 | asset composition plans, compatibility, dependencies, planning blockers | `docs/context/packs/asset-composition-planning.pack.md` |
+| composed systems, System Builder records, Systems navigation, software-status placement | `docs/context/packs/system-builder.pack.md` |
 | runtime readiness, capability matching, runtime resources, execution-output readiness | `docs/context/packs/runtime-readiness-binding.pack.md` |
 | execution plans, dry-run/preflight, planned steps/inputs/outputs, safety gates | `docs/context/packs/execution-plan-preparation.pack.md` |
 | conversational runnable systems, sessions, turns, runs, text-generation adapters | `docs/context/packs/controlled-conversational-system-execution.pack.md` |
@@ -50,6 +51,7 @@ Use this guide to select **minimum-sufficient** context packs. Start with `index
 - User Library: `index` + `user-library` + either `asset-kernel` for semantics or `persistence-storage` for repository behavior.
 - Asset authoring: `index` + `asset-authoring` + either `asset-kernel`, `user-library`, or `effective-asset-projections` based on the adjacent behavior.
 - Projection/composition/readiness/planning: select the one owning layer plus one immediate neighbor; move forward through the chain in separate reasoning stages.
+- System Builder: `index` + `system-builder`; add `asset-kernel` or `asset-composition-planning` for data semantics, or `desktop-implementation` for Systems/Settings UI placement.
 - Controlled conversational execution: `index` + `controlled-conversational-system-execution`; add the execution-plan or runtime pack only when that exact boundary changes.
 - Security: `index` + `security` + the one public host/client/feature boundary being changed.
 - Desktop renderer styling: `index` + `desktop-styling` + `desktop-implementation`.

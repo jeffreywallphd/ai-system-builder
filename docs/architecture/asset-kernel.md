@@ -90,6 +90,10 @@ An `AssetComposition` assembles asset instances and bindings into a larger featu
 
 A composition is not simply a folder, route, renderer tree, or file hierarchy. It is a validated assembly of configured instances and typed bindings.
 
+### System Builder specialization
+
+The System Builder does not define another component graph. `modules/contracts/system-builder` narrows `AssetComposition` to the `system` and `system-of-subsystems` composition types and wraps it in a workspace-owned design-time record. System Builder lifecycle describes construction progress only; software, host, installer, runtime, and execution status remain outside that record. See `docs/architecture/system-builder.md` and ADR-0024.
+
 ## Asset Families
 
 High-level asset families:

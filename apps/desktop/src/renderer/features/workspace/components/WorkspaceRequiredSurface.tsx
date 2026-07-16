@@ -1,7 +1,7 @@
 import { useActiveWorkspace } from "../hooks/useActiveWorkspace";
 import { WorkspaceCreateForm } from "./WorkspaceCreateForm";
 
-export const WORKSPACE_REQUIRED_MESSAGE = "Create a workspace to use Assets, Artifacts, Data, Models, and Images.";
+export const WORKSPACE_REQUIRED_MESSAGE = "Create a workspace to use Systems, Assets, Artifacts, Data, Models, and Images.";
 
 export function WorkspaceRequiredSurface() {
   const workspace = useActiveWorkspace();

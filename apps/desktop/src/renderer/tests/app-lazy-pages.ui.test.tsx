@@ -64,10 +64,11 @@ function createControlledRegistry() {
       home: loaderFor("home"),
       artifacts: loaderFor("artifacts"),
       assets: loaderFor("assets"),
+      "user-library": loaderFor("user-library"),
       models: loaderFor("models"),
       "image-generation": loaderFor("image-generation"),
       settings: loaderFor("settings"),
-      system: loaderFor("system"),
+      systems: loaderFor("systems"),
     }),
     calls,
     resolve(pageKey: DesktopPageKey, label = pageKey) {
@@ -151,7 +152,7 @@ describe("desktop renderer lazy page loading", () => {
     expect(mounted.container.textContent).toContain("Assets");
     expect(mounted.container.textContent).toContain("Models");
     expect(mounted.container.textContent).toContain("Image Generation");
-    expect(mounted.container.textContent).toContain("System");
+    expect(mounted.container.textContent).toContain("Systems");
     expect(mounted.container.textContent).toContain("Loading page…");
     expect(controlled.calls.get("home")).toBe(1);
     expect(controlled.calls.get("artifacts") ?? 0).toBe(0);
