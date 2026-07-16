@@ -74,8 +74,15 @@ Use only the docs needed for the current task:
 ## Prompt Assembly Notes
 
 - Always include this pack first.
-- Use `docs/context/prompt-routing.md` to choose companion packs.
-- Typical order: `index` -> task-specific pack(s) -> targeted canonical docs.
+- Use `docs/context/pack-catalog.json` and `docs/context/prompt-routing.md` to choose companion packs.
+- Typical order: `index` -> one primary pack -> at most one evidenced adjacent pack -> targeted canonical docs.
 - For debugging, add `debugging-error-handling` first, then the affected host/runtime/storage/UI pack.
-- For Asset Kernel, workspace, user-library, authoring, projection, composition, readiness, execution-plan, or conversational-execution work, include only the relevant pack chain named by prompt routing.
-- Common planning chain paths: `docs/context/packs/effective-asset-projections.pack.md`, `docs/context/packs/asset-composition-planning.pack.md`, `docs/context/packs/runtime-readiness-binding.pack.md`, `docs/context/packs/execution-plan-preparation.pack.md`, `docs/context/packs/controlled-conversational-system-execution.pack.md`.
+- For Asset Kernel, workspace, user-library, authoring, projection, composition, readiness, execution-plan, or conversational-execution work, select the owning pack and only the immediate neighbor proven relevant by repository inspection.
+- For work spanning projection, composition, readiness, planning, and execution, retrieve and validate one boundary at a time instead of preloading the entire chain.
+
+Frequently adjacent late-stage planning packs remain explicitly discoverable here while the catalog
+stays authoritative for the complete inventory:
+
+- `docs/context/packs/runtime-readiness-binding.pack.md`
+- `docs/context/packs/execution-plan-preparation.pack.md`
+- `docs/context/packs/controlled-conversational-system-execution.pack.md`

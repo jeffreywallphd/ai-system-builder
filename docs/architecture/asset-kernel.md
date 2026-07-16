@@ -1,5 +1,9 @@
 # Asset Kernel
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0005-builder-core-platform-capabilities-and-user-composable-assets.md`, `docs/adr/ADR-0016-asset-kernel-terminology-and-architecture-baseline.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 ## Purpose
 
 The Asset Kernel is the canonical shared foundation for assets in `ai-system-builder`.

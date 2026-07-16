@@ -1,5 +1,9 @@
 # Host Model
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0003-host-model-and-transport-separation.md`, `docs/adr/ADR-0013-host-owned-runtime-execution-and-feature-placement.md`, `docs/adr/ADR-0015-security-architecture-and-policy-boundaries.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 ## Asset Kernel relationship
 
 Assets may declare host and permission requirements, but hosts remain responsible for composition and concrete runtime/readiness provider wiring. Asset metadata should stay declarative and transport/UI-neutral; desktop IPC, server API, and renderer models must not redefine asset semantics. Permission requirements can be validated structurally first, with enforcement added later through application and host policy seams.

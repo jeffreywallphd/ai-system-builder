@@ -1,5 +1,9 @@
 # Persistence and Storage
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0004-persistence-and-storage-separation.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 ## Asset Kernel relationship
 
 The Asset Kernel is the semantic composition model for reusable building blocks. Persistence and storage remain separate lower-level architecture concerns. Asset metadata may be persisted as structured records for asset definitions, instances, bindings, compositions, lifecycle, and provenance; binary/content payloads remain storage concerns. The current Asset Kernel persistence stack includes a minimal local JSON record adapter with schema-version manifest metadata and descriptor-only resource-backed mapping/view helpers. This does not add a migration framework, durable resource-backed mapping repository, or version-history service.

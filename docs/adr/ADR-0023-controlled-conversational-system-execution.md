@@ -1,6 +1,6 @@
 # ADR-0023: Controlled Conversational System Execution
 
-- Status: Accepted
+- Status: accepted
 - Date: 2026-05-22
 
 ## Context

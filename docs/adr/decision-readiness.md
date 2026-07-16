@@ -1,0 +1,43 @@
+# Architecture Decision Readiness
+
+- Status: current
+- Verification: `npm run docs:check`
+
+This register tells contributors and automated agents whether architecture-sensitive work can proceed from existing decisions. It is a decision gate, not an ADR inventory, implementation backlog, or substitute for reading the linked sources.
+
+## Readiness Values
+
+- `ready`: accepted guidance is specific enough for work within its stated boundary.
+- `constrained`: accepted guidance exists, but expansion beyond current behavior needs another decision.
+- `proposed`: direction is recorded but has not been accepted as authority.
+- `decision-required`: canonical docs explicitly leave materially different choices open.
+
+## Current Decision Surface
+
+| Area | Readiness | Authority and boundary | Agent action |
+| --- | --- | --- | --- |
+| Repository shape and dependency direction | ready | ADR-0001 and `docs/architecture/module-dependency-rules.md` | Follow the existing layers; changing dependency direction requires an ADR update or successor. |
+| TypeScript-first application/runtime model | ready | ADR-0002; Python is isolated behind runtime boundaries by ADR-0010 | Keep domain/application/host code TypeScript-first and Python runtime details adapter-owned. |
+| Desktop/server hosts and transport separation | ready | ADR-0003, ADR-0013, `docs/architecture/host-model.md` | Add behavior through application seams and host composition; do not move business policy into API/IPC/UI layers. |
+| Persistence/storage separation | constrained | ADR-0004 and `docs/architecture/persistence-and-storage.md` accept Postgres as the structured-data default and separate blob/resource storage | Existing local adapters and current Postgres foundation may evolve within their ports. Deployment-specific schema lifecycle, migration, backup, tenancy, and failover policies need explicit decisions before being presented as supported. |
+| Builder-core/platform/asset separation | proposed | ADR-0005 is proposed; ADR-0016 supplies the accepted Asset Kernel vocabulary and boundary | Use ADR-0016 and later accepted ADRs for Asset Kernel work. Do not use ADR-0005 alone to authorize new capability APIs or taxonomy. |
+| Desktop renderer structure and styling | ready | ADR-0006 and ADR-0007 | Preserve shared UI boundaries, platform clients, and styling layers. A separate design-system architecture requires a decision if introduced. |
+| Ingestion and artifact identity/backing | ready | ADR-0008 and ADR-0009 | Extend through established domain/application/storage seams and preserve artifact-versus-storage distinctions. |
+| Python runtime and runtime task registry | proposed | ADR-0010 and ADR-0011 are proposed even though corresponding behavior and tests exist | Maintain implemented, tested behavior within current architecture docs, but do not broaden runtime topology or lifecycle guarantees until the decisions are accepted or superseded. |
+| Host-owned runtime placement, installers, and image generation | constrained | ADR-0012 through ADR-0014 plus runtime architecture docs | Implement supported capabilities through runtime ports, readiness, task registry, installers, and host ownership. New engines, generalized orchestration, or lifecycle guarantees need explicit decisions. |
+| Security policy boundaries | constrained | ADR-0015 and the security architecture/context | Preserve current secure modes, policy seams, and sanitized diagnostics. OAuth, mTLS, external identity, encryption-at-rest, public-internet hardening, and complete audit architecture require explicit accepted decisions. |
+| Asset Kernel, reuse, authoring, projections, composition, readiness, and execution planning | ready | ADR-0016 through ADR-0022 and their architecture docs | Work only inside each ADR's implemented/current boundary; capabilities marked deferred are not implied by the next layer. |
+| Controlled conversational execution | constrained | ADR-0023 and `docs/architecture/controlled-conversational-system-execution.md` | Preserve explicit approval, supported text-generation adapter boundaries, and truthful unsupported states. Streaming, tools, retrieval, memory, multimodal behavior, and arbitrary workflows require decisions and implementation evidence. |
+| Desktop-to-server hybrid coordination and synchronization | decision-required | ADR-0003 and `docs/architecture/host-model.md` intentionally leave topology and coordination open | Do not invent routing, synchronization, conflict, offline, or ownership policy. Produce options and consequences for approval. |
+| Multi-user collaboration, organization tenancy, and shared libraries | decision-required | Workspace, user-library, security, and persistence docs defer identity, membership, permissions, sync, and tenancy semantics | Do not infer organization ownership or access policy from passive actor/member fields. Require an ADR before public behavior or durable schema commitment. |
+| Public pack import/export, registry, and marketplace behavior | decision-required | Asset Kernel and system overview docs keep these surfaces deferred | Do not expose installation, marketplace, trust, signing, override, or distribution behavior without accepted trust and lifecycle decisions. |
+
+## How to Use This Register
+
+1. Locate the nearest row for the proposed change.
+2. Read its linked ADR and architecture sources.
+3. If `ready`, stay inside the stated boundary and apply the change-impact matrix.
+4. If `constrained`, verify that the work does not cross the named constraint.
+5. If `proposed` or `decision-required`, stop before implementation and present decision options, consequences, and affected boundaries.
+
+When a decision is accepted, superseded, or materially constrained, update this register in the same change as the ADR and affected architecture/context docs.

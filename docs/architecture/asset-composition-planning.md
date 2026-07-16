@@ -1,5 +1,9 @@
 # Asset Composition Planning
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0020-asset-composition-planning.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 ## Purpose
 
 Asset composition planning is a workspace-scoped, non-runtime planning layer.

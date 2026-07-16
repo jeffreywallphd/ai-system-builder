@@ -66,7 +66,7 @@
 ## Canonical Source Docs
 
 - `docs/adr/ADR-0002-typescript-first-runtime-model.md` - core runtime decision.
-- `docs/adr/ADR-0013-cross-host-runtime-ownership.md` - desktop/server runtime ownership.
+- `docs/adr/ADR-0013-host-owned-runtime-execution-and-feature-placement.md` - desktop/server runtime ownership.
 - `docs/architecture/runtime-model.md` - runtime responsibilities and boundaries.
 - `docs/architecture/runtime-readiness-binding.md` - readiness/capability output.
 - `docs/architecture/module-dependency-rules.md` - adapter dependency constraints.

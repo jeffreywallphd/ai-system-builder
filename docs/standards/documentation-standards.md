@@ -1,5 +1,8 @@
 # Documentation Standards
 
+- Status: accepted
+- Verification: `npm run docs:check`
+
 ## Purpose
 
 Documentation in `ai-system-builder` is part of the system, not commentary about the system.
@@ -142,7 +145,13 @@ When a canonical change affects context-pack guidance, update only the materiall
 
 ## Consistency and templates
 
-Use repository templates where they exist (`docs/templates/`, `docs/adr/template.md`) to keep structure consistent.
+Use the canonical repository templates to keep structure consistent:
+
+- ADRs: `docs/adr/template.md`.
+- Context packs: `docs/context/packs/pack.template.md`.
+- Epic, feature, and story context: `docs/context/templates/`.
+
+Use `docs/standards/documentation-metadata-standards.md` for canonical status, decision, and verification metadata. Do not add owners or review dates that cannot be maintained or proven.
 
 Expectations:
 

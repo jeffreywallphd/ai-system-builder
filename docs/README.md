@@ -2,9 +2,9 @@
 
 > AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
 
-This directory is organized into four documentation areas with distinct roles.
+This directory separates canonical system guidance from downstream task context and operational support material.
 
-## Areas and Roles
+## Canonical Areas
 
 - `docs/adr/`
   - Architecture Decision Records (ADRs): major architectural decisions and rationale.
@@ -15,15 +15,32 @@ This directory is organized into four documentation areas with distinct roles.
 - `docs/standards/`
   - Canonical implementation and documentation rules.
 - `docs/context/`
-  - Reusable context-assembly support for prompts and implementation work.
+  - Downstream context-assembly support for implementation work; it summarizes canonical sources but does not replace them.
 
-## How to Use These Docs
+## Supporting Areas
 
-- Read ADRs for major decision history and constraints.
-- Read architecture docs for structure and boundary guidance.
-- Read standards docs for canonical rules to follow during implementation.
-- Use context docs to assemble task-relevant current context without replacing canonical docs.
-- If context docs conflict with ADR/architecture/standards docs, canonical docs take precedence.
+- `docs/security/`
+  - Security-oriented operational checks and manual verification guidance.
+- `docs/diagnostics/`
+  - Focused diagnostic and regression-check procedures.
+- `docs/docs-mismatch-register.md`
+  - Visible record of unresolved conflicts between code and documentation.
+- `docs/context/templates/`
+  - Templates for durable epic, feature, and story context artifacts.
+
+## Start by Task
+
+- Any repository task: read the root `AGENTS.md`, then `docs/context/packs/index.pack.md`.
+- Narrow implementation task: use `docs/context/prompt-routing.md` to add only materially relevant packs.
+- Architecture or dependency change: read `docs/architecture/system-overview.md`, `docs/architecture/module-dependency-rules.md`, and related ADRs.
+- Persistence or deployment work: read `docs/architecture/persistence-and-storage.md`, `docs/architecture/host-model.md`, ADR-0003, and ADR-0004.
+- Documentation work: read `docs/standards/documentation-standards.md` and use the canonical templates listed there.
+- Automated or repository-scale implementation: read `docs/standards/ai-agent-development-standards.md`, apply `docs/standards/change-impact-matrix.md`, and check `docs/adr/decision-readiness.md`.
+- Architecture verification: use `docs/architecture/architecture-verification.md` to distinguish direct fitness functions from representative coverage and known gaps.
+- Agent-support evaluation: use `docs/context/pack-catalog.json`, `dev-tools/agent-evals/scenarios.json`, and `docs/standards/agent-support-evaluation-standards.md`.
+- Security-sensitive work: add `docs/context/packs/security.pack.md` and inspect `docs/security/`.
+
+If context guidance conflicts with an ADR, architecture document, or standard, the canonical source takes precedence and the conflict must be corrected or recorded.
 
 ## Current Architecture Pointers
 
@@ -36,7 +53,7 @@ This directory is organized into four documentation areas with distinct roles.
 - Execution plan preparation: `docs/architecture/execution-plan-preparation.md` and ADR-0022.
 - Controlled conversational execution: `docs/architecture/controlled-conversational-system-execution.md` and ADR-0023.
 
-## Automation Note
+## Agent Context
 
 - Start prompt assembly from `docs/context/packs/index.pack.md`.
 - Use `docs/context/prompt-routing.md` to choose only additional packs that are materially relevant.
@@ -48,3 +65,9 @@ This directory is organized into four documentation areas with distinct roles.
 - Execution plan preparation pack: `docs/context/packs/execution-plan-preparation.pack.md`.
 - Controlled conversational execution pack: `docs/context/packs/controlled-conversational-system-execution.pack.md`.
 - Execution requires explicit approval plus supported runtime invocation boundaries.
+
+## Verification
+
+- Run `npm run docs:check` after documentation or context changes.
+- Run `npm test` after implementation changes and before handoff when practical.
+- Continuous integration enforces both gates for pull requests and changes to the default branch.

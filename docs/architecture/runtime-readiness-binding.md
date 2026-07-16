@@ -1,5 +1,9 @@
 # Runtime Readiness Binding (runtime readiness binding Baseline)
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0021-runtime-readiness-binding.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 ## Purpose and area placement
 
 runtime readiness binding introduces **Runtime Readiness Binding**: a workspace-scoped, non-executing readiness layer that evaluates whether a validated asset composition planning composition plan can be safely mapped to available runtime capabilities.

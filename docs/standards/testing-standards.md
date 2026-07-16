@@ -1,5 +1,8 @@
 # Testing Standards
 
+- Status: accepted
+- Verification: `npm test`
+
 ## Purpose
 
 Tests in `ai-system-builder` protect meaningful behavior and architectural intent.

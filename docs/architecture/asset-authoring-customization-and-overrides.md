@@ -1,5 +1,9 @@
 # Asset Authoring, Customization, and Override Management
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0018-asset-authoring-customization-and-overrides.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 - Effective asset projections: `docs/architecture/effective-asset-projections.md` and ADR-0019 define how authored/customized records become workspace-scoped effective projections with explicit status/blockers.
 
 ## Purpose

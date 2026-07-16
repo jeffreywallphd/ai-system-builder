@@ -1,5 +1,9 @@
 # System Overview
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0001-repository-structure.md`, `docs/adr/ADR-0003-host-model-and-transport-separation.md`, `docs/adr/ADR-0004-persistence-and-storage-separation.md`, `docs/adr/ADR-0015-security-architecture-and-policy-boundaries.md`, `docs/adr/ADR-0016-asset-kernel-terminology-and-architecture-baseline.md`, `docs/adr/ADR-0023-controlled-conversational-system-execution.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 - effective asset projections baseline: `docs/architecture/effective-asset-projections.md` defines workspace-scoped safe materialized/effective asset projections for planning-readiness (non-executing).
 ## Purpose of this repository
 

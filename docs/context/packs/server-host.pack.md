@@ -58,7 +58,7 @@
 
 - `docs/architecture/host-model.md` - server host role and thin-client positioning.
 - `docs/adr/ADR-0003-host-model-and-transport-separation.md` - host/transport separation.
-- `docs/adr/ADR-0013-cross-host-runtime-ownership.md` - server/desktop runtime ownership.
+- `docs/adr/ADR-0013-host-owned-runtime-execution-and-feature-placement.md` - server/desktop runtime ownership.
 - `docs/architecture/module-dependency-rules.md` - dependency and boundary rules.
 - `docs/architecture/system-overview.md` - app/host/transport placement model.
 - `docs/standards/coding-standards.md` - boundary-safe route and host code.

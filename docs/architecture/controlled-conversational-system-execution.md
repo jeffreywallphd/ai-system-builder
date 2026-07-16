@@ -1,5 +1,9 @@
 # Controlled Conversational System Execution
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0023-controlled-conversational-system-execution.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 ## Purpose
 
 Controlled conversational execution defines the first runnable composed-system execution slice while preserving the existing composition-first architecture.

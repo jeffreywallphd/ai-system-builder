@@ -1,5 +1,9 @@
 # Workspace Model
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0017-user-library-and-cross-workspace-reuse.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 ## Scope
 
 Workspace foundations establish persisted workspace records, explicit active-workspace selection, workspace-gated resource surfaces, workspace-owned operation context propagation, and reference-only activation of system-owned packs. They do not implement User Library reuse, asset authoring, override editing, composition authoring, collaboration permissions, pack import/export, marketplace behavior, or automatic legacy migration.

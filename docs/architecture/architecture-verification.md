@@ -1,0 +1,36 @@
+# Architecture Verification Map
+
+- Status: current
+- Related decisions: `docs/adr/ADR-0001-repository-structure.md`
+- Verification: `npm test` and `npm run docs:check`
+
+This map connects high-value architectural claims to current automated evidence. It does not claim that passing tests proves every sentence in the architecture documentation.
+
+## Coverage Levels
+
+- `direct`: a check explicitly owns the named invariant.
+- `representative`: focused tests cover important instances, but a repository-wide violation could still escape.
+- `gap`: the invariant is review-only or its intended adapter is incomplete.
+
+## Current Fitness Functions
+
+| Invariant | Coverage | Current evidence | Remaining limit |
+| --- | --- | --- | --- |
+| Contract consumers use explicit family public surfaces rather than a flattened root or internal files | direct | `modules/contracts/tests/contracts-public-surface-discipline.unit.test.ts`; `modules/contracts/tests/contracts-cross-family-invariants.unit.test.ts` | New contract families must be added to the discipline fixtures. |
+| Contract families compose through shared transport/operation identities | direct | `modules/contracts/shared/operation-identity.unit.test.ts`; transport parity tests under `modules/contracts/tests/`; family invariant tests under `modules/contracts/*/tests/` | The checks cover registered families and operations, so catalog drift must remain checked. |
+| Application ports stay contract-aligned and independent of outer layers | direct | `modules/application/ports/tests/ports-cross-family-invariants.unit.test.ts`; port-family tests under `modules/application/ports/*/tests/` | A newly added port family must join the invariant test inventory. |
+| Production module source preserves documented cross-layer dependency direction | direct | `npm run architecture:check`; `dev-tools/config/architecture-boundaries.json`; `dev-tools/scripts/testing/module-dependency-guard.test.mjs` | Two exact contract-to-application exceptions are tracked by DM-20260716-001; package aliases, external-package transitivity, and business-policy placement remain outside the generic source-edge check. |
+| Domain and application code keep concrete hosts, adapters, transports, and UI outward | direct | `npm run architecture:check`; focused import-boundary tests under `modules/domain/**/tests/` and `modules/application/**/tests/` | Focused tests still own feature-specific forbidden calls and public exposure. |
+| Persistence and storage adapters depend inward and keep host/UI/app behavior out | direct | `npm run architecture:check`; `modules/adapters/persistence/asset/tests/local-asset-repository-adapters.unit.test.ts`; storage and persistence family invariant tests | Runtime-specific adapter constraints remain adapter-specific. |
+| Apps bootstrap and hosts compose without absorbing feature business rules | representative | `modules/hosts/desktop/composition/tests/composeDesktopHost.unit.test.ts`; `modules/hosts/server/composition/tests/composeServerHost.unit.test.ts`; shared composition boundary tests | Composition size and all possible policy leakage are not checked repository-wide. |
+| Workspace-owned records require explicit context and remain isolated | representative | Workspace contract/use-case/persistence tests; `modules/adapters/persistence/execution-runs/tests/local-execution-run-repositories.unit.test.ts`; feature-specific workspace-isolation tests | Every new workspace-owned family must add propagation and isolation evidence. |
+| Server transport denies unknown routes and enforces configured security policy | direct | `modules/adapters/transport/api-express/security/security-enforcement.unit.test.ts`; `modules/hosts/server/security/tests/composeServerSecurity.unit.test.ts` | External identity, mTLS, public-internet hardening, and complete audit behavior are not implemented decisions. |
+| Runtime readiness remains separate from feature execution and is transport-aligned | direct | `modules/contracts/tests/runtime-readiness-transport-parity.unit.test.ts`; runtime-readiness contract, port, use-case, persistence, API, IPC, and host tests | Generalized workflow execution is outside this invariant. |
+| Asset Kernel internal mutation/install behavior is not accidentally exposed publicly | direct | `modules/hosts/shared/composition/tests/asset-kernel-non-exposure.unit.test.ts`; Asset contract/application boundary tests | New approved public operations require explicit fixture updates and canonical decisions. |
+| Generated JavaScript does not contaminate TypeScript module source trees | direct | `dev-tools/scripts/testing/source-tree-contamination-guard.test.mjs` and its repository test-runner integration | Other generated artifact locations use separate ignore/build controls. |
+| Structured persistent data defaults toward Postgres while blobs/resources remain storage concerns | gap | ADR-0004 and `docs/architecture/persistence-and-storage.md`; local adapter tests verify the separation for implemented local stores | Postgres currently provides a pool foundation but not complete repository/schema/migration coverage for deployment targets. |
+| Canonical documentation remains current-state oriented, linked, metadata-bearing, and context packs stay bounded/downstream | direct | `dev-tools/scripts/docs/check-doc-drift.mjs`; `dev-tools/scripts/testing/documentation-drift-guard.test.mjs`; `.github/workflows/ci.yml` | Semantic agreement between prose and implementation still requires focused review and the mismatch register. |
+
+## Updating the Map
+
+When a test is added, renamed, or removed, update the corresponding row in the same change. Promote `representative` or `gap` only when a check directly owns the full stated invariant; do not promote coverage based only on a passing general test suite.

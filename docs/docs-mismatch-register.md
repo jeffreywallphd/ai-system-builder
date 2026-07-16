@@ -86,4 +86,17 @@ Do not use this register for:
 
 ## Findings
 
-No open findings.
+### DM-20260716-001
+
+- Status: open
+- Severity: medium
+- Drift type: canonical-vs-code
+- Primary doc: `docs/architecture/module-dependency-rules.md`
+- Compared with: `modules/contracts/api/asset-registry-api-contract.ts`, `modules/contracts/ipc/desktop-asset-registry-contract.ts`
+- Summary: Two transport contract files import Asset Registry read-model types owned by an application service instead of a contract family.
+- Evidence:
+  - `docs/architecture/module-dependency-rules.md`: contract modules must not depend on application code, and contract families are the stable cross-boundary language.
+  - `modules/contracts/api/asset-registry-api-contract.ts`: imports `asset-registry-read-facade.types` from `modules/application/services/asset`.
+  - `modules/contracts/ipc/desktop-asset-registry-contract.ts`: imports the same application-owned types.
+- Expected decision: Relocate the transport-facing read-model types to the appropriate contract family, update application and transport consumers, then remove both exact exceptions from `dev-tools/config/architecture-boundaries.json`.
+- Notes: `npm run architecture:check` permits only these two tracked source/target pairs and rejects new contract-to-application dependencies.

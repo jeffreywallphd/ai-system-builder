@@ -1,5 +1,9 @@
 # Execution Plan Preparation (execution plan preparation)
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0022-execution-plan-preparation.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 ## Purpose
 
 execution plan preparation defines **Execution Plan Preparation** as a workspace-scoped, non-executing planning layer.

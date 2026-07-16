@@ -1,5 +1,8 @@
 # Naming Standards
 
+- Status: accepted
+- Verification: `npm test`
+
 ## Purpose
 
 Names in `ai-system-builder` must reveal architectural role, not just implementation convenience.

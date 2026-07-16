@@ -1,7 +1,6 @@
 # ADR-0014: Runtime Installer Architecture
 
-## Status
-Accepted
+- Status: accepted
 
 ## Problem
 
