@@ -12,6 +12,7 @@ import type {
   ImageAssetRegistryPort,
   RegisterImageAssetInput,
 } from "../../../application/ports/image";
+import { readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../shared";
 
 interface ImageAssetRegistryDocument {
   assets?: Record<string, ImageAsset>;
@@ -19,13 +20,16 @@ interface ImageAssetRegistryDocument {
 
 export interface LocalImageAssetRegistryAdapterOptions {
   filePath: string;
+  rootDirectory?: string;
+  documents?: StructuredDocumentStore;
   now?: () => string;
   createAssetId?: () => string;
 }
 
 export type LocalImageAssetRegistryAdapter = ImageAssetRegistryPort & ImageAssetDescriptorReadPort;
 
-async function readDocument(filePath: string): Promise<ImageAssetRegistryDocument> {
+async function readDocument(filePath: string, documents?: StructuredDocumentStore, rootDirectory?: string): Promise<ImageAssetRegistryDocument> {
+  if (documents) return (await readDocumentRecord({ rootDirectory: rootDirectory ?? dirname(filePath), documents }, ".catalog/image-assets.json", { assets: {} })).value;
   try {
     const parsed = JSON.parse(await readFile(filePath, "utf8")) as ImageAssetRegistryDocument;
     return parsed && typeof parsed === "object" ? parsed : { assets: {} };
@@ -37,7 +41,11 @@ async function readDocument(filePath: string): Promise<ImageAssetRegistryDocumen
   }
 }
 
-async function writeDocument(filePath: string, document: ImageAssetRegistryDocument): Promise<void> {
+async function writeDocument(filePath: string, document: ImageAssetRegistryDocument, documents?: StructuredDocumentStore, rootDirectory?: string): Promise<void> {
+  if (documents) {
+    await writeDocumentRecord({ rootDirectory: rootDirectory ?? dirname(filePath), documents }, ".catalog/image-assets.json", document);
+    return;
+  }
   await mkdir(dirname(filePath), { recursive: true });
   const temporaryPath = `${filePath}.tmp`;
   await writeFile(temporaryPath, JSON.stringify(document, null, 2), "utf8");
@@ -82,22 +90,22 @@ export function createLocalImageAssetRegistryAdapter(
   return {
     async registerImageAsset(input) {
       assertWorkspaceId(input.workspaceId);
-      const document = await readDocument(options.filePath);
+      const document = await readDocument(options.filePath, options.documents, options.rootDirectory);
       const assets = document.assets ?? {};
       const asset = toImageAsset(input);
       assets[asset.assetId] = asset;
-      await writeDocument(options.filePath, { ...document, assets });
+      await writeDocument(options.filePath, { ...document, assets }, options.documents, options.rootDirectory);
       return { assetId: asset.assetId };
     },
     async getImageAsset(workspaceId, assetId) {
       assertWorkspaceId(workspaceId);
-      const document = await readDocument(options.filePath);
+      const document = await readDocument(options.filePath, options.documents, options.rootDirectory);
       const asset = document.assets?.[assetId] ?? null;
       return asset?.workspaceId === workspaceId ? asset : null;
     },
     async listImageAssetDescriptors(query: ImageAssetDescriptorListQuery): Promise<ImageAssetDescriptorListResult> {
       assertWorkspaceId(query?.workspaceId);
-      const document = await readDocument(options.filePath);
+      const document = await readDocument(options.filePath, options.documents, options.rootDirectory);
       const limit = typeof query.limit === "number" && Number.isFinite(query.limit) && query.limit > 0
         ? Math.floor(query.limit)
         : 50;
@@ -129,7 +137,7 @@ export function createLocalImageAssetRegistryAdapter(
     },
     async readImageAssetDescriptor(workspaceId, assetId) {
       assertWorkspaceId(workspaceId);
-      const document = await readDocument(options.filePath);
+      const document = await readDocument(options.filePath, options.documents, options.rootDirectory);
       const asset = document.assets?.[assetId] ?? null;
       return asset?.workspaceId === workspaceId ? asset : null;
     },

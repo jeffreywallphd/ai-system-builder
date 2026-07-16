@@ -1,6 +1,7 @@
 import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
 import { createHuggingFaceModelBrowseDetailsAdapter, createHuggingFaceModelPublisherAdapter } from "../../../adapters/model/huggingface";
 import { createLocalGeneratedModelStorageAdapter } from "../../../adapters/model/local";
+import type { StructuredDocumentStore } from "../../../adapters/persistence/shared";
 import {
   BrowseModelsUseCase,
   DeleteModelRecordUseCase,
@@ -18,6 +19,7 @@ import { asyncLazyObject } from "./lazyProxy";
 export interface ComposeDesktopModelFeatureOptions {
   storageRootDirectory: string;
   now: () => string;
+  documents?: StructuredDocumentStore;
   tokenProvider: () => string | undefined;
   readSharedModelStorageDirectory?: () => Promise<string | undefined>;
   getArtifacts: () => Promise<any>;
@@ -28,6 +30,8 @@ export interface ComposeDesktopModelFeatureOptions {
 export function composeDesktopModelFeature(options: ComposeDesktopModelFeatureOptions): any {
   const modelRegistry = createLocalModelRegistryAdapter({
     filePath: `${options.storageRootDirectory}/model-registry/models.json`,
+    rootDirectory: options.storageRootDirectory,
+    documents: options.documents,
     now: options.now,
     discovery: {
       searchRoots: async () => {

@@ -10,18 +10,22 @@ import { createLocalImageAssetRegistryAdapter } from "../../../adapters/persiste
 import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
 import { composeInternalAssetRegistry, type InternalAssetRegistryComposition } from "../../shared/composition/composeInternalAssetRegistry";
 import { composeResourceBackedViewProviders } from "../../shared/composition/composeResourceBackedViewProviders";
+import type { StructuredDocumentStore } from "../../../adapters/persistence/shared";
 
 export interface ComposeDesktopAssetFeatureOptions {
   storageRootDirectory: string;
   now: () => string;
   readSharedModelStorageDirectory?: () => Promise<string | undefined>;
   artifacts: any;
+  documents?: StructuredDocumentStore;
   onInternalAssetRegistry?: (registry: InternalAssetRegistryComposition) => void;
 }
 
 export function composeDesktopAssetFeature(options: ComposeDesktopAssetFeatureOptions): any {
   const modelRegistry = createLocalModelRegistryAdapter({
     filePath: `${options.storageRootDirectory}/model-registry/models.json`,
+    rootDirectory: options.storageRootDirectory,
+    documents: options.documents,
     now: options.now,
     discovery: {
       searchRoots: async () => {
@@ -30,10 +34,11 @@ export function composeDesktopAssetFeature(options: ComposeDesktopAssetFeatureOp
       },
     },
   });
-  const imageAssetRegistry = createLocalImageAssetRegistryAdapter({ filePath: join(options.storageRootDirectory, ".catalog", "image-assets.json"), now: options.now });
+  const imageAssetRegistry = createLocalImageAssetRegistryAdapter({ filePath: join(options.storageRootDirectory, ".catalog", "image-assets.json"), rootDirectory: options.storageRootDirectory, documents: options.documents, now: options.now });
   const internalAssetRegistry = composeInternalAssetRegistry({
     rootDirectory: options.storageRootDirectory,
     now: options.now,
+    documents: options.documents,
     resourceBackedViewProvider: composeResourceBackedViewProviders({
       artifactBrowserMetadataRead: options.artifacts.artifactBrowserRead,
       imageAssetDescriptorRead: imageAssetRegistry,

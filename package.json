@@ -27,12 +27,15 @@
     "preview:thin-client": "npm run preview -w @ai-system-builder/thin-client",
     "dev:server": "npm run dev -w @ai-system-builder/server",
     "build:server": "npm run build -w @ai-system-builder/server",
-    "start:server": "npm run start -w @ai-system-builder/server"
+    "start:server": "npm run start -w @ai-system-builder/server",
+    "persistence:sqlite": "node --preserve-symlinks --preserve-symlinks-main dev-tools/scripts/persistence/run-sqlite-maintenance.mjs",
+    "persistence:postgres": "node --import tsx dev-tools/scripts/persistence/postgres-maintenance.ts"
   },
   "dependencies": {
     "@huggingface/hub": "^2.11.0",
     "busboy": "^1.6.0",
     "express": "^5.1.0",
+    "pg": "^8.22.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
@@ -41,8 +44,9 @@
     "@electron-forge/maker-squirrel": "^7.10.2",
     "@electron-forge/maker-zip": "^7.10.2",
     "@electron-forge/plugin-webpack": "^7.10.2",
-    "@types/node": "^24.7.2",
     "@types/busboy": "^1.5.4",
+    "@types/node": "^24.7.2",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vercel/webpack-asset-relocator-loader": "^1.10.0",
@@ -51,8 +55,8 @@
     "jsdom": "^26.1.0",
     "node-loader": "^2.1.0",
     "style-loader": "^4.0.0",
-    "tsx": "^4.20.6",
     "ts-loader": "^9.5.4",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "webpack": "^5.99.9"

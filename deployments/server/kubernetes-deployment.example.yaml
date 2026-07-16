@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-system-builder
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-system-builder
+  template:
+    metadata:
+      labels:
+        app: ai-system-builder
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: server
+          image: REPLACE_WITH_PINNED_AI_SYSTEM_BUILDER_IMAGE
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: https
+              containerPort: 3010
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: DEPLOYMENT_SHAPE
+              value: cloud
+            - name: AI_SYSTEM_BUILDER_SECURITY_MODE
+              value: lan-https-token
+            - name: AI_SYSTEM_BUILDER_TLS_CERT_MODE
+              value: manual
+            - name: AI_SYSTEM_BUILDER_TLS_CERT_PATH
+              value: /run/tls/tls.crt
+            - name: AI_SYSTEM_BUILDER_TLS_KEY_PATH
+              value: /run/tls/tls.key
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ai-system-builder-secrets
+                  key: database-url
+            - name: SERVER_TOKEN_HASH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ai-system-builder-secrets
+                  key: token-hash-secret
+            - name: POSTGRES_SSL_MODE
+              value: verify-full
+            - name: POSTGRES_SSL_CA_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: ai-system-builder-secrets
+                  key: postgres-ca-pem
+            - name: SERVER_STORAGE_ROOT
+              value: /var/lib/ai-system-builder/artifacts
+            - name: SERVER_RUNTIME_ROOT
+              value: /var/lib/ai-system-builder/runtime
+          startupProbe:
+            httpGet:
+              scheme: HTTPS
+              path: /health/live
+              port: https
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              scheme: HTTPS
+              path: /health/live
+              port: https
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              scheme: HTTPS
+              path: /health/ready
+              port: https
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: tls
+              mountPath: /run/tls
+              readOnly: true
+            - name: artifact-storage
+              mountPath: /var/lib/ai-system-builder/artifacts
+            - name: runtime-storage
+              mountPath: /var/lib/ai-system-builder/runtime
+      volumes:
+        - name: tls
+          secret:
+            secretName: ai-system-builder-tls
+        - name: artifact-storage
+          persistentVolumeClaim:
+            claimName: ai-system-builder-artifacts
+        - name: runtime-storage
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-system-builder
+spec:
+  selector:
+    app: ai-system-builder
+  ports:
+    - name: https
+      port: 3010
+      targetPort: https

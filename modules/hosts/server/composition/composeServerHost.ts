@@ -135,6 +135,7 @@ import { WorkspaceAssetCompositionReadModelService } from "../../../application/
 import { composeExecutionPlanServices } from "../../shared/composition/composeExecutionPlanServices";
 import { composeConversationExecutionServices } from "../../shared/composition/composeConversationExecutionServices";
 import { createPythonConversationalRuntimeAdapterCatalog, createPythonConversationalRuntimeGuard, createPythonConversationalTextGenerationInvocationAdapter } from "../../../adapters/runtime/conversational-text-generation";
+import type { StructuredDocumentStore } from "../../../adapters/persistence/shared";
 
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
 const execFile = promisify(nodeExecFile);
@@ -213,6 +214,7 @@ export interface ComposeServerHostArtifactRepoOptions {
 }
 
 export interface ComposeServerHostOptions {
+  persistence?: { documents: StructuredDocumentStore };
   env?: NodeJS.ProcessEnv;
   logging?: ComposeServerHostLoggingOptions;
   logSink?: StructuredLogSink;
@@ -435,6 +437,8 @@ export function composeServerHost(
       const defaultRuntimeRootDirectory = joinHostPath(dirname(registerOptions.storageRootDirectory), "server-runtime");
       const applicationSettings = createLocalApplicationSettingsAdapter({
         filePath: options.settings?.localSettingsFilePath ?? joinHostPath(registerOptions.storageRootDirectory, "config", "application-settings.json"),
+        rootDirectory: registerOptions.storageRootDirectory,
+        documents: options.persistence?.documents,
         now: options.now,
       });
       const applicationSecrets = createInMemorySecretsAdapter();
@@ -556,9 +560,11 @@ export function composeServerHost(
       });
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
+        documents: options.persistence?.documents,
       });
       const artifactBindings = createLocalArtifactStorageBindingAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
+        documents: options.persistence?.documents,
       });
       const storage = createFilesystemArtifactObjectStorageAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
@@ -582,6 +588,7 @@ export function composeServerHost(
       const workspaceFoundation = internalAssetRegistry ?? composeInternalAssetRegistry({
         rootDirectory: registerOptions.storageRootDirectory,
         now: options.now,
+        documents: options.persistence?.documents,
       });
       internalAssetRegistry = workspaceFoundation;
       const storeArtifactUploadUseCase = new StoreArtifactUploadUseCase({
@@ -861,6 +868,8 @@ export function composeServerHost(
 
       const modelRegistry = createLocalModelRegistryAdapter({
         filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`,
+        rootDirectory: registerOptions.storageRootDirectory,
+        documents: options.persistence?.documents,
         now: options.now,
         discovery: {
           searchRoots: async () => {
@@ -871,11 +880,14 @@ export function composeServerHost(
       });
       const imageAssetRegistry = createLocalImageAssetRegistryAdapter({
         filePath: joinHostPath(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
+        rootDirectory: registerOptions.storageRootDirectory,
+        documents: options.persistence?.documents,
         now: options.now,
       });
       internalAssetRegistry = composeInternalAssetRegistry({
         rootDirectory: registerOptions.storageRootDirectory,
         now: options.now,
+        documents: options.persistence?.documents,
         resourceBackedViewProvider: composeResourceBackedViewProviders({
           artifactBrowserMetadataRead: artifactBrowserRead,
           imageAssetDescriptorRead: imageAssetRegistry,
@@ -1063,21 +1075,13 @@ export function composeServerHost(
         }),
       });
 
-      const assetCompositionPlanRepository = createLocalAssetCompositionPlanRepositoryAdapter({
-        rootDir: registerOptions.storageRootDirectory,
-        now: options.now,
-      });
-      const runtimeReadinessBindingRepository = createLocalRuntimeReadinessBindingRepositoryAdapter({
-        rootDir: registerOptions.storageRootDirectory,
-        now: options.now,
-      });
-      const executionPlanRepository = createLocalExecutionPlanRepositoryAdapter({
-        rootDir: registerOptions.storageRootDirectory,
-        now: options.now,
-      });
+      const structuredRepositoryOptions = { rootDir: registerOptions.storageRootDirectory, now: options.now, documents: options.persistence?.documents };
+      const assetCompositionPlanRepository = createLocalAssetCompositionPlanRepositoryAdapter(structuredRepositoryOptions);
+      const runtimeReadinessBindingRepository = createLocalRuntimeReadinessBindingRepositoryAdapter(structuredRepositoryOptions);
+      const executionPlanRepository = createLocalExecutionPlanRepositoryAdapter(structuredRepositoryOptions);
       const executionPlanServices = composeExecutionPlanServices({ executionPlanRepository, runtimeReadinessBindingRepository, compositionPlanRepository: assetCompositionPlanRepository, now: options.now });
-      const conversationRepositories = createLocalConversationRepositoryAdapters({ rootDir: registerOptions.storageRootDirectory, now: options.now });
-      const executionRunRepositories = createLocalExecutionRunRepositoryAdapters({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const conversationRepositories = createLocalConversationRepositoryAdapters(structuredRepositoryOptions);
+      const executionRunRepositories = createLocalExecutionRunRepositoryAdapters(structuredRepositoryOptions);
       const conversationExecutionServices = composeConversationExecutionServices({
         ...conversationRepositories,
         ...executionRunRepositories,
@@ -1140,8 +1144,8 @@ export function composeServerHost(
         },
         assetMutationUseCases,
         userLibraryServices: (() => {
-          const userLibraryAssetRepository = createLocalUserLibraryAssetRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
-          const workspaceUserLibraryLinkRepository = createLocalWorkspaceUserLibraryLinkRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+          const userLibraryAssetRepository = createLocalUserLibraryAssetRepositoryAdapter(structuredRepositoryOptions);
+          const workspaceUserLibraryLinkRepository = createLocalWorkspaceUserLibraryLinkRepositoryAdapter(structuredRepositoryOptions);
           return {
             userLibraryAssetRepository,
             workspaceUserLibraryLinkRepository,
@@ -1154,22 +1158,10 @@ export function composeServerHost(
         })(),
         assetAuthoringServices: (() => {
           const assetAuthoringRepositories = {
-            authoredAssetRepository: createLocalAuthoredAssetRepositoryAdapter({
-              rootDir: registerOptions.storageRootDirectory,
-              now: options.now,
-            }),
-            assetDraftRepository: createLocalAssetDraftRepositoryAdapter({
-              rootDir: registerOptions.storageRootDirectory,
-              now: options.now,
-            }),
-            assetRevisionRepository: createLocalAssetRevisionRepositoryAdapter({
-              rootDir: registerOptions.storageRootDirectory,
-              now: options.now,
-            }),
-            assetOverrideRepository: createLocalAssetOverrideRepositoryAdapter({
-              rootDir: registerOptions.storageRootDirectory,
-              now: options.now,
-            }),
+            authoredAssetRepository: createLocalAuthoredAssetRepositoryAdapter(structuredRepositoryOptions),
+            assetDraftRepository: createLocalAssetDraftRepositoryAdapter(structuredRepositoryOptions),
+            assetRevisionRepository: createLocalAssetRevisionRepositoryAdapter(structuredRepositoryOptions),
+            assetOverrideRepository: createLocalAssetOverrideRepositoryAdapter(structuredRepositoryOptions),
           };
           const unavailableTargetReader: AssetCustomizationTargetReaderPort = {
             async readCustomizationTargetByReference() {
@@ -1223,10 +1215,7 @@ export function composeServerHost(
           };
         })(),
         assetCompositionServices: (() => {
-          const effectiveProjectionRepository = createLocalEffectiveAssetProjectionRepositoryAdapter({
-            rootDir: registerOptions.storageRootDirectory,
-            now: options.now,
-          });
+          const effectiveProjectionRepository = createLocalEffectiveAssetProjectionRepositoryAdapter(structuredRepositoryOptions);
           return {
             createPlan: new CreateAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository, generatePlanId: () => `plan.${randomUUID()}`, now: options.now }),
             updatePlan: new UpdateAssetCompositionPlanUseCase({ repository: assetCompositionPlanRepository, now: options.now }),

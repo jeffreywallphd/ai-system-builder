@@ -3,6 +3,7 @@ import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { ExecutionPlanRecord } from "../../../contracts/execution-plans";
+import { readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../shared";
 
 export const EXECUTION_PLAN_LOCAL_STORE_KIND = "execution-plan-local-store" as const;
 export const EXECUTION_PLAN_LOCAL_SCHEMA_VERSION = 1 as const;
@@ -16,6 +17,7 @@ export interface LocalExecutionPlanManifest {
 export interface LocalExecutionPlanRecordStoreOptions {
   readonly rootDir: string;
   readonly now?: () => string;
+  readonly documents?: StructuredDocumentStore;
 }
 
 export class LocalExecutionPlanRecordStoreError extends Error {
@@ -32,10 +34,14 @@ export class LocalExecutionPlanRecordStoreError extends Error {
 export class LocalExecutionPlanRecordStore {
   private readonly storeDir: string;
   private readonly now: () => string;
+  private readonly rootDir: string;
+  private readonly documents?: StructuredDocumentStore;
   private writeQueue: Promise<void> = Promise.resolve();
 
   public constructor(options: LocalExecutionPlanRecordStoreOptions) {
     this.storeDir = join(options.rootDir, "execution-plans");
+    this.rootDir = options.rootDir;
+    this.documents = options.documents;
     this.now = options.now ?? (() => new Date().toISOString());
   }
 
@@ -66,12 +72,19 @@ export class LocalExecutionPlanRecordStore {
   }
 
   private async ensureStoreFiles(): Promise<void> {
-    await mkdir(this.storeDir, { recursive: true });
+    if (!this.documents) await mkdir(this.storeDir, { recursive: true });
     await this.ensureJsonFile("manifest.json", this.createManifest());
     await this.ensureJsonFile("execution-plans.json", []);
   }
 
   private async ensureJsonFile(file: string, fallback: unknown): Promise<void> {
+    if (this.documents) {
+      const result = await readDocumentRecord({ rootDirectory: this.rootDir, documents: this.documents }, `execution-plans/${file}`, fallback);
+      if (file === "manifest.json") validateManifest(result.value);
+      else if (!Array.isArray(result.value)) throw new LocalExecutionPlanRecordStoreError("Execution plan local store collection is invalid.");
+      if (!result.found) await this.writeJsonFile(file, fallback);
+      return;
+    }
     const value = await this.readJsonFile(file, fallback);
     if (file === "manifest.json") {
       validateManifest(value);
@@ -90,6 +103,9 @@ export class LocalExecutionPlanRecordStore {
   }
 
   private async readJsonFile<T>(file: string, fallback: T): Promise<T> {
+    if (this.documents) {
+      return (await readDocumentRecord({ rootDirectory: this.rootDir, documents: this.documents }, `execution-plans/${file}`, fallback)).value;
+    }
     try {
       return cloneJson(JSON.parse(await readFile(this.path(file), "utf8")) as unknown) as T;
     } catch (error) {
@@ -110,6 +126,10 @@ export class LocalExecutionPlanRecordStore {
   }
 
   private async writeJsonFile(file: string, value: unknown): Promise<void> {
+    if (this.documents) {
+      await writeDocumentRecord({ rootDirectory: this.rootDir, documents: this.documents }, `execution-plans/${file}`, value);
+      return;
+    }
     const path = this.path(file);
     const tempPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
     try {

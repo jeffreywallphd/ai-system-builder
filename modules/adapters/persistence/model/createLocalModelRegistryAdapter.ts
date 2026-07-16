@@ -22,6 +22,7 @@ import {
 import { isWorkspaceId } from "../../../contracts/workspace";
 import type { WorkspaceId } from "../../../contracts/workspace";
 import type { ModelRegistryPort } from "../../../application/ports/model";
+import { readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../shared";
 
 interface ModelRegistryFileShape {
   models?: ModelInventoryRecord[];
@@ -33,6 +34,8 @@ type SharedModelDiscoveryRootProvider = string[] | (() => string[] | Promise<str
 
 export interface LocalModelRegistryAdapterOptions {
   filePath: string;
+  rootDirectory?: string;
+  documents?: StructuredDocumentStore;
   now?: () => string;
   discovery?: {
     enabled?: boolean;
@@ -69,6 +72,9 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
   let registryWriteQueue: Promise<void> = Promise.resolve();
 
   async function readDocument(): Promise<ModelRegistryFileShape> {
+    if (options.documents) {
+      return (await readDocumentRecord({ rootDirectory: options.rootDirectory ?? dirname(options.filePath), documents: options.documents }, "model-registry/models.json", { models: [] })).value;
+    }
     try {
       const json = await readFile(options.filePath, "utf8");
       const parsed = JSON.parse(json) as ModelRegistryFileShape;
@@ -91,6 +97,10 @@ export function createLocalModelRegistryAdapter(options: LocalModelRegistryAdapt
   }
 
   async function writeDocumentNow(document: ModelRegistryFileShape): Promise<void> {
+    if (options.documents) {
+      await writeDocumentRecord({ rootDirectory: options.rootDirectory ?? dirname(options.filePath), documents: options.documents }, "model-registry/models.json", document);
+      return;
+    }
     await mkdir(dirname(options.filePath), { recursive: true });
     const temporaryPath = `${options.filePath}.${process.pid}.${randomUUID()}.tmp`;
     try {

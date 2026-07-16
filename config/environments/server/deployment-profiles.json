@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "profiles": [
+    {
+      "shape": "campus-server",
+      "structuredPersistence": "postgres",
+      "artifactStorage": "durable-mounted-filesystem",
+      "requiredSecretEnvironment": ["DATABASE_URL", "SERVER_TOKEN_HASH_SECRET"],
+      "requiredEnvironment": ["NODE_ENV", "DEPLOYMENT_SHAPE", "AI_SYSTEM_BUILDER_SECURITY_MODE", "SERVER_STORAGE_ROOT", "SERVER_RUNTIME_ROOT"],
+      "defaultPoolMax": 10
+    },
+    {
+      "shape": "corporate-server",
+      "structuredPersistence": "postgres",
+      "artifactStorage": "durable-managed-volume",
+      "requiredSecretEnvironment": ["DATABASE_URL", "SERVER_TOKEN_HASH_SECRET"],
+      "requiredEnvironment": ["NODE_ENV", "DEPLOYMENT_SHAPE", "AI_SYSTEM_BUILDER_SECURITY_MODE", "SERVER_STORAGE_ROOT", "SERVER_RUNTIME_ROOT"],
+      "defaultPoolMax": 10
+    },
+    {
+      "shape": "cloud",
+      "structuredPersistence": "postgres",
+      "artifactStorage": "durable-managed-volume",
+      "requiredSecretEnvironment": ["DATABASE_URL", "SERVER_TOKEN_HASH_SECRET"],
+      "requiredEnvironment": ["NODE_ENV", "DEPLOYMENT_SHAPE", "AI_SYSTEM_BUILDER_SECURITY_MODE", "SERVER_STORAGE_ROOT", "SERVER_RUNTIME_ROOT"],
+      "defaultPoolMax": 10
+    }
+  ]
+}

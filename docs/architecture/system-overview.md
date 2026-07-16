@@ -1,7 +1,7 @@
 # System Overview
 
 - Status: current
-- Related decisions: `docs/adr/ADR-0001-repository-structure.md`, `docs/adr/ADR-0003-host-model-and-transport-separation.md`, `docs/adr/ADR-0004-persistence-and-storage-separation.md`, `docs/adr/ADR-0015-security-architecture-and-policy-boundaries.md`, `docs/adr/ADR-0016-asset-kernel-terminology-and-architecture-baseline.md`, `docs/adr/ADR-0023-controlled-conversational-system-execution.md`
+- Related decisions: `docs/adr/ADR-0001-repository-structure.md`, `docs/adr/ADR-0003-host-model-and-transport-separation.md`, `docs/adr/ADR-0004-persistence-and-storage-separation.md`, `docs/adr/ADR-0015-security-architecture-and-policy-boundaries.md`, `docs/adr/ADR-0016-asset-kernel-terminology-and-architecture-baseline.md`, `docs/adr/ADR-0023-controlled-conversational-system-execution.md`, `docs/adr/ADR-0025-deployment-shaped-structured-persistence.md`
 - Verification: `docs/architecture/architecture-verification.md`
 
 - effective asset projections baseline: `docs/architecture/effective-asset-projections.md` defines workspace-scoped safe materialized/effective asset projections for planning-readiness (non-executing).
@@ -178,7 +178,10 @@ Transport technologies are adapters, not application definitions.
 
 ## Persistence and storage posture
 
-- Persistence: structured durable records (default adapter target: Postgres).
+- Persistence: structured durable records, targeting SQLite for local deployment
+  and PostgreSQL for campus, corporate, and cloud server deployments. Desktop
+  composition actively uses SQLite, and explicit managed server shapes actively
+  use PostgreSQL after the fail-closed legacy import/cutover step.
 - Storage adapters: a broad architectural category for non-relational durable/semi-durable content concerns with a thin shared foundation.
 - Storage is family-oriented (not one flat abstraction): artifact-object storage and artifact-repo storage are peer first-class specialized families.
 - Artifact-object storage centers on artifact keys, bytes, checksums, and artifact metadata.

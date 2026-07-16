@@ -1,7 +1,7 @@
 # Architecture Verification Map
 
 - Status: current
-- Related decisions: `docs/adr/ADR-0001-repository-structure.md`
+- Related decisions: `docs/adr/ADR-0001-repository-structure.md`, `docs/adr/ADR-0025-deployment-shaped-structured-persistence.md`, `docs/adr/ADR-0026-local-sqlite-runtime.md`, `docs/adr/ADR-0027-managed-postgresql-runtime.md`
 - Verification: `npm test` and `npm run docs:check`
 
 This map connects high-value architectural claims to current automated evidence. It does not claim that passing tests proves every sentence in the architecture documentation.
@@ -28,7 +28,9 @@ This map connects high-value architectural claims to current automated evidence.
 | Runtime readiness remains separate from feature execution and is transport-aligned | direct | `modules/contracts/tests/runtime-readiness-transport-parity.unit.test.ts`; runtime-readiness contract, port, use-case, persistence, API, IPC, and host tests | Generalized workflow execution is outside this invariant. |
 | Asset Kernel internal mutation/install behavior is not accidentally exposed publicly | direct | `modules/hosts/shared/composition/tests/asset-kernel-non-exposure.unit.test.ts`; Asset contract/application boundary tests | New approved public operations require explicit fixture updates and canonical decisions. |
 | Generated JavaScript does not contaminate TypeScript module source trees | direct | `dev-tools/scripts/testing/source-tree-contamination-guard.test.mjs` and its repository test-runner integration | Other generated artifact locations use separate ignore/build controls. |
-| Structured persistent data defaults toward Postgres while blobs/resources remain storage concerns | gap | ADR-0004 and `docs/architecture/persistence-and-storage.md`; local adapter tests verify the separation for implemented local stores | Postgres currently provides a pool foundation but not complete repository/schema/migration coverage for deployment targets. |
+| Deployment persistence targets and operator profiles select SQLite only for local single-host use and PostgreSQL for shared server shapes | direct | `modules/contracts/config/config-contracts.unit.test.ts`; `modules/contracts/config/tests/config-family-invariants.unit.test.ts`; `modules/adapters/persistence/sqlite/tests/local-sqlite-database-policy.unit.test.ts` | Environment-specific secret, storage, identity, HA, and recovery choices remain outside the generic target check. |
+| Local structured repositories actively run on SQLite with migration, import, typed reads/writes, health, backup, restore, and portable export | direct | `modules/adapters/persistence/sqlite/tests/sqlite-runtime.electron.integration.test.ts`; JSON import and export tests; desktop main/composition tests | Windows Electron evidence is local; macOS/Linux packaging and deliberate corruption/disk/lock fault qualification require platform runners. |
+| Explicit managed server shapes actively run on PostgreSQL with migration locking, import, repository wiring, readiness, export, and drain | representative | PostgreSQL unit/migration-drift tests; `apps/server/src/tests/server-postgres-selection.unit.test.ts`; server host/build tests; gated `postgres-database.live.integration.test.ts` | A real PostgreSQL service is mandatory for concurrency, isolation, pool pressure, restart, restore, and end-to-end thin-client release evidence. |
 | Canonical documentation remains current-state oriented, linked, metadata-bearing, and context packs stay bounded/downstream | direct | `dev-tools/scripts/docs/check-doc-drift.mjs`; `dev-tools/scripts/testing/documentation-drift-guard.test.mjs`; `.github/workflows/ci.yml` | Semantic agreement between prose and implementation still requires focused review and the mismatch register. |
 
 ## Updating the Map

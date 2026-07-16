@@ -4,3 +4,4 @@ export * from "./logging-config";
 export * from "./persistence-config";
 export * from "./storage-config";
 export * from "./system-config";
+export * from "./deployment-persistence-target";

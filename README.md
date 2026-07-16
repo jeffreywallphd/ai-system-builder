@@ -10,6 +10,13 @@ AI System Builder is a TypeScript platform for composing, running, and managing 
 - Architecture: start with the [system overview](docs/architecture/system-overview.md) and [module dependency rules](docs/architecture/module-dependency-rules.md).
 - Task context: load the [baseline context pack](docs/context/packs/index.pack.md), then use [prompt routing](docs/context/prompt-routing.md).
 - Decisions and implementation rules: use the [ADR index](docs/adr/README.md) and [repository standards](docs/standards/).
+- Deployment delivery: use the [multi-shape implementation roadmap](docs/deployment-readiness-implementation-roadmap.md); SQLite is the local structured-data target and PostgreSQL is the campus/corporate/cloud target.
+- Local structured persistence is active in desktop composition through SQLite;
+  legacy JSON import is explicit, rollback-preserving, and fail-closed.
+- Managed server shapes actively select PostgreSQL with fail-closed production
+  security, migrations, readiness, JSON import, and graceful drain. Start with
+  the [deployment templates](deployments/server/README.md) and
+  [qualification procedure](docs/operations/deployment-qualification.md).
 
 ## Repository shape
 
@@ -17,6 +24,8 @@ AI System Builder is a TypeScript platform for composing, running, and managing 
 - `modules/`: domain, contracts, application, adapter, host, runtime, UI, and shared capabilities.
 - `docs/`: canonical decisions, architecture, standards, security guidance, diagnostics, and downstream context packs.
 - `dev-tools/`: repository checks, test orchestration, and development utilities.
+- `deployments/`: reviewed server image and platform-neutral qualification
+  templates; environment-specific approval remains an operator responsibility.
 
 ## Local validation
 
@@ -28,6 +37,10 @@ Install dependencies with `npm install`, then use:
 - `npm test` — non-browser unit and integration suite.
 - `npm run build:server` — server build.
 - `npm run build:thin-client` — thin-client build.
+- `npm run persistence:sqlite -- <health|backup|restore|export> ...` — local
+  database maintenance through the Electron runtime.
+- `npm run persistence:postgres -- <health|export> ...` — managed database
+  diagnostics and portable export.
 - `npm run dev:desktop`, `npm run dev:server`, or `npm run dev:thin-client` — start a delivery surface.
 
 See the [documentation map](docs/README.md) for authoritative sources and deployment guidance.

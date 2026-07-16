@@ -15,6 +15,7 @@ import {
 import { normalizeStorageArtifactKey } from "../../../../contracts/storage";
 import { createWorkspaceId, isWorkspaceId } from "../../../../contracts/workspace";
 import { normalizeArtifactFamily } from "../../../../domain/artifact";
+import { readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../../../persistence/shared";
 
 const DEFAULT_CATALOG_FILE = ".catalog/artifact-catalog.ndjson";
 
@@ -23,6 +24,7 @@ type ArtifactCatalogRecordLine = ArtifactCatalogRecord | { workspaceId: string; 
 export interface CreateLocalArtifactCatalogPersistenceAdapterOptions {
   rootDirectory: string;
   catalogFile?: string;
+  documents?: StructuredDocumentStore;
 }
 
 export interface LocalArtifactCatalogPersistenceAdapter
@@ -109,6 +111,10 @@ export function createLocalArtifactCatalogPersistenceAdapter(
   const catalogPath = path.join(rootDirectory, catalogFile);
 
   async function readCatalogRecords(): Promise<ArtifactCatalogRecord[]> {
+    if (options.documents) {
+      const stored = (await readDocumentRecord({ rootDirectory, documents: options.documents }, catalogFile, [] as ArtifactCatalogRecordLine[])).value;
+      return stored.map((entry) => parseRecordLine(JSON.stringify(entry))).filter((entry): entry is ArtifactCatalogRecord => Boolean(entry && !("deletedAt" in entry)));
+    }
     let content: string;
     try {
       content = await readFile(catalogPath, "utf8");
@@ -150,6 +156,12 @@ export function createLocalArtifactCatalogPersistenceAdapter(
     async appendArtifactCatalogRecord(request, context = {}) {
       try {
         const record = normalizeRecord(request.record);
+        if (options.documents) {
+          const records = await readCatalogRecords();
+          const next = [...records.filter((entry) => entry.workspaceId !== record.workspaceId || entry.storageKey !== record.storageKey), record];
+          await writeDocumentRecord({ rootDirectory, documents: options.documents }, catalogFile, next);
+          return createSuccessResult({ storageKey: record.storageKey }, context);
+        }
         await mkdir(path.dirname(catalogPath), { recursive: true });
         await appendFile(catalogPath, `${JSON.stringify(record)}\n`, "utf8");
         return createSuccessResult({ storageKey: record.storageKey }, context);
@@ -229,6 +241,15 @@ export function createLocalArtifactCatalogPersistenceAdapter(
         const exists = records.some((entry) => entry.workspaceId === request.workspaceId && entry.storageKey === storageKey);
         if (!exists) {
           return createSuccessResult({ deleted: false }, context);
+        }
+
+        if (options.documents) {
+          await writeDocumentRecord(
+            { rootDirectory, documents: options.documents },
+            catalogFile,
+            records.filter((entry) => entry.workspaceId !== request.workspaceId || entry.storageKey !== storageKey),
+          );
+          return createSuccessResult({ deleted: true }, context);
         }
 
         await mkdir(path.dirname(catalogPath), { recursive: true });

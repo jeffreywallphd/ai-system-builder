@@ -4,11 +4,12 @@ import type { AssetReference } from "../../../contracts/asset";
 import { normalizeEffectiveAssetProjectionId } from "../../../contracts/effective-asset-projections";
 import { pageRecords, textValuesMatch } from "../user-library/local-user-library-repository-helpers";
 import { LocalAssetCompositionPlanRecordStore } from "./local-asset-composition-plan-record-store";
+import type { StructuredDocumentStore } from "../shared";
 
 const sort = (a:AssetCompositionPlan,b:AssetCompositionPlan)=>b.updatedAt.localeCompare(a.updatedAt)||a.planId.localeCompare(b.planId);
 const hasRef = (a?: AssetReference, b?: AssetReference)=>Boolean(a&&b&&a.kind===b.kind&&a.id===b.id&&a.version===b.version);
 
-export function createLocalAssetCompositionPlanRepositoryAdapter(o:{rootDir:string; now?:()=>string}): AssetCompositionPlanRepositoryPort {
+export function createLocalAssetCompositionPlanRepositoryAdapter(o:{rootDir:string; now?:()=>string; documents?:StructuredDocumentStore}): AssetCompositionPlanRepositoryPort {
   const store = new LocalAssetCompositionPlanRecordStore(o);
   return {
     async saveAssetCompositionPlanRecord(record){ const n = normalizeAssetCompositionPlan(record); const all = [ ...(await store.readPlans<AssetCompositionPlan>()).filter((x)=>!(x.targetWorkspaceId===n.targetWorkspaceId&&x.planId===n.planId)), n ].sort(sort); await store.writePlans(all); return n; },

@@ -30,10 +30,12 @@ import {
   createLocalAssetDefinitionRepositoryAdapter,
   createLocalAssetInstanceRepositoryAdapter,
 } from "../../../adapters/persistence/asset";
+import type { StructuredDocumentStore } from "../../../adapters/persistence/shared";
 
 export interface ComposeLocalAssetKernelOptions {
   readonly rootDirectory: string;
   readonly now?: () => string;
+  readonly documents?: StructuredDocumentStore;
 }
 
 export interface LocalAssetKernelComposition {
@@ -68,7 +70,7 @@ export interface LocalAssetKernelComposition {
 }
 
 export function composeLocalAssetKernel(options: ComposeLocalAssetKernelOptions): LocalAssetKernelComposition {
-  const storeOptions = { rootDir: options.rootDirectory, now: options.now };
+  const storeOptions = { rootDir: options.rootDirectory, now: options.now, documents: options.documents };
   new LocalAssetRecordStore(storeOptions).initializeSync();
 
   const definitionRepository = createLocalAssetDefinitionRepositoryAdapter(storeOptions);

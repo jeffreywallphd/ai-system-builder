@@ -5,6 +5,7 @@ import { Stream } from "node:stream";
 import { join } from "node:path";
 
 import type { AssetBinding, AssetComposition, AssetDefinition, AssetInstance } from "../../../contracts/asset";
+import { readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../shared";
 
 export const ASSET_KERNEL_LOCAL_STORE_KIND = "asset-kernel-local-store" as const;
 export const ASSET_KERNEL_LOCAL_SCHEMA_VERSION = 1 as const;
@@ -26,6 +27,7 @@ export interface LocalAssetKernelStoreSnapshot {
 export interface LocalAssetRecordStoreOptions {
   readonly rootDir: string;
   readonly now?: () => string;
+  readonly documents?: StructuredDocumentStore;
 }
 
 export class LocalAssetRecordStoreError extends Error {
@@ -58,10 +60,14 @@ const COLLECTION_FILES = {
 export class LocalAssetRecordStore {
   private readonly storeDir: string;
   private readonly now: () => string;
+  private readonly rootDir: string;
+  private readonly documents?: StructuredDocumentStore;
   private writeQueue: Promise<void> = Promise.resolve();
 
   public constructor(options: LocalAssetRecordStoreOptions) {
     this.storeDir = join(options.rootDir, "asset-kernel");
+    this.rootDir = options.rootDir;
+    this.documents = options.documents;
     this.now = options.now ?? (() => new Date().toISOString());
   }
 
@@ -70,6 +76,7 @@ export class LocalAssetRecordStore {
   }
 
   public initializeSync(): void {
+    if (this.documents) return;
     this.ensureStoreFilesSync();
   }
 
@@ -138,6 +145,7 @@ export class LocalAssetRecordStore {
   }
 
   private async ensureStoreDirectory(): Promise<void> {
+    if (this.documents) return;
     await mkdir(this.storeDir, { recursive: true });
   }
 
@@ -146,6 +154,12 @@ export class LocalAssetRecordStore {
   }
 
   private async ensureJsonFile(fileName: string, fallback: unknown): Promise<void> {
+    if (this.documents) {
+      const result = await readDocumentRecord({ rootDirectory: this.rootDir, documents: this.documents }, `asset-kernel/${fileName}`, fallback);
+      this.validateInitializedFile(fileName, result.value);
+      if (!result.found) await this.writeJsonFile(fileName, fallback);
+      return;
+    }
     try {
       this.validateInitializedFile(fileName, await this.readJsonFile(fileName, fallback));
     } catch (error) {
@@ -180,6 +194,10 @@ export class LocalAssetRecordStore {
   }
 
   private async readJsonFile<T>(fileName: string, fallback: T): Promise<T> {
+    if (this.documents) {
+      const result = await readDocumentRecord({ rootDirectory: this.rootDir, documents: this.documents }, `asset-kernel/${fileName}`, fallback);
+      return cloneJson(result.value);
+    }
     try {
       const source = await readFile(this.filePath(fileName), "utf8");
       const parsed = JSON.parse(source) as unknown;
@@ -221,6 +239,10 @@ export class LocalAssetRecordStore {
   }
 
   private async writeJsonFile(fileName: string, value: unknown): Promise<void> {
+    if (this.documents) {
+      await writeDocumentRecord({ rootDirectory: this.rootDir, documents: this.documents }, `asset-kernel/${fileName}`, value);
+      return;
+    }
     const path = this.filePath(fileName);
     const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
     try {

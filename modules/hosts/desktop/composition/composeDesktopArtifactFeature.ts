@@ -16,17 +16,19 @@ import {
   createLocalArtifactCatalogPersistenceAdapter,
   createLocalArtifactStorageBindingAdapter,
 } from "../../../adapters/storage/filesystem";
+import type { StructuredDocumentStore } from "../../../adapters/persistence/shared";
 
 export interface ComposeDesktopArtifactFeatureOptions {
   storageRootDirectory: string;
   loggingPort: LoggingPort;
   now?: () => string;
   workspaceShell: any;
+  documents?: StructuredDocumentStore;
 }
 
 export function composeDesktopArtifactFeature(options: ComposeDesktopArtifactFeatureOptions): any {
-  const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory: options.storageRootDirectory });
-  const artifactBindings = createLocalArtifactStorageBindingAdapter({ rootDirectory: options.storageRootDirectory });
+  const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({ rootDirectory: options.storageRootDirectory, documents: options.documents });
+  const artifactBindings = createLocalArtifactStorageBindingAdapter({ rootDirectory: options.storageRootDirectory, documents: options.documents });
   const storage = createFilesystemArtifactObjectStorageAdapter({
     rootDirectory: options.storageRootDirectory,
     host: "desktop",

@@ -11,16 +11,19 @@ import {
   resolveWorkspaceIndexFile,
   resolveWorkspaceRecordFile,
 } from "./localWorkspacePersistencePaths";
+import type { StructuredDocumentStore } from "../shared";
 
 export interface LocalWorkspaceRepositoryOptions {
   readonly rootDirectory: string;
+  readonly documents?: StructuredDocumentStore;
 }
 
 export function createLocalWorkspaceRepository(options: LocalWorkspaceRepositoryOptions): WorkspaceRepository {
   const rootDirectory = options.rootDirectory;
+  const persistence = { rootDirectory, documents: options.documents };
 
   async function readIndex(): Promise<WorkspaceRecord[]> {
-    const value = await readJsonDocument<unknown>(resolveWorkspaceIndexFile(rootDirectory), [], "workspace-persistence-read-failed");
+    const value = await readJsonDocument<unknown>(resolveWorkspaceIndexFile(rootDirectory), [], "workspace-persistence-read-failed", persistence);
     if (!Array.isArray(value)) {
       throw new LocalWorkspacePersistenceError("workspace-persistence-invalid-record");
     }
@@ -28,12 +31,25 @@ export function createLocalWorkspaceRepository(options: LocalWorkspaceRepository
     return sortWorkspaces(value.map(assertWorkspaceRecord));
   }
 
-  async function writeIndex(records: readonly WorkspaceRecord[]): Promise<void> {
-    await writeJsonDocument(resolveWorkspaceIndexFile(rootDirectory), sortWorkspaces(records), "workspace-persistence-write-failed");
+  async function writeIndex(records: readonly WorkspaceRecord[], target = persistence): Promise<void> {
+    await writeJsonDocument(resolveWorkspaceIndexFile(rootDirectory), sortWorkspaces(records), "workspace-persistence-write-failed", target);
   }
 
-  async function writeWorkspaceRecord(workspace: WorkspaceRecord): Promise<void> {
-    await writeJsonDocument(resolveWorkspaceRecordFile(rootDirectory, workspace.workspaceId), workspace, "workspace-persistence-write-failed");
+  async function writeWorkspaceRecord(workspace: WorkspaceRecord, target = persistence): Promise<void> {
+    await writeJsonDocument(resolveWorkspaceRecordFile(rootDirectory, workspace.workspaceId), workspace, "workspace-persistence-write-failed", target);
+  }
+
+  async function writeWorkspaceAndIndex(workspace: WorkspaceRecord, index: readonly WorkspaceRecord[]): Promise<void> {
+    if (options.documents) {
+      await options.documents.runInTransaction(async (transaction) => {
+        const target = { rootDirectory, documents: transaction };
+        await writeWorkspaceRecord(workspace, target);
+        await writeIndex(index, target);
+      });
+      return;
+    }
+    await writeWorkspaceRecord(workspace);
+    await writeIndex(index);
   }
 
   return {
@@ -47,6 +63,7 @@ export function createLocalWorkspaceRepository(options: LocalWorkspaceRepository
         resolveWorkspaceRecordFile(rootDirectory, safeWorkspaceId),
         undefined,
         "workspace-persistence-read-failed",
+        persistence,
       );
       if (value === undefined) return undefined;
       return cloneJson(assertWorkspaceRecord(value));
@@ -54,9 +71,8 @@ export function createLocalWorkspaceRepository(options: LocalWorkspaceRepository
 
     async saveWorkspace(workspace: WorkspaceRecord): Promise<void> {
       const validWorkspace = assertWorkspaceRecord(workspace);
-      await writeWorkspaceRecord(validWorkspace);
       const index = await readIndex();
-      await writeIndex(upsertWorkspace(index, validWorkspace));
+      await writeWorkspaceAndIndex(validWorkspace, upsertWorkspace(index, validWorkspace));
     },
 
     async updateWorkspace(workspace: WorkspaceRecord): Promise<void> {
@@ -67,8 +83,7 @@ export function createLocalWorkspaceRepository(options: LocalWorkspaceRepository
       }
       const index = await readIndex();
       const updatedIndex = replaceWorkspace(index, validWorkspace);
-      await writeWorkspaceRecord(validWorkspace);
-      await writeIndex(updatedIndex);
+      await writeWorkspaceAndIndex(validWorkspace, updatedIndex);
     },
 
     async archiveWorkspace(workspaceId: WorkspaceId, archivedAt: string): Promise<WorkspaceRecord | undefined> {

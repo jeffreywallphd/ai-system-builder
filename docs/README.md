@@ -23,8 +23,14 @@ This directory separates canonical system guidance from downstream task context 
   - Security-oriented operational checks and manual verification guidance.
 - `docs/diagnostics/`
   - Focused diagnostic and regression-check procedures.
+- `docs/operations/`
+  - Persistence operations, schema compatibility, recovery, rollout, and
+    deployment qualification procedures.
 - `docs/docs-mismatch-register.md`
   - Visible record of unresolved conflicts between code and documentation.
+- `docs/deployment-readiness-implementation-roadmap.md`
+  - Supporting delivery plan for database migration and multi-shape operational
+    readiness; canonical decisions remain in ADRs and architecture docs.
 - `docs/context/templates/`
   - Templates for durable epic, feature, and story context artifacts.
 
@@ -34,6 +40,11 @@ This directory separates canonical system guidance from downstream task context 
 - Narrow implementation task: use `docs/context/prompt-routing.md` to add only materially relevant packs.
 - Architecture or dependency change: read `docs/architecture/system-overview.md`, `docs/architecture/module-dependency-rules.md`, and related ADRs.
 - Persistence or deployment work: read `docs/architecture/persistence-and-storage.md`, `docs/architecture/host-model.md`, ADR-0003, and ADR-0004.
+- Database deployment implementation: also read ADR-0025 and the supporting
+  `docs/deployment-readiness-implementation-roadmap.md`.
+- Database operation or release qualification: use
+  `docs/operations/persistence-operations.md` and
+  `docs/operations/deployment-qualification.md`.
 - Documentation work: read `docs/standards/documentation-standards.md` and use the canonical templates listed there.
 - Automated or repository-scale implementation: read `docs/standards/ai-agent-development-standards.md`, apply `docs/standards/change-impact-matrix.md`, and check `docs/adr/decision-readiness.md`.
 - Architecture verification: use `docs/architecture/architecture-verification.md` to distinguish direct fitness functions from representative coverage and known gaps.

@@ -37,6 +37,14 @@ describe("server dev runner", () => {
     expect(source).not.toContain("RequestInfo");
   });
 
+  it("keeps browser-only shared UI out of the server compiler source set", () => {
+    const tsconfig = JSON.parse(
+      readFileSync(path.resolve("apps/server/tsconfig.json"), "utf8"),
+    ) as { exclude?: string[] };
+
+    expect(tsconfig.exclude).toContain("../../modules/ui/**");
+  });
+
   it("does not override an explicit ComfyUI Python command in the dev runner", async () => {
     const { resolveBundledDevPythonCommand } = await import("../../../../dev-tools/scripts/server/dev-server.mjs");
     expect(resolveBundledDevPythonCommand({ USERPROFILE: "C:/Users/example", COMFYUI_PYTHON_COMMAND: "python3.12" } as NodeJS.ProcessEnv)).toBeUndefined();

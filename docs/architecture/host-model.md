@@ -1,7 +1,7 @@
 # Host Model
 
 - Status: current
-- Related decisions: `docs/adr/ADR-0003-host-model-and-transport-separation.md`, `docs/adr/ADR-0013-host-owned-runtime-execution-and-feature-placement.md`, `docs/adr/ADR-0015-security-architecture-and-policy-boundaries.md`
+- Related decisions: `docs/adr/ADR-0003-host-model-and-transport-separation.md`, `docs/adr/ADR-0013-host-owned-runtime-execution-and-feature-placement.md`, `docs/adr/ADR-0015-security-architecture-and-policy-boundaries.md`, `docs/adr/ADR-0025-deployment-shaped-structured-persistence.md`, `docs/adr/ADR-0026-local-sqlite-runtime.md`, `docs/adr/ADR-0027-managed-postgresql-runtime.md`
 - Verification: `docs/architecture/architecture-verification.md`
 
 ## Asset Kernel relationship
@@ -34,6 +34,10 @@ Hosts are implemented under `modules/hosts/` and surfaced through `apps/*` entry
   - host composition (`modules/hosts/desktop`): adapter/use-case wiring.
 - Desktop artifact publish/verification uses the same shared application use case path as server/thin-client (`PublishArtifactToRepoUseCase`, `VerifyPublishedArtifactBackingUseCase`) and is exposed through preload+IPC transport wiring rather than renderer-side orchestration.
 - Desktop host composition may use focused helper modules for runtime readiness, storage, model management, image generation, and transport registration, but those helpers remain composition-only wiring seams and must not absorb business policy, runtime protocol logic, or IPC payload shaping. Runtime readiness helpers and small runtime-task-registry wiring helpers are extracted; broader storage/model/image-generation decomposition remains future cleanup unless completed in a later change.
+- The local deployment shape targets embedded SQLite under the desktop
+  application-data persistence root. Desktop startup migrates SQLite, performs
+  the explicit rollback-preserving legacy import, and then composes typed
+  repositories on the database seam before registering IPC.
 
 ## Server host
 
@@ -41,6 +45,10 @@ Hosts are implemented under `modules/hosts/` and surfaced through `apps/*` entry
 - Uses transport adapters (default: Express) for API exposure.
 - Keeps route/controller logic thin and delegates use-case behavior inward.
 - Server host composition may use focused helper modules for runtime readiness, storage, model management, image generation, and API registration, but those helpers remain composition-only wiring seams and must not absorb business policy, runtime protocol logic, or Express payload shaping. Runtime readiness helpers and small runtime-task-registry wiring helpers are extracted; broader storage/model/image-generation decomposition remains future cleanup unless completed in a later change.
+- Campus, corporate, and cloud deployment shapes target PostgreSQL through a
+  client/server connection. Explicit managed shapes migrate/import before API
+  registration and fail closed; only an unshaped non-production server retains
+  named JSON compatibility behavior.
 
 ## Why hosts are separate from transport adapters
 
@@ -89,6 +97,12 @@ The architecture is designed to support:
 1. desktop-only,
 2. server-only,
 3. desktop-server hybrid (later).
+
+Host kind and deployment shape are related but distinct. `desktop` normally maps
+to the `local` deployment shape. The `server` host can run as `campus-server`,
+`corporate-server`, or `cloud`; configuration must select that shape explicitly
+once database composition is active. Hybrid coordination remains undecided and
+must not be inferred from either host kind or persistence target.
 
 ### Staging rule
 

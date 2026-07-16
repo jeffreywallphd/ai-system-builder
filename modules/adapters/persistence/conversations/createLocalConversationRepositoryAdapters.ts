@@ -2,10 +2,11 @@ import type { AssistantResponseRepositoryPort, ConversationMessageRepositoryPort
 import { normalizeAssistantResponseRecord, normalizeConversationMessageRecord, normalizeConversationSessionRecord, normalizeConversationTurnRecord, type AssistantResponseRecord, type ConversationMessageRecord, type ConversationSessionRecord, type ConversationTurnRecord } from '../../../contracts/conversations';
 import { pageRecords } from '../user-library/local-user-library-repository-helpers';
 import { LocalConversationRecordStore } from './local-conversation-record-store';
+import type { StructuredDocumentStore } from '../shared';
 type ConversationUpdatedRecord={id:string;updatedAt:string};
 type ConversationCreatedRecord={id:string;createdAt:string};
 const byUpdated=(a:ConversationUpdatedRecord,b:ConversationUpdatedRecord)=>b.updatedAt.localeCompare(a.updatedAt)||a.id.localeCompare(b.id); const byCreated=(a:ConversationCreatedRecord,b:ConversationCreatedRecord)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id);
-export function createLocalConversationRepositoryAdapters(o:{rootDir:string; now?:()=>string}){const s=new LocalConversationRecordStore(o);
+export function createLocalConversationRepositoryAdapters(o:{rootDir:string; now?:()=>string; documents?:StructuredDocumentStore}){const s=new LocalConversationRecordStore(o);
 const sessions=async()=> (await s.readCollection<ConversationSessionRecord>('conversation-sessions.json')).map(normalizeConversationSessionRecord);
 const turns=async()=> (await s.readCollection<ConversationTurnRecord>('conversation-turns.json')).map(normalizeConversationTurnRecord);
 const messages=async()=> (await s.readCollection<ConversationMessageRecord>('conversation-messages.json')).map(normalizeConversationMessageRecord);

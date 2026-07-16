@@ -171,6 +171,8 @@ describe("resolveServerRuntimeConfig", () => {
     expect(source).toContain("loggingPort.log");
     expect(source).toContain("createServerListener");
     expect(source).toContain("server.http.listening");
+    expect(source).toContain('process.once("SIGINT", beginShutdown)');
+    expect(source).toContain('process.once("SIGTERM", beginShutdown)');
     expect(source).toContain("config.runtimeRootDirectory");
     expect(source).not.toContain("console.log");
     expect(source).not.toContain("[server] listening");

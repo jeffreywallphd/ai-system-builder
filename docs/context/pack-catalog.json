@@ -167,10 +167,10 @@
     {
       "id": "persistence-storage",
       "path": "docs/context/packs/persistence-storage.pack.md",
-      "description": "Structured persistence, blobs/resources, provider storage, roots, and workspace isolation.",
-      "taskSignals": ["persistence", "database", "postgres", "storage", "artifact bytes", "migration"],
-      "pathSignals": ["modules/contracts/persistence/", "modules/contracts/storage/", "modules/adapters/persistence/", "modules/adapters/storage/"],
-      "verification": ["npm run architecture:check", "npm test"]
+      "description": "Structured persistence, database deployment, recovery, blobs/resources, roots, and workspace isolation.",
+      "taskSignals": ["persistence", "database", "sqlite", "postgres", "deployment shape", "storage", "artifact bytes", "migration", "backup", "restore"],
+      "pathSignals": ["modules/contracts/persistence/", "modules/contracts/storage/", "modules/contracts/config/deployment-persistence-target.ts", "modules/adapters/persistence/", "modules/adapters/storage/", "config/environments/server/", "deployments/server/", "docs/operations/"],
+      "verification": ["npm run docs:check", "npm run architecture:check", "npm test"]
     },
     {
       "id": "security",

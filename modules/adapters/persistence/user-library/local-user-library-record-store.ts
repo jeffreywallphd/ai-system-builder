@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { Stream } from "node:stream";
 
 import type { UserLibraryAssetRecord, WorkspaceUserLibraryLinkRecord } from "../../../contracts/user-library";
+import { readDocumentRecord, writeDocumentRecord, type StructuredDocumentStore } from "../shared";
 
 export const USER_LIBRARY_LOCAL_STORE_KIND = "user-library-local-store" as const;
 export const USER_LIBRARY_LOCAL_SCHEMA_VERSION = 1 as const;
@@ -17,6 +18,7 @@ export interface LocalUserLibraryManifest {
 export interface LocalUserLibraryRecordStoreOptions {
   readonly rootDir: string;
   readonly now?: () => string;
+  readonly documents?: StructuredDocumentStore;
 }
 
 export class LocalUserLibraryRecordStoreError extends Error {
@@ -45,10 +47,14 @@ const COLLECTION_FILES = {
 export class LocalUserLibraryRecordStore {
   private readonly storeDir: string;
   private readonly now: () => string;
+  private readonly rootDir: string;
+  private readonly documents?: StructuredDocumentStore;
   private writeQueue: Promise<void> = Promise.resolve();
 
   public constructor(options: LocalUserLibraryRecordStoreOptions) {
     this.storeDir = join(options.rootDir, "user-library");
+    this.rootDir = options.rootDir;
+    this.documents = options.documents;
     this.now = options.now ?? (() => new Date().toISOString());
   }
 
@@ -108,10 +114,17 @@ export class LocalUserLibraryRecordStore {
   }
 
   private async ensureStoreDirectory(): Promise<void> {
+    if (this.documents) return;
     await mkdir(this.storeDir, { recursive: true });
   }
 
   private async ensureJsonFile(fileName: string, fallback: unknown): Promise<void> {
+    if (this.documents) {
+      const result = await readDocumentRecord({ rootDirectory: this.rootDir, documents: this.documents }, `user-library/${fileName}`, fallback);
+      this.validateInitializedFile(fileName, result.value);
+      if (!result.found) await this.writeJsonFile(fileName, fallback);
+      return;
+    }
     this.validateInitializedFile(fileName, await this.readJsonFile(fileName, fallback));
     try {
       await readFile(this.filePath(fileName), "utf8");
@@ -122,6 +135,10 @@ export class LocalUserLibraryRecordStore {
   }
 
   private async readJsonFile<T>(fileName: string, fallback: T): Promise<T> {
+    if (this.documents) {
+      const result = await readDocumentRecord({ rootDirectory: this.rootDir, documents: this.documents }, `user-library/${fileName}`, fallback);
+      return cloneJson(result.value);
+    }
     try {
       return cloneJson(JSON.parse(await readFile(this.filePath(fileName), "utf8")) as T);
     } catch (error) {
@@ -144,6 +161,10 @@ export class LocalUserLibraryRecordStore {
   }
 
   private async writeJsonFile(fileName: string, value: unknown): Promise<void> {
+    if (this.documents) {
+      await writeDocumentRecord({ rootDirectory: this.rootDir, documents: this.documents }, `user-library/${fileName}`, value);
+      return;
+    }
     const path = this.filePath(fileName);
     const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
     try {

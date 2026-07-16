@@ -8,15 +8,18 @@ import {
 import { LocalWorkspacePersistenceError } from "./localWorkspacePersistenceErrors";
 import { cloneJson, readJsonDocument, writeJsonDocument } from "./localWorkspacePersistenceJson";
 import { resolveWorkspaceSystemPackActivationsFile } from "./localWorkspacePersistencePaths";
+import type { StructuredDocumentStore } from "../shared";
 
 export interface LocalWorkspaceSystemPackActivationRepositoryOptions {
   readonly rootDirectory: string;
+  readonly documents?: StructuredDocumentStore;
 }
 
 export function createLocalWorkspaceSystemPackActivationRepository(
   options: LocalWorkspaceSystemPackActivationRepositoryOptions,
 ): WorkspaceSystemPackActivationRepository {
   const rootDirectory = options.rootDirectory;
+  const persistence = { rootDirectory, documents: options.documents };
 
   async function readWorkspaceActivations(workspaceId: WorkspaceId): Promise<WorkspaceSystemPackActivation[]> {
     const safeWorkspaceId = assertWorkspaceId(workspaceId);
@@ -24,6 +27,7 @@ export function createLocalWorkspaceSystemPackActivationRepository(
       resolveWorkspaceSystemPackActivationsFile(rootDirectory, safeWorkspaceId),
       [],
       "workspace-activation-persistence-read-failed",
+      persistence,
     );
     if (!Array.isArray(value)) {
       throw new LocalWorkspacePersistenceError("workspace-activation-persistence-read-failed");
@@ -41,6 +45,7 @@ export function createLocalWorkspaceSystemPackActivationRepository(
       resolveWorkspaceSystemPackActivationsFile(rootDirectory, safeWorkspaceId),
       sortActivations(activations),
       "workspace-activation-persistence-write-failed",
+      persistence,
     );
   }
 

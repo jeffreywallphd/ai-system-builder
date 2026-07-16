@@ -6,10 +6,12 @@ import { CreateWorkspaceUseCase, ListWorkspaceSystemPackActivationsUseCase } fro
 import { createLocalWorkspaceRepository, createLocalWorkspaceSelectionRepository, createLocalWorkspaceSystemPackActivationRepository } from "../../../adapters/persistence/workspace";
 import type { AssetResourceBackedViewProvider } from "../../../application/ports/asset";
 import { composeLocalAssetKernel, type LocalAssetKernelComposition } from "./composeLocalAssetKernel";
+import type { StructuredDocumentStore } from "../../../adapters/persistence/shared";
 
 export interface ComposeInternalAssetRegistryOptions {
   readonly rootDirectory: string;
   readonly now?: () => string;
+  readonly documents?: StructuredDocumentStore;
   readonly resourceBackedViewProvider?: AssetResourceBackedViewProvider;
   readonly resourceBackedViewProviders?: readonly AssetResourceBackedViewProvider[];
 }
@@ -39,11 +41,11 @@ export interface InternalAssetRegistryComposition {
 }
 
 export function composeInternalAssetRegistry(options: ComposeInternalAssetRegistryOptions): InternalAssetRegistryComposition {
-  const assetKernel = composeLocalAssetKernel({ rootDirectory: options.rootDirectory, now: options.now });
+  const assetKernel = composeLocalAssetKernel({ rootDirectory: options.rootDirectory, now: options.now, documents: options.documents });
   const resourceBackedViewProvider = composeResourceBackedViewProvider(options);
-  const workspaceRepository = createLocalWorkspaceRepository({ rootDirectory: options.rootDirectory });
-  const workspaceSelectionRepository = createLocalWorkspaceSelectionRepository({ rootDirectory: options.rootDirectory });
-  const systemPackActivationRepository = createLocalWorkspaceSystemPackActivationRepository({ rootDirectory: options.rootDirectory });
+  const workspaceRepository = createLocalWorkspaceRepository({ rootDirectory: options.rootDirectory, documents: options.documents });
+  const workspaceSelectionRepository = createLocalWorkspaceSelectionRepository({ rootDirectory: options.rootDirectory, documents: options.documents });
+  const systemPackActivationRepository = createLocalWorkspaceSystemPackActivationRepository({ rootDirectory: options.rootDirectory, documents: options.documents });
   const installerDependencies = {
     definitionRepository: assetKernel.repositories.definitionRepository,
     registerAssetDefinition: assetKernel.useCases.registerAssetDefinition,

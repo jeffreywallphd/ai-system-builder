@@ -2,11 +2,12 @@ import type { ExecutionApprovalRepositoryPort, ExecutionAttemptRepositoryPort, E
 import { normalizeExecutionApprovalRecord, normalizeExecutionAttemptRecord, normalizeExecutionCancellationRequestRecord, normalizeExecutionEventRecord, normalizeExecutionResultRecord, normalizeExecutionRetryRequestRecord, normalizeExecutionRunRecord, normalizeExecutionRuntimeReferenceRecord, type ExecutionApprovalRecord, type ExecutionAttemptRecord, type ExecutionCancellationRequestRecord, type ExecutionEventRecord, type ExecutionResultRecord, type ExecutionRetryRequestRecord, type ExecutionRunRecord, type ExecutionRuntimeReferenceRecord } from '../../../contracts/execution-runs';
 import { pageRecords } from '../user-library/local-user-library-repository-helpers';
 import { LocalExecutionRunRecordStore } from './local-execution-run-record-store';
+import type { StructuredDocumentStore } from '../shared';
 type UpdatedRecord={id:string;updatedAt?:string;createdAt?:string};
 type CreatedRecord={id:string;createdAt?:string;at?:string};
 const byUpdated=(a:UpdatedRecord,b:UpdatedRecord)=>(b.updatedAt??b.createdAt??'').localeCompare(a.updatedAt??a.createdAt??'')||a.id.localeCompare(b.id);
 const byCreated=(a:CreatedRecord,b:CreatedRecord)=>(a.createdAt??a.at??'').localeCompare(b.createdAt??b.at??'')||a.id.localeCompare(b.id);
-export function createLocalExecutionRunRepositoryAdapters(o:{rootDir:string;now?:()=>string}){const s=new LocalExecutionRunRecordStore(o);
+export function createLocalExecutionRunRepositoryAdapters(o:{rootDir:string;now?:()=>string;documents?:StructuredDocumentStore}){const s=new LocalExecutionRunRecordStore(o);
 const runs=async()=> (await s.readCollection<ExecutionRunRecord>('execution-runs.json')).map(normalizeExecutionRunRecord);
 const attempts=async()=> (await s.readCollection<ExecutionAttemptRecord>('execution-attempts.json')).map(normalizeExecutionAttemptRecord);
 const events=async()=> (await s.readCollection<ExecutionEventRecord>('execution-events.json')).map(normalizeExecutionEventRecord);

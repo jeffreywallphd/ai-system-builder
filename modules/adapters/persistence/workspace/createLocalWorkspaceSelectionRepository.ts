@@ -8,27 +8,36 @@ import {
 import { LocalWorkspacePersistenceError } from "./localWorkspacePersistenceErrors";
 import { cloneJson, readJsonDocument, writeJsonDocument } from "./localWorkspacePersistenceJson";
 import { resolveActiveWorkspaceSelectionFile } from "./localWorkspacePersistencePaths";
+import { resolveDocumentIdentity, type StructuredDocumentStore } from "../shared";
+import { relative } from "node:path";
 
 export interface LocalWorkspaceSelectionRepositoryOptions {
   readonly rootDirectory: string;
+  readonly documents?: StructuredDocumentStore;
 }
 
 const EMPTY_SELECTION: ActiveWorkspaceSelection = {};
 
 export function createLocalWorkspaceSelectionRepository(options: LocalWorkspaceSelectionRepositoryOptions): WorkspaceSelectionRepository {
   const selectionFile = resolveActiveWorkspaceSelectionFile(options.rootDirectory);
+  const persistence = { rootDirectory: options.rootDirectory, documents: options.documents };
 
   return {
     async readActiveWorkspaceSelection(): Promise<ActiveWorkspaceSelection> {
-      const value = await readJsonDocument<unknown>(selectionFile, EMPTY_SELECTION, "workspace-selection-persistence-read-failed");
+      const value = await readJsonDocument<unknown>(selectionFile, EMPTY_SELECTION, "workspace-selection-persistence-read-failed", persistence);
       return normalizeSelection(value);
     },
 
     async saveActiveWorkspaceSelection(selection: ActiveWorkspaceSelection): Promise<void> {
-      await writeJsonDocument(selectionFile, normalizeSelection(selection), "workspace-selection-persistence-write-failed");
+      await writeJsonDocument(selectionFile, normalizeSelection(selection), "workspace-selection-persistence-write-failed", persistence);
     },
 
     async clearActiveWorkspaceSelection(): Promise<void> {
+      if (options.documents) {
+        const identity = resolveDocumentIdentity(relative(options.rootDirectory, selectionFile));
+        await options.documents.deleteDocument(identity.namespace, identity.key);
+        return;
+      }
       try {
         await rm(selectionFile, { force: true });
       } catch (error) {
