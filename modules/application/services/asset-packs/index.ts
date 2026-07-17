@@ -8,3 +8,4 @@ export * from "./asset-resolution-planning.service";
 export * from "./install-system-asset-pack.service";
 export * from "./install-system-foundation-pack.service";
 export * from "./system-packs";
+export * from "./system-foundation-functional-default-catalog";

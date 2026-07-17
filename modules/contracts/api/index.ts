@@ -28,3 +28,6 @@ export * from "./workspace-api-contract";
 export * from "./user-library-api-contract";
 
 export * from "./asset-authoring-api-contract";
+export * from "./asset-implementation-api-contract";
+export * from "./asset-package-api-contract";
+export * from "./asset-studio-api-contract";

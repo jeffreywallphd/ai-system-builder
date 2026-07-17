@@ -112,7 +112,7 @@ export function createSystemFoundationPackManifest(
     metadata: {
       declarativeOnly: true,
       catalogKind: "system-foundation",
-      catalogStatus: "in-progress",
+      catalogStatus: "functional",
       catalogVersion: "1.0.0",
       categoryCount: SYSTEM_FOUNDATION_PACK_CATEGORIES.length,
       containsDefinitions: entries.length > 0,

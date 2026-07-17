@@ -20,6 +20,9 @@ describe("api route security policy coverage", () => {
     expect(API_ROUTE_POLICIES.get("GET /api/assets/definitions")).toMatchObject({ public: false, scopes: ["asset:read"] });
     expect(API_ROUTE_POLICIES.get("GET /api/assets/resource-backed-views")).toMatchObject({ public: false, scopes: ["asset:read"] });
     expect(API_ROUTE_POLICIES.get("POST /api/assets/register-resource-backed-view")).toMatchObject({ public: false, scopes: ["asset:write"] });
+    expect(API_ROUTE_POLICIES.get("GET /api/asset-implementations/releases")).toMatchObject({ public: false, scopes: ["asset:read"] });
+    expect(API_ROUTE_POLICIES.get("POST /api/asset-implementations/resolve")).toMatchObject({ public: false, scopes: ["asset:read"] });
+    expect(API_ROUTE_POLICIES.get("POST /api/asset-packages/inspect")).toMatchObject({ public: false, scopes: ["asset:write"] });
     expect(API_ROUTE_POLICIES.get("GET /api/asset-authoring/workspaces/:workspaceId/drafts")).toMatchObject({ public: false, scopes: ["asset:read"] });
     expect(API_ROUTE_POLICIES.get("POST /api/asset-authoring/workspaces/:workspaceId/drafts")).toMatchObject({ public: false, scopes: ["asset:write"] });
     expect(API_ROUTE_POLICIES.get("POST /api/asset-authoring/workspaces/:workspaceId/drafts/:draftId/publish")).toMatchObject({ public: false, scopes: ["asset:write"] });

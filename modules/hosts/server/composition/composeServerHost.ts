@@ -137,6 +137,10 @@ import { composeExecutionPlanServices } from "../../shared/composition/composeEx
 import { composeConversationExecutionServices } from "../../shared/composition/composeConversationExecutionServices";
 import { createPythonConversationalRuntimeAdapterCatalog, createPythonConversationalRuntimeGuard, createPythonConversationalTextGenerationInvocationAdapter } from "../../../adapters/runtime/conversational-text-generation";
 import type { StructuredDocumentStore } from "../../../adapters/persistence/shared";
+import { createAssetImplementationArtifactAdapter } from "../../../adapters/storage/asset-implementation";
+import { composeAssetImplementationKernel } from "../../shared/composition/composeAssetImplementationKernel";
+import { composeAssetPackageLifecycle } from "../../shared/composition/composeAssetPackageLifecycle";
+import { composeAssetStudioWorkflow } from "../../shared/composition/composeAssetStudioWorkflow";
 
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join("modules", "adapters", "runtime", "python", "worker");
 const execFile = promisify(nodeExecFile);
@@ -905,7 +909,36 @@ export function composeServerHost(
           publishedModelRegistry: modelRegistry,
         }),
       });
-      void internalAssetRegistry.installSystemFoundationPack.install();
+      const foundationReady = internalAssetRegistry.installSystemFoundationPack.install();
+      const assetImplementation = organizationDocuments
+        ? composeAssetImplementationKernel({
+            documents: organizationDocuments,
+            definitions: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+            artifacts: createAssetImplementationArtifactAdapter(storage),
+            now: options.now ?? (() => new Date().toISOString()),
+          })
+        : undefined;
+      const assetImplementationReady = assetImplementation
+        ? foundationReady.then(() => assetImplementation.ensureTrustedBuiltIns())
+        : foundationReady;
+      const assetPackages = organizationDocuments && assetImplementation
+        ? composeAssetPackageLifecycle({
+            documents: organizationDocuments,
+            definitions: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+            implementations: assetImplementation.repository,
+            artifacts: createAssetImplementationArtifactAdapter(storage),
+            nextInspectionId: () => `package-inspection.${randomUUID()}`,
+            now: options.now ?? (() => new Date().toISOString()),
+          })
+        : undefined;
+      const assetStudio = organizationDocuments && assetImplementation
+        ? composeAssetStudioWorkflow({
+            documents: organizationDocuments,
+            implementations: assetImplementation,
+            artifacts: createAssetImplementationArtifactAdapter(storage),
+            now: options.now ?? (() => new Date().toISOString()),
+          })
+        : undefined;
       const generateAssetInstanceId = () => `asset-instance.${randomUUID()}`;
       const assetMutationUseCases = {
         registerResourceBackedViewAsAsset: new RegisterResourceBackedViewAsAssetInstanceUseCase({
@@ -1244,6 +1277,47 @@ export function composeServerHost(
         })(),
         executionPlanServices: { executionPlans: { create: executionPlanServices.createPlan, validate: executionPlanServices.validatePlan, readModel: executionPlanServices.readModel } },
         conversationExecutionServices: { conversations: conversationExecutionServices },
+        ...(assetImplementation
+          ? {
+              assetImplementationServices: {
+                listReleases: {
+                  async execute(workspaceId) {
+                    await assetImplementationReady;
+                    return assetImplementation.useCases.listReleases.execute(workspaceId);
+                  },
+                },
+                resolve: {
+                  async execute(request) {
+                    await assetImplementationReady;
+                    return assetImplementation.useCases.resolve.execute(request);
+                  },
+                },
+              },
+            }
+          : {}),
+        ...(assetPackages
+          ? {
+              assetPackageServices: {
+                inspect: assetPackages.useCases.inspect,
+                admit: assetPackages.useCases.admit,
+                list: assetPackages.useCases.list,
+                activate: assetPackages.useCases.activate,
+                disable: assetPackages.useCases.disable,
+                rollback: assetPackages.useCases.rollback,
+              },
+            }
+          : {}),
+        ...(assetStudio
+          ? {
+              assetStudioServices: {
+                start: assetStudio.useCases.start,
+                propose: assetStudio.useCases.propose,
+                review: assetStudio.useCases.review,
+                read: assetStudio.useCases.read,
+                list: assetStudio.useCases.list,
+              },
+            }
+          : {}),
       });
     },
   };

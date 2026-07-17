@@ -1,14 +1,14 @@
 # System Builder
 
 - Status: current
-- Related decisions: `docs/adr/ADR-0005-builder-core-platform-capabilities-and-user-composable-assets.md`, `docs/adr/ADR-0016-asset-kernel-terminology-and-architecture-baseline.md`, `docs/adr/ADR-0020-asset-composition-planning.md`, `docs/adr/ADR-0024-system-builder-area-and-software-status-placement.md`
+- Related decisions: `docs/adr/ADR-0005-builder-core-platform-capabilities-and-user-composable-assets.md`, `docs/adr/ADR-0016-asset-kernel-terminology-and-architecture-baseline.md`, `docs/adr/ADR-0020-asset-composition-planning.md`, `docs/adr/ADR-0024-system-builder-area-and-software-status-placement.md`, `docs/adr/ADR-0033-system-builds-releases-security-and-workflows.md`
 - Verification: `docs/architecture/architecture-verification.md`
 
 ## Purpose
 
 System Builder is the workspace-scoped product area where users construct systems by composing assets and larger asset compositions. It is not an application-health dashboard and must not become a second asset, planning, runtime, or execution architecture.
 
-The current increment establishes terminology, design-time contracts, navigation ownership, and future data-model seams. It does not claim that system authoring or persistence is complete.
+The repository currently establishes terminology, design-time contracts, navigation ownership, and data-model seams. ADR-0033 accepts revision-safe CRUD, composition editing, deterministic builds, and immutable releases as the target boundary; their support remains increment-gated until implementation evidence passes.
 
 ## Canonical concepts
 
@@ -54,7 +54,7 @@ Design-time statuses are `draft`, `in-composition`, `blocked`, `ready-for-valida
 
 ## Product-area placement
 
-**Systems** is a top-level, workspace-required desktop destination. The initial page is a truthful preparation shell describing the composition model and deferred capabilities. Future System Builder workflows may add system lists, creation, editing, validation, and plan-to-system materialization through explicit contracts and use cases.
+**Systems** is a top-level, workspace-required destination. It owns system lists, revision-safe creation/editing, validation, builds, releases, and system-level Run & Test through explicit contracts and use cases. Surfaces must remain truthful while each operation is increment-gated.
 
 General asset composition planning may remain available in Assets / Plans as an input-building workflow. System-specific assembly and system-record management belong in Systems. The two surfaces must share the same contracts rather than fork planning and composition data.
 
@@ -67,7 +67,7 @@ General asset composition planning may remain available in Assets / Plans as an 
 
 Opening Systems must never trigger these operational reads. Opening Settings or Software status must not create, mutate, validate, or execute a composed system.
 
-## Deferred implementation
+## Current implementation gaps
 
 - system repository ports and persistence adapters;
 - create/read/list/update/archive use cases;
@@ -78,4 +78,4 @@ Opening Systems must never trigger these operational reads. Opening Settings or 
 - thin-client System Builder parity;
 - collaboration, permissions, import/export, marketplace, and deployment synchronization.
 
-Each deferred boundary requires its own scoped implementation and verification. Public support must not be inferred from the presence of the baseline contracts or page shell.
+The target choices for these boundaries are accepted by ADR-0033, but public support must not be inferred from documents or baseline contracts. Each operation remains unavailable until its implementation and verification are present. See `docs/architecture/system-build-and-release.md`.

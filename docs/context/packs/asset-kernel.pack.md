@@ -34,6 +34,7 @@ Use this pack for tasks involving:
 - Generated outputs become reusable only after explicit finalization/registration; external repository objects become assets only after explicit import/localization/registration.
 - Workspace-aware Asset Library reads require explicit workspace context and must not fall back to global records.
 - System Foundation availability is by `system.foundation@1.0.0` workspace activation reference; workspace creation must not install/copy/seed pack definitions.
+- Executable source, bundles, evidence, and host components live outside Asset Kernel records. Exact implementation releases bind to definitions through ADR-0030 contracts.
 
 ## Canonical Asset Terminology
 
@@ -59,6 +60,10 @@ Use this pack for tasks involving:
 - Local JSON persistence adapters live in `modules/adapters/persistence/asset` and store JSON-compatible metadata only.
 - Host composition uses internal helpers under `modules/hosts/shared/composition` and must keep runtime roots separate from Asset Kernel records.
 - Desktop IPC, server API, preload, renderer, and thin-client surfaces consume read/mutation wrappers rather than local persistence, host helpers, or application services directly.
+- `system.foundation@1.0.0` includes a functional construction kit whose exact
+  definitions resolve through closed trusted built-in or declarative-engine
+  bindings. Shared Catalog previews are bounded and side-effect free; policy
+  defaults fail closed and cannot expand platform authority.
 
 ## Resource-Backed View Rules
 
@@ -96,6 +101,8 @@ Use this pack for tasks involving:
 - `docs/architecture/runtime-readiness-binding.md` - readiness/capability output.
 - `docs/architecture/execution-plan-preparation.md` - execution plan output boundary.
 - `docs/architecture/controlled-conversational-system-execution.md` - conversational runtime execution when in scope.
+- `docs/architecture/asset-implementations-and-packages.md` - executable/declarative release, package, trust, and functional-foundation boundary.
+- `docs/architecture/asset-authoring-and-execution-security.md` - untrusted authoring, preview, build, execution, and capability boundary.
 - `docs/architecture/persistence-and-storage.md` - artifact/resource/storage boundaries.
 - `docs/architecture/module-dependency-rules.md` - dependency direction constraints.
 
@@ -115,6 +122,7 @@ Use this pack for tasks involving:
 
 - Do not create renderer-, IPC-, API-, image-generation-, workflow-, or provider-specific asset vocabularies.
 - Do not duplicate persistence/storage/runtime readiness/task-registry concepts inside asset contracts.
+- Do not embed code, React components, SQL, routes, source/package bytes, build logs, or implementation evidence in Asset Kernel records.
 - Do not treat generated outputs, external repository objects, or previews as registered assets before explicit finalization/import/registration.
 - Do not expose raw paths, bytes, provider payloads, prompts, tokens, stack traces, or local storage internals through Asset Kernel metadata or diagnostics.
 - Do not turn read-only Asset Library/Registry work into mutation, seeding, import, finalization, provider browsing, scans, runtime execution, or byte/content reads.

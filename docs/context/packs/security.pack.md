@@ -66,6 +66,9 @@
 - Never expose secrets, bearer tokens, auth headers, cookies, passwords, API keys, signed URLs, query credentials, raw env values, or token hashes.
 - Never expose local/cache/temp/storage/runtime paths, storage roots, command lines, stack traces, raw exceptions, process internals, provider-native payloads, raw JSON lines, or raw logs in public responses.
 - Never expose bytes, blobs, base64/data URLs, prompt/workflow payloads, model/dataset/image/document contents, or resource contents through diagnostics or Asset Kernel metadata.
+- Never execute imported/authored code in Electron main/preload/product renderer, the API server process, or the database process. Node permissions alone are not a malicious-code sandbox.
+- Treat package/source/model output as untrusted instructions. Use quarantine, non-executing inspection, isolated source roots, sandboxed builders/runners, default-deny egress, opaque secret references, a capability broker, exact approvals, and audit.
+- Security assets may only narrow platform and organization policy; any upstream denial wins.
 - Runtime/readiness failures may include safe capability ids, status, summaries, reason codes/categories, and recommended actions.
 - Resource-backed view diagnostics must be sanitized by provider/facade/transport/UI layers, not merely hidden in CSS.
 - Asset mutation guards must fail before source reads or side effects when approval, actor, capability, or request context is invalid.

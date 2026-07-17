@@ -53,6 +53,8 @@ import type {
   AssetMutationResult,
 } from "../../../../../modules/contracts/asset";
 import type { ActiveWorkspaceSelection, CreateWorkspaceCommand } from "../../../../../modules/contracts/workspace";
+import type { AdmitAssetPackageCommand, SetAssetPackageActivationCommand } from "../../../../../modules/contracts/asset-package";
+import type { ProposeAssetStudioChangeCommand, ReviewAssetStudioProposalCommand, StartAssetStudioCommand } from "../../../../../modules/contracts/asset-studio";
 
 export interface DesktopArtifactUploadInput {
   workspaceId: string;
@@ -433,6 +435,17 @@ interface DesktopApiBridge {
   saveActiveWorkspaceSelection?: (selection: ActiveWorkspaceSelection, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   clearActiveWorkspaceSelection?: (context?: DesktopBridgeRequestContext) => Promise<unknown>;
   listAssetDefinitions?: (input?: DesktopAssetDefinitionsListInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  inspectAssetPackage?: (input: { workspaceId: string; bytes: Uint8Array }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  admitAssetPackage?: (input: Omit<AdmitAssetPackageCommand, "actorId">, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  listAssetPackages?: (workspaceId: string, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  activateAssetPackage?: (input: Omit<SetAssetPackageActivationCommand, "actorId">, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  disableAssetPackage?: (input: Omit<SetAssetPackageActivationCommand, "actorId">, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  rollbackAssetPackage?: (input: Omit<SetAssetPackageActivationCommand, "actorId">, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  proposeAssetStudioChange?: (input: Omit<ProposeAssetStudioChangeCommand, "actorId">, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  startAssetStudio?: (input: Omit<StartAssetStudioCommand, "actorId">, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  reviewAssetStudioProposal?: (input: Omit<ReviewAssetStudioProposalCommand, "actorId">, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  readAssetStudioProposal?: (input: { workspaceId: string; workflowId: string }, context?: DesktopBridgeRequestContext) => Promise<unknown>;
+  listAssetStudioWorkflows?: (workspaceId: string, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readAssetDefinition?: (input: DesktopAssetDefinitionReadInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   readAssetDefinitionVersion?: (input: DesktopAssetDefinitionVersionReadInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;
   listAssetResourceBackedViews?: (input?: DesktopAssetResourceBackedViewsListInput, context?: DesktopBridgeRequestContext) => Promise<unknown>;

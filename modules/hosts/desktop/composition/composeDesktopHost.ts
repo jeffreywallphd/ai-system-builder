@@ -518,6 +518,40 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           ipcMain: registerOptions.ipcMain,
           conversations: conversationExecutionServices,
         },
+        assetImplementations: {
+          ipcMain: registerOptions.ipcMain,
+          listReleases: {
+            async execute(workspaceId) {
+              const implementation = (await getAssetFeatures()).assetImplementation;
+              if (!implementation) throw new Error("Asset implementation storage is unavailable.");
+              return implementation.useCases.listReleases.execute(workspaceId);
+            },
+          },
+          resolve: {
+            async execute(request) {
+              const implementation = (await getAssetFeatures()).assetImplementation;
+              if (!implementation) throw new Error("Asset implementation storage is unavailable.");
+              return implementation.useCases.resolve.execute(request);
+            },
+          },
+        },
+        assetPackages: {
+          ipcMain: registerOptions.ipcMain,
+          inspect: { async execute(command) { const feature = (await getAssetFeatures()).assetPackages; if (!feature) throw new Error("Asset package storage is unavailable."); return feature.useCases.inspect.execute(command); } },
+          admit: { async execute(command) { const feature = (await getAssetFeatures()).assetPackages; if (!feature) throw new Error("Asset package storage is unavailable."); return feature.useCases.admit.execute(command); } },
+          list: { async execute(workspaceId) { const feature = (await getAssetFeatures()).assetPackages; if (!feature) throw new Error("Asset package storage is unavailable."); return feature.useCases.list.execute(workspaceId); } },
+          activate: { async execute(command) { const feature = (await getAssetFeatures()).assetPackages; if (!feature) throw new Error("Asset package storage is unavailable."); return feature.useCases.activate.execute(command); } },
+          disable: { async execute(command) { const feature = (await getAssetFeatures()).assetPackages; if (!feature) throw new Error("Asset package storage is unavailable."); return feature.useCases.disable.execute(command); } },
+          rollback: { async execute(command) { const feature = (await getAssetFeatures()).assetPackages; if (!feature) throw new Error("Asset package storage is unavailable."); return feature.useCases.rollback.execute(command); } },
+        },
+        assetStudio: {
+          ipcMain: registerOptions.ipcMain,
+          start: { async execute(command) { const feature = (await getAssetFeatures()).assetStudio; if (!feature) throw new Error("Asset Studio storage is unavailable."); return feature.useCases.start.execute(command); } },
+          propose: { async execute(command) { const feature = (await getAssetFeatures()).assetStudio; if (!feature) throw new Error("Asset Studio storage is unavailable."); return feature.useCases.propose.execute(command); } },
+          review: { async execute(command) { const feature = (await getAssetFeatures()).assetStudio; if (!feature) throw new Error("Asset Studio storage is unavailable."); return feature.useCases.review.execute(command); } },
+          read: { async execute(workspaceId, workflowId) { const feature = (await getAssetFeatures()).assetStudio; if (!feature) throw new Error("Asset Studio storage is unavailable."); return feature.useCases.read.execute(workspaceId, workflowId); } },
+          list: { async execute(workspaceId) { const feature = (await getAssetFeatures()).assetStudio; if (!feature) throw new Error("Asset Studio storage is unavailable."); return feature.useCases.list.execute(workspaceId); } },
+        },
       });
       recordHostMemorySnapshot("desktop.host.ipc-registration.lazy-handlers.after");
       recordHostMemorySnapshot("desktop.host.ipc-registration.return");

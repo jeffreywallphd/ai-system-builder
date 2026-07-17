@@ -11,6 +11,9 @@ import { registerUserLibraryIpc, type RegisterUserLibraryIpcDependencies } from 
 import { registerEffectiveAssetProjectionIpc, type RegisterEffectiveAssetProjectionIpcDependencies } from "./effective-asset-projections/registerEffectiveAssetProjectionIpc";
 import { registerAssetCompositionIpc, type RegisterAssetCompositionIpcDependencies } from "./asset-composition/registerAssetCompositionIpc";
 import { registerConversationExecutionIpc, type RegisterConversationExecutionIpcDependencies } from "./conversations/registerConversationExecutionIpc";
+import { registerAssetImplementationIpc, type RegisterAssetImplementationIpcDependencies } from "./asset-implementation/registerAssetImplementationIpc";
+import { registerAssetPackageIpc, type RegisterAssetPackageIpcDependencies } from "./asset-package/registerAssetPackageIpc";
+import { registerAssetStudioIpc, type RegisterAssetStudioIpcDependencies } from "./asset-studio/registerAssetStudioIpc";
 export type { AsyncFeatureProvider, LazyProvidedObjectOptions } from "./lazyFeatureProvider";
 
 export type DesktopIpcRegistrationMilestoneRecorder = (milestone: string) => void;
@@ -29,6 +32,9 @@ export interface RegisterElectronIpcDependencies {
   effectiveAssetProjections?: RegisterEffectiveAssetProjectionIpcDependencies;
   assetComposition?: RegisterAssetCompositionIpcDependencies;
   conversations?: RegisterConversationExecutionIpcDependencies;
+  assetImplementations?: RegisterAssetImplementationIpcDependencies;
+  assetPackages?: RegisterAssetPackageIpcDependencies;
+  assetStudio?: RegisterAssetStudioIpcDependencies;
   recordMilestone?: DesktopIpcRegistrationMilestoneRecorder;
 }
 
@@ -62,6 +68,15 @@ export function registerElectronIpc(dependencies: RegisterElectronIpcDependencie
   if (dependencies.conversations) {
     registerGroup(dependencies.recordMilestone, "conversations-group", () => registerConversationExecutionIpc(dependencies.conversations!));
   }
+  if (dependencies.assetImplementations) {
+    registerGroup(dependencies.recordMilestone, "asset-implementations-group", () => registerAssetImplementationIpc(dependencies.assetImplementations!));
+  }
+  if (dependencies.assetPackages) {
+    registerGroup(dependencies.recordMilestone, "asset-packages-group", () => registerAssetPackageIpc(dependencies.assetPackages!));
+  }
+  if (dependencies.assetStudio) {
+    registerGroup(dependencies.recordMilestone, "asset-studio-group", () => registerAssetStudioIpc(dependencies.assetStudio!));
+  }
 }
 
 export type {
@@ -78,4 +93,7 @@ export type {
   RegisterEffectiveAssetProjectionIpcDependencies,
   RegisterAssetCompositionIpcDependencies,
   RegisterConversationExecutionIpcDependencies,
+  RegisterAssetImplementationIpcDependencies,
+  RegisterAssetPackageIpcDependencies,
+  RegisterAssetStudioIpcDependencies,
 };

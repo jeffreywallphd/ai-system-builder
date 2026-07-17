@@ -7,3 +7,4 @@ export * from "./display-primitives";
 export * from "./shell-primitives";
 
 export * from "./conversation-assets";
+export * from "./functional-defaults";

@@ -397,10 +397,36 @@ import {
   DESKTOP_MODEL_PUBLISH_OPERATION,
   DESKTOP_MODEL_PUBLISH_REQUEST_CHANNEL,
   DESKTOP_MODEL_PUBLISH_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_IMPLEMENTATION_RELEASES_LIST_OPERATION,
+  DESKTOP_ASSET_IMPLEMENTATION_RELEASES_LIST_REQUEST_CHANNEL,
+  DESKTOP_ASSET_IMPLEMENTATION_RELEASES_LIST_RESPONSE_CHANNEL,
+  DESKTOP_ASSET_IMPLEMENTATION_RESOLVE_OPERATION,
+  DESKTOP_ASSET_IMPLEMENTATION_RESOLVE_REQUEST_CHANNEL,
+  DESKTOP_ASSET_IMPLEMENTATION_RESOLVE_RESPONSE_CHANNEL,
+  createDesktopAssetImplementationReleasesListRequest,
+  createDesktopAssetImplementationResolveRequest,
+  type DesktopAssetImplementationReleasesListResponse,
+  type DesktopAssetImplementationResolveResponse,
+  DESKTOP_ASSET_PACKAGE_OPERATIONS,
+  DESKTOP_ASSET_PACKAGE_CHANNELS,
+  createDesktopAssetPackageRequest,
+  type DesktopAssetPackageInspectResponse,
+  type DesktopAssetPackageRecordResponse,
+  type DesktopAssetPackageListResponse,
+  DESKTOP_ASSET_STUDIO_OPERATIONS,
+  DESKTOP_ASSET_STUDIO_CHANNELS,
+  createDesktopAssetStudioRequest,
+  type DesktopAssetStudioProposalResponse,
+  type DesktopAssetStudioWorkflowResponse,
+  type DesktopAssetStudioListResponse,
+  type DesktopAssetStudioDraftResponse,
 } from "../../../../modules/contracts/ipc";
 import type { ActiveWorkspaceSelection, CreateWorkspaceCommand } from "../../../../modules/contracts/workspace";
 import type { ArtifactFamily } from "../../../../modules/domain/artifact";
 import type { RuntimeCapabilityId } from "../../../../modules/contracts/runtime";
+import type { AssetImplementationResolutionRequest } from "../../../../modules/contracts/asset-implementation";
+import type { AdmitAssetPackageCommand, SetAssetPackageActivationCommand } from "../../../../modules/contracts/asset-package";
+import type { ProposeAssetStudioChangeCommand, ReviewAssetStudioProposalCommand, StartAssetStudioCommand } from "../../../../modules/contracts/asset-studio";
 import type {
   CreateAssetDraftCommand,
   CreateAssetOverrideCommand,
@@ -590,6 +616,19 @@ export interface DesktopPreloadApi {
   listCompositionPlansForProjection: (input: { targetWorkspaceId: string; projectionId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
   listCompositionPlansForEffectiveAsset: (input: { targetWorkspaceId: string; effectiveAssetReference: { kind: string; id: string; version?: string } }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
   listCompositionPlansNeedingAttention: (input: { targetWorkspaceId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<unknown>;
+  listAssetImplementationReleases: (workspaceId: string, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetImplementationReleasesListResponse>;
+  resolveAssetImplementation: (input: AssetImplementationResolutionRequest, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetImplementationResolveResponse>;
+  inspectAssetPackage: (input: { workspaceId: string; bytes: Uint8Array }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetPackageInspectResponse>;
+  admitAssetPackage: (input: Omit<AdmitAssetPackageCommand, "actorId">, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetPackageRecordResponse>;
+  listAssetPackages: (workspaceId: string, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetPackageListResponse>;
+  activateAssetPackage: (input: Omit<SetAssetPackageActivationCommand, "actorId">, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetPackageRecordResponse>;
+  disableAssetPackage: (input: Omit<SetAssetPackageActivationCommand, "actorId">, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetPackageRecordResponse>;
+  rollbackAssetPackage: (input: Omit<SetAssetPackageActivationCommand, "actorId">, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetPackageRecordResponse>;
+  proposeAssetStudioChange: (input: Omit<ProposeAssetStudioChangeCommand, "actorId">, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetStudioProposalResponse>;
+  startAssetStudio: (input: Omit<StartAssetStudioCommand, "actorId">, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetStudioDraftResponse>;
+  reviewAssetStudioProposal: (input: Omit<ReviewAssetStudioProposalCommand, "actorId">, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetStudioWorkflowResponse>;
+  readAssetStudioProposal: (input: { workspaceId: string; workflowId: string }, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetStudioProposalResponse>;
+  listAssetStudioWorkflows: (workspaceId: string, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetStudioListResponse>;
   createWorkspaceAuthoredAsset: (command: CreateWorkspaceAuthoredAssetCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringCreateWorkspaceAuthoredAssetResponse>;
   createAssetDraft: (command: CreateAssetDraftCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringCreateDraftResponse>;
   updateAssetDraft: (command: UpdateAssetDraftCommand, context?: DesktopArtifactUploadBridgeContext) => Promise<DesktopAssetAuthoringUpdateDraftResponse>;
@@ -2179,7 +2218,96 @@ export function createDesktopPreloadApi(
         message: "Received invalid desktop model publish IPC response envelope.",
       });
     },
+    async listAssetImplementationReleases(workspaceId, context = {}) {
+      const request = createDesktopAssetImplementationReleasesListRequest(workspaceId, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ASSET_IMPLEMENTATION_RELEASES_LIST_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopAssetImplementationReleasesListResponse>(response, {
+        operation: DESKTOP_ASSET_IMPLEMENTATION_RELEASES_LIST_OPERATION,
+        channel: DESKTOP_ASSET_IMPLEMENTATION_RELEASES_LIST_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop asset implementation list IPC response envelope.",
+      });
+    },
+    async resolveAssetImplementation(input, context = {}) {
+      const request = createDesktopAssetImplementationResolveRequest(input, context);
+      const response = await dependencies.ipcRenderer.invoke(
+        DESKTOP_ASSET_IMPLEMENTATION_RESOLVE_REQUEST_CHANNEL.value,
+        request,
+      );
+      return assertDesktopEnvelopeResponse<DesktopAssetImplementationResolveResponse>(response, {
+        operation: DESKTOP_ASSET_IMPLEMENTATION_RESOLVE_OPERATION,
+        channel: DESKTOP_ASSET_IMPLEMENTATION_RESOLVE_RESPONSE_CHANNEL.value,
+        message: "Received invalid desktop asset implementation resolution IPC response envelope.",
+      });
+    },
+    async inspectAssetPackage(input, context = {}) {
+      return invokeAssetPackage<DesktopAssetPackageInspectResponse>(dependencies, "inspect", input, context);
+    },
+    async admitAssetPackage(input, context = {}) {
+      return invokeAssetPackage<DesktopAssetPackageRecordResponse>(dependencies, "admit", input, context);
+    },
+    async listAssetPackages(workspaceId, context = {}) {
+      return invokeAssetPackage<DesktopAssetPackageListResponse>(dependencies, "list", { workspaceId }, context);
+    },
+    async activateAssetPackage(input, context = {}) {
+      return invokeAssetPackage<DesktopAssetPackageRecordResponse>(dependencies, "activate", input, context);
+    },
+    async disableAssetPackage(input, context = {}) {
+      return invokeAssetPackage<DesktopAssetPackageRecordResponse>(dependencies, "disable", input, context);
+    },
+    async rollbackAssetPackage(input, context = {}) {
+      return invokeAssetPackage<DesktopAssetPackageRecordResponse>(dependencies, "rollback", input, context);
+    },
+    async proposeAssetStudioChange(input, context = {}) {
+      return invokeAssetStudio<DesktopAssetStudioProposalResponse>(dependencies, "propose", input, context);
+    },
+    async startAssetStudio(input, context = {}) {
+      return invokeAssetStudio<DesktopAssetStudioDraftResponse>(dependencies, "start", input, context);
+    },
+    async reviewAssetStudioProposal(input, context = {}) {
+      return invokeAssetStudio<DesktopAssetStudioWorkflowResponse>(dependencies, "review", input, context);
+    },
+    async readAssetStudioProposal(input, context = {}) {
+      return invokeAssetStudio<DesktopAssetStudioProposalResponse>(dependencies, "read", input, context);
+    },
+    async listAssetStudioWorkflows(workspaceId, context = {}) {
+      return invokeAssetStudio<DesktopAssetStudioListResponse>(dependencies, "list", { workspaceId }, context);
+    },
   };
+}
+
+async function invokeAssetPackage<TResponse extends { operation: string; channel: string }>(
+  dependencies: CreateDesktopPreloadApiDependencies,
+  operation: keyof typeof DESKTOP_ASSET_PACKAGE_OPERATIONS,
+  payload: unknown,
+  context: DesktopArtifactUploadBridgeContext,
+): Promise<TResponse> {
+  const request = createDesktopAssetPackageRequest(operation, payload, context);
+  const channels = DESKTOP_ASSET_PACKAGE_CHANNELS[operation];
+  const response = await dependencies.ipcRenderer.invoke(channels.request.value, request);
+  return assertDesktopEnvelopeResponse<TResponse>(response, {
+    operation: DESKTOP_ASSET_PACKAGE_OPERATIONS[operation],
+    channel: channels.response.value,
+    message: `Received invalid desktop asset package ${operation} IPC response envelope.`,
+  });
+}
+
+async function invokeAssetStudio<TResponse extends { operation: string; channel: string }>(
+  dependencies: CreateDesktopPreloadApiDependencies,
+  operation: keyof typeof DESKTOP_ASSET_STUDIO_OPERATIONS,
+  payload: unknown,
+  context: DesktopArtifactUploadBridgeContext,
+): Promise<TResponse> {
+  const request = createDesktopAssetStudioRequest(operation, payload, context);
+  const channels = DESKTOP_ASSET_STUDIO_CHANNELS[operation];
+  const response = await dependencies.ipcRenderer.invoke(channels.request.value, request);
+  return assertDesktopEnvelopeResponse<TResponse>(response, {
+    operation: DESKTOP_ASSET_STUDIO_OPERATIONS[operation],
+    channel: channels.response.value,
+    message: `Received invalid desktop Asset Studio ${operation} IPC response envelope.`,
+  });
 }
 import {
   DESKTOP_USER_LIBRARY_ASSET_LIST_OPERATION,

@@ -10,6 +10,7 @@ export * as workspace from "./workspace";
 export * as organization from "./organization";
 export * as userLibrary from "./user-library";
 export * as assetAuthoring from "./asset-authoring";
+export * as assetStudio from "./asset-studio";
 export * as artifact from "./artifact";
 export * as artifactBrowser from "./artifact-browser";
 export * as transform from "./transform";

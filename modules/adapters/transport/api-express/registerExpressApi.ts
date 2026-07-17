@@ -28,6 +28,9 @@ import { registerEffectiveAssetProjectionApiRoutes, type RegisterEffectiveAssetP
 import { registerAssetCompositionApiRoutes, type RegisterAssetCompositionApiRoutesDependencies } from "./asset-composition/registerAssetCompositionApiRoutes";
 import { registerExecutionPlanApiRoutes, type RegisterExecutionPlanApiRoutesDependencies } from "./execution-plans/registerExecutionPlanApiRoutes";
 import { registerConversationExecutionApiRoutes, type RegisterConversationExecutionApiRoutesDependencies } from "./conversations/registerConversationExecutionApiRoutes";
+import { registerAssetImplementationApiRoutes, type RegisterAssetImplementationApiRoutesDependencies } from "./asset-implementation/registerAssetImplementationApiRoutes";
+import { registerAssetPackageApiRoutes, type RegisterAssetPackageApiRoutesDependencies } from "./asset-package/registerAssetPackageApiRoutes";
+import { registerAssetStudioApiRoutes, type RegisterAssetStudioApiRoutesDependencies } from "./asset-studio/registerAssetStudioApiRoutes";
 
 export interface RegisterExpressApiDependencies {
   app: RegisterArtifactUploadApiRouteDependencies["app"]
@@ -98,6 +101,9 @@ export interface RegisterExpressApiDependencies {
   assetCompositionServices?: Omit<RegisterAssetCompositionApiRoutesDependencies, "app">;
   executionPlanServices?: Omit<RegisterExecutionPlanApiRoutesDependencies, "app">;
   conversationExecutionServices?: Omit<RegisterConversationExecutionApiRoutesDependencies, "app">;
+  assetImplementationServices?: Omit<RegisterAssetImplementationApiRoutesDependencies, "app">;
+  assetPackageServices?: Omit<RegisterAssetPackageApiRoutesDependencies, "app">;
+  assetStudioServices?: Omit<RegisterAssetStudioApiRoutesDependencies, "app">;
 }
 
 export function registerExpressApi(
@@ -202,6 +208,15 @@ export function registerExpressApi(
   }
   if (dependencies.conversationExecutionServices) {
     registerConversationExecutionApiRoutes({ app: dependencies.app, ...dependencies.conversationExecutionServices });
+  }
+  if (dependencies.assetImplementationServices) {
+    registerAssetImplementationApiRoutes({ app: dependencies.app, ...dependencies.assetImplementationServices });
+  }
+  if (dependencies.assetPackageServices) {
+    registerAssetPackageApiRoutes({ app: dependencies.app, ...dependencies.assetPackageServices });
+  }
+  if (dependencies.assetStudioServices) {
+    registerAssetStudioApiRoutes({ app: dependencies.app, ...dependencies.assetStudioServices });
   }
 
   if (dependencies.assetRegistryRead) {

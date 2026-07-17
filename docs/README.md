@@ -33,6 +33,11 @@ This directory separates canonical system guidance from downstream task context 
 - `docs/deployment-readiness-implementation-roadmap.md`
   - Supporting delivery plan for database migration and multi-shape operational
     readiness; canonical decisions remain in ADRs and architecture docs.
+- `docs/asset-system-composition-implementation-roadmap.md`
+  - Supporting delivery plan for executable assets, Catalog and Studio
+    workflows, System Builder composition, functional system defaults, system
+    builds/releases, and multi-shape execution; successor decisions are required
+    before crossing currently deferred import or execution boundaries.
 - `docs/context/templates/`
   - Templates for durable epic, feature, and story context artifacts.
 
@@ -44,6 +49,9 @@ This directory separates canonical system guidance from downstream task context 
 - Persistence or deployment work: read `docs/architecture/persistence-and-storage.md`, `docs/architecture/host-model.md`, ADR-0003, and ADR-0004.
 - Database deployment implementation: also read ADR-0025 and the supporting
   `docs/deployment-readiness-implementation-roadmap.md`.
+- End-to-end asset and system composition delivery: use
+  `docs/asset-system-composition-implementation-roadmap.md`, then load the one
+  owning Asset/System context pack for the increment being implemented.
 - Organization tenancy, managed identity, or deployment placement: read
   ADR-0029 and `docs/architecture/organization-tenancy-and-identity.md`.
 - Database operation or release qualification: use
@@ -65,7 +73,9 @@ If context guidance conflicts with an ADR, architecture document, or standard, t
 - Asset authoring, customization, and overrides: `docs/architecture/asset-authoring-customization-and-overrides.md` and ADR-0018.
 - Effective asset projections: `docs/architecture/effective-asset-projections.md` and ADR-0019.
 - Asset composition planning: `docs/architecture/asset-composition-planning.md` and ADR-0020.
-- System Builder: `docs/architecture/system-builder.md` and ADR-0024; Systems is workspace-scoped while builder-application status belongs to Settings / Software status.
+- Asset implementations, packages, trust, and functional defaults: `docs/architecture/asset-implementations-and-packages.md` and ADR-0030, ADR-0031, and ADR-0034.
+- Asset authoring/execution security: `docs/architecture/asset-authoring-and-execution-security.md`, `docs/security/asset-package-authoring-and-execution-threat-model.md`, and ADR-0032.
+- System Builder: `docs/architecture/system-builder.md`, `docs/architecture/system-build-and-release.md`, ADR-0024, and ADR-0033; Systems is workspace-scoped while builder-application status belongs to Settings / Software status.
 - Runtime readiness binding: `docs/architecture/runtime-readiness-binding.md` and ADR-0021.
 - Execution plan preparation: `docs/architecture/execution-plan-preparation.md` and ADR-0022.
 - Controlled conversational execution: `docs/architecture/controlled-conversational-system-execution.md` and ADR-0023.
@@ -75,7 +85,6 @@ If context guidance conflicts with an ADR, architecture document, or standard, t
 - Start prompt assembly from `docs/context/packs/index.pack.md`.
 - Use `docs/context/prompt-routing.md` to choose only additional packs that are materially relevant.
 - Include `docs/context/packs/persistence-storage.pack.md` for DB-vs-file/blob boundary work.
-
 
 ## Execution Context References
 

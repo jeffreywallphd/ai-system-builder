@@ -46,3 +46,6 @@ export * from "./desktop-runtime-readiness-v2-contract";
 export * from "./desktop-execution-plans-contract";
 
 export * from './desktop-conversation-execution-v2-contract';
+export * from "./desktop-asset-implementation-contract";
+export * from "./desktop-asset-package-contract";
+export * from "./desktop-asset-studio-contract";

@@ -11,6 +11,7 @@ AI System Builder is a TypeScript platform for composing, running, and managing 
 - Task context: load the [baseline context pack](docs/context/packs/index.pack.md), then use [prompt routing](docs/context/prompt-routing.md).
 - Decisions and implementation rules: use the [ADR index](docs/adr/README.md) and [repository standards](docs/standards/).
 - Deployment delivery: use the [multi-shape implementation roadmap](docs/deployment-readiness-implementation-roadmap.md); SQLite is the local structured-data target and PostgreSQL is the campus/corporate/cloud target.
+- Asset and System Builder delivery: use the [asset/system composition implementation roadmap](docs/asset-system-composition-implementation-roadmap.md) for executable assets, Catalog and Studio workflows, functional system-default assets, system composition, builds, releases, and multi-shape execution.
 - Local structured persistence is active in desktop composition through SQLite;
   first-run identity is explicit and generated, while legacy JSON import and
   organization assignment are rollback-preserving and fail-closed.

@@ -11,6 +11,10 @@ import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/m
 import { composeInternalAssetRegistry, type InternalAssetRegistryComposition } from "../../shared/composition/composeInternalAssetRegistry";
 import { composeResourceBackedViewProviders } from "../../shared/composition/composeResourceBackedViewProviders";
 import type { StructuredDocumentStore } from "../../../adapters/persistence/shared";
+import { createAssetImplementationArtifactAdapter } from "../../../adapters/storage/asset-implementation";
+import { composeAssetImplementationKernel } from "../../shared/composition/composeAssetImplementationKernel";
+import { composeAssetPackageLifecycle } from "../../shared/composition/composeAssetPackageLifecycle";
+import { composeAssetStudioWorkflow } from "../../shared/composition/composeAssetStudioWorkflow";
 
 export interface ComposeDesktopAssetFeatureOptions {
   storageRootDirectory: string;
@@ -21,7 +25,7 @@ export interface ComposeDesktopAssetFeatureOptions {
   onInternalAssetRegistry?: (registry: InternalAssetRegistryComposition) => void;
 }
 
-export function composeDesktopAssetFeature(options: ComposeDesktopAssetFeatureOptions): any {
+export async function composeDesktopAssetFeature(options: ComposeDesktopAssetFeatureOptions): Promise<any> {
   const modelRegistry = createLocalModelRegistryAdapter({
     filePath: `${options.storageRootDirectory}/model-registry/models.json`,
     rootDirectory: options.storageRootDirectory,
@@ -47,13 +51,43 @@ export function composeDesktopAssetFeature(options: ComposeDesktopAssetFeatureOp
     }),
   });
   options.onInternalAssetRegistry?.(internalAssetRegistry);
-  void internalAssetRegistry.installSystemFoundationPack.install();
+  await internalAssetRegistry.installSystemFoundationPack.install();
+  const assetImplementation = options.documents
+    ? composeAssetImplementationKernel({
+        documents: options.documents,
+        definitions: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+        artifacts: createAssetImplementationArtifactAdapter(options.artifacts.storage),
+        now: options.now,
+      })
+    : undefined;
+  await assetImplementation?.ensureTrustedBuiltIns();
+  const assetPackages = options.documents && assetImplementation
+    ? composeAssetPackageLifecycle({
+        documents: options.documents,
+        definitions: internalAssetRegistry.assetKernel.repositories.definitionRepository,
+        implementations: assetImplementation.repository,
+        artifacts: createAssetImplementationArtifactAdapter(options.artifacts.storage),
+        nextInspectionId: () => `package-inspection.${randomUUID()}`,
+        now: options.now,
+      })
+    : undefined;
+  const assetStudio = options.documents && assetImplementation
+    ? composeAssetStudioWorkflow({
+        documents: options.documents,
+        implementations: assetImplementation,
+        artifacts: createAssetImplementationArtifactAdapter(options.artifacts.storage),
+        now: options.now,
+      })
+    : undefined;
   const generateInstanceId = () => `asset-instance.${randomUUID()}`;
   const repositories = internalAssetRegistry.assetKernel.repositories;
   return {
     assetRegistryRead: internalAssetRegistry.workspaceReadFacade,
     modelRegistry,
     imageAssetRegistry,
+    assetImplementation,
+    assetPackages,
+    assetStudio,
     assetMutationUseCases: {
       registerResourceBackedViewAsAsset: new RegisterResourceBackedViewAsAssetInstanceUseCase({ assetRegistryRead: internalAssetRegistry.readFacade, definitionRepository: repositories.definitionRepository, instanceRepository: repositories.instanceRepository, now: options.now, generateInstanceId }),
       finalizeGeneratedOutputAsAsset: new FinalizeGeneratedOutputAsAssetUseCase({ assetRegistryRead: internalAssetRegistry.readFacade, definitionRepository: repositories.definitionRepository, instanceRepository: repositories.instanceRepository, now: options.now, generateInstanceId }),

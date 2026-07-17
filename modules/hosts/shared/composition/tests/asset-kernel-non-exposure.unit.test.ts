@@ -34,7 +34,7 @@ function combinedSource(relativeDir: string): string {
 }
 
 describe("Asset Kernel public non-exposure boundaries", () => {
-  it("keeps Phase 5 asset pack lifecycle, resolver, and override controls out of public surfaces", () => {
+  it("keeps accepted package lifecycle controls bounded and marketplace/registry behavior out of public surfaces", () => {
     const publicSource = [
       combinedSource("modules/contracts/api"),
       combinedSource("modules/contracts/ipc"),
@@ -51,11 +51,14 @@ describe("Asset Kernel public non-exposure boundaries", () => {
       combinedSource("modules/hosts/shared/composition"),
     ].join("\n");
 
-    assert.doesNotMatch(publicSource, /\/api\/(?:asset-packs|packs|marketplace|package-registry)(?:\/|["'`?])/i);
+    assert.match(publicSource, /\/api\/asset-packages\/inspect/i);
+    assert.match(publicSource, /\/api\/asset-packages\/admit/i);
+    assert.match(publicSource, /DESKTOP_ASSET_PACKAGE_OPERATIONS/);
+    assert.doesNotMatch(publicSource, /\/api\/(?:packs|marketplace|package-registry)(?:\/|["'`?])/i);
     assert.doesNotMatch(publicSource, /ipc\.asset\.(?:pack|packs|resolver|override|marketplace|package-registry)/i);
     assert.doesNotMatch(publicSource, /\bresolvedDefinition\b/i);
     assert.doesNotMatch(publicSource, /\b(?:installAssetPack|installSystemFoundationPack|importAssetPack|exportAssetPack|uploadAssetPack|downloadAssetPack|publishAssetPack|activateAssetPack|disableAssetPack|resolveAssetDefinition|deleteAssetOverride|editAssetOverride)\b/i);
-    assert.doesNotMatch(publicSource, /\b(?:Install pack|Import pack|Export pack|Upload pack|Download pack|Publish pack|Activate pack|Disable pack|Edit override|Delete override|Resolve asset|Resolver preview|Pack marketplace|Package registry|Asset editor|Visual composition|Canvas authoring|Wizard authoring)\b/i);
+    assert.doesNotMatch(publicSource, /\b(?:Export pack|Download pack|Publish pack|Edit override|Delete override|Resolve asset|Resolver preview|Pack marketplace|Package registry|Visual composition|Canvas authoring|Wizard authoring)\b/i);
     assert.doesNotMatch(publicSource, /\b(?:activePackRegistry|packActivation|packPriority|marketplaceClient|packageRegistry|archivePath|archiveBytes|signatureValue|filePicker)\b/i);
     assert.doesNotMatch(hostCompositionSource, /\b(?:installSystemFoundationPack|installAssetPack|importAssetPack|exportAssetPack|activateAssetPack|disableAssetPack|resolveAssetDefinition)\s*\(/i);
     assert.doesNotMatch(hostCompositionSource, /\b(?:startup.*(?:asset|pack|foundation).*seed|(?:asset|pack|foundation).*seed.*startup|auto.*(?:asset|pack|foundation).*(?:seed|install)|(?:asset|pack|foundation).*auto.*(?:seed|install))\b/i);

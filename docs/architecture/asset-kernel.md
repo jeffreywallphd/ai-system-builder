@@ -1,7 +1,7 @@
 # Asset Kernel
 
 - Status: current
-- Related decisions: `docs/adr/ADR-0005-builder-core-platform-capabilities-and-user-composable-assets.md`, `docs/adr/ADR-0016-asset-kernel-terminology-and-architecture-baseline.md`
+- Related decisions: `docs/adr/ADR-0005-builder-core-platform-capabilities-and-user-composable-assets.md`, `docs/adr/ADR-0016-asset-kernel-terminology-and-architecture-baseline.md`, `docs/adr/ADR-0030-executable-asset-implementations-and-releases.md`, `docs/adr/ADR-0034-functional-foundation-pack-evolution.md`
 - Verification: `docs/architecture/architecture-verification.md`
 
 ## Purpose
@@ -22,30 +22,32 @@ This document prevents parallel vocabularies for artifacts, resources, UI compon
 
 The Asset Kernel does not replace storage, runtime, host, transport, or security models. It defines how assets reference capabilities, resources, lifecycle, provenance, and composition needs without duplicating those lower-level systems.
 
+Executable source, implementation bundles, build evidence, and system releases are also outside Asset Kernel records. ADR-0030 and `docs/architecture/asset-implementations-and-packages.md` define the separate implementation-release family and its exact bindings to semantic definitions.
+
 ## Canonical Terminology
 
-| Concept | Kernel status | Canonical meaning |
-| --- | --- | --- |
-| `Asset` | Kernel concept | The reusable/composable semantic unit known to AI System Builder. |
-| `AssetDefinition` | Kernel concept | A reusable versioned blueprint/template for a composable building block. |
-| `AssetInstance` | Kernel concept | A configured use of an asset definition in a feature, system, workflow, page, or composition. |
-| `AssetBinding` | Kernel concept | A typed connection between asset instances, ports, resources, runtime capabilities, storage objects, or external repository objects. |
-| `AssetComposition` | Kernel concept | A validated assembly of asset instances and bindings into a larger unit such as a feature, workflow, page, subsystem, system, or system of subsystems. |
-| `AssetReference` | Kernel concept | A stable transport-neutral reference to an asset or referenceable backing object. Deterministic behavior should reference specific definition versions. |
-| `AssetConfiguration` | Kernel concept | The definition-owned configuration surface plus instance-selected values. |
-| `AssetAiContext` | Kernel concept | Structured AI-readable metadata for retrieval, validation support, and prompt assembly. |
-| `AssetPort` | Kernel concept | A formal input, output, event, control, action, data, or error connection point. |
-| `AssetCompositionRule` | Kernel concept | A machine-checkable rule for dependencies, incompatibilities, ordering, cardinality, parent/child constraints, or binding compatibility. |
-| `AssetValidationIssue` | Kernel concept | A structured validation result for missing/invalid configuration, AI-context gaps, incompatible bindings, lifecycle problems, missing requirements, or unsafe declarations. |
-| `AssetLifecycleStatus` | Kernel concept | The lifecycle baseline: `draft`, `validated`, `published`, `deprecated`, `archived`, and `failed-validation`. |
-| `AssetProvenance` | Kernel concept | Safe creation/update/source/derivation metadata, including AI-generated or human-authored markers where appropriate. |
-| `AssetRequirement` | Kernel concept | Declarative runtime, host, permission, safety, resource, artifact, or external-provider requirements. |
-| `Resource-backed Asset` | Kernel concept | An asset whose semantic value is backed by a resource or artifact descriptor. |
-| `Artifact` | Outside kernel, referenceable | A stored, managed resource with metadata, storage identity, provenance, and possibly external repository identity. |
-| `Resource` | Outside kernel, referenceable | Addressable content/data such as bytes, generated output, dataset file, image file, document file, model file, or provider object. |
-| `Generated Output` | Outside kernel until registered/finalized | A runtime-produced resource/artifact that may later become or back an asset after explicit finalization/registration. |
-| `Preview` | Outside kernel, referenceable | A derived readable representation of a resource-backed asset or artifact. |
-| `External Repository Object` | Outside kernel, referenceable | An object in an external system, such as a Hugging Face repository or file, that may be mirrored, referenced, localized, or wrapped as a resource-backed asset. |
+| Concept                      | Kernel status                             | Canonical meaning                                                                                                                                                           |
+| ---------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Asset`                      | Kernel concept                            | The reusable/composable semantic unit known to AI System Builder.                                                                                                           |
+| `AssetDefinition`            | Kernel concept                            | A reusable versioned blueprint/template for a composable building block.                                                                                                    |
+| `AssetInstance`              | Kernel concept                            | A configured use of an asset definition in a feature, system, workflow, page, or composition.                                                                               |
+| `AssetBinding`               | Kernel concept                            | A typed connection between asset instances, ports, resources, runtime capabilities, storage objects, or external repository objects.                                        |
+| `AssetComposition`           | Kernel concept                            | A validated assembly of asset instances and bindings into a larger unit such as a feature, workflow, page, subsystem, system, or system of subsystems.                      |
+| `AssetReference`             | Kernel concept                            | A stable transport-neutral reference to an asset or referenceable backing object. Deterministic behavior should reference specific definition versions.                     |
+| `AssetConfiguration`         | Kernel concept                            | The definition-owned configuration surface plus instance-selected values.                                                                                                   |
+| `AssetAiContext`             | Kernel concept                            | Structured AI-readable metadata for retrieval, validation support, and prompt assembly.                                                                                     |
+| `AssetPort`                  | Kernel concept                            | A formal input, output, event, control, action, data, or error connection point.                                                                                            |
+| `AssetCompositionRule`       | Kernel concept                            | A machine-checkable rule for dependencies, incompatibilities, ordering, cardinality, parent/child constraints, or binding compatibility.                                    |
+| `AssetValidationIssue`       | Kernel concept                            | A structured validation result for missing/invalid configuration, AI-context gaps, incompatible bindings, lifecycle problems, missing requirements, or unsafe declarations. |
+| `AssetLifecycleStatus`       | Kernel concept                            | The lifecycle baseline: `draft`, `validated`, `published`, `deprecated`, `archived`, and `failed-validation`.                                                               |
+| `AssetProvenance`            | Kernel concept                            | Safe creation/update/source/derivation metadata, including AI-generated or human-authored markers where appropriate.                                                        |
+| `AssetRequirement`           | Kernel concept                            | Declarative runtime, host, permission, safety, resource, artifact, or external-provider requirements.                                                                       |
+| `Resource-backed Asset`      | Kernel concept                            | An asset whose semantic value is backed by a resource or artifact descriptor.                                                                                               |
+| `Artifact`                   | Outside kernel, referenceable             | A stored, managed resource with metadata, storage identity, provenance, and possibly external repository identity.                                                          |
+| `Resource`                   | Outside kernel, referenceable             | Addressable content/data such as bytes, generated output, dataset file, image file, document file, model file, or provider object.                                          |
+| `Generated Output`           | Outside kernel until registered/finalized | A runtime-produced resource/artifact that may later become or back an asset after explicit finalization/registration.                                                       |
+| `Preview`                    | Outside kernel, referenceable             | A derived readable representation of a resource-backed asset or artifact.                                                                                                   |
+| `External Repository Object` | Outside kernel, referenceable             | An object in an external system, such as a Hugging Face repository or file, that may be mirrored, referenced, localized, or wrapped as a resource-backed asset.             |
 
 ## Asset Ontology
 
@@ -270,7 +272,7 @@ All controlled mutations require explicit approval, actor metadata, safe request
 
 System defaults are represented as pack entries, not loose hardcoded built-ins. Read-side system-default classification requires trusted system source metadata or a valid installer-managed marker, not source labels alone.
 
-Foundation primitives remain semantic definitions only. They do not implement renderer components, CSS, routes, API or IPC handlers, workflow engines, runtime tasks, provider calls, resource readers, storage reads/writes, file uploads, data validation, form submission, preview rendering, visual composition/canvas authoring, or AI-generated system composition.
+Foundation definitions remain semantic and host-neutral. Functional behavior is supplied by exact trusted implementation-release or declarative-engine bindings under ADR-0034. Definitions do not embed renderer components, CSS, routes, API or IPC handlers, workflow engines, runtime tasks, provider calls, resource readers, storage reads/writes, file uploads, executable code, or implementation bytes.
 
 Pack validation, quality gates, install diagnostics, resolver diagnostics, manifest serialization, and parsing must stay sanitized. Unsafe paths, credentials, signed URLs, raw provider payloads, stack traces, command lines, environment values, bytes/blob/base64/data URLs, prompt text, workflow JSON, and raw resource contents must be rejected or omitted.
 
@@ -305,8 +307,8 @@ Non-goals:
 - no automatic asset instance creation from artifacts, generated outputs, previews, or external repository objects,
 - no durable resource-backed mapping repository beyond explicit `AssetInstance` records created by controlled workflows,
 - no arbitrary asset create/update/delete/patch/editor API, IPC, preload method, renderer action, or thin-client action,
-- no public pack import/export/install/activation behavior,
-- no marketplace or package registry,
+- no public marketplace, ratings, billing, publisher governance, or automatic updates,
+- package import/install/activation is permitted only through ADR-0031's quarantine, inspection, admission, trust, and lifecycle boundary,
 - no broad provider browsing, storage scans, byte/content reads, or network/provider calls from Asset Kernel reads,
 - no workflow execution, runtime task execution, scheduler/queue behavior, or runtime readiness ownership,
 - no visual composition/canvas authoring,
@@ -322,5 +324,7 @@ Non-goals:
 - `docs/architecture/runtime-readiness-binding.md` defines runtime capability matching.
 - `docs/architecture/execution-plan-preparation.md` defines executable plan candidate preparation.
 - `docs/architecture/controlled-conversational-system-execution.md` defines conversational runtime execution when in scope.
+- `docs/architecture/asset-implementations-and-packages.md` defines executable/declarative implementation releases, bindings, package trust, and functional defaults.
+- `docs/architecture/asset-authoring-and-execution-security.md` defines coding-model, sandbox, UI isolation, and capability-broker boundaries.
 - `docs/architecture/persistence-and-storage.md` defines artifact/resource/storage boundaries.
 - `docs/architecture/module-dependency-rules.md` defines dependency direction constraints.

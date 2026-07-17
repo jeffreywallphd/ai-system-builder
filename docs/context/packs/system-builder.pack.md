@@ -11,6 +11,7 @@
 
 - Changing System Builder records, system composition semantics, or the Systems page.
 - Preparing system creation, editing, validation, persistence, or plan materialization.
+- Preparing deterministic builds, immutable releases, composed policy, finite workflows, or system-level Run & Test.
 - Moving or labeling software status and runtime diagnostics near the Systems/Settings boundary.
 
 ## Do Not Use When
@@ -27,6 +28,8 @@
 - Keep asset composition planning as an optional non-executing source record.
 - Require explicit workspace identity for every future system-owned operation and persistence seam.
 - Systems is workspace-scoped; Settings / Software status remains global and operational.
+- Design identity, immutable revisions, build attempts, immutable releases, deployments, and execution runs are separate record families.
+- Security assets may narrow but never widen platform/organization authority; the initial workflow language is finite, typed, and capability-based.
 
 ## Current Implementation Shape
 
@@ -38,7 +41,9 @@
 ## Canonical Source Docs
 
 - `docs/architecture/system-builder.md`
+- `docs/architecture/system-build-and-release.md`
 - `docs/adr/ADR-0024-system-builder-area-and-software-status-placement.md`
+- `docs/adr/ADR-0033-system-builds-releases-security-and-workflows.md`
 - `docs/architecture/asset-kernel.md`
 - `docs/architecture/asset-composition-planning.md`
 - `docs/architecture/workspace-model.md`
@@ -49,7 +54,8 @@
 - Do not create a parallel asset/composition vocabulary in System Builder.
 - Do not put Python, ComfyUI, host lifecycle, resource utilization, or software status on System Builder records.
 - Do not make Systems globally accessible without an active workspace.
-- Do not add CRUD, persistence, transport, execution, or thin-client claims from the contract baseline alone.
+- Do not claim CRUD, persistence, build, execution, or thin-client support until its increment implementation and evidence exist.
+- Do not mutate old system revisions/releases or store deployment/runtime status in design records.
 - Do not rename valid ownership terms such as `system.foundation` or `system-owned`.
 
 ## Companion Packs
