@@ -10,14 +10,14 @@
 The local deployment needs a SQLite driver that works in the packaged Electron
 main process, does not require a separately administered service, and can create
 consistent online backups. Native addon drivers introduce Electron ABI rebuild
-and packaging work. The repository's Electron 38 runtime embeds Node 22, which
+and packaging work. The repository's Electron 41 runtime embeds Node 24, which
 provides `node:sqlite` directly.
 
 ## Research basis
 
-- [Electron 38's release notes](https://www.electronjs.org/blog/electron-38-0)
-  identify its embedded Node 22 runtime.
-- [Node 22.18 SQLite documentation](https://nodejs.org/download/release/v22.18.0/docs/api/sqlite.html)
+- [Electron 41's release notes](https://www.electronjs.org/blog/electron-41-0)
+  identify its embedded Node 24 runtime.
+- [Node 24.14 SQLite documentation](https://nodejs.org/download/release/v24.14.0/docs/api/sqlite.html)
   documents `DatabaseSync`, busy timeout, prepared statements, and the online
   backup API available to that runtime.
 - [SQLite transaction documentation](https://www.sqlite.org/lang_transaction.html)

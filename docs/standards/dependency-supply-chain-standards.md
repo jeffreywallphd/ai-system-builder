@@ -16,6 +16,9 @@ upgrade.
 - CI and container builds use `npm ci`; they must not resolve a new dependency
   tree with `npm install`.
 - Dependency changes include the manifest and lockfile in the same review.
+- Runtime source imports only dependencies declared directly by the applicable
+  root or workspace manifest; incidental access through a tool's transitive tree
+  is not an application dependency boundary.
 - Install lifecycle scripts remain disabled in validation and server-image
   dependency stages unless a separately reviewed build step requires them.
 - Major runtime or packaging-tool upgrades require compatibility testing; do not
@@ -26,15 +29,14 @@ upgrade.
 `npm run security:dependencies` evaluates two scopes:
 
 - the production/runtime tree fails on any known advisory,
-- the complete development toolchain fails on critical advisories and reports
-  lower-severity debt for explicit review.
+- the complete development toolchain also fails on any known advisory.
 
-This distinction does not declare development-tool findings safe. It prevents
-existing toolchain debt from being hidden while keeping the production release
-boundary strict. Toolchain findings are reviewed through normal dependency
-updates and may be promoted to a stricter threshold when the baseline permits.
-Network or malformed-registry responses fail the check rather than producing a
-false pass.
+The scopes remain separate so runtime exposure and build/package exposure are
+visible independently, but neither scope may carry known advisory debt. When an
+upstream range has not adopted a patched transitive release, a narrow exact npm
+override is permitted only after its affected command paths pass compatibility
+tests. Network or malformed-registry responses fail the check rather than
+producing a false pass.
 
 ## SBOM and workflow integrity
 
@@ -54,7 +56,7 @@ false pass.
 
 - Does the lockfile match every workspace manifest?
 - Does `npm ci` succeed without modifying the tree?
-- Are production advisories at zero and critical toolchain advisories at zero?
+- Are production and complete-toolchain advisories both at zero?
 - Is every workflow action immutable by full commit SHA?
 - Are build/runtime base images and qualification service images immutable by
   digest, and does the image scan block fixed critical findings?

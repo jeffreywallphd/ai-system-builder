@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { run } from "node:test";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import {
   applyIgnoredFailureAdjustments,
@@ -466,11 +466,10 @@ try {
     throw new Error("No non-browser test files were discovered.");
   }
 
-  for (const runtimeTestFile of discoveredRuntimeTestFiles) {
-    await import(pathToFileURL(runtimeTestFile).href);
-  }
-
-  const testsStream = run(buildNonBrowserNodeTestRunOptions());
+  const testsStream = run(buildNonBrowserNodeTestRunOptions({
+    files: discoveredRuntimeTestFiles,
+    cwd: repoRoot,
+  }));
 
   for await (const streamEvent of testsStream) {
     const eventType = streamEvent?.type;

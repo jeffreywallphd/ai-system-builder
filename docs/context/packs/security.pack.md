@@ -49,8 +49,9 @@
 - Thin-client secure fetch adds `Authorization: Bearer` when a paired token exists.
 - Token hashes are persisted; raw bearer tokens and hash secrets must never be committed or logged.
 - The tracked npm lockfile is used by CI and server-image builds; the dependency
-  security gate requires a clean production tree, rejects critical development
-  toolchain advisories, and validates a production SPDX SBOM.
+  security gate requires clean production and complete development trees and
+  validates a production SPDX SBOM. Reviewed transitive overrides are exact and
+  must retain packaging and feature compatibility evidence.
 
 ## Layered Enforcement Model
 

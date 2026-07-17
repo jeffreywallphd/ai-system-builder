@@ -2,6 +2,9 @@
   "name": "ai-system-builder",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=24 <25"
+  },
   "main": ".webpack/main",
   "workspaces": [
     "apps/server",
@@ -44,7 +47,8 @@
     "jose": "6.2.3",
     "pg": "^8.22.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "selfsigned": "5.5.0"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.10.2",
@@ -58,7 +62,7 @@
     "@types/react-dom": "^19.2.2",
     "@vercel/webpack-asset-relocator-loader": "^1.10.0",
     "css-loader": "^7.1.2",
-    "electron": "^38.3.0",
+    "electron": "41.10.2",
     "jsdom": "^26.1.0",
     "node-loader": "^2.1.0",
     "style-loader": "^4.0.0",
@@ -67,5 +71,13 @@
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "webpack": "^5.99.9"
+  },
+  "overrides": {
+    "tar": "7.5.20",
+    "tmp": "0.2.7",
+    "webpack-dev-server": "5.2.6",
+    "sockjs": {
+      "uuid": "11.1.1"
+    }
   }
 }

@@ -230,12 +230,12 @@ a pass.
 ### Repository completion evidence (2026-07-17)
 
 - The full non-browser repository runner completed with report status `passed`,
-  exit code `0`, 2,228 passing test events, no actionable failures, and one
-  intentionally environment-gated live-PostgreSQL conformance test across 2,229
+  exit code `0`, 2,233 passing test events, no actionable failures, and one
+  intentionally environment-gated live-PostgreSQL conformance test across 2,234
   test events.
-- Windows x64 Electron packaging completed through webpack bundling, native
-  dependency preparation, file copy, and package finalization with the standard
-  Forge configuration.
+- Windows x64 Electron packaging completed through Forge webpack/native
+  preparation and Electron Packager finalization; the packaged output contains
+  application `0.1.0`, Electron `41.10.2`, and both main and renderer bundles.
 - Server TypeScript and thin-client production builds completed successfully.
 - Documentation drift, module architecture, and agent-support gates completed
   successfully; the agent-support catalog contains 26 packs and 19 scenarios.

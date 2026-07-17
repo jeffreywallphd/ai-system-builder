@@ -25,10 +25,7 @@ export function evaluateAuditReport(report, scope) {
   return {
     scope,
     counts: { ...counts, total },
-    blocking:
-      scope === "runtime"
-        ? total > 0
-        : counts.critical > 0,
+    blocking: total > 0,
   };
 }
 
@@ -91,7 +88,7 @@ export function runDependencySecurityCheck() {
     throw new Error("Runtime dependency audit contains known vulnerabilities.");
   }
   if (toolchain.blocking) {
-    throw new Error("Development toolchain audit contains a critical vulnerability.");
+    throw new Error("Development toolchain audit contains known vulnerabilities.");
   }
 }
 

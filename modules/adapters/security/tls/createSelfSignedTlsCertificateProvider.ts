@@ -6,6 +6,7 @@ import type { TlsCertificateProviderPort, TlsCertificateStorePort } from "../../
 const CERT_FILE_NAME = "dev-self-signed-server.pem";
 const KEY_FILE_NAME = "dev-self-signed-server-key.pem";
 const isIpHost = (h: string) => /^\d|:/.test(h);
+const addDays = (date: Date, days: number) => new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 
 export function createSelfSignedTlsCertificateProvider(store: TlsCertificateStorePort): TlsCertificateProviderPort {
   return { async resolveCertificateMaterial(input) {
@@ -17,8 +18,8 @@ export function createSelfSignedTlsCertificateProvider(store: TlsCertificateStor
     if (certExists !== keyExists) throw new Error(`TLS certificate directory has partial state at '${input.certificateDirectory}'. Found only one of certificate/key files; delete both or repair manually.`);
     if (!certExists) {
       await store.ensureDirectory(input.certificateDirectory);
-      const pems = selfsigned.generate([{ name: "commonName", value: input.hosts[0] ?? "localhost" }], {
-        algorithm: "sha256", keySize: 2048, days: 365,
+      const pems = await selfsigned.generate([{ name: "commonName", value: input.hosts[0] ?? "localhost" }], {
+        algorithm: "sha256", keySize: 2048, notBeforeDate: input.now, notAfterDate: addDays(input.now, 365),
         extensions: [{ name: "basicConstraints", cA: false }, { name: "keyUsage", digitalSignature: true, keyEncipherment: true }, { name: "extKeyUsage", serverAuth: true }, { name: "subjectAltName", altNames: input.hosts.map((h) => isIpHost(h) ? ({ type: 7, ip: h }) : ({ type: 2, value: h })) }],
       });
       await store.writeTextAtomic(certPath, pems.cert, 0o644);

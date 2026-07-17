@@ -1,7 +1,9 @@
 const metricPattern = /^(?:\W+)?\s*(tests|suites|pass|fail|cancelled|skipped|todo|duration_ms)\s+(.+)$/;
 
-export const buildNonBrowserNodeTestRunOptions = () => ({
-  concurrency: true,
+export const buildNonBrowserNodeTestRunOptions = ({ files, cwd }) => ({
+  cwd,
+  files: [...files],
+  isolation: "none",
 });
 
 export const applyDiagnosticSummaryMetric = (summary, diagnosticMessage) => {
