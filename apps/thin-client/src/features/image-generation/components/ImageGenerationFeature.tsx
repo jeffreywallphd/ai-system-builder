@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
-import { formatImageGenerationModelDropdownLabel, TermWithHint } from "../../../../../../modules/ui/shared";
+
+import {
+  ApplicationIcon,
+  EmptyState,
+  formatImageGenerationModelDropdownLabel,
+  PanelHeading,
+  TermWithHint,
+  WorkflowSequence,
+  WorkflowStep,
+} from "../../../../../../modules/ui/shared";
 import { LoadingSpinner } from "../../../components/ui/LoadingSpinner";
 import { secureFetch } from "../../../security/secureFetch";
 import { useImageGenerationFeature } from "../hooks/useImageGenerationFeature";
@@ -14,10 +23,15 @@ function GeneratedImagePreview({ src, alt }: { src: string; alt: string }) {
     setObjectUrl(undefined);
     setFailed(false);
 
-    void secureFetch(src, { method: "GET", headers: { "x-client-source": "thin-client.image-generation.preview" } })
+    void secureFetch(src, {
+      method: "GET",
+      headers: { "x-client-source": "thin-client.image-generation.preview" },
+    })
       .then(async (response) => {
         if (!response.ok) {
-          throw new Error(`Image preview request failed with HTTP ${response.status}.`);
+          throw new Error(
+            `Image preview request failed with HTTP ${response.status}.`,
+          );
         }
         const blob = await response.blob();
         if (cancelled) return;
@@ -39,7 +53,12 @@ function GeneratedImagePreview({ src, alt }: { src: string; alt: string }) {
   }
 
   if (!objectUrl) {
-    return <p role="status"><LoadingSpinner label="Loading image preview" /> Loading image preview...</p>;
+    return (
+      <p role="status">
+        <LoadingSpinner label="Loading image preview" /> Loading image
+        preview...
+      </p>
+    );
   }
 
   return <img src={objectUrl} alt={alt} />;
@@ -47,7 +66,11 @@ function GeneratedImagePreview({ src, alt }: { src: string; alt: string }) {
 
 function renderImageGenerationNumericLabel(label: string) {
   if (label.startsWith("Seed")) {
-    return <><TermWithHint termId="seed">Seed</TermWithHint> (optional)</>;
+    return (
+      <>
+        <TermWithHint termId="seed">Seed</TermWithHint> (optional)
+      </>
+    );
   }
   if (label === "Steps") {
     return <TermWithHint termId="steps">Steps</TermWithHint>;
@@ -68,7 +91,9 @@ function renderImageGenerationNumericLabel(label: string) {
     return <TermWithHint termId="scheduler">Scheduler</TermWithHint>;
   }
   if (label === "Number of Images") {
-    return <TermWithHint termId="numberOfImages">Number of Images</TermWithHint>;
+    return (
+      <TermWithHint termId="numberOfImages">Number of Images</TermWithHint>
+    );
   }
   return label;
 }
@@ -85,259 +110,581 @@ export function ImageGenerationFeature({
   workspaceId?: string;
   workspaceName?: string;
 } = {}) {
-  const feature = useImageGenerationFeature(undefined, () => onGenerated?.(), undefined, undefined, workspaceId);
+  const feature = useImageGenerationFeature(
+    undefined,
+    () => onGenerated?.(),
+    undefined,
+    undefined,
+    workspaceId,
+  );
   const selectedModelDownloaded = feature.selectedModelRecord
-    ? ["downloaded", "generated", "validated"].includes(feature.selectedModelRecord.lifecycleStatus)
+    ? ["downloaded", "generated", "validated"].includes(
+        feature.selectedModelRecord.lifecycleStatus,
+      )
     : false;
+  const isBusy = ["starting", "queued", "running", "finalizing"].includes(
+    feature.status,
+  );
 
   const setFormValue = (key: keyof typeof feature.form, value: string) => {
     feature.setForm((current) => ({ ...current, [key]: value }));
   };
 
   return (
-    <section className="ui-panel ui-stack ui-stack--sm" aria-label="Image Generation">
-      <h2>Image Generation</h2>
-      <p className="ui-text-muted">Generate images from a prompt. Completed generations are registered in Artifacts automatically.</p>
+    <section
+      className="ui-panel ui-panel--elevated ui-panel--sectioned"
+      aria-label="Image Generation"
+    >
+      <header className="ui-panel__section-header">
+        <PanelHeading icon="image-generation" tone="violet">
+          Image Generation
+        </PanelHeading>
+      </header>
+      <div className="ui-panel__section-body image-generation-workflow ui-stack ui-stack--sm">
+        <p className="ui-text-muted">
+          Generate images from a prompt. Completed generations are registered in
+          Artifacts automatically.
+        </p>
 
-      <section className="ui-stack ui-stack--sm">
-        <div className="ui-stack ui-stack--xs">
-          <label htmlFor="image-generation-model-record"><TermWithHint termId="modelInventory">Model</TermWithHint> (server inventory)</label>
-          <div>
-            <select
-              className="ui-input"
-              id="image-generation-model-record"
-              value={feature.selectedModelRecordId}
-              onChange={(event) => feature.setSelectedModelRecordId((event.target as HTMLSelectElement).value)}
-            >
-              <option value="">Select a server model...</option>
-              <optgroup label="Downloaded image models">
-                {feature.downloadedImageGenerationModels.map((model) => (
-                  <option key={model.modelRecordId} value={model.modelRecordId}>
-                    {formatImageGenerationModelDropdownLabel(model)}
-                  </option>
-                ))}
-              </optgroup>
-              {feature.referenceOnlyImageGenerationModels.length > 0 ? (
-                <optgroup label="Saved references / download required">
-                  {feature.referenceOnlyImageGenerationModels.map((model) => (
-                    <option key={model.modelRecordId} value={model.modelRecordId}>
-                      {formatImageGenerationModelDropdownLabel(model, true)}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : null}
-            </select>{" "}
-            <button type="button" className="ui-button" onClick={() => void feature.refreshModelInventory()} disabled={feature.modelInventoryLoading}>
-              Refresh Models
-            </button>
-          </div>
-          {feature.modelInventoryLoading ? <p className="ui-text-muted" role="status"><LoadingSpinner label="Loading model inventory" /> Loading model inventory...</p> : null}
-          {feature.modelInventoryError ? <p role="alert">{feature.modelInventoryError}</p> : null}
-          {feature.downloadedImageGenerationModels.length === 0 ? (
-            <p className="ui-text-muted" role="note">
-              No downloaded image models found. You can still generate with a server default checkpoint or the manual override below if configured. Download one on the
-              Models page for predictable results.{" "}
-              {onNavigateToModels ? (
-                <button type="button" className="ui-button" onClick={() => onNavigateToModels()}>
-                  Open Models
+        <WorkflowSequence ariaLabel="Image generation workflow">
+          <WorkflowStep
+            title="Model and runtime"
+            description="Choose an available image model and the server runtime mode."
+          >
+            <div className="ui-workflow__field-grid ui-workflow__field-grid--wide">
+              <label className="ui-stack ui-stack--xs">
+                <span>
+                  <TermWithHint termId="modelInventory">Model</TermWithHint>{" "}
+                  (server inventory)
+                </span>
+                <select
+                  className="ui-input"
+                  id="image-generation-model-record"
+                  value={feature.selectedModelRecordId}
+                  onChange={(event) =>
+                    feature.setSelectedModelRecordId(event.target.value)
+                  }
+                >
+                  <option value="">Select a server model...</option>
+                  <optgroup label="Downloaded image models">
+                    {feature.downloadedImageGenerationModels.map((model) => (
+                      <option
+                        key={model.modelRecordId}
+                        value={model.modelRecordId}
+                      >
+                        {formatImageGenerationModelDropdownLabel(model)}
+                      </option>
+                    ))}
+                  </optgroup>
+                  {feature.referenceOnlyImageGenerationModels.length > 0 ? (
+                    <optgroup label="Saved references / download required">
+                      {feature.referenceOnlyImageGenerationModels.map(
+                        (model) => (
+                          <option
+                            key={model.modelRecordId}
+                            value={model.modelRecordId}
+                          >
+                            {formatImageGenerationModelDropdownLabel(
+                              model,
+                              true,
+                            )}
+                          </option>
+                        ),
+                      )}
+                    </optgroup>
+                  ) : null}
+                </select>
+              </label>
+              <label className="ui-stack ui-stack--xs">
+                <span>
+                  <TermWithHint termId="runtime">Runtime mode</TermWithHint>
+                </span>
+                <select
+                  className="ui-input"
+                  id="image-generation-runtime-mode"
+                  value={feature.runtimeMode}
+                  onChange={(event) =>
+                    feature.setRuntimeMode(
+                      event.target.value as typeof feature.runtimeMode,
+                    )
+                  }
+                >
+                  <option value="auto">Auto</option>
+                  <option value="cpu">CPU</option>
+                  <option value="cuda">CUDA</option>
+                  <option value="directml">DirectML</option>
+                </select>
+              </label>
+            </div>
+            <div className="ui-workflow__actions">
+              <button
+                type="button"
+                className="ui-button"
+                onClick={() => void feature.refreshModelInventory()}
+                disabled={feature.modelInventoryLoading}
+              >
+                <ApplicationIcon name="refresh" />
+                <span className="ui-button__label">Refresh Models</span>
+              </button>
+              {feature.downloadedImageGenerationModels.length === 0 &&
+              onNavigateToModels ? (
+                <button
+                  type="button"
+                  className="ui-button ui-button--secondary"
+                  onClick={onNavigateToModels}
+                >
+                  <ApplicationIcon name="models" />
+                  <span className="ui-button__label">Open Models</span>
                 </button>
               ) : null}
-            </p>
-          ) : null}
-          {feature.selectedModelRecord ? (
-            <p role="note">
-              Selected model status: <strong>{feature.selectedModelRecord.lifecycleStatus}</strong>
-              {!selectedModelDownloaded ? " (reference only; download before generating)." : " (available locally)."}
-            </p>
-          ) : null}
-        </div>
-
-        <div className="ui-stack ui-stack--xs">
-          <label htmlFor="image-generation-runtime-mode"><TermWithHint termId="runtime">Runtime mode</TermWithHint></label>
-          <select
-            className="ui-input"
-            id="image-generation-runtime-mode"
-            value={feature.runtimeMode}
-            onChange={(event) => feature.setRuntimeMode((event.target as HTMLSelectElement).value as typeof feature.runtimeMode)}
-          >
-            <option value="auto">Auto</option>
-            <option value="cpu">CPU</option>
-            <option value="cuda">CUDA</option>
-            <option value="directml">DirectML</option>
-          </select>
-        </div>
-
-        <div className="ui-stack ui-stack--xs">
-          <label htmlFor="image-generation-latent-source"><TermWithHint termId="latentSourceArtifact">Latent source</TermWithHint></label>
-          <div>
-            <select
-              className="ui-input"
-              id="image-generation-latent-source"
-              value={feature.form.latentSourceArtifactId}
-              onChange={(event) => setFormValue("latentSourceArtifactId", (event.target as HTMLSelectElement).value)}
-            >
-              <option value="">Empty latent image</option>
-              {feature.imageArtifacts.map((artifact) => (
-                <option key={artifact.storageKey} value={artifact.storageKey}>
-                  {artifact.originalName ?? artifact.storageKey}
-                </option>
-              ))}
-            </select>{" "}
-            <button type="button" className="ui-button" onClick={() => void feature.refreshImageArtifacts()} disabled={feature.imageArtifactsLoading}>
-              Refresh Images
-            </button>
-          </div>
-          {feature.imageArtifactsError ? <p role="alert">{feature.imageArtifactsError}</p> : null}
-        </div>
-        <label className="ui-stack ui-stack--xs">
-          <span><TermWithHint termId="faceId">Enable FaceID</TermWithHint> (optional)</span>
-          <input type="checkbox" checked={feature.form.faceIdEnabled} onChange={(event) => feature.setForm((current) => ({ ...current, faceIdEnabled: event.target.checked }))} />
-        </label>
-        {feature.form.faceIdEnabled ? (
-          <div className="ui-stack ui-stack--xs">
-            <p className="ui-text-muted">FaceID supports 1-3 image artifacts. You can reuse the same artifact in multiple slots.</p>
-            <label className="ui-stack ui-stack--xs"><span><TermWithHint termId="faceReferenceImage">Face reference image 1</TermWithHint></span><select className="ui-input" value={feature.form.faceIdArtifactId1} onChange={(event) => setFormValue("faceIdArtifactId1", (event.target as HTMLSelectElement).value)}><option value="">Select image artifact</option>{feature.imageArtifacts.map((artifact) => <option key={`face1-${artifact.storageKey}`} value={artifact.storageKey}>{artifact.originalName ?? artifact.storageKey}</option>)}</select></label>
-            <label className="ui-stack ui-stack--xs"><span><TermWithHint termId="faceReferenceImage">Face reference image 2</TermWithHint> (optional)</span><select className="ui-input" value={feature.form.faceIdArtifactId2} onChange={(event) => setFormValue("faceIdArtifactId2", (event.target as HTMLSelectElement).value)}><option value="">Select image artifact</option>{feature.imageArtifacts.map((artifact) => <option key={`face2-${artifact.storageKey}`} value={artifact.storageKey}>{artifact.originalName ?? artifact.storageKey}</option>)}</select></label>
-            <label className="ui-stack ui-stack--xs"><span><TermWithHint termId="faceReferenceImage">Face reference image 3</TermWithHint> (optional)</span><select className="ui-input" value={feature.form.faceIdArtifactId3} onChange={(event) => setFormValue("faceIdArtifactId3", (event.target as HTMLSelectElement).value)}><option value="">Select image artifact</option>{feature.imageArtifacts.map((artifact) => <option key={`face3-${artifact.storageKey}`} value={artifact.storageKey}>{artifact.originalName ?? artifact.storageKey}</option>)}</select></label>
-            <label className="ui-stack ui-stack--xs"><span><TermWithHint termId="faceIdentityWeight">Face identity strength</TermWithHint></span><input className="ui-input" type="number" step="0.01" value={feature.form.faceIdIdentityStrength} onInput={(event) => setFormValue("faceIdIdentityStrength", (event.target as HTMLInputElement).value)} /></label>
-            <label className="ui-stack ui-stack--xs"><span><TermWithHint termId="faceStructureWeight">Face structure strength</TermWithHint></span><input className="ui-input" type="number" step="0.01" value={feature.form.faceIdStructureStrength} onInput={(event) => setFormValue("faceIdStructureStrength", (event.target as HTMLInputElement).value)} /></label>
-            <label className="ui-stack ui-stack--xs"><span><TermWithHint termId="faceNoise">Face noise</TermWithHint></span><input className="ui-input" type="number" step="0.01" value={feature.form.faceIdNoise} onInput={(event) => setFormValue("faceIdNoise", (event.target as HTMLInputElement).value)} /></label>
-          </div>
-        ) : null}
-
-        <div className="ui-stack ui-stack--xs">
-          <label htmlFor="image-generation-prompt"><TermWithHint termId="prompt">Prompt</TermWithHint></label>
-          <textarea
-            className="ui-input ui-textarea"
-            id="image-generation-prompt"
-            value={feature.form.prompt}
-            onInput={(event) => setFormValue("prompt", (event.target as HTMLTextAreaElement).value)}
-          />
-        </div>
-
-        <div className="ui-stack ui-stack--xs">
-          <label htmlFor="image-generation-negativePrompt"><TermWithHint termId="negativePrompt">Negative Prompt</TermWithHint> (optional)</label>
-          <textarea
-            className="ui-input ui-textarea"
-            id="image-generation-negativePrompt"
-            value={feature.form.negativePrompt}
-            onInput={(event) => setFormValue("negativePrompt", (event.target as HTMLTextAreaElement).value)}
-          />
-        </div>
-
-        {[
-          ["seed", "Seed (optional)", "number"],
-          ["width", "Width", "number"],
-          ["height", "Height", "number"],
-          ["steps", "Steps", "number"],
-          ["cfg", "CFG", "number"],
-          ["sampler", "Sampler", "text"],
-          ["scheduler", "Scheduler", "text"],
-          ["numImages", "Number of Images", "number"],
-        ].map(([key, label, type]) => {
-          const formKey = key as keyof typeof feature.form;
-          const id = `image-generation-${String(key)}`;
-          return (
-            <div key={id} className="ui-stack ui-stack--xs">
-              <label htmlFor={id}>{renderImageGenerationNumericLabel(label)}</label>
-              <input
-                className="ui-input"
-                id={id}
-                type={type}
-                value={String(feature.form[formKey])}
-                onInput={(event) => setFormValue(formKey, (event.target as HTMLInputElement).value)}
-              />
             </div>
-          );
-        })}
+            {feature.modelInventoryLoading ? (
+              <p className="ui-text-muted" role="status">
+                <LoadingSpinner label="Loading model inventory" /> Loading model
+                inventory...
+              </p>
+            ) : null}
+            {feature.modelInventoryError ? (
+              <p role="alert">{feature.modelInventoryError}</p>
+            ) : null}
+            {feature.downloadedImageGenerationModels.length === 0 ? (
+              <p className="ui-text-muted" role="note">
+                No downloaded image models found. A configured server default
+                checkpoint or manual override may still be used.
+              </p>
+            ) : null}
+            {feature.selectedModelRecord ? (
+              <p role="note">
+                Selected model status:{" "}
+                <strong>{feature.selectedModelRecord.lifecycleStatus}</strong>
+                {!selectedModelDownloaded
+                  ? " (reference only; download before generating)."
+                  : " (available locally)."}
+              </p>
+            ) : null}
+          </WorkflowStep>
 
-        <div className="ui-stack ui-stack--xs">
-          <label htmlFor="image-generation-denoise"><TermWithHint termId="denoise">Denoise</TermWithHint></label>
-          <input
-            className="ui-input"
-            id="image-generation-denoise"
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={feature.form.denoise}
-            onInput={(event) => setFormValue("denoise", (event.target as HTMLInputElement).value)}
-          />
-          <output htmlFor="image-generation-denoise">{feature.form.denoise}</output>
-        </div>
+          <WorkflowStep
+            title="Prompt and references"
+            description="Describe the image and optionally provide latent or identity references."
+          >
+            <div className="ui-workflow__field-grid ui-workflow__field-grid--wide">
+              <label className="ui-stack ui-stack--xs">
+                <span>
+                  <TermWithHint termId="latentSourceArtifact">
+                    Latent source
+                  </TermWithHint>
+                </span>
+                <select
+                  className="ui-input"
+                  id="image-generation-latent-source"
+                  value={feature.form.latentSourceArtifactId}
+                  onChange={(event) =>
+                    setFormValue("latentSourceArtifactId", event.target.value)
+                  }
+                >
+                  <option value="">Empty latent image</option>
+                  {feature.imageArtifacts.map((artifact) => (
+                    <option
+                      key={artifact.storageKey}
+                      value={artifact.storageKey}
+                    >
+                      {artifact.originalName ?? artifact.storageKey}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="ui-workflow__actions">
+                <button
+                  type="button"
+                  className="ui-button ui-button--secondary"
+                  onClick={() => void feature.refreshImageArtifacts()}
+                  disabled={feature.imageArtifactsLoading}
+                >
+                  <ApplicationIcon name="refresh" />
+                  <span className="ui-button__label">Refresh Images</span>
+                </button>
+              </div>
+            </div>
+            {feature.imageArtifactsError ? (
+              <p role="alert">{feature.imageArtifactsError}</p>
+            ) : null}
 
-        <details>
-          <summary>Advanced: Manual model/checkpoint override (optional)</summary>
-          <div className="ui-stack ui-stack--xs">
-            <label htmlFor="image-generation-model">Manual <TermWithHint termId="model">model/checkpoint</TermWithHint></label>
-            <input
-              className="ui-input"
-              id="image-generation-model"
-              type="text"
-              value={feature.form.model}
-              onInput={(event) => setFormValue("model", (event.target as HTMLInputElement).value)}
-              placeholder="checkpoint.safetensors or model record id"
-            />
-          </div>
-        </details>
-      </section>
+            <label className="ui-workflow__checkbox-row">
+              <input
+                type="checkbox"
+                checked={feature.form.faceIdEnabled}
+                onChange={(event) =>
+                  feature.setForm((current) => ({
+                    ...current,
+                    faceIdEnabled: event.target.checked,
+                  }))
+                }
+              />
+              <span>
+                <TermWithHint termId="faceId">Enable FaceID</TermWithHint>{" "}
+                (optional)
+              </span>
+            </label>
+            {feature.form.faceIdEnabled ? (
+              <div className="ui-workflow__subpanel ui-stack ui-stack--sm">
+                <p className="ui-text-muted">
+                  FaceID supports one to three image artifacts. The same
+                  artifact may be reused in multiple slots.
+                </p>
+                <div className="ui-workflow__field-grid">
+                  {[
+                    "faceIdArtifactId1",
+                    "faceIdArtifactId2",
+                    "faceIdArtifactId3",
+                  ].map((key, index) => (
+                    <label className="ui-stack ui-stack--xs" key={key}>
+                      <span>
+                        <TermWithHint termId="faceReferenceImage">
+                          Face reference image {index + 1}
+                        </TermWithHint>{" "}
+                        {index > 0 ? "(optional)" : null}
+                      </span>
+                      <select
+                        className="ui-input"
+                        value={String(
+                          feature.form[key as keyof typeof feature.form],
+                        )}
+                        onChange={(event) =>
+                          setFormValue(
+                            key as keyof typeof feature.form,
+                            event.target.value,
+                          )
+                        }
+                      >
+                        <option value="">Select image artifact</option>
+                        {feature.imageArtifacts.map((artifact) => (
+                          <option
+                            key={`${key}-${artifact.storageKey}`}
+                            value={artifact.storageKey}
+                          >
+                            {artifact.originalName ?? artifact.storageKey}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+                <div className="ui-workflow__field-grid">
+                  {(
+                    [
+                      [
+                        "faceIdIdentityStrength",
+                        "faceIdentityWeight",
+                        "Face identity strength",
+                      ],
+                      [
+                        "faceIdStructureStrength",
+                        "faceStructureWeight",
+                        "Face structure strength",
+                      ],
+                      ["faceIdNoise", "faceNoise", "Face noise"],
+                    ] as const
+                  ).map(([key, termId, label]) => (
+                    <label className="ui-stack ui-stack--xs" key={key}>
+                      <span>
+                        <TermWithHint termId={termId}>{label}</TermWithHint>
+                      </span>
+                      <input
+                        className="ui-input"
+                        type="number"
+                        step="0.01"
+                        value={String(
+                          feature.form[key as keyof typeof feature.form],
+                        )}
+                        onInput={(event) =>
+                          setFormValue(
+                            key as keyof typeof feature.form,
+                            event.currentTarget.value,
+                          )
+                        }
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
-      {feature.qualityNote ? <p role="note">{feature.qualityNote}</p> : null}
-      {feature.validationError ? <p role="alert">{feature.validationError}</p> : null}
+            <label className="ui-stack ui-stack--xs">
+              <span>
+                <TermWithHint termId="prompt">Prompt</TermWithHint>
+              </span>
+              <textarea
+                className="ui-input ui-textarea"
+                id="image-generation-prompt"
+                value={feature.form.prompt}
+                onInput={(event) =>
+                  setFormValue("prompt", event.currentTarget.value)
+                }
+              />
+            </label>
+            <label className="ui-stack ui-stack--xs">
+              <span>
+                <TermWithHint termId="negativePrompt">
+                  Negative Prompt
+                </TermWithHint>{" "}
+                (optional)
+              </span>
+              <textarea
+                className="ui-input ui-textarea"
+                id="image-generation-negativePrompt"
+                value={feature.form.negativePrompt}
+                onInput={(event) =>
+                  setFormValue("negativePrompt", event.currentTarget.value)
+                }
+              />
+            </label>
+          </WorkflowStep>
 
-      <div className="ui-grid ui-grid--two">
-        <button className="ui-button" type="button" onClick={() => void feature.start()} disabled={feature.isGenerateDisabled}>
-          {feature.isGenerateDisabled ? <><LoadingSpinner label="Generating image" /> Generating...</> : "Generate"}
-        </button>{" "}
-        <button className="ui-button" type="button" onClick={() => void feature.cancel()} disabled={feature.isCancelDisabled}>
-          Cancel
-        </button>{" "}
-        <button className="ui-button" type="button" onClick={() => onNavigateToArtifacts?.()}>
-          Open Artifacts
-        </button>
-        <button className="ui-button" type="button" onClick={() => void feature.unloadModel()} disabled={feature.isUnloadModelDisabled}>
-          {feature.unloadModelState.status === "loading" ? "Unloading model..." : "Unload model"}
-        </button>
-      </div>
-      {feature.unloadModelState.message ? (
-        <p role={feature.unloadModelState.status === "error" ? "alert" : "status"}>{feature.unloadModelState.message}</p>
-      ) : null}
+          <WorkflowStep
+            title="Generation settings"
+            description="Set dimensions, sampling behavior, and output count."
+          >
+            <div className="ui-workflow__field-grid">
+              {[
+                ["seed", "Seed (optional)", "number"],
+                ["width", "Width", "number"],
+                ["height", "Height", "number"],
+                ["steps", "Steps", "number"],
+                ["cfg", "CFG", "number"],
+                ["sampler", "Sampler", "text"],
+                ["scheduler", "Scheduler", "text"],
+                ["numImages", "Number of Images", "number"],
+              ].map(([key, label, type]) => {
+                const formKey = key as keyof typeof feature.form;
+                const id = `image-generation-${key}`;
+                return (
+                  <label key={id} className="ui-stack ui-stack--xs">
+                    <span>{renderImageGenerationNumericLabel(label)}</span>
+                    <input
+                      className="ui-input"
+                      id={id}
+                      type={type}
+                      value={String(feature.form[formKey])}
+                      onInput={(event) =>
+                        setFormValue(formKey, event.currentTarget.value)
+                      }
+                    />
+                  </label>
+                );
+              })}
+              <label className="ui-stack ui-stack--xs">
+                <span>
+                  <TermWithHint termId="denoise">Denoise</TermWithHint>
+                </span>
+                <input
+                  className="ui-input"
+                  id="image-generation-denoise"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={feature.form.denoise}
+                  onInput={(event) =>
+                    setFormValue("denoise", event.currentTarget.value)
+                  }
+                />
+                <output htmlFor="image-generation-denoise">
+                  {feature.form.denoise}
+                </output>
+              </label>
+            </div>
+            <details className="ui-workflow__subpanel">
+              <summary>
+                Advanced: Manual model/checkpoint override (optional)
+              </summary>
+              <label className="ui-stack ui-stack--xs">
+                <span>
+                  Manual{" "}
+                  <TermWithHint termId="model">model/checkpoint</TermWithHint>
+                </span>
+                <input
+                  className="ui-input"
+                  id="image-generation-model"
+                  type="text"
+                  value={feature.form.model}
+                  onInput={(event) =>
+                    setFormValue("model", event.currentTarget.value)
+                  }
+                  placeholder="checkpoint.safetensors or model record id"
+                />
+              </label>
+            </details>
+          </WorkflowStep>
 
-      <h3>Status</h3>
-      <p role={["starting", "queued", "running", "finalizing"].includes(feature.status) ? "status" : undefined}>
-        {["starting", "queued", "running", "finalizing"].includes(feature.status) ? <LoadingSpinner label="Image generation in progress" /> : null} <strong>{feature.status}</strong>
-      </p>
-      <ul>
-        <li>Memory: <strong>{feature.runtimeResources.memoryUsagePercent.toFixed(1)}%</strong></li>
-        <li>CPU: <strong>{feature.runtimeResources.cpuUsagePercent.toFixed(1)}%</strong></li>
-        <li>GPU: <strong>{feature.runtimeResources.gpuUsagePercent.toFixed(1)}%</strong></li>
-      </ul>
-      {feature.requestId ? <p>Request ID: {feature.requestId}</p> : null}
-      {feature.error ? <p role="alert">{feature.error}</p> : null}
+          <WorkflowStep
+            title="Review and generate"
+            description="Review the configuration and start the generation run."
+            active={!feature.isGenerateDisabled}
+          >
+            {feature.qualityNote ? (
+              <p role="note">{feature.qualityNote}</p>
+            ) : null}
+            {feature.validationError ? (
+              <p role="alert">{feature.validationError}</p>
+            ) : null}
+            <div className="ui-workflow__actions">
+              <button
+                className="ui-button"
+                type="button"
+                onClick={() => void feature.start()}
+                disabled={feature.isGenerateDisabled}
+              >
+                {feature.isGenerateDisabled ? (
+                  <LoadingSpinner label="Generating image" />
+                ) : (
+                  <ApplicationIcon name="play" />
+                )}
+                <span className="ui-button__label">
+                  {feature.isGenerateDisabled ? "Generating..." : "Generate"}
+                </span>
+              </button>
+              <button
+                className="ui-button ui-button--secondary"
+                type="button"
+                onClick={() => void feature.cancel()}
+                disabled={feature.isCancelDisabled}
+              >
+                <ApplicationIcon name="close" />
+                <span className="ui-button__label">Cancel</span>
+              </button>
+              <button
+                className="ui-button ui-button--secondary"
+                type="button"
+                onClick={() => onNavigateToArtifacts?.()}
+              >
+                <ApplicationIcon name="artifacts" />
+                <span className="ui-button__label">Open Artifacts</span>
+              </button>
+              <button
+                className="ui-button ui-button--secondary"
+                type="button"
+                onClick={() => void feature.unloadModel()}
+                disabled={feature.isUnloadModelDisabled}
+              >
+                <ApplicationIcon name="models" />
+                <span className="ui-button__label">
+                  {feature.unloadModelState.status === "loading"
+                    ? "Unloading model..."
+                    : "Unload model"}
+                </span>
+              </button>
+            </div>
+          </WorkflowStep>
 
-      <h3>Generated Images</h3>
-      <div className="image-generation-current-result ui-stack ui-stack--sm">
-        {feature.results.map((asset) => (
-          <article key={asset.assetId} className="ui-stack ui-stack--xs">
-            <GeneratedImagePreview src={feature.createPreviewUrl(asset.storageKey)} alt={`Generated image ${asset.assetId}`} />
-            <p>{asset.assetId}</p>
-          </article>
-        ))}
-      </div>
-      <section className="ui-stack ui-stack--sm" aria-label="Session gallery">
-        <h3>Session Gallery</h3>
-        {feature.sessionGallery.length > 0 ? (
-          <div className="image-generation-session-gallery image-generation-session-gallery--single">
-            {feature.sessionGallery.map((generation) => (
-              <article key={generation.id} className="ui-stack ui-stack--xs">
-                {generation.assets.map((asset) => (
-                  <GeneratedImagePreview key={`${generation.id}-${asset.assetId}`} src={feature.createPreviewUrl(asset.storageKey)} alt={`Previous generated image ${asset.assetId}`} />
+          <WorkflowStep
+            title="Generation progress"
+            description="Monitor runtime status and resource use for this request."
+            active={isBusy}
+          >
+            <div className="ui-workflow__status ui-stack ui-stack--sm">
+              <p role={isBusy ? "status" : undefined}>
+                {isBusy ? (
+                  <LoadingSpinner label="Image generation in progress" />
+                ) : null}{" "}
+                <strong>{feature.status}</strong>
+              </p>
+              <dl className="ui-workflow__field-grid">
+                <div>
+                  <dt>Memory</dt>
+                  <dd>
+                    {feature.runtimeResources.memoryUsagePercent.toFixed(1)}%
+                  </dd>
+                </div>
+                <div>
+                  <dt>CPU</dt>
+                  <dd>
+                    {feature.runtimeResources.cpuUsagePercent.toFixed(1)}%
+                  </dd>
+                </div>
+                <div>
+                  <dt>GPU</dt>
+                  <dd>
+                    {feature.runtimeResources.gpuUsagePercent.toFixed(1)}%
+                  </dd>
+                </div>
+              </dl>
+              {feature.requestId ? (
+                <p>Request ID: {feature.requestId}</p>
+              ) : null}
+              {feature.error ? <p role="alert">{feature.error}</p> : null}
+              {feature.unloadModelState.message ? (
+                <p
+                  role={
+                    feature.unloadModelState.status === "error"
+                      ? "alert"
+                      : "status"
+                  }
+                >
+                  {feature.unloadModelState.message}
+                </p>
+              ) : null}
+            </div>
+          </WorkflowStep>
+
+          <WorkflowStep
+            title="Generated images"
+            description="Review the current outputs and prior generations from this session."
+            active={feature.results.length > 0}
+          >
+            {feature.results.length > 0 ? (
+              <div className="image-generation-current-result ui-stack ui-stack--sm">
+                {feature.results.map((asset) => (
+                  <article
+                    key={asset.assetId}
+                    className="image-generation-result-card ui-stack ui-stack--xs"
+                  >
+                    <GeneratedImagePreview
+                      src={feature.createPreviewUrl(asset.storageKey)}
+                      alt={`Generated image ${asset.assetId}`}
+                    />
+                    <p>{asset.assetId}</p>
+                  </article>
                 ))}
-              </article>
-            ))}
-          </div>
-        ) : <p className="ui-text-muted">Previous generations from this session will appear here.</p>}
-      </section>
+              </div>
+            ) : (
+              <EmptyState
+                icon="image-generation"
+                title="No generated images yet"
+                description="Run image generation to create finalized artifacts."
+              />
+            )}
+            <section
+              className="ui-stack ui-stack--sm"
+              aria-label="Session gallery"
+            >
+              <h4>Session Gallery</h4>
+              {feature.sessionGallery.length > 0 ? (
+                <div className="image-generation-session-gallery image-generation-session-gallery--single">
+                  {feature.sessionGallery.map((generation) => (
+                    <article
+                      key={generation.id}
+                      className="ui-stack ui-stack--xs"
+                    >
+                      {generation.assets.map((asset) => (
+                        <GeneratedImagePreview
+                          key={`${generation.id}-${asset.assetId}`}
+                          src={feature.createPreviewUrl(asset.storageKey)}
+                          alt={`Previous generated image ${asset.assetId}`}
+                        />
+                      ))}
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="ui-text-muted">
+                  Previous generations from this session will appear here.
+                </p>
+              )}
+            </section>
+          </WorkflowStep>
+        </WorkflowSequence>
+      </div>
     </section>
   );
 }

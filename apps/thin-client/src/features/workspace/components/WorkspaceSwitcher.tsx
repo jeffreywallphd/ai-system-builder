@@ -1,6 +1,9 @@
 import { useEffect, useId, useState } from "react";
 
-import { TermWithHint } from "../../../../../../modules/ui/shared";
+import {
+  ApplicationIcon,
+  TermWithHint,
+} from "../../../../../../modules/ui/shared";
 import { useActiveWorkspace } from "../hooks/useActiveWorkspace";
 import { WorkspaceCreateForm } from "./WorkspaceCreateForm";
 
@@ -8,13 +11,18 @@ export interface WorkspaceSwitcherProps {
   readonly variant?: "card" | "header";
 }
 
-export function WorkspaceSwitcher({ variant = "card" }: WorkspaceSwitcherProps = {}) {
+export function WorkspaceSwitcher({
+  variant = "card",
+}: WorkspaceSwitcherProps = {}) {
   const workspace = useActiveWorkspace();
   const selectId = useId();
   const [creating, setCreating] = useState(false);
-  const activeWorkspaces = workspace.workspaces.filter((candidate) => candidate.status === "active");
+  const activeWorkspaces = workspace.workspaces.filter(
+    (candidate) => candidate.status === "active",
+  );
   const activeWorkspaceId = workspace.activeWorkspace?.id ?? "";
-  const [pendingWorkspaceId, setPendingWorkspaceId] = useState(activeWorkspaceId);
+  const [pendingWorkspaceId, setPendingWorkspaceId] =
+    useState(activeWorkspaceId);
 
   useEffect(() => {
     setPendingWorkspaceId(activeWorkspaceId);
@@ -22,34 +30,43 @@ export function WorkspaceSwitcher({ variant = "card" }: WorkspaceSwitcherProps =
 
   if (variant === "card") {
     if (workspace.loading) {
-      return <section className="workspace-switcher" aria-label="Workspace"><span>Workspace: Loading...</span></section>;
+      return (
+        <section className="workspace-switcher" aria-label="Workspace">
+          <span>Workspace: Loading...</span>
+        </section>
+      );
     }
 
-    const canChangeWorkspace = pendingWorkspaceId.length > 0 && pendingWorkspaceId !== activeWorkspaceId;
+    const canChangeWorkspace =
+      pendingWorkspaceId.length > 0 && pendingWorkspaceId !== activeWorkspaceId;
 
     return (
-      <section className="workspace-switcher workspace-switcher--card ui-stack ui-stack--md" aria-label="Workspace">
+      <section
+        className="workspace-switcher workspace-switcher--card ui-stack ui-stack--md"
+        aria-label="Workspace"
+      >
+        <span className="ui-visually-hidden">
+          Current workspace:{" "}
+          {workspace.activeWorkspace?.displayName ?? "No workspace selected"}
+        </span>
         <div className="workspace-switcher__card-section ui-stack ui-stack--sm">
-          <div className="ui-stack ui-stack--xs">
-            <h3><TermWithHint termId="workspace">Change current workspace</TermWithHint></h3>
-            <p className="ui-text-muted">
-              Current workspace: {workspace.activeWorkspace?.displayName ?? "No workspace selected"}
-            </p>
-          </div>
           {activeWorkspaces.length > 0 ? (
             <div className="ui-cluster">
               <label className="ui-stack ui-stack--xs" htmlFor={selectId}>
-                <span>Select another workspace</span>
                 <select
                   id={selectId}
                   className="ui-input"
                   aria-label="Select workspace"
                   value={pendingWorkspaceId}
-                  onChange={(event) => setPendingWorkspaceId(event.currentTarget.value)}
+                  onChange={(event) =>
+                    setPendingWorkspaceId(event.currentTarget.value)
+                  }
                 >
                   <option value="">Select workspace</option>
                   {activeWorkspaces.map((candidate) => (
-                    <option key={candidate.id} value={candidate.id}>{candidate.displayName}</option>
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.displayName}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -63,42 +80,62 @@ export function WorkspaceSwitcher({ variant = "card" }: WorkspaceSwitcherProps =
                   }
                 }}
               >
-                Change workspace
+                <ApplicationIcon name="switch" />
+                <span className="ui-button__label">Change workspace</span>
               </button>
             </div>
-          ) : <p className="ui-text-muted">Create a workspace before changing the current workspace.</p>}
+          ) : (
+            <p className="ui-text-muted">No workspace is available yet.</p>
+          )}
         </div>
-
         <div className="workspace-switcher__card-section workspace-switcher__card-section--create ui-stack ui-stack--sm">
-          <div className="ui-stack ui-stack--xs">
-            <h3>Create a new workspace</h3>
-            <p className="ui-text-muted">Use this only when you want a new working area, not when switching to an existing one.</p>
-          </div>
           {creating ? (
             <WorkspaceCreateForm compact onCreated={() => setCreating(false)} />
           ) : (
-            <button className="ui-button" type="button" onClick={() => setCreating(true)}>Create new workspace</button>
+            <button
+              className="ui-button ui-button--secondary"
+              type="button"
+              onClick={() => setCreating(true)}
+            >
+              <ApplicationIcon name="add" />
+              <span className="ui-button__label">Create new workspace</span>
+            </button>
           )}
         </div>
-        {workspace.error ? <p className="ui-status ui-status--error" role="alert">{workspace.error}</p> : null}
-        {workspace.activeWorkspaceId && !workspace.activeWorkspace ? <p className="ui-status ui-status--error" role="alert">This workspace is unavailable. Select or create another workspace.</p> : null}
+        {workspace.error ? (
+          <p className="ui-status ui-status--error" role="alert">
+            {workspace.error}
+          </p>
+        ) : null}
+        {workspace.activeWorkspaceId && !workspace.activeWorkspace ? (
+          <p className="ui-status ui-status--error" role="alert">
+            This workspace is unavailable. Select or create another workspace.
+          </p>
+        ) : null}
       </section>
     );
   }
 
   if (workspace.loading) {
     return (
-      <section className="workspace-switcher workspace-switcher--header" aria-label="Current workspace">
+      <section
+        className="workspace-switcher workspace-switcher--header"
+        aria-label="Current workspace"
+      >
         <span className="workspace-switcher__label">Current Workspace</span>
         <span className="workspace-switcher__status">Loading...</span>
       </section>
     );
   }
 
-  const canChangeWorkspace = pendingWorkspaceId.length > 0 && pendingWorkspaceId !== activeWorkspaceId;
+  const canChangeWorkspace =
+    pendingWorkspaceId.length > 0 && pendingWorkspaceId !== activeWorkspaceId;
 
   return (
-    <section className="workspace-switcher workspace-switcher--header" aria-label="Current workspace">
+    <section
+      className="workspace-switcher workspace-switcher--header"
+      aria-label="Current workspace"
+    >
       <label className="workspace-switcher__field" htmlFor={selectId}>
         <span className="workspace-switcher__label">
           <TermWithHint termId="workspace">Current Workspace</TermWithHint>
@@ -113,7 +150,9 @@ export function WorkspaceSwitcher({ variant = "card" }: WorkspaceSwitcherProps =
         >
           <option value="">No workspace selected</option>
           {activeWorkspaces.map((candidate) => (
-            <option key={candidate.id} value={candidate.id}>{candidate.displayName}</option>
+            <option key={candidate.id} value={candidate.id}>
+              {candidate.displayName}
+            </option>
           ))}
         </select>
       </label>
@@ -127,10 +166,19 @@ export function WorkspaceSwitcher({ variant = "card" }: WorkspaceSwitcherProps =
           }
         }}
       >
-        Change
+        <ApplicationIcon name="switch" />
+        <span className="ui-button__label">Change</span>
       </button>
-      {workspace.error ? <p className="ui-status ui-status--error" role="alert">{workspace.error}</p> : null}
-      {workspace.activeWorkspaceId && !workspace.activeWorkspace ? <p className="ui-status ui-status--error" role="alert">This workspace is unavailable. Select or create another workspace.</p> : null}
+      {workspace.error ? (
+        <p className="ui-status ui-status--error" role="alert">
+          {workspace.error}
+        </p>
+      ) : null}
+      {workspace.activeWorkspaceId && !workspace.activeWorkspace ? (
+        <p className="ui-status ui-status--error" role="alert">
+          This workspace is unavailable. Select or create another workspace.
+        </p>
+      ) : null}
     </section>
   );
 }

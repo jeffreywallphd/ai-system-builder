@@ -48,6 +48,11 @@ test("Electron's production runtime executes SQLite migrations, transactions, he
       rolledBackPresent: boolean;
       workspaceDisplayName: string;
       workspaceJsonWritten: boolean;
+      organizationWorkspaceStatus: string;
+      organizationWorkspaceDisplayName: string;
+      organizationWorkspaceCount: number;
+      organizationWorkspaceActivationCount: number;
+      organizationWorkspaceSelectionId: string;
       organizationAOwner: string;
       organizationBOwner: string;
       platformOwner: string;
@@ -60,6 +65,11 @@ test("Electron's production runtime executes SQLite migrations, transactions, he
     assert.equal(output.rolledBackPresent, false);
     assert.equal(output.workspaceDisplayName, "SQLite workspace");
     assert.equal(output.workspaceJsonWritten, false);
+    assert.equal(output.organizationWorkspaceStatus, "created");
+    assert.equal(output.organizationWorkspaceDisplayName, "Jeff's Systems");
+    assert.equal(output.organizationWorkspaceCount, 1);
+    assert.equal(output.organizationWorkspaceActivationCount, 1);
+    assert.match(output.organizationWorkspaceSelectionId, /^workspace\./);
     assert.equal(output.organizationAOwner, "a");
     assert.equal(output.organizationBOwner, "b");
     assert.equal(output.platformOwner, "platform");

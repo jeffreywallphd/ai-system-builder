@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir } from "node:fs/promises";
+import { mkdtemp, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -9,6 +9,28 @@ import {
   readDocumentRecord,
 } from "../document-record-persistence";
 import { createInMemoryStructuredDocumentStore } from "../in-memory-structured-document-store";
+
+test("missing document reads preserve an undefined fallback", async () => {
+  const documents = createInMemoryStructuredDocumentStore();
+  const structuredResult = await readDocumentRecord(
+    { rootDirectory: ".", documents },
+    "workspaces/missing/workspace.json",
+    undefined,
+  );
+  assert.deepEqual(structuredResult, { found: false, value: undefined });
+
+  const rootDirectory = await mkdtemp(join(tmpdir(), "document-missing-"));
+  try {
+    const fileResult = await readDocumentRecord(
+      { rootDirectory },
+      "workspaces/missing/workspace.json",
+      undefined,
+    );
+    assert.deepEqual(fileResult, { found: false, value: undefined });
+  } finally {
+    await rm(rootDirectory, { recursive: true, force: true });
+  }
+});
 
 test("atomic document mutation retries concurrent whole-document updates without loss", async () => {
   const documents = createInMemoryStructuredDocumentStore(

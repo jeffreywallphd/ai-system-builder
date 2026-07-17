@@ -42,7 +42,7 @@ export async function readDocumentRecord<T>(
     );
     return document
       ? { found: true, value: cloneStructuredJson(document.value) }
-      : { found: false, value: cloneStructuredJson(fallback) };
+      : { found: false, value: cloneDocumentFallback(fallback) };
   }
 
   try {
@@ -53,10 +53,14 @@ export async function readDocumentRecord<T>(
     return { found: true, value: JSON.parse(source) as T };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return { found: false, value: cloneStructuredJson(fallback) };
+      return { found: false, value: cloneDocumentFallback(fallback) };
     }
     throw error;
   }
+}
+
+function cloneDocumentFallback<T>(fallback: T): T {
+  return fallback === undefined ? fallback : cloneStructuredJson(fallback);
 }
 
 export async function writeDocumentRecord<T>(

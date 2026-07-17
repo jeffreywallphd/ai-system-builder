@@ -1,18 +1,33 @@
 require.extensions[".svg"] = (module: NodeModule) => {
   module.exports = "logo.svg";
 };
+require.extensions[".png"] = (module: NodeModule) => {
+  module.exports = "page-art.png";
+};
 
 import { JSDOM } from "jsdom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
-import { afterEach, describe, expect, it, testDouble } from "../../../../../modules/testing/node-test";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  testDouble,
+} from "../../../../../modules/testing/node-test";
 import type { WorkspaceClient, WorkspaceUiRecord } from "../features/workspace";
 import { ActiveWorkspaceProvider } from "../features/workspace";
-import { createLazyDesktopPageRegistry, type DesktopLazyPageModule, type DesktopLazyPageRegistry } from "../routes/lazyDesktopPages";
+import {
+  createLazyDesktopPageRegistry,
+  type DesktopLazyPageModule,
+  type DesktopLazyPageRegistry,
+} from "../routes/lazyDesktopPages";
 import type { DesktopPageKey } from "../routes/desktopPages";
 
-const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
+const dom = new JSDOM("<!doctype html><html><body></body></html>", {
+  url: "http://localhost/",
+});
 (globalThis as any).window = dom.window;
 (globalThis as any).document = dom.window.document;
 (globalThis as any).Event = dom.window.Event;
@@ -43,18 +58,27 @@ function deferred<T>(): Deferred<T> {
 function pageModule(label: string): DesktopLazyPageModule<any> {
   return {
     default: (props: Record<string, unknown>) => (
-      <section data-testid={`${label}-page`} data-workspace-name={String(props.workspaceName ?? "")}>Lazy {label} page</section>
+      <section
+        data-testid={`${label}-page`}
+        data-workspace-name={String(props.workspaceName ?? "")}
+      >
+        Lazy {label} page
+      </section>
     ),
   };
 }
 
 function createControlledRegistry() {
   const calls = new Map<DesktopPageKey, number>();
-  const pending = new Map<DesktopPageKey, Deferred<DesktopLazyPageModule<any>>>();
+  const pending = new Map<
+    DesktopPageKey,
+    Deferred<DesktopLazyPageModule<any>>
+  >();
 
   const loaderFor = (pageKey: DesktopPageKey) => () => {
     calls.set(pageKey, (calls.get(pageKey) ?? 0) + 1);
-    const control = pending.get(pageKey) ?? deferred<DesktopLazyPageModule<any>>();
+    const control =
+      pending.get(pageKey) ?? deferred<DesktopLazyPageModule<any>>();
     pending.set(pageKey, control);
     return control.promise;
   };
@@ -81,10 +105,15 @@ function createControlledRegistry() {
   };
 }
 
-function workspaceClient(records: readonly WorkspaceUiRecord[] = [], selectedWorkspaceId?: string): WorkspaceClient {
+function workspaceClient(
+  records: readonly WorkspaceUiRecord[] = [],
+  selectedWorkspaceId?: string,
+): WorkspaceClient {
   return {
     listWorkspaces: testDouble.fn(async () => records),
-    readActiveWorkspaceSelection: testDouble.fn(async () => selectedWorkspaceId ? { workspaceId: selectedWorkspaceId as any } : {}),
+    readActiveWorkspaceSelection: testDouble.fn(async () =>
+      selectedWorkspaceId ? { workspaceId: selectedWorkspaceId as any } : {},
+    ),
     saveActiveWorkspaceSelection: testDouble.fn(async () => undefined),
     clearActiveWorkspaceSelection: testDouble.fn(async () => undefined),
     createWorkspace: testDouble.fn(async () => {
@@ -102,7 +131,10 @@ function readyWorkspace(): WorkspaceUiRecord {
   };
 }
 
-async function mountWithRegistry(lazyPages: DesktopLazyPageRegistry, client: WorkspaceClient) {
+async function mountWithRegistry(
+  lazyPages: DesktopLazyPageRegistry,
+  client: WorkspaceClient,
+) {
   const { WorkspaceAwareDesktopApp } = await import("../App");
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -143,7 +175,10 @@ describe("desktop renderer lazy page loading", () => {
   it("renders the app shell and navigation while the active page module is still pending", async () => {
     window.desktopApi = { memoryDiagnosticsEnabled: false } as any;
     const controlled = createControlledRegistry();
-    const mounted = await mountWithRegistry(controlled.registry, workspaceClient());
+    const mounted = await mountWithRegistry(
+      controlled.registry,
+      workspaceClient(),
+    );
     mountedRoot = mounted.root;
     mountedContainer = mounted.container;
 
@@ -154,6 +189,9 @@ describe("desktop renderer lazy page loading", () => {
     expect(mounted.container.textContent).toContain("Image Generation");
     expect(mounted.container.textContent).toContain("Systems");
     expect(mounted.container.textContent).toContain("Loading page…");
+    expect(
+      Boolean(mounted.container.querySelector(".ui-page-loading-surface")),
+    ).toBe(true);
     expect(controlled.calls.get("home")).toBe(1);
     expect(controlled.calls.get("artifacts") ?? 0).toBe(0);
     expect(controlled.calls.get("models") ?? 0).toBe(0);
@@ -162,17 +200,27 @@ describe("desktop renderer lazy page loading", () => {
   it("renders the active lazy page after resolution and keeps unrelated page modules unloaded", async () => {
     window.desktopApi = { memoryDiagnosticsEnabled: false } as any;
     const controlled = createControlledRegistry();
-    const mounted = await mountWithRegistry(controlled.registry, workspaceClient([readyWorkspace()], "workspace.ready"));
+    const mounted = await mountWithRegistry(
+      controlled.registry,
+      workspaceClient([readyWorkspace()], "workspace.ready"),
+    );
     mountedRoot = mounted.root;
     mountedContainer = mounted.container;
 
     await act(async () => controlled.resolve("home", "home"));
     expect(mounted.container.textContent).toContain("Lazy home page");
 
-    const modelsButton = Array.from(mounted.container.querySelectorAll("button")).find((button) => button.textContent === "Models");
-    await act(async () => modelsButton?.dispatchEvent(new Event("click", { bubbles: true })));
+    const modelsButton = Array.from(
+      mounted.container.querySelectorAll("button"),
+    ).find((button) => button.textContent === "Models");
+    await act(async () =>
+      modelsButton?.dispatchEvent(new Event("click", { bubbles: true })),
+    );
 
     expect(mounted.container.textContent).toContain("Loading page…");
+    expect(
+      Boolean(mounted.container.querySelector(".ui-page-loading-surface")),
+    ).toBe(true);
     expect(controlled.calls.get("models")).toBe(1);
     expect(controlled.calls.get("image-generation") ?? 0).toBe(0);
     expect(controlled.calls.get("artifacts") ?? 0).toBe(0);
@@ -181,54 +229,84 @@ describe("desktop renderer lazy page loading", () => {
     await settle();
 
     expect(mounted.container.textContent).toContain("Lazy models page");
-    expect(mounted.container.textContent).not.toContain("Lazy image-generation page");
-    expect(mounted.container.querySelector("button[aria-current='page']")?.textContent).toBe("Models");
+    expect(mounted.container.textContent).not.toContain(
+      "Lazy image-generation page",
+    );
+    expect(
+      mounted.container.querySelector("button[aria-current='page']")
+        ?.textContent,
+    ).toBe("Models");
   });
 
   it("does not import workspace-required page modules when the workspace gate blocks the route", async () => {
     window.desktopApi = { memoryDiagnosticsEnabled: false } as any;
     const controlled = createControlledRegistry();
-    const mounted = await mountWithRegistry(controlled.registry, workspaceClient());
+    const mounted = await mountWithRegistry(
+      controlled.registry,
+      workspaceClient(),
+    );
     mountedRoot = mounted.root;
     mountedContainer = mounted.container;
 
     await act(async () => controlled.resolve("home", "home"));
     await settle();
 
-    const artifactsButton = Array.from(mounted.container.querySelectorAll("button")).find((button) => button.textContent === "Data");
-    await act(async () => artifactsButton?.dispatchEvent(new Event("click", { bubbles: true })));
+    const artifactsButton = Array.from(
+      mounted.container.querySelectorAll("button"),
+    ).find((button) => button.textContent === "Data");
+    await act(async () =>
+      artifactsButton?.dispatchEvent(new Event("click", { bubbles: true })),
+    );
     await settle();
 
     expect(mounted.container.textContent).toContain("Workspace required");
     expect(mounted.container.textContent).not.toContain("Lazy artifacts page");
     expect(controlled.calls.get("artifacts") ?? 0).toBe(0);
-    expect(mounted.container.querySelector("button[aria-current='page']")?.textContent).not.toBe("Data");
+    expect(
+      mounted.container.querySelector("button[aria-current='page']")
+        ?.textContent,
+    ).not.toBe("Data");
   });
 
   it("emits lazy page milestones only when renderer diagnostics are enabled", async () => {
     const lines: string[] = [];
-    consoleLogSpy = testDouble.spyOn(console, "log").mockImplementation(((line: string) => {
+    consoleLogSpy = testDouble.spyOn(console, "log").mockImplementation(((
+      line: string,
+    ) => {
       lines.push(line);
     }) as typeof console.log);
 
     window.desktopApi = { memoryDiagnosticsEnabled: true } as any;
     const enabledRegistry = createControlledRegistry();
-    const enabledMount = await mountWithRegistry(enabledRegistry.registry, workspaceClient());
+    const enabledMount = await mountWithRegistry(
+      enabledRegistry.registry,
+      workspaceClient(),
+    );
     mountedRoot = enabledMount.root;
     mountedContainer = enabledMount.container;
 
-    const startSnapshot = lines.map((line) => JSON.parse(line)).find((snapshot) => snapshot.milestone === "renderer.page.lazy-load.start");
+    const startSnapshot = lines
+      .map((line) => JSON.parse(line))
+      .find(
+        (snapshot) => snapshot.milestone === "renderer.page.lazy-load.start",
+      );
     expect(startSnapshot?.detail).toMatchObject({
       activePage: "home",
       visibleActivePage: "home",
       workspaceStatus: "loading",
       routeRequiresWorkspace: false,
     });
-    expect(lines.map((line) => JSON.parse(line).milestone)).toContain("renderer.page.lazy-render.fallback");
+    expect(lines.map((line) => JSON.parse(line).milestone)).toContain(
+      "renderer.page.lazy-render.fallback",
+    );
     await act(async () => enabledRegistry.resolve("home", "home"));
     await settle();
-    expect(lines.map((line) => JSON.parse(line).milestone)).toContain("renderer.page.lazy-load.resolved");
-    expect(lines.map((line) => JSON.parse(line).milestone)).toContain("renderer.page.active.changed");
+    expect(lines.map((line) => JSON.parse(line).milestone)).toContain(
+      "renderer.page.lazy-load.resolved",
+    );
+    expect(lines.map((line) => JSON.parse(line).milestone)).toContain(
+      "renderer.page.active.changed",
+    );
 
     await act(async () => mountedRoot?.unmount());
     mountedContainer?.remove();
@@ -238,7 +316,10 @@ describe("desktop renderer lazy page loading", () => {
     window.desktopApi = { memoryDiagnosticsEnabled: false } as any;
 
     const disabledRegistry = createControlledRegistry();
-    const disabledMount = await mountWithRegistry(disabledRegistry.registry, workspaceClient());
+    const disabledMount = await mountWithRegistry(
+      disabledRegistry.registry,
+      workspaceClient(),
+    );
     mountedRoot = disabledMount.root;
     mountedContainer = disabledMount.container;
     await act(async () => disabledRegistry.resolve("home", "home"));

@@ -1,7 +1,24 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
-import type { DesktopPageDefinition, DesktopPageKey } from "../../routes/desktopPages";
+import {
+  ApplicationIcon,
+  SidebarNavigationGroup,
+  type ApplicationIconName,
+  useNavigationGroupCollapseState,
+  useSidebarCollapseState,
+} from "../../../../../../modules/ui/shared";
+import type {
+  DesktopPageDefinition,
+  DesktopPageKey,
+} from "../../routes/desktopPages";
 import appLogoSrc from "../../../../../../modules/ui/shared/assets/branding/logo.svg";
+import dataOrbitSrc from "../../../../../../modules/ui/shared/assets/illustrations/data-orbit.svg";
+import systemsOrbitSrc from "../../../../../../modules/ui/shared/assets/illustrations/systems-orbit.png";
+import assetsOrbitSrc from "../../../../../../modules/ui/shared/assets/illustrations/assets-orbit.png";
+import libraryOrbitSrc from "../../../../../../modules/ui/shared/assets/illustrations/library-orbit.png";
+import modelsOrbitSrc from "../../../../../../modules/ui/shared/assets/illustrations/models-orbit.png";
+import imageGenerationOrbitSrc from "../../../../../../modules/ui/shared/assets/illustrations/image-generation-orbit.png";
+import settingsOrbitSrc from "../../../../../../modules/ui/shared/assets/illustrations/settings-orbit.png";
 import { WorkspaceSwitcher } from "../../features/workspace";
 
 export interface AppShellProps {
@@ -11,20 +28,66 @@ export interface AppShellProps {
   children: ReactNode;
 }
 
-export function AppShell({ activePage, onNavigate, pages, children }: AppShellProps) {
+export function AppShell({
+  activePage,
+  onNavigate,
+  pages,
+  children,
+}: AppShellProps) {
   const menuRef = useRef<HTMLDetailsElement | null>(null);
+  const { isSidebarCollapsed, toggleSidebar } = useSidebarCollapseState();
+  const { isNavigationGroupExpanded, toggleNavigationGroup } =
+    useNavigationGroupCollapseState();
   const primaryPages = pages.filter((page) => page.key !== "settings");
-  const navigationPages: readonly (DesktopPageDefinition | { readonly key: "home"; readonly label: "Home" })[] = [
-    { key: "home", label: "Home" },
-    ...primaryPages,
+  const navigationPages: readonly (
+    DesktopPageDefinition | { readonly key: "home"; readonly label: "Home" }
+  )[] = [{ key: "home", label: "Home" }, ...primaryPages];
+  const pageByKey = new Map(pages.map((page) => [page.key, page]));
+  const navigationGroups: readonly {
+    readonly id: "build" | "manage";
+    readonly label: string;
+    readonly keys: readonly DesktopPageKey[];
+  }[] = [
+    {
+      id: "build",
+      label: "Build",
+      keys: ["systems", "models", "image-generation"],
+    },
+    {
+      id: "manage",
+      label: "Manage",
+      keys: ["artifacts", "assets", "user-library"],
+    },
   ];
+
+  const renderSidebarItem = (page: {
+    readonly key: DesktopPageKey;
+    readonly label: string;
+  }) => (
+    <button
+      key={page.key}
+      className="ui-shell__sidebar-item"
+      type="button"
+      aria-current={activePage === page.key ? "page" : undefined}
+      onClick={() => onNavigate(page.key)}
+      title={isSidebarCollapsed ? page.label : undefined}
+    >
+      <ApplicationIcon name={desktopPageIcon(page.key)} />
+      <span>{page.label}</span>
+    </button>
+  );
 
   useEffect(() => {
     const closeMenuOnOutsideClick = (event: MouseEvent | TouchEvent) => {
       const menu = menuRef.current;
       const target = event.target;
 
-      if (!menu?.open || !target || !(target as Node).nodeType || menu.contains(target as Node)) {
+      if (
+        !menu?.open ||
+        !target ||
+        !(target as Node).nodeType ||
+        menu.contains(target as Node)
+      ) {
         return;
       }
 
@@ -40,10 +103,14 @@ export function AppShell({ activePage, onNavigate, pages, children }: AppShellPr
     };
   }, []);
 
+  const pageArtwork = resolveDesktopPageArtwork(activePage);
+
   return (
-    <main className="ui-shell">
+    <main
+      className={`ui-shell${isSidebarCollapsed ? " ui-shell--sidebar-collapsed" : ""}`}
+    >
       <header className="ui-shell__header">
-        <div className="ui-container ui-shell__header-inner">
+        <div className="ui-shell__header-inner">
           <div className="ui-shell__header-left">
             <div className="ui-shell__brand">
               <button
@@ -54,7 +121,12 @@ export function AppShell({ activePage, onNavigate, pages, children }: AppShellPr
                 onClick={() => onNavigate("home")}
               >
                 <span className="ui-shell__logo-frame">
-                  <img className="ui-shell__logo-image" src={appLogoSrc} alt="" aria-hidden="true" />
+                  <img
+                    className="ui-shell__logo-image"
+                    src={appLogoSrc}
+                    alt=""
+                    aria-hidden="true"
+                  />
                 </span>
               </button>
               <h1 className="ui-shell__title">AI System Builder</h1>
@@ -66,12 +138,12 @@ export function AppShell({ activePage, onNavigate, pages, children }: AppShellPr
           <div className="ui-shell__header-actions">
             <nav className="ui-shell__nav" aria-label="Primary">
               <details ref={menuRef} className="ui-shell__menu">
-                <summary className="ui-shell__menu-trigger" aria-label="Open navigation menu" title="Menu">
-                  <span className="ui-shell__hamburger" aria-hidden="true">
-                    <span />
-                    <span />
-                    <span />
-                  </span>
+                <summary
+                  className="ui-shell__menu-trigger"
+                  aria-label="Open navigation menu"
+                  title="Menu"
+                >
+                  <ApplicationIcon name="menu" />
                   <span className="ui-visually-hidden">Menu</span>
                 </summary>
                 <div className="ui-shell__menu-panel" role="menu">
@@ -81,9 +153,13 @@ export function AppShell({ activePage, onNavigate, pages, children }: AppShellPr
                       className="ui-shell__menu-item"
                       type="button"
                       role="menuitem"
-                      aria-current={activePage === page.key ? "page" : undefined}
+                      aria-current={
+                        activePage === page.key ? "page" : undefined
+                      }
                       onClick={(event) => {
-                        event.currentTarget.closest("details")?.removeAttribute("open");
+                        event.currentTarget
+                          .closest("details")
+                          ?.removeAttribute("open");
                         onNavigate(page.key);
                       }}
                     >
@@ -101,22 +177,128 @@ export function AppShell({ activePage, onNavigate, pages, children }: AppShellPr
               title="Settings"
               onClick={() => onNavigate("settings")}
             >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="ui-shell__settings-icon">
-                <path
-                  className="ui-shell__settings-gear"
-                  d="M9.54 3.25 8.83 5.4a7.88 7.88 0 0 0-1.33.77L5.3 5.7 3.1 9.5l1.5 1.68a7.55 7.55 0 0 0 0 1.64L3.1 14.5l2.2 3.8 2.2-.47c.42.3.86.55 1.33.77l.71 2.15h4.92l.71-2.15c.47-.22.91-.47 1.33-.77l2.2.47 2.2-3.8-1.5-1.68a7.55 7.55 0 0 0 0-1.64l1.5-1.68-2.2-3.8-2.2.47a7.88 7.88 0 0 0-1.33-.77l-.71-2.15H9.54Z"
-                />
-                <path className="ui-shell__settings-hub" d="M12 8.45 15.08 10.23v3.54L12 15.55l-3.08-1.78v-3.54L12 8.45Z" />
-                <path className="ui-shell__settings-lines" d="M12 8.45V12m0 0 3.08-1.77M12 12l-3.08-1.77M12 12v3.55" />
-              </svg>
+              <ApplicationIcon name="settings" />
               <span className="ui-visually-hidden">Settings</span>
             </button>
           </div>
         </div>
       </header>
-      <div className="ui-container ui-shell__main">
-        {children}
+      <div className="ui-shell__body">
+        <aside className="ui-shell__sidebar">
+          <nav className="ui-shell__sidebar-nav" aria-label="Application areas">
+            <div className="ui-shell__sidebar-group ui-shell__sidebar-group--home">
+              {renderSidebarItem({ key: "home", label: "Home" })}
+            </div>
+            {navigationGroups.map((group) => (
+              <SidebarNavigationGroup
+                key={group.id}
+                label={group.label}
+                isExpanded={isNavigationGroupExpanded(group.id)}
+                forceExpanded={isSidebarCollapsed}
+                onToggle={() => toggleNavigationGroup(group.id)}
+              >
+                {group.keys.map((key) => {
+                  const page = pageByKey.get(key);
+                  return page ? renderSidebarItem(page) : null;
+                })}
+              </SidebarNavigationGroup>
+            ))}
+            <SidebarNavigationGroup
+              label="Admin"
+              isExpanded={isNavigationGroupExpanded("admin")}
+              forceExpanded={isSidebarCollapsed}
+              onToggle={() => toggleNavigationGroup("admin")}
+            >
+              {renderSidebarItem({ key: "settings", label: "Settings" })}
+            </SidebarNavigationGroup>
+          </nav>
+          <div className="ui-shell__sidebar-footer">
+            <button
+              className="ui-shell__collapse-button"
+              type="button"
+              aria-label={
+                isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
+              }
+              aria-expanded={!isSidebarCollapsed}
+              title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              onClick={toggleSidebar}
+            >
+              <ApplicationIcon
+                name={isSidebarCollapsed ? "expand" : "collapse"}
+              />
+              <span>{isSidebarCollapsed ? "Expand" : "Collapse"}</span>
+            </button>
+          </div>
+        </aside>
+        <div className="ui-shell__main">
+          {pageArtwork ? (
+            <div
+              className={`ui-shell__page-art ui-shell__page-art--${pageArtwork.tone}`}
+              aria-hidden="true"
+            >
+              <img src={pageArtwork.src} alt="" />
+            </div>
+          ) : null}
+          <div
+            className={`ui-shell__content${pageArtwork ? " ui-shell__content--with-art" : ""}`}
+          >
+            {children}
+          </div>
+        </div>
       </div>
     </main>
   );
+}
+
+function resolveDesktopPageArtwork(activePage?: DesktopPageKey) {
+  if (!activePage || activePage === "home") {
+    return undefined;
+  }
+
+  if (activePage === "artifacts") {
+    return { src: dataOrbitSrc, tone: "data" } as const;
+  }
+
+  if (activePage === "systems") {
+    return { src: systemsOrbitSrc, tone: "systems" } as const;
+  }
+
+  if (activePage === "assets") {
+    return { src: assetsOrbitSrc, tone: "assets" } as const;
+  }
+
+  if (activePage === "user-library") {
+    return { src: libraryOrbitSrc, tone: "user-library" } as const;
+  }
+
+  if (activePage === "models") {
+    return { src: modelsOrbitSrc, tone: "models" } as const;
+  }
+
+  if (activePage === "image-generation") {
+    return { src: imageGenerationOrbitSrc, tone: "image-generation" } as const;
+  }
+
+  return { src: settingsOrbitSrc, tone: "settings" } as const;
+}
+
+function desktopPageIcon(page: DesktopPageKey): ApplicationIconName {
+  switch (page) {
+    case "home":
+      return "home";
+    case "systems":
+      return "systems";
+    case "artifacts":
+      return "artifacts";
+    case "assets":
+      return "assets";
+    case "user-library":
+      return "library";
+    case "models":
+      return "models";
+    case "image-generation":
+      return "image-generation";
+    case "settings":
+      return "settings";
+  }
 }

@@ -2,12 +2,17 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 
 import { createOrganizationId } from "../../../../contracts/organization";
+import { CreateWorkspaceUseCase } from "../../../../application/use-cases/workspace/create-workspace.use-case";
 import {
   openLocalSqliteDatabase,
   restoreLocalSqliteDatabase,
 } from "../sqlite-database";
 import { resolveLocalSqliteDatabasePolicy } from "../local-sqlite-database-policy";
-import { createLocalWorkspaceRepository } from "../../workspace";
+import {
+  createLocalWorkspaceRepository,
+  createLocalWorkspaceSelectionRepository,
+  createLocalWorkspaceSystemPackActivationRepository,
+} from "../../workspace";
 
 async function main(): Promise<void> {
   const rootDirectory = process.argv[2];
@@ -27,6 +32,33 @@ async function main(): Promise<void> {
   await orgA.writeDocument("tenant-test", "shared", { owner: "a" });
   await orgB.writeDocument("tenant-test", "shared", { owner: "b" });
   const structuredRoot = path.join(rootDirectory, "artifacts");
+
+  const organizationWorkspaceRepository = createLocalWorkspaceRepository({
+    rootDirectory: structuredRoot,
+    documents: orgA,
+  });
+  const organizationWorkspaceSelectionRepository = createLocalWorkspaceSelectionRepository({
+    rootDirectory: structuredRoot,
+    documents: orgA,
+  });
+  const organizationSystemPackActivationRepository = createLocalWorkspaceSystemPackActivationRepository({
+    rootDirectory: structuredRoot,
+    documents: orgA,
+  });
+  const organizationWorkspaceResult = await new CreateWorkspaceUseCase({
+    workspaceRepository: organizationWorkspaceRepository,
+    workspaceSelectionRepository: organizationWorkspaceSelectionRepository,
+    systemPackActivationRepository: organizationSystemPackActivationRepository,
+    organizationId: createOrganizationId("org-a"),
+  }).execute({
+    command: {
+      displayName: "Jeff's Systems",
+      includeSystemFoundationAssets: true,
+    },
+    selectAfterCreate: true,
+  });
+  const organizationWorkspaceCount = (await organizationWorkspaceRepository.listWorkspaces()).length;
+
   const workspaceRepository = createLocalWorkspaceRepository({ rootDirectory: structuredRoot, documents: database.documents });
   await workspaceRepository.saveWorkspace({
     workspaceId: "workspace-sqlite",
@@ -75,6 +107,11 @@ async function main(): Promise<void> {
     rolledBackPresent: Boolean(rolledBack),
     workspaceDisplayName: persistedWorkspace?.displayName,
     workspaceJsonWritten: existsSync(path.join(structuredRoot, "workspaces")),
+    organizationWorkspaceStatus: organizationWorkspaceResult.status,
+    organizationWorkspaceDisplayName: organizationWorkspaceResult.workspace?.displayName,
+    organizationWorkspaceCount,
+    organizationWorkspaceActivationCount: organizationWorkspaceResult.systemPackActivations.length,
+    organizationWorkspaceSelectionId: organizationWorkspaceResult.activeSelection?.workspaceId,
     organizationAOwner,
     organizationBOwner,
     platformOwner,

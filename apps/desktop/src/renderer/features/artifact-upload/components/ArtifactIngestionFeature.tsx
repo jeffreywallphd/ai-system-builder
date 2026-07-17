@@ -6,6 +6,7 @@ import { useArtifactUploadFeature } from "../hooks/useArtifactUploadFeature";
 import { ArtifactUploadForm } from "./ArtifactUploadForm";
 import { ArtifactScrapeForm } from "./ArtifactScrapeForm";
 import { ArtifactHuggingFaceForm } from "./ArtifactHuggingFaceForm";
+import { PanelHeading } from "../../../../../../../modules/ui/shared";
 
 export interface ArtifactIngestionFeatureProps {
   client?: ArtifactUploadClient;
@@ -71,7 +72,7 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
   return (
     <section className="ui-panel ui-panel--elevated ui-panel--sectioned">
       <header className="ui-panel__section-header">
-        <h2 className="ui-panel__title">Data Artifact Ingester</h2>
+        <PanelHeading icon="upload" tone="cyan">Data Artifact Ingester</PanelHeading>
       </header>
       <div className="ui-panel__section-body ui-stack ui-stack--sm">
         <p>Please select a method below to add data to the system.</p>
@@ -130,4 +131,3 @@ export function ArtifactIngestionFeature({ client, ingestionClient, onUploadComp
     </section>
   );
 }
-

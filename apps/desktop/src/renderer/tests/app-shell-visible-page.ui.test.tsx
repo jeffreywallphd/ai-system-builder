@@ -1,10 +1,18 @@
 require.extensions[".svg"] = (module: NodeModule) => {
   module.exports = "logo.svg";
 };
+require.extensions[".png"] = (module: NodeModule) => {
+  module.exports = "page-art.png";
+};
 
 import { renderToString } from "react-dom/server";
 
-import { describe, expect, it, testDouble } from "../../../../../modules/testing/node-test";
+import {
+  describe,
+  expect,
+  it,
+  testDouble,
+} from "../../../../../modules/testing/node-test";
 import type { WorkspaceClient } from "../features/workspace";
 
 function workspaceClient(): WorkspaceClient {
@@ -26,7 +34,11 @@ describe("desktop AppShell visible workspace page state", () => {
     const { desktopPageDefinitions } = await import("../routes/desktopPages");
     const html = renderToString(
       <ActiveWorkspaceProvider client={workspaceClient()}>
-        <AppShell activePage={undefined} pages={desktopPageDefinitions} onNavigate={() => undefined}>
+        <AppShell
+          activePage={undefined}
+          pages={desktopPageDefinitions}
+          onNavigate={() => undefined}
+        >
           <section>Workspace required</section>
         </AppShell>
       </ActiveWorkspaceProvider>,
@@ -34,6 +46,12 @@ describe("desktop AppShell visible workspace page state", () => {
 
     expect(html).toContain("Workspace required");
     expect(html).toContain("Models");
+    expect(html).toContain("Application areas");
+    expect(html).toContain("Build");
+    expect(html).toContain("Manage");
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain("ui-app-icon");
+    expect(html).toContain("Collapse sidebar");
     expect(html).not.toContain('aria-current="page"');
   });
 });
