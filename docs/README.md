@@ -44,6 +44,8 @@ This directory separates canonical system guidance from downstream task context 
 - Persistence or deployment work: read `docs/architecture/persistence-and-storage.md`, `docs/architecture/host-model.md`, ADR-0003, and ADR-0004.
 - Database deployment implementation: also read ADR-0025 and the supporting
   `docs/deployment-readiness-implementation-roadmap.md`.
+- Organization tenancy, managed identity, or deployment placement: read
+  ADR-0029 and `docs/architecture/organization-tenancy-and-identity.md`.
 - Database operation or release qualification: use
   `docs/operations/persistence-operations.md` and
   `docs/operations/deployment-qualification.md`.
@@ -58,6 +60,7 @@ If context guidance conflicts with an ADR, architecture document, or standard, t
 ## Current Architecture Pointers
 
 - Workspace model: `docs/architecture/workspace-model.md`, including reference-only `system.foundation@1.0.0` activation and the no-hidden-workspace/no-auto-migration rule.
+- Organization tenancy and identity: `docs/architecture/organization-tenancy-and-identity.md`; pooled placement is the managed default and dedicated one-organization placement is the premium profile.
 - User Library reuse: `docs/architecture/user-library-and-cross-workspace-reuse.md` and ADR-0017.
 - Asset authoring, customization, and overrides: `docs/architecture/asset-authoring-customization-and-overrides.md` and ADR-0018.
 - Effective asset projections: `docs/architecture/effective-asset-projections.md` and ADR-0019.

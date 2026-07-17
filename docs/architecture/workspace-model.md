@@ -1,7 +1,7 @@
 # Workspace Model
 
 - Status: current
-- Related decisions: `docs/adr/ADR-0017-user-library-and-cross-workspace-reuse.md`
+- Related decisions: `docs/adr/ADR-0017-user-library-and-cross-workspace-reuse.md`, `docs/adr/ADR-0029-organization-tenancy-identity-and-authorization.md`
 - Verification: `docs/architecture/architecture-verification.md`
 
 ## Scope
@@ -13,6 +13,12 @@ Related topics are defined by their own architecture docs and ADRs. Do not infer
 ## Workspace records and active selection
 
 Workspace records are persisted through workspace repositories/use cases and are selected through host/server workspace transports. Renderer localStorage may not be the source of truth for workspace identity, and clients must not derive workspace ids from display names. Hosts must not create hidden/default workspaces to make workspace-scoped features appear populated.
+
+Every new workspace belongs to the active organization. Managed and initialized
+local creation persist that organization id in the workspace record and use an
+organization-scoped repository. Records without an organization id are an
+explicit legacy/unassigned shape only; they are invisible to organization-scoped
+repositories until the operator completes the reviewed assignment workflow.
 
 The active workspace is an explicit user/host selection. Workspace-gated pages should show a workspace-required state when no active workspace exists instead of issuing workspace-owned reads without context or showing legacy/global records.
 

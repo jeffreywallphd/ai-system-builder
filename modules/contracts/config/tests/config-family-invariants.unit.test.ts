@@ -12,6 +12,7 @@ describe("config family invariants", () => {
       "STORAGE_ADAPTER_ID_FORMAT_DESCRIPTION",
       "STORAGE_NAMESPACE_FORMAT_DESCRIPTION",
       "STORAGE_OPERATION_TIMEOUT_MS_FORMAT_DESCRIPTION",
+      "TENANT_PLACEMENT_MODES",
       "createDefaultDeploymentPersistenceTarget",
       "createHostConfig",
       "createLoggingConfig",
@@ -19,6 +20,7 @@ describe("config family invariants", () => {
       "createRuntimeConfig",
       "createStorageConfig",
       "createSystemConfig",
+      "createTenantPlacementConfig",
       "isDeploymentShape",
       "isPersistenceAdapterId",
       "isPersistenceNamespace",
@@ -31,6 +33,7 @@ describe("config family invariants", () => {
       "normalizeStorageAdapterId",
       "normalizeStorageNamespace",
       "normalizeStorageOperationTimeoutMs",
+      "tenantPlacementAllowsOrganization",
     ]);
   });
 

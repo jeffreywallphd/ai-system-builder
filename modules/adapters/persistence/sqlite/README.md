@@ -9,6 +9,12 @@ migrations, supplies transactional structured documents with optimistic
 revisions, reports sanitized health, and performs online backup plus validated
 restore. See ADR-0026.
 
+Schema version 2 separates platform/legacy documents from organization-owned
+documents with a composite organization key. First launch explicitly creates a
+generated local organization/principal profile. New feature repositories use its
+scoped store; application settings remain platform data. Existing records require
+the fingerprint-confirmed assignment command and are never adopted silently.
+
 Desktop main composition selects this runtime before IPC registration. Existing
 JSON data passes through the explicit inventory, rollback copy, transactional
 import, reconciliation, activation marker, and divergence guard before typed

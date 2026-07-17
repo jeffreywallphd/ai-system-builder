@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
+import { createOrganizationId } from "../../../../contracts/organization";
 
 import {
   StructuredDocumentConflictError,
@@ -25,7 +26,13 @@ test(
     );
     const [database] = databases;
     const namespace = `integration-${randomUUID()}`;
+    const orgA = database.documents.forOrganization(createOrganizationId(`org-a-${randomUUID()}`));
+    const orgB = database.documents.forOrganization(createOrganizationId(`org-b-${randomUUID()}`));
     try {
+      await orgA.writeDocument(namespace, "shared", { owner: "a" });
+      await orgB.writeDocument(namespace, "shared", { owner: "b" });
+      assert.equal((await orgA.readDocument<{ owner: string }>(namespace, "shared"))?.value.owner, "a");
+      assert.equal((await orgB.readDocument<{ owner: string }>(namespace, "shared"))?.value.owner, "b");
       const first = await database.documents.writeDocument(
         namespace,
         "record",
@@ -100,6 +107,8 @@ test(
       assert.equal(new Set(counter?.value.writers).size, 24);
       assert.equal((await database.checkHealth()).healthy, true);
     } finally {
+      await orgA.deleteDocument(namespace, "shared");
+      await orgB.deleteDocument(namespace, "shared");
       await database.documents.deleteDocument(namespace, "record");
       await database.documents.deleteDocument(namespace, "counter.json");
       await Promise.all(databases.map((opened) => opened.close()));

@@ -9,6 +9,8 @@ import type { ArtifactStorageBindingPort } from "../../../../application/ports/s
 import { normalizeStorageArtifactKey } from "../../../../contracts/storage";
 import { createWorkspaceId } from "../../../../contracts/workspace";
 import { SystemArtifactIdFactory } from "../../../../domain/artifact";
+import type { OrganizationRequestContextProviderPort } from "../../../../application/ports/organization";
+import { resolveOrganizationStorageKey } from "../organizationStorageScope";
 
 class GeneratedImagePersistenceSafeError extends Error {}
 
@@ -36,6 +38,7 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
   artifactCatalogAppend?: ArtifactCatalogAppendPort;
   artifactStorageBinding?: Pick<ArtifactStorageBindingPort, "upsertArtifactStorageBinding">;
   now?: () => string;
+  organizationContextProvider?: OrganizationRequestContextProviderPort;
 }): GeneratedImagePersistencePort {
   const outputRoot = path.resolve(options.comfyUiOutputRoot);
   const storageRoot = path.resolve(options.artifactStorageRoot);
@@ -49,8 +52,16 @@ export function createFilesystemGeneratedImagePersistenceAdapter(options: {
         const sourcePath = resolveContainedOutputPath(outputRoot, output.subfolder, output.fileName);
         const artifactId = artifactIdFactory.createArtifactId().toString();
         const desiredFileName = sanitizeFileName(output.fileName) ?? "generated-image.png";
-        const storageKey = await reserveGeneratedImageStorageKey(storageRoot, scopedWorkspaceId, desiredFileName);
-        const destinationPath = path.join(storageRoot, storageKey);
+        const storageKey = await reserveGeneratedImageStorageKey(
+          storageRoot,
+          scopedWorkspaceId,
+          desiredFileName,
+          options.organizationContextProvider,
+        );
+        const destinationPath = path.join(
+          storageRoot,
+          resolveOrganizationStorageKey(storageKey, options.organizationContextProvider),
+        );
         await mkdir(path.dirname(destinationPath), { recursive: true });
 
         if (output.contentBase64 && output.contentBase64.trim()) {
@@ -111,7 +122,12 @@ function sanitizeFileName(value: string | undefined): string | undefined {
   return `${stripped}.png`;
 }
 
-async function reserveGeneratedImageStorageKey(storageRoot: string, workspaceId: string, desiredFileName: string): Promise<string> {
+async function reserveGeneratedImageStorageKey(
+  storageRoot: string,
+  workspaceId: string,
+  desiredFileName: string,
+  organizationContextProvider?: OrganizationRequestContextProviderPort,
+): Promise<string> {
   const parsed = path.parse(desiredFileName);
   const ext = parsed.ext || ".png";
   const base = parsed.name || "generated-image";
@@ -120,7 +136,7 @@ async function reserveGeneratedImageStorageKey(storageRoot: string, workspaceId:
     const candidate = next === 0 ? `${base}${ext}` : `${base}-${next + 1}${ext}`;
     const storageKey = normalizeStorageArtifactKey(`workspaces/${createWorkspaceId(workspaceId)}/generated/images/${candidate}`);
     try {
-      await access(path.join(storageRoot, storageKey), constants.F_OK);
+      await access(path.join(storageRoot, resolveOrganizationStorageKey(storageKey, organizationContextProvider)), constants.F_OK);
       next += 1;
     } catch (error) {
       const fsError = error as NodeJS.ErrnoException;

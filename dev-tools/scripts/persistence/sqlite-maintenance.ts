@@ -9,8 +9,10 @@ import {
   restoreLocalSqliteDatabase,
 } from "../../../modules/adapters/persistence/sqlite";
 import { exportStructuredData, writeStructuredDataExport } from "../../../modules/adapters/persistence/migration";
+import { assignLegacyStructuredDataToOrganization, inventoryLegacyStructuredData } from "../../../modules/adapters/persistence/migration";
+import { createOrganizationId } from "../../../modules/contracts/organization";
 
-type Operation = "health" | "backup" | "restore" | "export";
+type Operation = "health" | "backup" | "restore" | "export" | "legacy-inventory" | "legacy-assign";
 
 interface Arguments {
   operation: Operation;
@@ -18,6 +20,11 @@ interface Arguments {
   destination?: string;
   backup?: string;
   confirmReplace: boolean;
+  organizationId?: string;
+  namespaces?: readonly string[];
+  fingerprint?: string;
+  rollback?: string;
+  confirmAssignment?: string;
 }
 
 async function main(): Promise<void> {
@@ -51,6 +58,30 @@ async function main(): Promise<void> {
       process.stdout.write(`${JSON.stringify({ operation: "export", status: "completed", ...result })}\n`);
       return;
     }
+    if (args.operation === "legacy-inventory") {
+      if (!args.namespaces?.length) throw new Error("legacy-inventory requires --namespaces <comma-separated-list>.");
+      const inventory = await inventoryLegacyStructuredData(database.documents, args.namespaces);
+      process.stdout.write(`${JSON.stringify({ operation: "legacy-inventory", ...inventory })}\n`);
+      return;
+    }
+    if (args.operation === "legacy-assign") {
+      if (!args.organizationId) throw new Error("legacy-assign requires --organization-id <id>.");
+      if (args.confirmAssignment !== args.organizationId) {
+        throw new Error("legacy-assign requires --confirm-assignment to exactly match --organization-id.");
+      }
+      if (!args.namespaces?.length || !args.fingerprint || !args.rollback) {
+        throw new Error("legacy-assign requires --namespaces, --fingerprint, and --rollback.");
+      }
+      const inventory = await assignLegacyStructuredDataToOrganization({
+        documents: database.documents,
+        organizationId: createOrganizationId(args.organizationId),
+        namespaces: args.namespaces,
+        expectedFingerprint: args.fingerprint,
+        rollbackFilePath: args.rollback,
+      });
+      process.stdout.write(`${JSON.stringify({ operation: "legacy-assign", status: "completed", ...inventory })}\n`);
+      return;
+    }
     if (!args.destination) throw new Error("backup requires --destination <sqlite-file>.");
     const result = await database.createBackup(path.resolve(args.destination));
     process.stdout.write(`${JSON.stringify({ operation: "backup", status: "completed", ...result })}\n`);
@@ -61,8 +92,8 @@ async function main(): Promise<void> {
 
 function parseArguments(values: string[]): Arguments {
   const operation = values[0];
-  if (operation !== "health" && operation !== "backup" && operation !== "restore" && operation !== "export") {
-    throw new Error("Usage: persistence:sqlite <health|backup|restore|export> --data-root <directory> [options].");
+  if (operation !== "health" && operation !== "backup" && operation !== "restore" && operation !== "export" && operation !== "legacy-inventory" && operation !== "legacy-assign") {
+    throw new Error("Usage: persistence:sqlite <health|backup|restore|export|legacy-inventory|legacy-assign> --data-root <directory> [options].");
   }
   const options = new Map<string, string>();
   let confirmReplace = false;
@@ -86,6 +117,11 @@ function parseArguments(values: string[]): Arguments {
     destination: options.get("--destination"),
     backup: options.get("--backup"),
     confirmReplace,
+    organizationId: options.get("--organization-id"),
+    namespaces: options.get("--namespaces")?.split(",").map((value) => value.trim()).filter(Boolean),
+    fingerprint: options.get("--fingerprint"),
+    rollback: options.get("--rollback"),
+    confirmAssignment: options.get("--confirm-assignment"),
   };
 }
 

@@ -34,7 +34,8 @@ Security is a cross-cutting architecture concern implemented through shared cont
 - Secrets/credentials are handled through security/credential-store ports, not general settings bags.
 - Audit logging is separate from normal diagnostics.
 - Dev no-auth mode must be explicit and noisy.
-- Initial implementation target: `HTTPS + LAN pairing bearer token`.
+- Initial LAN implementation target: `HTTPS + LAN pairing bearer token`.
+- Managed production identity and organization authorization follow ADR-0029.
 - Future modes are added by new adapters, not use-case rewrites.
 
 ## Current first implementation status (rebuild branch)
@@ -56,6 +57,17 @@ This ADR remains the canonical architecture decision. Current implementation is 
   - Server persists token hashes only in server-side security store data.
   - Thin-client token persistence flows through `pairedDeviceTokenStore`.
   - Current browser storage uses `localStorage` as an initial LAN convenience; it is not hostile-browser-hardened storage.
+- `oidc-bearer` (implemented for managed production)
+  - HTTPS is required.
+  - Exact configured issuer, audience, asymmetric algorithm allowlist, signature,
+    and subject are verified through the configured remote JWK set.
+  - Issuer plus subject maps to an opaque internal principal id; provider scopes,
+    email/domain, and organization claims do not grant membership.
+  - Pooled requests require an explicit organization id; premium dedicated
+    placement permits only its configured organization.
+  - Active organization and membership are checked before protected feature
+    routes, and organization-owned persistence/storage require the same request
+    context.
 - Security status supports both public discovery and authenticated principal validation when a bearer token is sent.
 - Unknown `/api/*` routes are denied by centralized route policy with `security.route-policy-missing`.
 - Canonical security API failures in active use include:
@@ -72,9 +84,14 @@ Current limitations / required follow-up:
 - Pairing-code creation/admin UX is not full device administration.
 - `POST /api/security/token/revoke` exists and is currently policy-gated as admin (`security:admin`); normal thin-client self-revoke/admin device-management UX is not a completed first-implementation flow.
 - Pairing endpoints should be rate-limited as hardening follow-up (not complete in current implementation).
-- Audit logging is an architectural requirement/follow-up; not yet complete as a dedicated security-audit subsystem.
-- Storage security and resource-level authorization are next-phase beyond current route-level scope checks.
-- mTLS, external TLS termination mode, API-key mode, OAuth, encryption at rest, and public-internet hardening remain future adapter work.
+- Authorization allow/deny events now use a separate append-only JSONL audit
+  adapter with strict redaction; broader privileged-operation coverage and
+  managed audit-service export remain qualification work.
+- Organization membership and storage containment are implemented. Fine-grained
+  resource grants beyond the current role model remain a successor decision.
+- mTLS, external TLS termination mode, API-key mode, interactive OIDC login
+  session UX, encryption at rest, and broader public-internet abuse hardening
+  remain future work.
 
 ## Security domains
 
@@ -316,6 +333,7 @@ Security modes:
 ```txt
 disabled-dev
 lan-https-token
+oidc-bearer
 external-tls future
 mtls future
 api-key future

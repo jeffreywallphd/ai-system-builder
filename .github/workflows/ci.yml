@@ -150,12 +150,10 @@ jobs:
         run: docker compose -f deployments/server/compose.qualification.yaml config --quiet
         env:
           POSTGRES_PASSWORD: qualification-only
-          SERVER_TOKEN_HASH_SECRET: qualification-only-token-hash-secret
       - name: Build and start isolated managed shape
         run: docker compose -f deployments/server/compose.qualification.yaml up --build --detach --wait --wait-timeout 240
         env:
           POSTGRES_PASSWORD: qualification-only
-          SERVER_TOKEN_HASH_SECRET: qualification-only-token-hash-secret
       - name: Smoke test managed server probes
         run: npm run deployment:smoke
       - name: Retain image configuration evidence
@@ -184,4 +182,3 @@ jobs:
         run: docker compose -f deployments/server/compose.qualification.yaml down --volumes --remove-orphans
         env:
           POSTGRES_PASSWORD: qualification-only
-          SERVER_TOKEN_HASH_SECRET: qualification-only-token-hash-secret

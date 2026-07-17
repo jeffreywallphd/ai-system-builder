@@ -1,6 +1,6 @@
 # ADR-0029: Organization Tenancy, Identity, and Authorization
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-07-16
 - Deciders: ai-system-builder maintainers
 - Related: ADR-0015, ADR-0017, ADR-0025, ADR-0027,
@@ -86,10 +86,13 @@ organization.
   cross-organization administration scale with tenant count; local and small
   campus deployments pay complexity they do not need.
 
-## Proposed decision
+## Decision
 
-Choose option A as the default managed-server model while retaining an adapter
-boundary that can place selected organizations in dedicated databases later.
+Choose option A as the default managed-server model. Option B is a premium
+deployment-placement profile over the same contracts, release, and
+configuration model; it is not a product fork. Retain an adapter boundary that
+can place selected organizations in dedicated databases later without making
+option C the default.
 
 - **Tenant definition:** an organization is the tenant. A workspace belongs to
   exactly one organization and cannot be reassigned by ordinary update flows.
@@ -135,8 +138,13 @@ boundary that can place selected organizations in dedicated databases later.
   ownership descriptors. Organization/workspace/principal identifiers form
   containment prefixes; callers never construct raw provider keys. Platform
   assets remain in a separate read-only scope.
+- **Premium dedicated placement:** a dedicated deployment accepts exactly one
+  configured organization identifier and rejects any other organization before
+  application or storage access. Dedicated stacks run the same released
+  software and schema as pooled stacks. Customer-specific code, schema drift,
+  and one-off deployment behavior are prohibited.
 
-## Acceptance-dependent implementation plan
+## Implementation plan
 
 1. Add organization, external-subject, membership, selected-organization, and
    request-security contracts with normalization and negative tests.
@@ -155,7 +163,7 @@ boundary that can place selected organizations in dedicated databases later.
 7. Qualify local single-user behavior and managed multi-user denial paths before
    implementing the tenant-aware object-storage recommendation.
 
-## Consequences if accepted
+## Consequences
 
 ### Positive
 
@@ -189,6 +197,6 @@ boundary that can place selected organizations in dedicated databases later.
 - Public-internet ingress, session, abuse-prevention, and compliance claims
   beyond the identity and authorization boundaries in this proposal.
 
-> AI documentation reminder: this proposal is not implementation authority.
-> If accepted, update its status and the decision-readiness register before
-> adding public multi-user behavior or a durable tenant schema.
+> AI documentation reminder: when behavior in this area changes, update the
+> related architecture docs, context packs, deployment guidance, and tests in
+> the same change.

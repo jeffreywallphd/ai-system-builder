@@ -34,12 +34,14 @@
     "build:server": "npm run build -w @ai-system-builder/server",
     "start:server": "npm run start -w @ai-system-builder/server",
     "persistence:sqlite": "node --preserve-symlinks --preserve-symlinks-main dev-tools/scripts/persistence/run-sqlite-maintenance.mjs",
-    "persistence:postgres": "node --import tsx dev-tools/scripts/persistence/postgres-maintenance.ts"
+    "persistence:postgres": "node --import tsx dev-tools/scripts/persistence/postgres-maintenance.ts",
+    "tenancy:postgres": "node --import tsx dev-tools/scripts/tenancy/postgres-tenancy-admin.ts"
   },
   "dependencies": {
     "@huggingface/hub": "^2.11.0",
     "busboy": "^1.6.0",
     "express": "^5.1.0",
+    "jose": "6.2.3",
     "pg": "^8.22.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

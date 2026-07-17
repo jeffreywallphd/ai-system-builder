@@ -7,6 +7,7 @@ import type {
   WorkspaceMetadata,
   WorkspaceSystemPackActivation,
 } from "./workspace-system-pack-activation";
+import type { OrganizationId } from "../organization";
 
 export interface WorkspaceSettings {
   readonly defaultIncludeSystemFoundationAssets?: boolean;
@@ -19,6 +20,11 @@ export interface WorkspaceSettings {
  * permission engine.
  */
 export interface WorkspaceRecord {
+  /**
+   * Required for new organization-owned records. Absence classifies an
+   * existing record as legacy/unassigned; ordinary reads never infer it.
+   */
+  readonly organizationId?: OrganizationId;
   readonly workspaceId: WorkspaceId;
   readonly displayName: string;
   readonly description?: string;

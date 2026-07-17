@@ -7,12 +7,18 @@ import test from "node:test";
 
 import electronPath from "electron";
 
-import { LOCAL_SQLITE_MIGRATION_0001 } from "../sqlite-database";
+import { LOCAL_SQLITE_MIGRATION_0001, LOCAL_SQLITE_MIGRATION_0002 } from "../sqlite-database";
 
 test("the checked-in SQLite migration matches the runtime migration", async () => {
   const migrationPath = path.resolve("migrations", "sqlite", "0001-create-structured-document-store.sql");
   const checkedIn = await readFile(migrationPath, "utf8");
   assert.equal(normalizeSql(checkedIn), normalizeSql(LOCAL_SQLITE_MIGRATION_0001));
+});
+
+test("the checked-in organization SQLite migration matches the runtime migration", async () => {
+  const migrationPath = path.resolve("migrations", "sqlite", "0002-create-organization-document-store.sql");
+  const checkedIn = await readFile(migrationPath, "utf8");
+  assert.equal(normalizeSql(checkedIn), normalizeSql(LOCAL_SQLITE_MIGRATION_0002));
 });
 
 test("Electron's production runtime executes SQLite migrations, transactions, health, backup, and restore", async () => {
@@ -42,15 +48,21 @@ test("Electron's production runtime executes SQLite migrations, transactions, he
       rolledBackPresent: boolean;
       workspaceDisplayName: string;
       workspaceJsonWritten: boolean;
+      organizationAOwner: string;
+      organizationBOwner: string;
+      platformOwner: string;
     };
     assert.equal(output.health.healthy, true);
-    assert.equal(output.health.schemaVersion, 1);
+    assert.equal(output.health.schemaVersion, 2);
     assert.ok(output.backup.pages > 0);
     assert.equal(output.secondRevision, 2);
     assert.equal(output.restoredValue, 2);
     assert.equal(output.rolledBackPresent, false);
     assert.equal(output.workspaceDisplayName, "SQLite workspace");
     assert.equal(output.workspaceJsonWritten, false);
+    assert.equal(output.organizationAOwner, "a");
+    assert.equal(output.organizationBOwner, "b");
+    assert.equal(output.platformOwner, "platform");
   } finally {
     await rm(rootDirectory, { recursive: true, force: true });
   }
@@ -76,6 +88,14 @@ test("operator CLI reports health, creates a backup, and requires explicit resto
     });
     assert.equal(health.status, 0, health.stderr || health.stdout);
     assert.equal((JSON.parse(health.stdout) as { healthy: boolean }).healthy, true);
+
+    const legacyInventory = spawnSync(process.execPath, [
+      cli, "legacy-inventory", "--data-root", rootDirectory, "--namespaces", "tests",
+    ], { cwd: path.resolve("."), encoding: "utf8", timeout: 30_000 });
+    assert.equal(legacyInventory.status, 0, legacyInventory.stderr || legacyInventory.stdout);
+    const inventory = JSON.parse(legacyInventory.stdout) as { totalDocumentCount: number; fingerprint: string };
+    assert.ok(inventory.totalDocumentCount > 0);
+    assert.match(inventory.fingerprint, /^sha256:[a-f0-9]{64}$/);
 
     const backup = spawnSync(process.execPath, [cli, "backup", "--data-root", rootDirectory, "--destination", backupPath], {
       cwd: path.resolve("."), encoding: "utf8", timeout: 30_000,

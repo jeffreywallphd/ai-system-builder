@@ -1,6 +1,7 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
 
+import { createOrganizationId } from "../../../../contracts/organization";
 import {
   openLocalSqliteDatabase,
   restoreLocalSqliteDatabase,
@@ -20,6 +21,11 @@ async function main(): Promise<void> {
 
   const first = await database.documents.writeDocument("tests", "one", { value: 1 });
   const second = await database.documents.writeDocument("tests", "one", { value: 2 }, { expectedRevision: first.revision });
+  const orgA = database.documents.forOrganization(createOrganizationId("org-a"));
+  const orgB = database.documents.forOrganization(createOrganizationId("org-b"));
+  await database.documents.writeDocument("tenant-test", "shared", { owner: "platform" });
+  await orgA.writeDocument("tenant-test", "shared", { owner: "a" });
+  await orgB.writeDocument("tenant-test", "shared", { owner: "b" });
   const structuredRoot = path.join(rootDirectory, "artifacts");
   const workspaceRepository = createLocalWorkspaceRepository({ rootDirectory: structuredRoot, documents: database.documents });
   await workspaceRepository.saveWorkspace({
@@ -52,6 +58,12 @@ async function main(): Promise<void> {
   const restored = await openLocalSqliteDatabase({ policy });
   const restoredDocument = await restored.documents.readDocument<{ value: number }>("tests", "one");
   const rolledBack = await restored.documents.readDocument("tests", "rolled-back");
+  const organizationAOwner = (await restored.documents.forOrganization(createOrganizationId("org-a"))
+    .readDocument<{ owner: string }>("tenant-test", "shared"))?.value.owner;
+  const organizationBOwner = (await restored.documents.forOrganization(createOrganizationId("org-b"))
+    .readDocument<{ owner: string }>("tenant-test", "shared"))?.value.owner;
+  const platformOwner = (await restored.documents
+    .readDocument<{ owner: string }>("tenant-test", "shared"))?.value.owner;
   restored.close();
 
   process.stdout.write(JSON.stringify({
@@ -63,6 +75,9 @@ async function main(): Promise<void> {
     rolledBackPresent: Boolean(rolledBack),
     workspaceDisplayName: persistedWorkspace?.displayName,
     workspaceJsonWritten: existsSync(path.join(structuredRoot, "workspaces")),
+    organizationAOwner,
+    organizationBOwner,
+    platformOwner,
   }));
 }
 

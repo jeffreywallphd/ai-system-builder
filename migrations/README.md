@@ -14,3 +14,11 @@ repository adapters. Their runtime mirrors are drift-tested. The separate JSON
 import workflow inventories an allowlist, preserves a rollback copy, imports in
 one transaction, reconciles records, and writes a cutover marker; schema migration
 scripts never silently consume or delete JSON data.
+
+Migration `0002` adds the organization-scoped structured-document table with a
+composite organization/namespace/key identity. PostgreSQL additionally enables
+and forces row-level security using the transaction-local
+`app.organization_id`; SQLite uses the same logical key without claiming
+server-grade RLS. The original table remains the explicit platform/legacy
+partition. Moving records between them requires reviewed inventory, a matching
+fingerprint, a pre-written rollback source, and an explicit assignment command.

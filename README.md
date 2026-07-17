@@ -12,9 +12,12 @@ AI System Builder is a TypeScript platform for composing, running, and managing 
 - Decisions and implementation rules: use the [ADR index](docs/adr/README.md) and [repository standards](docs/standards/).
 - Deployment delivery: use the [multi-shape implementation roadmap](docs/deployment-readiness-implementation-roadmap.md); SQLite is the local structured-data target and PostgreSQL is the campus/corporate/cloud target.
 - Local structured persistence is active in desktop composition through SQLite;
-  legacy JSON import is explicit, rollback-preserving, and fail-closed.
+  first-run identity is explicit and generated, while legacy JSON import and
+  organization assignment are rollback-preserving and fail-closed.
 - Managed server shapes actively select PostgreSQL with fail-closed production
-  security, migrations, readiness, JSON import, and graceful drain. Start with
+  OIDC, pooled organization tenancy by default, premium dedicated placement,
+  forced row security, tenant-scoped object paths, migrations, readiness, and
+  graceful drain. See the [tenancy architecture](docs/architecture/organization-tenancy-and-identity.md), then start with
   the [deployment templates](deployments/server/README.md) and
   [qualification procedure](docs/operations/deployment-qualification.md).
 

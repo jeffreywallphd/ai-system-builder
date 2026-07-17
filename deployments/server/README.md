@@ -24,22 +24,24 @@ replaceable runtime installations and caches.
 - `kubernetes-deployment.example.yaml` is a production-oriented starting point
   with secret references, TLS mounts, a durable artifact volume, ephemeral
   runtime storage, graceful termination, and distinct liveness/readiness probes.
-  It is intentionally `Recreate` plus one replica until identity/tenancy and
-  multi-replica operation are accepted and qualified.
+  It is intentionally `Recreate` plus one replica until target-platform
+  multi-replica tenancy, capacity, and recovery are qualified.
 - `config/environments/server/*.env.example` are shape-specific environment
   profiles. They intentionally omit secret values.
 
 ## Required operator choices
 
 Before deployment, pin the built image by immutable digest, provision PostgreSQL
-and artifact storage, inject `DATABASE_URL`, `SERVER_TOKEN_HASH_SECRET`, the
-PostgreSQL CA, and TLS material through the platform secret boundary, and replace
-the Kubernetes storage claims with qualified services. The current filesystem
-artifact adapter requires a durable mounted path; an object-storage adapter is a
-separate future increment.
+and artifact storage, inject `DATABASE_URL`, the PostgreSQL CA, and TLS material
+through the platform secret boundary, configure the exact OIDC issuer, audience,
+and JWKS values, provision organization memberships, and replace the Kubernetes
+storage claims with qualified services. The filesystem adapter derives physical
+organization prefixes on a durable mounted path. An external object-service
+adapter remains replaceable behind the same ownership contract.
 
-The repository does not choose organization tenancy, retention, RPO, RTO, high
-availability, or backup schedules. Operators must obtain those approved values
+ADR-0029 chooses pooled organization tenancy by default and premium dedicated
+one-organization placement over the same release. The repository does not choose
+retention, RPO, RTO, high availability, or backup schedules. Operators must obtain those approved values
 and apply the procedures in `docs/operations/persistence-operations.md` before a
 shape can be declared production-qualified.
 

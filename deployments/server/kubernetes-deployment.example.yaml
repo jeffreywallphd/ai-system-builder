@@ -43,7 +43,15 @@ spec:
             - name: DEPLOYMENT_SHAPE
               value: cloud
             - name: AI_SYSTEM_BUILDER_SECURITY_MODE
-              value: lan-https-token
+              value: oidc-bearer
+            - name: AI_SYSTEM_BUILDER_OIDC_ISSUER
+              value: https://identity.example.invalid
+            - name: AI_SYSTEM_BUILDER_OIDC_AUDIENCE
+              value: ai-system-builder
+            - name: AI_SYSTEM_BUILDER_OIDC_JWKS_URI
+              value: https://identity.example.invalid/.well-known/jwks.json
+            - name: AI_SYSTEM_BUILDER_TENANT_PLACEMENT_MODE
+              value: pooled
             - name: AI_SYSTEM_BUILDER_TLS_CERT_MODE
               value: manual
             - name: AI_SYSTEM_BUILDER_TLS_CERT_PATH
@@ -55,11 +63,6 @@ spec:
                 secretKeyRef:
                   name: ai-system-builder-secrets
                   key: database-url
-            - name: SERVER_TOKEN_HASH_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: ai-system-builder-secrets
-                  key: token-hash-secret
             - name: POSTGRES_SSL_MODE
               value: verify-full
             - name: POSTGRES_SSL_CA_PEM

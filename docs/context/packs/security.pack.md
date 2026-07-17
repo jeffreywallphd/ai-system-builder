@@ -32,6 +32,7 @@
 - Security modes:
   - `disabled-dev`
   - `lan-https-token`
+  - `oidc-bearer`
 - Required env for `lan-https-token`:
   - `AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token`
   - `AI_SYSTEM_BUILDER_TLS_CERT_MODE=manual|auto-self-signed|auto-local-ca`
@@ -40,6 +41,11 @@
   - `AI_SYSTEM_BUILDER_HTTPS_ENABLED=true`
   - `AI_SYSTEM_BUILDER_THIN_CLIENT_HTTPS_ENABLED=true`
   - `AI_SYSTEM_BUILDER_TLS_CERT_MODE=auto-self-signed`
+- Managed production requires `oidc-bearer`, exact HTTPS issuer/audience/JWKS
+  configuration, PostgreSQL, and active application-managed organization
+  membership. Provider claims do not grant membership.
+- Pooled tenant placement is the default. Premium dedicated placement allows
+  only one configured organization while retaining the same release and schema.
 - Thin-client secure fetch adds `Authorization: Bearer` when a paired token exists.
 - Token hashes are persisted; raw bearer tokens and hash secrets must never be committed or logged.
 - The tracked npm lockfile is used by CI and server-image builds; the dependency
@@ -70,6 +76,9 @@
 - Treat secrets/credentials as sensitive configuration, not normal settings.
 - Keep audit logs distinct from normal diagnostics.
 - Active workspace selection is routing context, not authorization.
+- Active organization selection is also routing context. Managed requests must
+  pass organization membership policy, request-scoped persistence, PostgreSQL
+  row security, and organization-derived object containment.
 
 ## TLS And Dev Notes
 
@@ -82,7 +91,11 @@
 
 ## Current Limitations
 
-- No OAuth, mTLS, external TLS termination mode, encryption-at-rest, public-internet hardening, full admin device-management UI, complete rate limiting, complete audit subsystem, or resource-level storage authorization.
+- OIDC bearer verification, membership authorization, redacted append-only audit,
+  and organization-level storage authorization are implemented. Interactive
+  login/session UX, mTLS, external TLS termination mode, encryption at rest,
+  broad public-internet abuse hardening, full admin UI, fine-grained resource
+  grants, and complete managed audit export remain open.
 - Dev browser localStorage token persistence is LAN-convenience behavior, not hostile-browser hardening.
 
 ## Dependency Rules
@@ -95,6 +108,8 @@
 ## Canonical Source Docs
 
 - `docs/adr/ADR-0015-security-architecture-and-policy-boundaries.md` - canonical security architecture and policy boundary.
+- `docs/adr/ADR-0029-organization-tenancy-identity-and-authorization.md` - organization, managed OIDC, authorization, audit, and placement decision.
+- `docs/architecture/organization-tenancy-and-identity.md` - current end-to-end implementation model and operator flow.
 - `docs/architecture/host-model.md` - host composition and mode selection.
 - `docs/architecture/persistence-and-storage.md` - storage containment and credential/storage separation.
 - `docs/standards/logging-standards.md` - structured logging and redaction expectations.

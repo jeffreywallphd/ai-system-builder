@@ -25,4 +25,24 @@ describe("composeServerSecurity", () => {
   it("accepts lan-https-token with token hash secret", async () => {
     await composeServerSecurity({ AI_SYSTEM_BUILDER_SECURITY_MODE: "lan-https-token", SERVER_TOKEN_HASH_SECRET: "abc123", ...tlsEnv() } as any, "/tmp/x");
   });
+  it("requires complete OIDC configuration and no LAN token hash secret", async () => {
+    await expect(composeServerSecurity({
+      AI_SYSTEM_BUILDER_SECURITY_MODE: "oidc-bearer",
+      AI_SYSTEM_BUILDER_TLS_CERT_MODE: "auto-self-signed",
+    } as any, "/tmp/x")).rejects.toThrow(/OIDC bearer mode requires/);
+    const security = await composeServerSecurity({
+      AI_SYSTEM_BUILDER_SECURITY_MODE: "oidc-bearer",
+      AI_SYSTEM_BUILDER_TLS_CERT_MODE: "auto-self-signed",
+      AI_SYSTEM_BUILDER_OIDC_ISSUER: "https://identity.example.test/tenant",
+      AI_SYSTEM_BUILDER_OIDC_AUDIENCE: "ai-system-builder",
+      AI_SYSTEM_BUILDER_OIDC_JWKS_URI: "https://identity.example.test/tenant/keys",
+      AI_SYSTEM_BUILDER_TENANT_PLACEMENT_MODE: "dedicated",
+      AI_SYSTEM_BUILDER_DEDICATED_ORGANIZATION_ID: "org-premium",
+    } as any, "/tmp/x");
+    expect(security.config.tenantPlacement).toEqual({
+      mode: "dedicated",
+      organizationId: "org-premium",
+    });
+    expect(security.config.pairingEnabled).toBe(false);
+  });
 });

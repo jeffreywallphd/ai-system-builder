@@ -5,7 +5,8 @@
 PostgreSQL is the structured persistence target for campus, corporate, and cloud
 server deployment shapes. This family owns the bounded `pg` pool, TLS and timeout
 configuration, startup validation, advisory-locked migrations, transactional
-JSONB document implementation, optimistic revisions, Serializable transaction
+JSONB document implementation, schema-v2 organization keys, forced row-level
+security with transaction-local tenant binding, optimistic revisions, Serializable transaction
 retry, transactionally consistent portable export, sanitized health/readiness data, and graceful drain behind existing
 application ports.
 
@@ -22,3 +23,10 @@ multi-pool atomic mutation, isolation, and health behavior. Operator qualificati
 against the owning environment's PostgreSQL service and TLS boundary.
 Connection strings, credentials, SQL, pools, transactions, and driver errors must
 remain within composition and adapter boundaries.
+
+The default managed placement is pooled. Premium dedicated placement rejects
+every organization except its configured id before persistence. The runtime
+database role must not own the organization table, be a superuser, or have
+`BYPASSRLS`; deployment qualification must use separately controlled migration,
+runtime, and backup roles. Existing platform/legacy records are never assigned
+by startup.

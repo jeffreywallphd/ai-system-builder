@@ -5,3 +5,4 @@ export * from "./persistence-config";
 export * from "./storage-config";
 export * from "./system-config";
 export * from "./deployment-persistence-target";
+export * from "./tenant-placement-config";

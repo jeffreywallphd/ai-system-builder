@@ -35,6 +35,8 @@ const checks = {
     [/read_only: true/, "Compose application root filesystem is writable"],
     [/no-new-privileges:true/, "Compose does not prevent privilege escalation"],
     [/cap_drop:\s*\n\s*- ALL/, "Compose does not drop Linux capabilities"],
+    [/AI_SYSTEM_BUILDER_SECURITY_MODE: oidc-bearer/, "Compose does not use managed OIDC"],
+    [/AI_SYSTEM_BUILDER_TENANT_PLACEMENT_MODE: pooled/, "Compose does not qualify the default pooled placement"],
     [
       /tmpfs:\s*\n\s*- \/tmp:/,
       "Compose does not provide bounded temporary storage",
@@ -90,6 +92,8 @@ const checks = {
       /image: [^\s]+@sha256:/,
       "Kubernetes image is not expressed as an immutable digest",
     ],
+    [/value: oidc-bearer/, "Kubernetes template does not use managed OIDC"],
+    [/value: pooled/, "Kubernetes template does not declare pooled default placement"],
   ],
   workflow: [
     [

@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import type { QueryResult } from "pg";
 
+import { createOrganizationId } from "../../../../contracts/organization";
 import {
   resolvePostgresPoolConfig,
   type PostgresPoolLike,
@@ -13,6 +14,7 @@ import {
   migratePostgresDatabase,
   openPostgresDatabase,
   POSTGRES_MIGRATION_0001,
+  POSTGRES_MIGRATION_0002,
   POSTGRES_MIGRATION_LOCK_KEY,
   createPostgresStructuredDocumentStore,
 } from "../postgres-database";
@@ -50,12 +52,19 @@ test("migration uses one transaction and an advisory transaction lock", async ()
   assert.equal(queries[0]?.text, "BEGIN");
   assert.deepEqual(queries[1]?.values, [POSTGRES_MIGRATION_LOCK_KEY]);
   assert.ok(queries.some((query) => query.text.includes("CREATE TABLE IF NOT EXISTS structured_documents")));
+  assert.ok(queries.some((query) => query.text.includes("FORCE ROW LEVEL SECURITY")));
   assert.equal(queries[queries.length - 1]?.text, "COMMIT");
 });
 
 test("checked-in PostgreSQL migration matches the runtime migration", async () => {
   const checkedIn = await readFile(path.resolve("migrations", "postgres", "0001-create-structured-document-store.sql"), "utf8");
   assert.equal(normalizeSql(checkedIn), normalizeSql(POSTGRES_MIGRATION_0001));
+});
+
+test("checked-in organization PostgreSQL migration matches forced-RLS runtime migration", async () => {
+  const checkedIn = await readFile(path.resolve("migrations", "postgres", "0002-create-organization-document-store-with-rls.sql"), "utf8");
+  assert.equal(normalizeSql(checkedIn), normalizeSql(POSTGRES_MIGRATION_0002));
+  assert.match(POSTGRES_MIGRATION_0002, /current_setting\('app\.organization_id', true\)/);
 });
 
 test("startup failure releases the checked-out client before draining the pool", async () => {
@@ -152,6 +161,56 @@ test("serializable transactions retry the complete callback after serialization 
   assert.equal(lifecycle.filter((entry) => entry === "ROLLBACK").length, 1);
   assert.equal(lifecycle.filter((entry) => entry === "COMMIT").length, 1);
   assert.equal(lifecycle.filter((entry) => entry === "release").length, 2);
+});
+
+test("organization-scoped PostgreSQL operations bind transaction-local context and explicit predicates", async () => {
+  const queries: { text: string; values?: readonly unknown[] }[] = [];
+  const client = {
+    async query(text: string, values?: readonly unknown[]) {
+      queries.push({ text, values });
+      if (text.includes("RETURNING namespace")) {
+        return queryResult([{
+          namespace: "settings",
+          document_key: "shared",
+          payload_json: { owner: "a" },
+          revision: "1",
+          updated_at: "2026-07-16T12:00:00.000Z",
+        }]);
+      }
+      return queryResult([]);
+    },
+    release() {},
+  };
+  const pool = {
+    totalCount: 1,
+    idleCount: 1,
+    waitingCount: 0,
+    async connect() { return client; },
+    async query() { throw new Error("scoped operations must use a checked-out transaction client"); },
+    async end() {},
+  } as unknown as PostgresPoolLike;
+  const orgAId = createOrganizationId("org-a");
+  const store = createPostgresStructuredDocumentStore(pool, () => "2026-07-16T12:00:00.000Z")
+    .forOrganization(orgAId);
+
+  const written = await store.writeDocument("settings", "shared", { owner: "a" });
+  await store.readDocument("settings", "shared");
+  assert.equal(written.value.owner, "a");
+  assert.deepEqual(queries[0], { text: "BEGIN", values: undefined });
+  assert.deepEqual(queries[1], {
+    text: "SELECT set_config('app.organization_id', $1, true)",
+    values: [orgAId],
+  });
+  assert.match(queries[2]?.text ?? "", /INSERT INTO organization_documents \(organization_id,/);
+  assert.deepEqual(queries[2]?.values?.slice(0, 3), [orgAId, "settings", "shared"]);
+  const scopedRead = queries.find((query) => query.text.includes("WHERE organization_id = $1"));
+  assert.ok(scopedRead);
+  assert.deepEqual(scopedRead.values, [orgAId, "settings", "shared"]);
+  assert.equal(queries[queries.length - 1]?.text, "COMMIT");
+  assert.throws(
+    () => store.forOrganization(createOrganizationId("org-b")),
+    /cannot change organization scope/,
+  );
 });
 
 function queryResult<T extends Record<string, unknown>>(rows: T[]): QueryResult<T> {

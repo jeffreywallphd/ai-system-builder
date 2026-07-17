@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "../../testing/node-test";
+import { createOrganizationId } from "../organization";
 
 import {
   createDefaultDeploymentPersistenceTarget,
@@ -11,9 +12,37 @@ import {
   createRuntimeConfig,
   createStorageConfig,
   createSystemConfig,
+  createTenantPlacementConfig,
+  tenantPlacementAllowsOrganization,
 } from ".";
 
 describe("config contracts", () => {
+  it("defaults to pooled placement and constrains premium dedicated placement", () => {
+    expect(createTenantPlacementConfig()).toEqual({ mode: "pooled" });
+    const dedicated = createTenantPlacementConfig({
+      mode: "dedicated",
+      organizationId: "org-premium",
+    });
+    expect(dedicated).toEqual({
+      mode: "dedicated",
+      organizationId: "org-premium",
+    });
+    expect(tenantPlacementAllowsOrganization(
+      dedicated,
+      createOrganizationId("org-premium"),
+    )).toBe(true);
+    expect(tenantPlacementAllowsOrganization(
+      dedicated,
+      createOrganizationId("org-other"),
+    )).toBe(false);
+    expect(() => createTenantPlacementConfig({ mode: "dedicated" })).toThrow(
+      /requires an organization id/,
+    );
+    expect(() => createTenantPlacementConfig({
+      mode: "pooled",
+      organizationId: "org-invalid-for-pooled",
+    })).toThrow(/must not configure/);
+  });
   it("selects deployment-shaped structured persistence targets", () => {
     expect(createDefaultDeploymentPersistenceTarget(" LOCAL ")).toEqual({
       deploymentShape: "local",
@@ -67,7 +96,7 @@ describe("config contracts", () => {
       expect(createDefaultDeploymentPersistenceTarget(profile.shape).persistence.adapter).toBe("postgres");
       expect(profile.structuredPersistence).toBe("postgres");
       expect(profile.requiredSecretEnvironment).toContain("DATABASE_URL");
-      expect(profile.requiredSecretEnvironment).toContain("SERVER_TOKEN_HASH_SECRET");
+      expect(profile.requiredSecretEnvironment).not.toContain("SERVER_TOKEN_HASH_SECRET");
 
       const exampleName = profile.shape === "campus-server" ? "campus.env.example"
         : profile.shape === "corporate-server" ? "corporate.env.example"
@@ -76,6 +105,8 @@ describe("config contracts", () => {
       for (const name of profile.requiredEnvironment) expect(example).toContain(`${name}=`);
       expect(example).toContain(`DEPLOYMENT_SHAPE=${profile.shape}`);
       expect(example).toContain("POSTGRES_SSL_MODE=verify-full");
+      expect(example).toContain("AI_SYSTEM_BUILDER_SECURITY_MODE=oidc-bearer");
+      expect(example).toContain("AI_SYSTEM_BUILDER_TENANT_PLACEMENT_MODE=pooled");
       expect(example).not.toMatch(/^DATABASE_URL=/m);
       expect(example).not.toMatch(/^SERVER_TOKEN_HASH_SECRET=/m);
     }

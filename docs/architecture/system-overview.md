@@ -271,7 +271,14 @@ Desktop renderer artifact-browser publish/re-check UX should call the preload-ba
 
 ## Security architecture posture
 
-Security is cross-cutting and layered rather than a monolithic module. The first implementation target is **HTTPS + LAN pairing bearer token** (`lan-https-token`). Transport security remains adapter-based and swappable, while authorization policy is shared but enforced at both transport and application/resource boundaries. Storage and runtime security concerns remain separate from transport security and are enforced in their own adapter/application seams. ADR-0015 is the canonical security architecture reference.
+Security is cross-cutting and layered rather than a monolithic module. HTTPS +
+LAN pairing bearer tokens remain an implemented private-LAN mode. Managed
+production uses OIDC plus explicit organization selection, active membership,
+pooled organization isolation by default, and premium one-organization placement
+over the same release. Transport security remains adapter-based and swappable,
+while authorization policy is shared and enforced at transport,
+application/resource, persistence, and storage boundaries. ADR-0015 and ADR-0029
+are the canonical security and tenancy references.
 
 ## Workspace Model
 

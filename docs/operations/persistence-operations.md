@@ -3,7 +3,7 @@
 > AI documentation reminder: when behavior in this area changes, update the related ADRs, architecture docs, context packs, and README files in the same change.
 
 - Status: active operator runbook
-- Decision authority: [ADR-0025](../adr/ADR-0025-deployment-shaped-structured-persistence.md), [ADR-0026](../adr/ADR-0026-local-sqlite-runtime.md), and [ADR-0027](../adr/ADR-0027-managed-postgresql-runtime.md)
+- Decision authority: [ADR-0025](../adr/ADR-0025-deployment-shaped-structured-persistence.md), [ADR-0026](../adr/ADR-0026-local-sqlite-runtime.md), [ADR-0027](../adr/ADR-0027-managed-postgresql-runtime.md), and [ADR-0029](../adr/ADR-0029-organization-tenancy-identity-and-authorization.md)
 - Architecture authority: [Persistence and Storage](../architecture/persistence-and-storage.md)
 
 This runbook covers the implemented database boundary. Artifact bytes have a
@@ -47,6 +47,21 @@ key enforcement. Backup uses SQLite's online backup API. The portable export is 
 transactionally consistent, deterministic NDJSON document containing a versioned
 manifest, document count, and SHA-256 digest.
 
+First launch explicitly asks the user to create a generated local organization
+and owner profile. New feature records use that organization partition. Existing
+unassigned records are not adopted. With the desktop stopped, inventory and then
+assign only reviewed namespaces using the returned fingerprint and a new
+rollback file:
+
+```text
+npm run persistence:sqlite -- legacy-inventory --data-root <desktop-user-data> --namespaces <namespace-a,namespace-b>
+npm run persistence:sqlite -- legacy-assign --data-root <desktop-user-data> --organization-id <org-id> --namespaces <namespace-a,namespace-b> --fingerprint <sha256:...> --rollback <rollback.ndjson> --confirm-assignment <org-id>
+```
+
+Platform namespaces are rejected. The assignment writes the rollback source
+first, then moves all selected records in one database transaction. Stale
+fingerprints, revision changes, or target conflicts abort the move.
+
 Restore validates database integrity and the exact supported schema before
 replacement. It requires the explicit confirmation flag and retains the old live
 database as `<database>.pre-restore`:
@@ -75,6 +90,25 @@ Health reports only schema compatibility, query latency, pool counts, and
 sanitized idle-client error counters/timestamps. Export
 runs under a transactionally consistent transaction and writes the same versioned NDJSON
 format as SQLite. Neither command prints the connection string.
+
+Before OIDC users can access a managed organization, provision the organization
+and application-managed membership. The issuer and subject must exactly match
+the IdP token values; the command derives the verifier's opaque principal id:
+
+```text
+npm run tenancy:postgres -- --organization-id <org-id> --display-name <name> --issuer <https-issuer> --subject <subject> --role owner --confirm-organization <org-id>
+```
+
+Pooled placement is the default. Premium dedicated placement sets
+`AI_SYSTEM_BUILDER_TENANT_PLACEMENT_MODE=dedicated` and
+`AI_SYSTEM_BUILDER_DEDICATED_ORGANIZATION_ID=<org-id>`; all other organization
+ids are rejected before application persistence or storage.
+
+The production runtime database role must be non-superuser, non-owner for
+organization tables, and lack `BYPASSRLS`. Use a separately controlled migration
+role for schema ownership and separately controlled backup roles. Confirm those
+properties and a missing-context default denial against the target database;
+forced RLS is not a substitute for role qualification.
 
 Use the database platform's physical or managed backup service for disaster
 recovery. For a logical backup, use the matching PostgreSQL client toolchain and
@@ -117,7 +151,7 @@ shared, staging, or production database: destruction is intentional.
 ## Upgrade and rollback
 
 The application owns monotonic migrations and serializes startup migration work.
-Current schema version is 1 for both engines.
+Current schema version is 2 for both engines.
 
 - An older schema is migrated during startup inside a database transaction.
 - The exact current schema is accepted without mutation beyond startup validation.

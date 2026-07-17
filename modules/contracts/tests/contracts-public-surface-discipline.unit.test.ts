@@ -20,6 +20,7 @@ const CONTRACT_FAMILIES = [
   "lineage",
   "logging",
   "model",
+  "organization",
   "persistence",
   "runtime",
   "runtimeInstaller",

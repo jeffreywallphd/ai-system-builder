@@ -39,6 +39,9 @@
 - Application logic depends on persistence/storage ports, not direct DB/filesystem/provider details.
 - Host wiring composes concrete adapters and roots; runtime roots must not be used as persistence or asset-resource roots unless a canonical doc explicitly says so.
 - Workspace-owned records and resources require explicit workspace context and must not fall back to global records.
+- Organization-owned records and bytes additionally require explicit
+  organization context. Platform/legacy records are a separate partition and
+  are never an implicit fallback.
 - Shared model storage is an additional configured model source, not a replacement for workspace model storage.
 
 ## Key Constraints
@@ -56,7 +59,7 @@
 - Deployment-target config maps local to SQLite and campus/corporate/cloud to
   PostgreSQL. Desktop composition actively selects the Electron SQLite runtime;
   explicit managed server shapes actively select the PostgreSQL runtime.
-- Both engines provide version-1 migrations, transactions, revisions, health,
+- Both engines provide schema-version-2 migrations, transactions, revisions, health,
   and portable exports. SQLite adds online backup/validated restore. Managed
   PostgreSQL backup/restore remains an operator/platform responsibility.
 - Database-backed collection mutations use bounded revision compare-and-swap;
@@ -69,6 +72,14 @@
   images, a restricted single-replica Compose/Kubernetes posture, separate
   liveness/readiness semantics, and retained scan/smoke/render evidence. Do not
   increase replicas before identity/tenancy and target-platform qualification.
+- Schema version 2 adds organization-keyed documents. PostgreSQL enables and
+  forces RLS with transaction-local tenant binding; SQLite provides the same
+  logical partition for a generated local profile.
+- Managed filesystem storage derives physical organization prefixes from the
+  authenticated request scope while returning stable logical keys. Pooled is
+  default; premium dedicated placement rejects every other organization.
+- Legacy assignment is an explicit fingerprint-confirmed atomic move with a
+  rollback source. Ordinary startup never assigns ownership.
 - Artifact-object storage owns key/byte/checksum/metadata behavior.
 - Artifact-repo storage owns provider/repository/revision/path import and publish behavior; Hugging Face is one provider adapter, not the whole storage family.
 - Hugging Face token configuration is host-side persisted config, not client-only state.
@@ -97,6 +108,8 @@
   migration lock, server selection, import, and shutdown behavior.
 - `docs/adr/ADR-0028-atomic-structured-document-mutations.md` - revision
   compare-and-swap, retryable callback purity, and PostgreSQL retry policy.
+- `docs/adr/ADR-0029-organization-tenancy-identity-and-authorization.md` - tenant identity, placement, RLS, and object-key containment.
+- `docs/architecture/organization-tenancy-and-identity.md` - current tenancy implementation and operator procedures.
 - `docs/adr/ADR-0008-ingestion-and-staged-artifact-semantic-model.md` - staged artifact intake model.
 - `docs/architecture/persistence-and-storage.md` - boundary model and implementation guidance.
 - `docs/architecture/workspace-model.md` - workspace scoping and active selection.

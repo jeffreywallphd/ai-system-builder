@@ -36,9 +36,12 @@ services:
       DEPLOYMENT_SHAPE: campus-server
       DATABASE_URL: postgresql://ai_system_builder:${POSTGRES_PASSWORD}@postgres:5432/ai_system_builder
       POSTGRES_SSL_MODE: disable
-      AI_SYSTEM_BUILDER_SECURITY_MODE: lan-https-token
+      AI_SYSTEM_BUILDER_SECURITY_MODE: oidc-bearer
+      AI_SYSTEM_BUILDER_OIDC_ISSUER: https://identity.example.invalid
+      AI_SYSTEM_BUILDER_OIDC_AUDIENCE: ai-system-builder-qualification
+      AI_SYSTEM_BUILDER_OIDC_JWKS_URI: https://identity.example.invalid/.well-known/jwks.json
+      AI_SYSTEM_BUILDER_TENANT_PLACEMENT_MODE: pooled
       AI_SYSTEM_BUILDER_TLS_CERT_MODE: auto-local-ca
-      SERVER_TOKEN_HASH_SECRET: ${SERVER_TOKEN_HASH_SECRET:?SERVER_TOKEN_HASH_SECRET is required}
       SERVER_STORAGE_ROOT: /var/lib/ai-system-builder/artifacts
       SERVER_RUNTIME_ROOT: /var/lib/ai-system-builder/runtime
     ports:

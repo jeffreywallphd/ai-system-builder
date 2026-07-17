@@ -1,6 +1,6 @@
 import type { AuthPrincipal } from "./auth-principal";
 
-export const AUTH_METHODS = ["none", "lan-pairing-token", "api-key", "bearer-token", "mtls", "external"] as const;
+export const AUTH_METHODS = ["none", "lan-pairing-token", "oidc-bearer", "api-key", "bearer-token", "mtls", "external"] as const;
 export type AuthMethod = (typeof AUTH_METHODS)[number];
 
 export interface AuthContext {

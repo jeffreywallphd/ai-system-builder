@@ -36,7 +36,7 @@ Use this guide to select **minimum-sufficient** context packs. Start with `index
 | renderer CSS/style architecture, shared style layers, tokens | `docs/context/packs/desktop-styling.pack.md` |
 | server lifecycle, Express APIs, thin-client coupling, API route handlers | `docs/context/packs/server-host.pack.md` |
 | persistence/storage, artifacts/uploads, storage keys, AppData/server roots, model/artifact storage | `docs/context/packs/persistence-storage.pack.md` |
-| authn/authz, route policy, HTTPS/TLS, tokens, credentials, audit, sanitization | `docs/context/packs/security.pack.md` |
+| authn/authz, OIDC, organization tenancy/placement, route policy, HTTPS/TLS, tokens, credentials, audit, sanitization | `docs/context/packs/security.pack.md` + `docs/context/packs/persistence-storage.pack.md` when data isolation changes |
 | structured logging, diagnostic events, verbosity, safe failure reporting | `docs/context/packs/logging.pack.md` |
 | documentation governance, agent change planning, decision readiness, change impact, canonical-vs-context updates | `docs/context/packs/docs-standards.pack.md` |
 | test strategy, regression coverage, test placement | `docs/context/packs/testing.pack.md` |

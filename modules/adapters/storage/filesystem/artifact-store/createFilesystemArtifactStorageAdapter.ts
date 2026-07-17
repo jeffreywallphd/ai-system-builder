@@ -30,6 +30,8 @@ import {
   type StoreArtifactResult,
 } from "../../../../contracts/storage";
 import { createWorkspaceId, isWorkspaceId } from "../../../../contracts/workspace";
+import type { OrganizationRequestContextProviderPort } from "../../../../application/ports/organization";
+import { resolveOrganizationStorageKey } from "../organizationStorageScope";
 
 const STORAGE_COMPONENT = "adapters.storage.filesystem";
 const DEFAULT_STORAGE_HOST = "desktop";
@@ -46,6 +48,7 @@ export interface CreateFilesystemArtifactStorageAdapterOptions {
   randomSuffix?: () => string;
   statPath?: typeof stat;
   artifactCatalogAppend?: ArtifactCatalogAppendPort;
+  organizationContextProvider?: OrganizationRequestContextProviderPort;
 }
 
 function isFsError(error: unknown): error is NodeJS.ErrnoException {
@@ -314,7 +317,10 @@ export function createFilesystemArtifactObjectStorageAdapter(
         attemptedKey = key;
         const bytes = toBytes(request.content);
         const checksum = createContentChecksum(bytes);
-        const absolutePath = resolvePathInsideRoot(rootDirectory, key);
+        const absolutePath = resolvePathInsideRoot(
+          rootDirectory,
+          resolveOrganizationStorageKey(key, options.organizationContextProvider),
+        );
         attemptedAbsolutePath = absolutePath;
         const writeFlag = request.overwrite === true ? "w" : "wx";
 
@@ -440,7 +446,7 @@ export function createFilesystemArtifactObjectStorageAdapter(
       const requestContext = resolveRequestContext(request, context);
       try {
         const key = normalizeStorageArtifactKey(request.key);
-        const absolutePath = resolvePathInsideRoot(rootDirectory, key);
+        const absolutePath = resolvePathInsideRoot(rootDirectory, resolveOrganizationStorageKey(key, options.organizationContextProvider));
         const [fileContent, fileStats] = await Promise.all([
           readFile(absolutePath),
           stat(absolutePath),
@@ -480,7 +486,7 @@ export function createFilesystemArtifactObjectStorageAdapter(
       const requestContext = resolveRequestContext(request, context);
       try {
         const key = normalizeStorageArtifactKey(request.key);
-        const absolutePath = resolvePathInsideRoot(rootDirectory, key);
+        const absolutePath = resolvePathInsideRoot(rootDirectory, resolveOrganizationStorageKey(key, options.organizationContextProvider));
         const fileStats = await stat(absolutePath);
 
         return createHasArtifactSuccessResult(true, {
@@ -521,7 +527,7 @@ export function createFilesystemArtifactObjectStorageAdapter(
       const requestContext = resolveRequestContext(request, context);
       try {
         const key = normalizeStorageArtifactKey(request.key);
-        const absolutePath = resolvePathInsideRoot(rootDirectory, key);
+        const absolutePath = resolvePathInsideRoot(rootDirectory, resolveOrganizationStorageKey(key, options.organizationContextProvider));
         await unlink(absolutePath);
 
         // Best-effort cleanup of empty parent directories under the root.

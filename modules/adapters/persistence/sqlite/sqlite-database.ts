@@ -1,6 +1,7 @@
 import { access, copyFile, mkdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
 
+import type { OrganizationId } from "../../../contracts/organization";
 import {
   StructuredDocumentConflictError,
   cloneStructuredJson,
@@ -13,7 +14,7 @@ import {
   type LocalSqliteDatabasePolicy,
 } from "./local-sqlite-database-policy";
 
-export const LOCAL_SQLITE_SCHEMA_VERSION = 1;
+export const LOCAL_SQLITE_SCHEMA_VERSION = 2;
 
 export const LOCAL_SQLITE_MIGRATION_0001 = `
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -33,6 +34,21 @@ CREATE TABLE IF NOT EXISTS structured_documents (
 
 CREATE INDEX IF NOT EXISTS structured_documents_updated_at_idx
   ON structured_documents (namespace, updated_at DESC);
+`;
+
+export const LOCAL_SQLITE_MIGRATION_0002 = `
+CREATE TABLE IF NOT EXISTS organization_documents (
+  organization_id TEXT NOT NULL,
+  namespace TEXT NOT NULL,
+  document_key TEXT NOT NULL,
+  payload_json TEXT NOT NULL CHECK (json_valid(payload_json)),
+  revision INTEGER NOT NULL DEFAULT 1 CHECK (revision > 0),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (organization_id, namespace, document_key)
+) STRICT;
+
+CREATE INDEX IF NOT EXISTS organization_documents_updated_at_idx
+  ON organization_documents (organization_id, namespace, updated_at DESC);
 `;
 
 type SqliteBindable = null | number | bigint | string | NodeJS.ArrayBufferView;
@@ -221,10 +237,18 @@ export function migrateLocalSqliteDatabase(database: SqliteDatabaseLike, now: ()
 
   database.exec("BEGIN IMMEDIATE;");
   try {
-    database.exec(LOCAL_SQLITE_MIGRATION_0001);
-    database.prepare(
-      "INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
-    ).run(1, "create-structured-document-store", now());
+    if (currentVersion < 1) {
+      database.exec(LOCAL_SQLITE_MIGRATION_0001);
+      database.prepare(
+        "INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+      ).run(1, "create-structured-document-store", now());
+    }
+    if (currentVersion < 2) {
+      database.exec(LOCAL_SQLITE_MIGRATION_0002);
+      database.prepare(
+        "INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+      ).run(2, "create-organization-document-store", now());
+    }
     database.exec(`PRAGMA user_version = ${LOCAL_SQLITE_SCHEMA_VERSION};`);
     database.exec("COMMIT;");
   } catch (error) {
@@ -264,19 +288,38 @@ export function createSqliteStructuredDocumentStore(
   return store;
 }
 
-function createStore(database: SqliteDatabaseLike, now: () => string, insideTransaction: boolean): StructuredDocumentStore {
+function createStore(
+  database: SqliteDatabaseLike,
+  now: () => string,
+  insideTransaction: boolean,
+  organizationId?: OrganizationId,
+): StructuredDocumentStore {
   return {
+    organizationId,
+    forOrganization(requestedOrganizationId) {
+      assertOrganizationScope(organizationId, requestedOrganizationId);
+      return createStore(database, now, insideTransaction, requestedOrganizationId);
+    },
     async readDocument<T>(namespace: string, key: string) {
-      const row = database.prepare(
-        "SELECT namespace, document_key, payload_json, revision, updated_at FROM structured_documents WHERE namespace = ? AND document_key = ?",
-      ).get(namespace, key);
+      const row = organizationId === undefined
+        ? database.prepare(
+          "SELECT namespace, document_key, payload_json, revision, updated_at FROM structured_documents WHERE namespace = ? AND document_key = ?",
+        ).get(namespace, key)
+        : database.prepare(
+          "SELECT namespace, document_key, payload_json, revision, updated_at FROM organization_documents WHERE organization_id = ? AND namespace = ? AND document_key = ?",
+        ).get(organizationId, namespace, key);
       return row ? mapDocument<T>(row) : undefined;
     },
 
     async listNamespaces() {
-      return database.prepare(
-        "SELECT DISTINCT namespace FROM structured_documents ORDER BY namespace",
-      ).all().map((row) => {
+      const rows = organizationId === undefined
+        ? database.prepare(
+          "SELECT DISTINCT namespace FROM structured_documents ORDER BY namespace",
+        ).all()
+        : database.prepare(
+          "SELECT DISTINCT namespace FROM organization_documents WHERE organization_id = ? ORDER BY namespace",
+        ).all(organizationId);
+      return rows.map((row) => {
         if (!row || typeof row !== "object" || typeof (row as { namespace?: unknown }).namespace !== "string") {
           throw new Error("SQLite returned an invalid structured document namespace.");
         }
@@ -285,16 +328,44 @@ function createStore(database: SqliteDatabaseLike, now: () => string, insideTran
     },
 
     async listDocuments<T>(namespace: string) {
-      return database.prepare(
-        "SELECT namespace, document_key, payload_json, revision, updated_at FROM structured_documents WHERE namespace = ? ORDER BY document_key",
-      ).all(namespace).map((row) => mapDocument<T>(row));
+      const rows = organizationId === undefined
+        ? database.prepare(
+          "SELECT namespace, document_key, payload_json, revision, updated_at FROM structured_documents WHERE namespace = ? ORDER BY document_key",
+        ).all(namespace)
+        : database.prepare(
+          "SELECT namespace, document_key, payload_json, revision, updated_at FROM organization_documents WHERE organization_id = ? AND namespace = ? ORDER BY document_key",
+        ).all(organizationId, namespace);
+      return rows.map((row) => mapDocument<T>(row));
     },
 
     async writeDocument<T>(namespace: string, key: string, value: T, options: StructuredDocumentWriteOptions = {}) {
       const payload = JSON.stringify(cloneStructuredJson(value));
       const updatedAt = options.updatedAt ?? now();
       let changes: number | bigint;
-      if (options.expectedRevision === undefined) {
+      if (organizationId !== undefined) {
+        if (options.expectedRevision === undefined) {
+          changes = database.prepare(`
+            INSERT INTO organization_documents (organization_id, namespace, document_key, payload_json, revision, updated_at)
+            VALUES (?, ?, ?, ?, 1, ?)
+            ON CONFLICT(organization_id, namespace, document_key) DO UPDATE SET
+              payload_json = excluded.payload_json,
+              revision = organization_documents.revision + 1,
+              updated_at = excluded.updated_at
+          `).run(organizationId, namespace, key, payload, updatedAt).changes;
+        } else if (options.expectedRevision === 0) {
+          changes = database.prepare(`
+            INSERT INTO organization_documents (organization_id, namespace, document_key, payload_json, revision, updated_at)
+            VALUES (?, ?, ?, ?, 1, ?)
+            ON CONFLICT(organization_id, namespace, document_key) DO NOTHING
+          `).run(organizationId, namespace, key, payload, updatedAt).changes;
+        } else {
+          changes = database.prepare(`
+            UPDATE organization_documents
+            SET payload_json = ?, revision = revision + 1, updated_at = ?
+            WHERE organization_id = ? AND namespace = ? AND document_key = ? AND revision = ?
+          `).run(payload, updatedAt, organizationId, namespace, key, options.expectedRevision).changes;
+        }
+      } else if (options.expectedRevision === undefined) {
         changes = database.prepare(`
           INSERT INTO structured_documents (namespace, document_key, payload_json, revision, updated_at)
           VALUES (?, ?, ?, 1, ?)
@@ -325,9 +396,13 @@ function createStore(database: SqliteDatabaseLike, now: () => string, insideTran
     },
 
     async deleteDocument(namespace: string, key: string, expectedRevision?: number) {
-      const result = expectedRevision === undefined
-        ? database.prepare("DELETE FROM structured_documents WHERE namespace = ? AND document_key = ?").run(namespace, key)
-        : database.prepare("DELETE FROM structured_documents WHERE namespace = ? AND document_key = ? AND revision = ?").run(namespace, key, expectedRevision);
+      const result = organizationId === undefined
+        ? expectedRevision === undefined
+          ? database.prepare("DELETE FROM structured_documents WHERE namespace = ? AND document_key = ?").run(namespace, key)
+          : database.prepare("DELETE FROM structured_documents WHERE namespace = ? AND document_key = ? AND revision = ?").run(namespace, key, expectedRevision)
+        : expectedRevision === undefined
+          ? database.prepare("DELETE FROM organization_documents WHERE organization_id = ? AND namespace = ? AND document_key = ?").run(organizationId, namespace, key)
+          : database.prepare("DELETE FROM organization_documents WHERE organization_id = ? AND namespace = ? AND document_key = ? AND revision = ?").run(organizationId, namespace, key, expectedRevision);
       if (expectedRevision !== undefined && Number(result.changes) === 0) {
         throw new StructuredDocumentConflictError(namespace, key, expectedRevision);
       }
@@ -338,7 +413,7 @@ function createStore(database: SqliteDatabaseLike, now: () => string, insideTran
       if (insideTransaction) return work(this);
       database.exec("BEGIN IMMEDIATE;");
       try {
-        const result = await work(createStore(database, now, true));
+        const result = await work(createStore(database, now, true, organizationId));
         database.exec("COMMIT;");
         return result;
       } catch (error) {
@@ -351,6 +426,15 @@ function createStore(database: SqliteDatabaseLike, now: () => string, insideTran
       }
     },
   };
+}
+
+function assertOrganizationScope(
+  currentOrganizationId: OrganizationId | undefined,
+  requestedOrganizationId: OrganizationId,
+): void {
+  if (currentOrganizationId !== undefined && currentOrganizationId !== requestedOrganizationId) {
+    throw new Error("An organization-scoped document store cannot change organization scope.");
+  }
 }
 
 function mapDocument<T>(value: unknown): StructuredDocument<T> {

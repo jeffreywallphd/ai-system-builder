@@ -123,9 +123,9 @@ test("server rejects the desktop-only local deployment shape", async () => {
   await assert.rejects(() => createServer({ env: { DEPLOYMENT_SHAPE: "local" } }), /cannot use the local deployment shape/);
 });
 
-test("production server startup rejects the development security mode", async () => {
+test("production server startup requires managed OIDC security", async () => {
   await assert.rejects(
     () => createServer({ env: { NODE_ENV: "production", DEPLOYMENT_SHAPE: "cloud" } }),
-    /requires AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token/,
+    /requires AI_SYSTEM_BUILDER_SECURITY_MODE=oidc-bearer/,
   );
 });

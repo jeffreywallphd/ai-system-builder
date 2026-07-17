@@ -1,3 +1,5 @@
+import type { OrganizationId } from "../../../contracts/organization";
+
 export interface StructuredDocument<T = unknown> {
   readonly namespace: string;
   readonly key: string;
@@ -20,6 +22,10 @@ export interface StructuredDocumentWriteOptions {
  * continue to depend on the typed repository ports for each record family.
  */
 export interface StructuredDocumentStore {
+  /** Undefined identifies the unassigned platform/legacy partition. */
+  readonly organizationId?: OrganizationId;
+  /** Returns a store whose operations are isolated to exactly one organization. */
+  forOrganization(organizationId: OrganizationId): StructuredDocumentStore;
   readDocument<T>(namespace: string, key: string): Promise<StructuredDocument<T> | undefined>;
   listNamespaces(): Promise<readonly string[]>;
   listDocuments<T>(namespace: string): Promise<readonly StructuredDocument<T>[]>;

@@ -18,9 +18,11 @@ through the deployment secret boundary and must not be logged.
 
 `deployment-profiles.json` is the machine-checked inventory for managed shapes;
 `campus.env.example`, `corporate.env.example`, and `cloud.env.example` contain
-non-secret production defaults. Production also requires the existing
-`lan-https-token` security mode. The examples intentionally omit database,
-certificate-authority, and token-hash secret values.
+non-secret production defaults. Production requires `oidc-bearer` with exact
+HTTPS issuer, audience, and JWKS configuration. Pooled organization placement is
+the default. A premium dedicated deployment sets `dedicated` plus exactly one
+organization id and otherwise runs the same release and schema. The examples
+intentionally omit database and certificate-authority secret values.
 
 The server exposes `/health/live` for process liveness and `/health/ready` for
 PostgreSQL schema/query/pool plus artifact-storage readiness. Responses are

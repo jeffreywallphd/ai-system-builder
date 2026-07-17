@@ -1,7 +1,7 @@
 # Persistence and Storage
 
 - Status: current
-- Related decisions: `docs/adr/ADR-0004-persistence-and-storage-separation.md`, `docs/adr/ADR-0025-deployment-shaped-structured-persistence.md`, `docs/adr/ADR-0026-local-sqlite-runtime.md`, `docs/adr/ADR-0027-managed-postgresql-runtime.md`, `docs/adr/ADR-0028-atomic-structured-document-mutations.md`
+- Related decisions: `docs/adr/ADR-0004-persistence-and-storage-separation.md`, `docs/adr/ADR-0025-deployment-shaped-structured-persistence.md`, `docs/adr/ADR-0026-local-sqlite-runtime.md`, `docs/adr/ADR-0027-managed-postgresql-runtime.md`, `docs/adr/ADR-0028-atomic-structured-document-mutations.md`, `docs/adr/ADR-0029-organization-tenancy-identity-and-authorization.md`
 - Verification: `docs/architecture/architecture-verification.md`
 
 ## Asset Kernel relationship
@@ -89,6 +89,32 @@ Backup method, recovery objective, replication, failover, tenant layout, and
 retention vary by managed environment and require explicit operational decisions.
 Selecting PostgreSQL does not claim those capabilities are already implemented.
 
+### Organization partitioning and placement
+
+Managed structured persistence defaults to pooled organization tenancy. Schema
+version 2 keeps platform/legacy records in `structured_documents` and stores
+organization-owned records in `organization_documents`, keyed by organization,
+namespace, and document key. SQLite implements the same explicit logical
+partition for local mode. PostgreSQL additionally enables and forces row-level
+security, with visibility and writes tied to transaction-local
+`app.organization_id`. Adapters include explicit organization predicates and
+bind the setting on a checked-out transaction. Missing request context never
+falls back to platform records.
+
+Premium dedicated placement accepts exactly one configured organization before
+persistence or storage access. It uses the same schema, contracts, migrations,
+and release as pooled placement. Existing records are never assigned during
+ordinary startup; use the fingerprinted assignment procedure in the operations
+runbook.
+
+Managed filesystem artifact adapters preserve contract-level logical keys while
+deriving a physical `organizations/<organization-id>/...` prefix from the
+authenticated request scope. The prefix is adapter-owned and cannot be supplied
+by callers. Object reads, writes, existence checks, deletes, generated-image
+finalization, and unregistered-file access fail closed without organization
+context. A future external object-service adapter must preserve those ownership
+semantics rather than expose provider bucket/key construction to use cases.
+
 ### Database portability and migrations
 
 - Repository ports and record contracts define semantic behavior independent of
@@ -130,12 +156,13 @@ invent domain merge rules for two writers replacing the same logical record.
 
 The server publishes process-only liveness separately from dependency-aware
 readiness. Readiness combines database schema/query/pool state with artifact-root
-access/capacity and sanitizes all failures. Production server shapes require the
-existing HTTPS/token mode and drain their pool on restart, SIGINT, or SIGTERM.
+access/capacity and sanitizes all failures. Production server shapes require
+managed OIDC over HTTPS and drain their pool on restart, SIGINT, or SIGTERM.
 Shape profiles and deployment templates are under `config/environments/server`
 and `deployments/server`; the compatibility, backup/restore, rollout, and
-qualification rules are in `docs/operations`. These templates do not decide
-tenancy, retention, RPO/RTO, HA, or object-storage semantics.
+qualification rules are in `docs/operations`. ADR-0029 decides organization
+tenancy and placement. The templates do not decide retention, RPO/RTO, HA, or
+the external object-service provider.
 
 ### JSON adapter transition
 

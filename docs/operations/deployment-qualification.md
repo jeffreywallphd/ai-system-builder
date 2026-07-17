@@ -33,7 +33,6 @@ container gate is:
 
 ```text
 POSTGRES_PASSWORD=<qualification-only> \
-SERVER_TOKEN_HASH_SECRET=<qualification-only> \
 docker compose -f deployments/server/compose.qualification.yaml up --build --detach --wait --wait-timeout 240
 npm run deployment:smoke
 docker compose -f deployments/server/compose.qualification.yaml down --volumes --remove-orphans
@@ -75,12 +74,15 @@ backup/restore procedure is executable; it does not qualify managed PITR,
 cross-region recovery, target RPO/RTO, or coordinated artifact restoration.
 
 Then qualify managed startup with `NODE_ENV=production`, the selected
-`DEPLOYMENT_SHAPE`, `lan-https-token`, real TLS material, and the same database.
+`DEPLOYMENT_SHAPE`, `oidc-bearer`, exact IdP configuration, real TLS material,
+an RLS-safe runtime database role, provisioned memberships, and the same database.
 Verify `/health/live`, `/health/ready`, a representative thin-client workflow,
 multi-pool collection contention without lost updates, same-record revision
 conflicts, pool timeout/recovery, graceful SIGTERM drain, JSON
-import retry/divergence behavior, portable export, and database plus artifact
-restore. The live test must never target a production database.
+import retry/divergence behavior, portable export, pooled cross-organization
+denial, dedicated-placement rejection, transaction-local context clearing,
+physical object-prefix separation, redacted audit output, and database plus
+artifact restore. The live test must never target a production database.
 
 For the isolated Compose profile, inject unique qualification-only secrets and
 run `docker compose -f deployments/server/compose.qualification.yaml up --build`.
@@ -96,18 +98,19 @@ liveness independent of PostgreSQL while readiness includes PostgreSQL and
 artifact storage, so a dependency outage removes traffic without creating a
 restart storm.
 
-Until the tenancy decision and multi-replica qualification are accepted, the
+Until multi-replica tenancy, capacity, and target-platform qualification pass, the
 template enforces one replica with a `Recreate` strategy so a nominal
 single-replica upgrade cannot overlap old and new Pods. It also requires
 non-root execution, runtime-default seccomp, no privilege escalation, no Linux
 capabilities, a read-only root filesystem, no service-account token, bounded
 temporary storage, and explicit resource requests/limits.
 
-Run a canary first. Confirm migration serialization, readiness, secret/certificate
-rotation, volume permissions, storage capacity alerting, termination within the
-grace period, and rollback compatibility. Do not increase replicas until shared
-repository concurrency behavior and the still-open tenancy/authorization decision
-are qualified for that deployment.
+Run a canary first. Confirm migration serialization, OIDC key rotation,
+organization membership, pooled or dedicated placement, readiness,
+secret/certificate rotation, volume permissions, storage capacity alerting,
+termination within the grace period, and rollback compatibility. Do not increase
+replicas until shared repository concurrency, RLS-safe roles, tenant isolation,
+object storage, and audit behavior are qualified for that deployment.
 
 ## Release evidence record
 

@@ -1,5 +1,6 @@
 import { constants as fsConstants, existsSync, readFileSync } from "node:fs";
 import { access, statfs } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import http from "node:http";
 import https from "node:https";
 import path from "node:path";
@@ -9,6 +10,7 @@ import express from "express";
 import { composeServerHost } from "../../../modules/hosts/server";
 import {
   applySecurityHeaders,
+  createExpressOrganizationAuthorizationMiddleware,
   createHttpsServerOptions,
   registerSecurityRoutes,
 } from "../../../modules/adapters/transport/api-express/security";
@@ -18,6 +20,10 @@ import type { StructuredLogSink } from "../../../modules/adapters/observability/
 import { normalizeDeploymentShape, type DeploymentShape } from "../../../modules/contracts/config";
 import { openPostgresDatabase, resolvePostgresPoolConfig, type OpenedPostgresDatabase } from "../../../modules/adapters/persistence/postgres";
 import { importJsonStructuredData } from "../../../modules/adapters/persistence/migration";
+import { createOrganizationContextStructuredDocumentStore } from "../../../modules/adapters/persistence/shared";
+import { createStructuredOrganizationRepositories } from "../../../modules/adapters/persistence/organization";
+import { AuthorizeOperationService, createOrganizationAuthorizationPolicy } from "../../../modules/application/services/security";
+import { createJsonlSecurityAuditLogAdapter } from "../../../modules/adapters/security/audit/createJsonlSecurityAuditLogAdapter";
 
 export const DEFAULT_SERVER_PORT = 3010;
 export const DEFAULT_SERVER_STORAGE_ROOT_DIRECTORY_NAME = "server-artifacts";
@@ -204,8 +210,8 @@ export async function createServer(options: CreateServerOptions = {}): Promise<C
   if (deploymentShape === "local") {
     throw new Error("The server host cannot use the local deployment shape; use the desktop host for local SQLite.");
   }
-  if (env.NODE_ENV === "production" && security.config.mode !== "lan-https-token") {
-    throw new Error("Production server startup requires AI_SYSTEM_BUILDER_SECURITY_MODE=lan-https-token.");
+  if (env.NODE_ENV === "production" && security.config.mode !== "oidc-bearer") {
+    throw new Error("Production managed-server startup requires AI_SYSTEM_BUILDER_SECURITY_MODE=oidc-bearer.");
   }
   const postgresDatabase = deploymentShape
     ? options.postgresDatabase ?? await openPostgresDatabase({ config: resolvePostgresPoolConfig(env), now: options.now })
@@ -226,6 +232,12 @@ export async function createServer(options: CreateServerOptions = {}): Promise<C
       ...(deploymentShape ? { deploymentShape } : {}),
       persistenceAdapter: postgresDatabase ? "postgres" : "json-compatibility",
     };
+    const organizationDocuments = postgresDatabase
+      ? createOrganizationContextStructuredDocumentStore(
+        postgresDatabase.documents,
+        security.organizationContextScope,
+      )
+      : undefined;
     const serverHost = composeServerHost({
       env: options.env,
       logging: {
@@ -235,7 +247,15 @@ export async function createServer(options: CreateServerOptions = {}): Promise<C
       logSink: options.logSink,
       now: options.now,
       restartServer: options.restartServer,
-      ...(postgresDatabase ? { persistence: { documents: postgresDatabase.documents } } : {}),
+      organizationContextProvider: postgresDatabase
+        ? security.organizationContextScope
+        : undefined,
+      ...(postgresDatabase ? {
+        persistence: {
+          documents: postgresDatabase.documents,
+          organizationDocuments,
+        },
+      } : {}),
       artifactRepo: {
         huggingFaceAccessToken: options.env?.HF_TOKEN ?? options.env?.HUGGING_FACE_TOKEN,
         huggingFaceTokenConfigFilePath: path.join(config.storageRootDirectory, "config", "hugging-face-token.json"),
@@ -252,6 +272,25 @@ export async function createServer(options: CreateServerOptions = {}): Promise<C
       postgresDatabase,
     );
     app.use(security.middleware);
+    if (postgresDatabase && security.config.mode === "oidc-bearer") {
+      const organizationRepositories = createStructuredOrganizationRepositories(postgresDatabase.documents);
+      const organizationAuthorizer = new AuthorizeOperationService(
+        createOrganizationAuthorizationPolicy({
+          ...organizationRepositories,
+          tenantPlacement: security.config.tenantPlacement,
+        }),
+        {
+          audit: createJsonlSecurityAuditLogAdapter(
+            path.join(config.runtimeRootDirectory, "security", "authorization-audit.jsonl"),
+          ),
+          createEventId: () => `evt-${randomUUID()}`,
+          now: options.now,
+        },
+      );
+      app.use(createExpressOrganizationAuthorizationMiddleware({
+        authorizer: organizationAuthorizer,
+      }));
+    }
     registerSecurityRoutes(app, {
       getStatus: async (authContext) => ({ ...(await security.services.getStatusService.execute({ config: { mode: security.config.mode, httpsRequired: security.config.httpsRequired, authRequired: security.config.authRequired, allowLocalhostWithoutAuth: security.config.allowLocalhostWithoutAuth }, httpsEnabled: security.config.httpsEnabled, pairingEnabled: security.config.pairingEnabled, now: new Date(), currentAuthContext: authContext, devSecurityToggleEnabled: security.config.devSecurityToggleEnabled, devSecurityEnforcementMode: security.devSecurityEnforcement.isEnabled() ? security.devSecurityEnforcement.getMode() : undefined, requiresRestartToChangeTransportSecurity: true })), tls: security.config.tlsStatus }),
       completePairing: (body) => security.services.completePairing.execute(body),

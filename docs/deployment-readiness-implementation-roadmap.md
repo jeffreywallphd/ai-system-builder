@@ -1,6 +1,6 @@
 # Deployment Readiness Implementation Roadmap
 
-- Status: Increments 1-5 implemented end to end at the repository level;
+- Status: Recommendations 1-7 implemented end to end at the repository level;
   controlled-environment qualification remains open
 - Decision authority: [ADR-0025](adr/ADR-0025-deployment-shaped-structured-persistence.md)
 - Architecture authority: [Persistence and Storage](architecture/persistence-and-storage.md) and [Host Model](architecture/host-model.md)
@@ -24,8 +24,8 @@ artifact, an unexercised database, or an undecided ownership boundary.
 | 3     | Atomic mutations and multi-process concurrency                             | verified at repository level | Revision-zero insert, bounded compare-and-swap, Serializable PostgreSQL retry, pure mutation seam, independent-adapter and multi-pool contention tests, anti-drift fitness test |
 | 4     | Automated backup/restore and recovery drills                               | verified in CI configuration | Destructive disposable custom-format restore drill, digest/count reconciliation, retained sanitized evidence, documented RPO/RTO measurement                                    |
 | 5     | OCI, Compose, and Kubernetes single-replica qualification                  | verified in CI configuration | Digest-pinned non-root image build/scan, restricted Compose managed-shape smoke, static Kubernetes policy and syntax validation, immutable image guidance                       |
-| 6     | Accepted identity, organization tenancy, authorization, and audit decision | proposal awaiting acceptance | ADR-0029 records researched options, recommends pooled organization tenancy with OIDC and PostgreSQL row security, and defines the acceptance-dependent implementation sequence |
-| 7     | Tenant-aware object storage                                                | blocked by recommendation 6  | Workspace/tenant-prefixed object keys, ownership authorization, object-service adapter, lifecycle/retention, cross-tenant denial and integration tests                          |
+| 6     | Identity, organization tenancy, authorization, and audit                    | verified at repository level | Managed OIDC, local profile, membership policy, request context, append-only audit, schema v2, forced RLS, explicit assignment, pooled default and dedicated placement       |
+| 7     | Tenant-aware object storage                                                | verified at repository level | Adapter-derived organization prefixes, context-required object/generated/unregistered operations, stable logical keys, and cross-organization denial/integration tests      |
 
 ## Target deployment shapes
 
@@ -41,16 +41,18 @@ artifact storage. Secrets remain in environment/credential-store boundaries.
 
 ## Recommendation 6 decision checkpoint
 
-ADR-0029 is intentionally `proposed`. It recommends organization-as-tenant,
+ADR-0029 is accepted. It defines organization-as-tenant,
 pooled managed PostgreSQL with an explicit partition key and forced row-level
 security, OIDC identity for managed hosts, an explicit local organization and
 principal for desktop, deny-by-default application authorization, and separate
 structured audit records. Alternatives and their isolation/operating tradeoffs
 are recorded in the ADR.
 
-Acceptance is required before public request contracts, durable tenancy schema,
-identity adapters, authorization semantics, or tenant-aware storage keys are
-implemented. Recommendation 7 remains blocked until this checkpoint is resolved.
+The implementation now carries explicit request contracts, durable tenancy
+schema, local and OIDC identity adapters, membership authorization, audit,
+tenant-aware storage keys, and pooled/dedicated placement. Controlled target
+environments must still qualify their IdP, database roles, ingress, recovery,
+capacity, and artifact service before production support is claimed.
 
 ## Current baseline
 
@@ -60,7 +62,7 @@ implemented. Recommendation 7 remains blocked until this checkpoint is resolved.
 - `modules/contracts/config` now records finite deployment shapes and target
   databases.
 - `modules/adapters/persistence/sqlite` now provides the Electron-compatible
-  SQLite runtime, version-1 migration, transactions, health, backup, restore,
+  SQLite runtime, schema-version-2 migrations, transactions, health, backup, restore,
   portable export, and active desktop repository composition.
 - `modules/adapters/persistence/postgres` provides a bounded `pg` pool,
   advisory-locked migration, JSONB document repository seam, transactionally consistent
@@ -81,6 +83,15 @@ implemented. Recommendation 7 remains blocked until this checkpoint is resolved.
   and retains static, runtime, image, scan, and rendered-manifest evidence.
 - Existing allowlisted JSON data has inventory, rollback-preserving import,
   reconciliation, activation marking, and source-divergence rejection.
+- Existing unassigned structured documents remain in the legacy/platform
+  partition until an operator selects namespaces, reviews a fingerprint, writes
+  a rollback source, and confirms an atomic organization assignment.
+- Managed production requires OIDC and active membership. The default pooled
+  profile uses explicit organization predicates plus forced PostgreSQL RLS;
+  premium dedicated placement rejects every organization other than its fixed
+  configured id without changing the release or schema.
+- Managed filesystem artifact operations derive physical organization prefixes
+  from request context while preserving logical keys.
 - Managed environment profiles, OCI/Compose/Kubernetes templates, maintenance
   commands, operational runbooks, and a qualification matrix are checked in.
 - Server and thin-client build gates are clean after correcting compiler scope and
@@ -216,11 +227,12 @@ macOS/Linux packaging, and recovery-objective evidence remain mandatory in the
 owning controlled environments; absence of those environments is not recorded as
 a pass.
 
-### Repository completion evidence (2026-07-16)
+### Repository completion evidence (2026-07-17)
 
 - The full non-browser repository runner completed with report status `passed`,
-  exit code `0`, and no actionable failures across 2,182 TAP test events. One
-  live-PostgreSQL conformance test remains intentionally environment-gated.
+  exit code `0`, 2,228 passing test events, no actionable failures, and one
+  intentionally environment-gated live-PostgreSQL conformance test across 2,229
+  test events.
 - Windows x64 Electron packaging completed through webpack bundling, native
   dependency preparation, file copy, and package finalization with the standard
   Forge configuration.
@@ -240,8 +252,8 @@ a pass.
 
 1. Keep the now-clean server and thin-client build gates required for every
    database increment that changes a host or shared contract.
-2. Decide identity, organization tenancy, authorization, and audit ownership before
-   committing tenant-specific shared schemas.
+2. Preserve ADR-0029 identity, organization tenancy, authorization, audit, and
+   placement invariants as repository families evolve.
 3. Keep artifact/object storage replaceable: filesystem is suitable locally and
    for some campus installs; corporate/cloud deployments need qualified object or
    managed-volume adapters without changing application contracts.

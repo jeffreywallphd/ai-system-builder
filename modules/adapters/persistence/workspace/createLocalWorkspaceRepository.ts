@@ -28,7 +28,7 @@ export function createLocalWorkspaceRepository(options: LocalWorkspaceRepository
       throw new LocalWorkspacePersistenceError("workspace-persistence-invalid-record");
     }
 
-    return sortWorkspaces(value.map(assertWorkspaceRecord));
+    return sortWorkspaces(value.map((record) => assertWorkspaceRecord(record, options.documents?.organizationId)));
   }
 
   async function writeWorkspaceRecord(workspace: WorkspaceRecord, target = persistence): Promise<void> {
@@ -47,7 +47,10 @@ export function createLocalWorkspaceRepository(options: LocalWorkspaceRepository
           resolveWorkspaceIndexFile(rootDirectory),
           [] as WorkspaceRecord[],
           "workspace-persistence-write-failed",
-          (current) => ({ value: updateIndex(current.map(assertWorkspaceRecord)), result: undefined }),
+          (current) => ({
+            value: updateIndex(current.map((record) => assertWorkspaceRecord(record, transaction.organizationId))),
+            result: undefined,
+          }),
           target,
         );
       });
@@ -77,16 +80,16 @@ export function createLocalWorkspaceRepository(options: LocalWorkspaceRepository
         persistence,
       );
       if (value === undefined) return undefined;
-      return cloneJson(assertWorkspaceRecord(value));
+      return cloneJson(assertWorkspaceRecord(value, options.documents?.organizationId));
     },
 
     async saveWorkspace(workspace: WorkspaceRecord): Promise<void> {
-      const validWorkspace = assertWorkspaceRecord(workspace);
+      const validWorkspace = assertWorkspaceRecord(workspace, options.documents?.organizationId);
       await writeWorkspaceAndIndex(validWorkspace, (index) => upsertWorkspace(index, validWorkspace));
     },
 
     async updateWorkspace(workspace: WorkspaceRecord): Promise<void> {
-      const validWorkspace = assertWorkspaceRecord(workspace);
+      const validWorkspace = assertWorkspaceRecord(workspace, options.documents?.organizationId);
       const existing = await this.readWorkspace(validWorkspace.workspaceId);
       if (!existing) {
         throw new LocalWorkspacePersistenceError("workspace-persistence-missing-record");
@@ -133,7 +136,10 @@ function sortWorkspaces(records: readonly WorkspaceRecord[]): WorkspaceRecord[] 
   });
 }
 
-function assertWorkspaceRecord(value: unknown): WorkspaceRecord {
+function assertWorkspaceRecord(
+  value: unknown,
+  expectedOrganizationId?: WorkspaceRecord["organizationId"],
+): WorkspaceRecord {
   if (!value || typeof value !== "object") {
     throw new LocalWorkspacePersistenceError("workspace-persistence-invalid-record");
   }
@@ -146,6 +152,9 @@ function assertWorkspaceRecord(value: unknown): WorkspaceRecord {
     typeof record.createdAt !== "string" ||
     typeof record.updatedAt !== "string"
   ) {
+    throw new LocalWorkspacePersistenceError("workspace-persistence-invalid-record");
+  }
+  if (expectedOrganizationId !== undefined && record.organizationId !== expectedOrganizationId) {
     throw new LocalWorkspacePersistenceError("workspace-persistence-invalid-record");
   }
 

@@ -26,13 +26,14 @@ test("managed deployment artifacts satisfy immutable and restricted single-repli
   assert.deepEqual(inspectServerDeploymentArtifacts(await sources()), []);
 });
 
-test("deployment policy detects mutable images, privilege drift, and overlapping replicas", async () => {
+test("deployment policy detects mutable images, privilege drift, identity drift, and overlapping replicas", async () => {
   const changed = await sources();
   changed.dockerfile = changed.dockerfile.replace(/@sha256:[a-f0-9]{64}/g, "");
   changed.compose = changed.compose.replace(
     "read_only: true",
     "read_only: false",
   );
+  changed.compose = changed.compose.replace("oidc-bearer", "lan-https-token");
   changed.kubernetes = changed.kubernetes.replace(
     "type: Recreate",
     "type: RollingUpdate",
@@ -41,4 +42,5 @@ test("deployment policy detects mutable images, privilege drift, and overlapping
   assert.match(violations, /digest-pinned/);
   assert.match(violations, /root filesystem is writable/);
   assert.match(violations, /overlapping replicas/);
+  assert.match(violations, /managed OIDC/);
 });

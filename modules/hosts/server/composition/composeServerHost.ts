@@ -34,6 +34,7 @@ import { createLocalConversationRepositoryAdapters } from "../../../adapters/per
 import { createLocalExecutionRunRepositoryAdapters } from "../../../adapters/persistence/execution-runs";
 import { LinkUserLibraryAssetToWorkspaceUseCase } from "../../../application/use-cases/user-library";
 import type { LoggingPort } from "../../../application/ports/logging";
+import type { OrganizationRequestContextProviderPort } from "../../../application/ports/organization";
 import { SystemArtifactIdFactory } from "../../../domain/artifact";
 import {
   BrowseArtifactsUseCase,
@@ -214,7 +215,13 @@ export interface ComposeServerHostArtifactRepoOptions {
 }
 
 export interface ComposeServerHostOptions {
-  persistence?: { documents: StructuredDocumentStore };
+  persistence?: {
+    /** Deployment-local configuration and explicit legacy/unassigned records. */
+    documents: StructuredDocumentStore;
+    /** Organization-owned feature data; managed hosts must provide a context-required adapter. */
+    organizationDocuments?: StructuredDocumentStore;
+  };
+  organizationContextProvider?: OrganizationRequestContextProviderPort;
   env?: NodeJS.ProcessEnv;
   logging?: ComposeServerHostLoggingOptions;
   logSink?: StructuredLogSink;
@@ -434,6 +441,7 @@ export function composeServerHost(
     },
     registerApi(registerOptions) {
       const env = options.env ?? process.env;
+      const organizationDocuments = options.persistence?.organizationDocuments ?? options.persistence?.documents;
       const defaultRuntimeRootDirectory = joinHostPath(dirname(registerOptions.storageRootDirectory), "server-runtime");
       const applicationSettings = createLocalApplicationSettingsAdapter({
         filePath: options.settings?.localSettingsFilePath ?? joinHostPath(registerOptions.storageRootDirectory, "config", "application-settings.json"),
@@ -560,11 +568,11 @@ export function composeServerHost(
       });
       const artifactCatalog = createLocalArtifactCatalogPersistenceAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
-        documents: options.persistence?.documents,
+        documents: organizationDocuments,
       });
       const artifactBindings = createLocalArtifactStorageBindingAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
-        documents: options.persistence?.documents,
+        documents: organizationDocuments,
       });
       const storage = createFilesystemArtifactObjectStorageAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
@@ -572,6 +580,7 @@ export function composeServerHost(
         logging: loggingPort,
         now: options.now,
         artifactCatalogAppend: artifactCatalog,
+        organizationContextProvider: options.organizationContextProvider,
       });
       const artifactBrowserRead = createFilesystemArtifactBrowserReadAdapter({
         rootDirectory: registerOptions.storageRootDirectory,
@@ -579,6 +588,7 @@ export function composeServerHost(
         artifactCatalogAppend: artifactCatalog,
         storage,
         artifactBindingRead: artifactBindings,
+        organizationContextProvider: options.organizationContextProvider,
       });
       const artifactMediaViewRetrieval = createFilesystemArtifactContentRetrievalAdapter({
         storage,
@@ -588,7 +598,7 @@ export function composeServerHost(
       const workspaceFoundation = internalAssetRegistry ?? composeInternalAssetRegistry({
         rootDirectory: registerOptions.storageRootDirectory,
         now: options.now,
-        documents: options.persistence?.documents,
+        documents: organizationDocuments,
       });
       internalAssetRegistry = workspaceFoundation;
       const storeArtifactUploadUseCase = new StoreArtifactUploadUseCase({
@@ -869,7 +879,7 @@ export function composeServerHost(
       const modelRegistry = createLocalModelRegistryAdapter({
         filePath: `${registerOptions.storageRootDirectory}/model-registry/models.json`,
         rootDirectory: registerOptions.storageRootDirectory,
-        documents: options.persistence?.documents,
+        documents: organizationDocuments,
         now: options.now,
         discovery: {
           searchRoots: async () => {
@@ -881,13 +891,13 @@ export function composeServerHost(
       const imageAssetRegistry = createLocalImageAssetRegistryAdapter({
         filePath: joinHostPath(registerOptions.storageRootDirectory, ".catalog", "image-assets.json"),
         rootDirectory: registerOptions.storageRootDirectory,
-        documents: options.persistence?.documents,
+        documents: organizationDocuments,
         now: options.now,
       });
       internalAssetRegistry = composeInternalAssetRegistry({
         rootDirectory: registerOptions.storageRootDirectory,
         now: options.now,
-        documents: options.persistence?.documents,
+        documents: organizationDocuments,
         resourceBackedViewProvider: composeResourceBackedViewProviders({
           artifactBrowserMetadataRead: artifactBrowserRead,
           imageAssetDescriptorRead: imageAssetRegistry,
@@ -1061,6 +1071,7 @@ export function composeServerHost(
 
       const imageGenerationFinalizationOrchestrator = new ImageGenerationFinalizationOrchestratorService({
         runtimeTaskRegistry,
+        organizationContextProvider: options.organizationContextProvider,
         finalizeImageGenerationService: new FinalizeImageGenerationService({
           imageAssetRegistry,
           generatedImagePersistence: createFilesystemGeneratedImagePersistenceAdapter({
@@ -1070,12 +1081,13 @@ export function composeServerHost(
             artifactStorageBinding: artifactBindings,
             logging: loggingPort,
             now: options.now,
+            organizationContextProvider: options.organizationContextProvider,
           }),
           now: options.now,
         }),
       });
 
-      const structuredRepositoryOptions = { rootDir: registerOptions.storageRootDirectory, now: options.now, documents: options.persistence?.documents };
+      const structuredRepositoryOptions = { rootDir: registerOptions.storageRootDirectory, now: options.now, documents: organizationDocuments };
       const assetCompositionPlanRepository = createLocalAssetCompositionPlanRepositoryAdapter(structuredRepositoryOptions);
       const runtimeReadinessBindingRepository = createLocalRuntimeReadinessBindingRepositoryAdapter(structuredRepositoryOptions);
       const executionPlanRepository = createLocalExecutionPlanRepositoryAdapter(structuredRepositoryOptions);

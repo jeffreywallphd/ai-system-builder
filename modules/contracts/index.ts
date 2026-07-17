@@ -7,6 +7,7 @@ export * as runtime from "./runtime";
 export * as storage from "./storage";
 export * as asset from "./asset";
 export * as workspace from "./workspace";
+export * as organization from "./organization";
 export * as userLibrary from "./user-library";
 export * as assetAuthoring from "./asset-authoring";
 export * as artifact from "./artifact";
