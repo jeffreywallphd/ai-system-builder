@@ -27,6 +27,8 @@ This directory separates canonical system guidance from downstream task context 
   - Focused diagnostic and regression-check procedures.
   - `contributor-helper-loops.md` documents the configurable, bounded helper
     loops under `dev-tools/helpers/`.
+  - `implementation-roadmap-skill.md` documents the cross-agent repository
+    skill, durable roadmap/report artifacts, installation, and maintenance.
 - `docs/operations/`
   - Persistence operations, schema compatibility, recovery, rollout, and
     deployment qualification procedures.
@@ -46,6 +48,10 @@ This directory separates canonical system guidance from downstream task context 
 ## Start by Task
 
 - Any repository task: read the root `AGENTS.md`, then `docs/context/packs/index.pack.md`.
+- Implementation roadmap preparation, review, execution, continuation, or
+  resumption: use `skills/manage-implementation-roadmaps/SKILL.md`. Invoke it
+  from intent even without the exact skill name; a request such as "use a skill
+  if available to create an implementation roadmap" is sufficient.
 - Narrow implementation task: use `docs/context/prompt-routing.md` to add only materially relevant packs.
 - Architecture or dependency change: read `docs/architecture/system-overview.md`, `docs/architecture/module-dependency-rules.md`, and related ADRs.
 - Persistence or deployment work: read `docs/architecture/persistence-and-storage.md`, `docs/architecture/host-model.md`, ADR-0003, and ADR-0004.

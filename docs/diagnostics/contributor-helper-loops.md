@@ -6,6 +6,12 @@ The portable helpers in `dev-tools/helpers/` group recurring repository work
 into bounded processes. They are intended to reduce repeated approval prompts
 without weakening the approval boundary or creating a general command runner.
 
+These helpers are contributor infrastructure, not user-invoked agent skills.
+Portable agent workflows live under `skills/`; see
+`implementation-roadmap-skill.md`. Keep the roadmap state/report engine with
+that skill, while generic snapshots, checks, and patch transport remain in
+`dev-tools/helpers/`.
+
 ## Local configuration
 
 Copy `dev-tools/helpers/helpers.example.json` to an ignored location such as

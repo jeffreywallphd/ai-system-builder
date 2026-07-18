@@ -7,6 +7,9 @@ AI System Builder is a TypeScript platform for composing, running, and managing 
 ## Start here
 
 - Contributors and coding agents: read [`AGENTS.md`](AGENTS.md), then the [`docs` map](docs/README.md).
+- Cross-agent implementation roadmaps: use the
+  [repository roadmap skill](skills/manage-implementation-roadmaps/SKILL.md);
+  natural-language requests are sufficient and do not require its exact name.
 - Architecture: start with the [system overview](docs/architecture/system-overview.md) and [module dependency rules](docs/architecture/module-dependency-rules.md).
 - Task context: load the [baseline context pack](docs/context/packs/index.pack.md), then use [prompt routing](docs/context/prompt-routing.md).
 - Decisions and implementation rules: use the [ADR index](docs/adr/README.md) and [repository standards](docs/standards/).
@@ -28,6 +31,8 @@ AI System Builder is a TypeScript platform for composing, running, and managing 
 - `modules/`: domain, contracts, application, adapter, host, runtime, UI, and shared capabilities.
 - `docs/`: canonical decisions, architecture, standards, security guidance, diagnostics, and downstream context packs.
 - `dev-tools/`: repository checks, test orchestration, and development utilities.
+- `skills/`: portable, user-invoked Agent Skills workflows with repository
+  tests and cross-agent installation guidance.
 - `deployments/`: reviewed server image and platform-neutral qualification
   templates; environment-specific approval remains an operator responsibility.
 
