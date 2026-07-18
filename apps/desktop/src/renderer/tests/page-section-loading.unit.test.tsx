@@ -9,7 +9,7 @@ import { AssetLibraryPage } from "../pages/AssetLibraryPage";
 import { ImageGenerationPage } from "../pages/ImageGenerationPage";
 import { ModelsPage } from "../pages/ModelsPage";
 import { SettingsPage } from "../pages/SettingsPage";
-import { SystemPage } from "../pages/SystemPage";
+import { SystemBuilderPage } from "../pages/SystemBuilderPage";
 import { pageSectionLoadingPolicy } from "../pageSectionLoadingPolicy";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
@@ -164,7 +164,7 @@ describe("desktop page section loading", () => {
 
   it("keeps Asset Library resource-backed views separate from initial definitions", async () => {
     const { container: c, api } = await mount(<AssetLibraryPage workspaceId="w1" workspaceName="Workspace" />);
-    expect(c.textContent).toContain("Asset Library");
+    expect(c.textContent).toContain("Assets");
     expect(api.listAssetDefinitions).toHaveBeenCalled();
     expect(api.listAssetResourceBackedViews).not.toHaveBeenCalled();
     const tab = Array.from(c.querySelectorAll("button")).find((button) => button.textContent === "Resource views");
@@ -183,10 +183,22 @@ describe("desktop page section loading", () => {
   });
 
 
-  it("loads System lifecycle diagnostics only when diagnostics are enabled and expanded", async () => {
+  it("keeps the Systems builder shell free of operational software reads", async () => {
+    const { container: c, api } = await mount(<SystemBuilderPage workspaceId="w1" workspaceName="Workspace" />);
+    expect(c.textContent).toContain("System Builder");
+    expect(c.textContent).toContain("Plans");
+    expect(c.textContent).toContain("Run & Test");
+    expect(api.readFeatureLifecycleState).not.toHaveBeenCalled();
+    expect(api.readPythonRuntimeStatus).not.toHaveBeenCalled();
+    expect(api.readComfyUiInstallStatus).not.toHaveBeenCalled();
+  });
+
+  it("loads Settings software lifecycle diagnostics only when diagnostics are enabled and expanded", async () => {
     const api = createDesktopApiMock();
     api.memoryDiagnosticsEnabled = true;
-    const { container: c } = await mount(<SystemPage />, api);
+    const { container: c } = await mount(<SettingsPage />, api);
+    const softwareStatusButton = Array.from(c.querySelectorAll("button")).find((button) => button.textContent?.includes("Software status"));
+    await act(async () => { softwareStatusButton?.click(); await Promise.resolve(); });
     expect(c.textContent).toContain("Feature lifecycle diagnostics");
     expect(api.readFeatureLifecycleState).not.toHaveBeenCalled();
     expect(api.readPythonRuntimeStatus).not.toHaveBeenCalled();
@@ -198,9 +210,11 @@ describe("desktop page section loading", () => {
     expect(api.readComfyUiInstallStatus).not.toHaveBeenCalled();
   });
 
-  it("defers System runtime controls until expanded", async () => {
-    const { container: c, api } = await mount(<SystemPage />);
-    expect(c.textContent).toContain("System");
+  it("defers Settings software runtime controls until their nested sections expand", async () => {
+    const { container: c, api } = await mount(<SettingsPage />);
+    const softwareStatusButton = Array.from(c.querySelectorAll("button")).find((button) => button.textContent?.includes("Software status"));
+    await act(async () => { softwareStatusButton?.click(); await Promise.resolve(); });
+    expect(c.textContent).toContain("Software status");
     expect(api.readPythonRuntimeStatus).not.toHaveBeenCalled();
     expect(api.controlPythonRuntime).not.toHaveBeenCalled();
     expect(api.readComfyUiInstallStatus).not.toHaveBeenCalled();
@@ -245,15 +259,17 @@ describe("page section loading policy classification", () => {
       "settings:runtime settings",
       "settings:dataset settings",
       "settings:publishing settings",
-      "system:basic shell",
-      "system:lifecycle diagnostics",
-      "system:Python runtime controls",
-      "system:ComfyUI install status",
-      "system:ComfyUI repair/install/start",
+      "settings:software status",
+      "settings:lifecycle diagnostics",
+      "settings:Python runtime controls",
+      "settings:ComfyUI install status",
+      "settings:ComfyUI repair/install/start",
+      "systems:builder shell",
+      "systems:system records",
     ]) {
       expect(policy.has(key)).toBe(true);
     }
-    expect(policy.get("system:lifecycle diagnostics")).toEqual(["expanded", "refresh"]);
+    expect(policy.get("settings:lifecycle diagnostics")).toEqual(["expanded", "refresh"]);
     expect(policy.get("image-generation:generate")).toBe("user-action");
   });
 });

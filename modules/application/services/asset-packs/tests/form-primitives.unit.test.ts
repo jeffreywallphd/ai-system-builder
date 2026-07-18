@@ -115,6 +115,19 @@ const expectedFieldsById: Record<string, readonly string[]> = {
     "visibilityCondition",
     "accessibilityLabel",
   ],
+  "builtin.form.date-time-field": [
+    "label",
+    "helpText",
+    "required",
+    "dateTimeKind",
+    "defaultValue",
+    "minimum",
+    "maximum",
+    "autocompleteHint",
+    "disabled",
+    "visibilityCondition",
+    "accessibilityLabel",
+  ],
   "builtin.form.validation-message": [
     "message",
     "severity",
@@ -201,6 +214,14 @@ const expectedPortsById: Record<string, readonly string[]> = {
     "field-blurred",
     "validation-requested",
   ],
+  "builtin.form.date-time-field": [
+    "value",
+    "disabled-state",
+    "validation-state",
+    "value-changed",
+    "field-blurred",
+    "validation-requested",
+  ],
   "builtin.form.validation-message": ["validation-state", "field-ref"],
   "builtin.form.submit-action": [
     "form-state",
@@ -221,12 +242,12 @@ describe("form and field primitives", () => {
       "builtin.form.select-field",
       "builtin.form.checkbox-field",
       "builtin.form.radio-group",
+      "builtin.form.date-time-field",
       "builtin.form.validation-message",
       "builtin.form.submit-action",
       "builtin.form.cancel-action",
     ]);
     assert.deepEqual(DEFERRED_FORM_PRIMITIVE_IDS, [
-      "builtin.form.date-time-field",
       "builtin.form.file-upload-field",
     ]);
     assert.deepEqual(

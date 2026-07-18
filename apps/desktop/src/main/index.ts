@@ -4,6 +4,9 @@ import { app, BrowserWindow, dialog, ipcMain } from "electron";
 
 import { composeDesktopHost } from "../../../../modules/hosts/desktop";
 import { recordDesktopMemorySnapshot } from "../../../../modules/hosts/desktop/diagnostics";
+import { resolveLocalSqliteDatabasePolicy, openLocalSqliteDatabase } from "../../../../modules/adapters/persistence/sqlite";
+import { importJsonStructuredData } from "../../../../modules/adapters/persistence/migration";
+import { initializeLocalIdentityProfile, readLocalIdentityProfile } from "../../../../modules/adapters/security/local-identity";
 
 recordDesktopMemorySnapshot({
   milestone: "desktop.main.module.loaded",
@@ -74,6 +77,44 @@ app.whenReady().then(async () => {
 
   const desktopDataRootDirectory = app.getPath("userData");
   const storageRootDirectory = path.join(desktopDataRootDirectory, "artifacts");
+  const sqlitePolicy = resolveLocalSqliteDatabasePolicy({ dataRootDirectory: desktopDataRootDirectory });
+  const sqliteDatabase = await openLocalSqliteDatabase({ policy: sqlitePolicy });
+  try {
+    await importJsonStructuredData({
+      sourceRootDirectory: storageRootDirectory,
+      rollbackRootDirectory: path.join(sqlitePolicy.persistenceRootDirectory, "json-rollback"),
+      documents: sqliteDatabase.documents,
+    });
+  } catch (error) {
+    sqliteDatabase.close();
+    throw error;
+  }
+  let localIdentityProfile = await readLocalIdentityProfile(sqliteDatabase.documents);
+  if (!localIdentityProfile) {
+    const setup = await dialog.showMessageBox({
+      type: "question",
+      title: "Set up local identity",
+      message: "Create a private local organization and owner profile for this installation?",
+      detail: "Identifiers are generated and stored only in the local SQLite database. Existing legacy data is not assigned automatically.",
+      buttons: ["Create local profile", "Quit"],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+    if (setup.response !== 0) {
+      sqliteDatabase.close();
+      app.quit();
+      return;
+    }
+    localIdentityProfile = await initializeLocalIdentityProfile({
+      documents: sqliteDatabase.documents,
+      organizationDisplayName: "Local Organization",
+      principalDisplayName: "Local Owner",
+    });
+  }
+  const organizationDocuments = sqliteDatabase.documents.forOrganization(
+    localIdentityProfile.organizationId,
+  );
   recordDesktopMemorySnapshot({
     milestone: "desktop.paths.resolved",
     component: "desktop-main",
@@ -88,6 +129,7 @@ app.whenReady().then(async () => {
     component: "desktop-main",
   });
   const desktopHost = composeDesktopHost({
+    persistence: { documents: sqliteDatabase.documents, organizationDocuments },
     logging: {
       verbosity: process.env.LOG_VERBOSITY,
       level: "info",
@@ -148,6 +190,7 @@ app.whenReady().then(async () => {
       component: "desktop-main",
     });
     void desktopHost.stopPythonRuntime();
+    sqliteDatabase.close();
   });
 });
 

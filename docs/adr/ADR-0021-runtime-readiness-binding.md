@@ -1,6 +1,6 @@
 # ADR-0021: Runtime Readiness Binding
 
-- Status: Accepted
+- Status: accepted
 - Date: 2026-05-21
 - Deciders: Core architecture maintainers
 - Related: docs/architecture/runtime-readiness-binding.md, docs/architecture/asset-composition-planning.md, docs/architecture/effective-asset-projections.md, docs/adr/ADR-0020-asset-composition-planning.md, docs/adr/ADR-0019-effective-asset-projections.md

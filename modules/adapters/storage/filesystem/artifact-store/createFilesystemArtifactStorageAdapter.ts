@@ -29,7 +29,12 @@ import {
   type StoreArtifactRequest,
   type StoreArtifactResult,
 } from "../../../../contracts/storage";
-import { createWorkspaceId, isWorkspaceId } from "../../../../contracts/workspace";
+import {
+  createWorkspaceId,
+  isWorkspaceId,
+} from "../../../../contracts/workspace";
+import type { OrganizationRequestContextProviderPort } from "../../../../application/ports/organization";
+import { resolveOrganizationStorageKey } from "../organizationStorageScope";
 
 const STORAGE_COMPONENT = "adapters.storage.filesystem";
 const DEFAULT_STORAGE_HOST = "desktop";
@@ -46,6 +51,7 @@ export interface CreateFilesystemArtifactStorageAdapterOptions {
   randomSuffix?: () => string;
   statPath?: typeof stat;
   artifactCatalogAppend?: ArtifactCatalogAppendPort;
+  organizationContextProvider?: OrganizationRequestContextProviderPort;
 }
 
 function isFsError(error: unknown): error is NodeJS.ErrnoException {
@@ -98,7 +104,9 @@ function resolvePathInsideRoot(rootDirectory: string, key: string): string {
     .filter((segment) => segment.length > 0);
 
   if (segments.length === 0) {
-    throw new StorageAdapterValidationError("Storage key must include at least one segment.");
+    throw new StorageAdapterValidationError(
+      "Storage key must include at least one segment.",
+    );
   }
 
   for (const segment of segments) {
@@ -131,10 +139,16 @@ function toBytes(content: unknown): Uint8Array {
   }
 
   if (ArrayBuffer.isView(content)) {
-    return new Uint8Array(content.buffer, content.byteOffset, content.byteLength);
+    return new Uint8Array(
+      content.buffer,
+      content.byteOffset,
+      content.byteLength,
+    );
   }
 
-  throw new StorageAdapterValidationError("Storage content must be binary bytes.");
+  throw new StorageAdapterValidationError(
+    "Storage content must be binary bytes.",
+  );
 }
 
 function extensionForMediaType(mediaType: string | undefined): string {
@@ -168,7 +182,9 @@ function extensionForMediaType(mediaType: string | undefined): string {
   }
 }
 
-function extensionFromOriginalFileName(originalFileName: string | undefined): string | undefined {
+function extensionFromOriginalFileName(
+  originalFileName: string | undefined,
+): string | undefined {
   if (typeof originalFileName !== "string") {
     return undefined;
   }
@@ -187,14 +203,15 @@ function extensionFromOriginalFileName(originalFileName: string | undefined): st
 }
 
 function createContentChecksum(bytes: Uint8Array): StorageObjectChecksum {
-  const digest = createHash(STORAGE_CHECKSUM_ALGORITHM).update(bytes).digest("hex");
+  const digest = createHash(STORAGE_CHECKSUM_ALGORITHM)
+    .update(bytes)
+    .digest("hex");
 
   return {
     algorithm: STORAGE_CHECKSUM_ALGORITHM,
     value: digest,
   };
 }
-
 
 function resolveRequestContext(
   request: { requestId?: string; correlationId?: string },
@@ -216,7 +233,8 @@ export function createFilesystemArtifactObjectStorageAdapter(
   const rootDirectory = path.resolve(options.rootDirectory);
   const logging = options.logging;
   const now = options.now ?? (() => new Date().toISOString());
-  const randomSuffix = options.randomSuffix ?? (() => randomUUID().replaceAll("-", ""));
+  const randomSuffix =
+    options.randomSuffix ?? (() => randomUUID().replaceAll("-", ""));
   const statPath = options.statPath ?? stat;
 
   async function logBoundaryEvent(event: {
@@ -268,10 +286,14 @@ export function createFilesystemArtifactObjectStorageAdapter(
     workspaceId?: string;
   }): string {
     const compactTimestamp = now().replace(/[-:.TZ]/g, "");
-    const extension = extensionFromOriginalFileName(input.originalFileName) ?? extensionForMediaType(input.mediaType);
+    const extension =
+      extensionFromOriginalFileName(input.originalFileName) ??
+      extensionForMediaType(input.mediaType);
     const uploadPath = `uploads/${compactTimestamp}-${randomSuffix()}.${extension}`;
     return normalizeStorageArtifactKey(
-      input.workspaceId ? `workspaces/${createWorkspaceId(input.workspaceId)}/artifacts/files/${uploadPath}` : uploadPath,
+      input.workspaceId
+        ? `workspaces/${createWorkspaceId(input.workspaceId)}/artifacts/files/${uploadPath}`
+        : uploadPath,
     );
   }
 
@@ -300,21 +322,33 @@ export function createFilesystemArtifactObjectStorageAdapter(
 
       try {
         const originalFileName =
-          typeof (request.descriptor.metadata as { originalFileName?: unknown } | undefined)?.originalFileName === "string"
-            ? (request.descriptor.metadata as { originalFileName?: string }).originalFileName
+          typeof (
+            request.descriptor.metadata as
+              { originalFileName?: unknown } | undefined
+          )?.originalFileName === "string"
+            ? (request.descriptor.metadata as { originalFileName?: string })
+                .originalFileName
             : undefined;
         const key = request.descriptor.key
           ? normalizeStorageArtifactKey(request.descriptor.key)
           : createGeneratedKey({
-            mediaType: request.descriptor.mediaType,
-            originalFileName,
-            workspaceId: context.workspaceId,
-          });
-        const extension = extensionFromOriginalFileName(originalFileName) ?? path.extname(key).replace(/^\./, "");
+              mediaType: request.descriptor.mediaType,
+              originalFileName,
+              workspaceId: context.workspaceId,
+            });
+        const extension =
+          extensionFromOriginalFileName(originalFileName) ??
+          path.extname(key).replace(/^\./, "");
         attemptedKey = key;
         const bytes = toBytes(request.content);
         const checksum = createContentChecksum(bytes);
-        const absolutePath = resolvePathInsideRoot(rootDirectory, key);
+        const absolutePath = resolvePathInsideRoot(
+          rootDirectory,
+          resolveOrganizationStorageKey(
+            key,
+            options.organizationContextProvider,
+          ),
+        );
         attemptedAbsolutePath = absolutePath;
         const writeFlag = request.overwrite === true ? "w" : "wx";
 
@@ -336,32 +370,40 @@ export function createFilesystemArtifactObjectStorageAdapter(
 
         if (options.artifactCatalogAppend) {
           if (!isWorkspaceId(context.workspaceId)) {
-            throw new StorageAdapterValidationError("Workspace id is required for artifact catalog writes.");
+            throw new StorageAdapterValidationError(
+              "Workspace id is required for artifact catalog writes.",
+            );
           }
-          const appendResult = await options.artifactCatalogAppend.appendArtifactCatalogRecord({
-            record: {
-              workspaceId: context.workspaceId,
-              storageKey: key,
-              artifactFamily: resolveArtifactFamily({
-                mediaType: request.descriptor.mediaType,
-                extension,
-                fileName: originalFileName,
-              }),
-              mediaType: request.descriptor.mediaType,
-              sizeBytes: bytes.byteLength,
-              sourceKind: "upload",
-              originalName: originalFileName,
-              createdAt: now(),
-              checksum,
-            },
-          }, {
-            requestId: requestContext.requestId,
-            correlationId: requestContext.correlationId,
-            workspaceId: context.workspaceId,
-          });
+          const appendResult =
+            await options.artifactCatalogAppend.appendArtifactCatalogRecord(
+              {
+                record: {
+                  workspaceId: context.workspaceId,
+                  storageKey: key,
+                  artifactFamily: resolveArtifactFamily({
+                    mediaType: request.descriptor.mediaType,
+                    extension,
+                    fileName: originalFileName,
+                  }),
+                  mediaType: request.descriptor.mediaType,
+                  sizeBytes: bytes.byteLength,
+                  sourceKind: "upload",
+                  originalName: originalFileName,
+                  createdAt: now(),
+                  checksum,
+                },
+              },
+              {
+                requestId: requestContext.requestId,
+                correlationId: requestContext.correlationId,
+                workspaceId: context.workspaceId,
+              },
+            );
 
           if (!appendResult.ok) {
-            throw new StorageAdapterVerificationError(appendResult.error.message);
+            throw new StorageAdapterVerificationError(
+              appendResult.error.message,
+            );
           }
         }
 
@@ -395,9 +437,10 @@ export function createFilesystemArtifactObjectStorageAdapter(
         );
       } catch (error) {
         const code = toErrorCode(error);
-        const message = code === "conflict"
-          ? "Storage artifact already exists and overwrite is disabled."
-          : "Failed to store artifact bytes.";
+        const message =
+          code === "conflict"
+            ? "Storage artifact already exists and overwrite is disabled."
+            : "Failed to store artifact bytes.";
 
         await logBoundaryEvent({
           level: "error",
@@ -440,11 +483,36 @@ export function createFilesystemArtifactObjectStorageAdapter(
       const requestContext = resolveRequestContext(request, context);
       try {
         const key = normalizeStorageArtifactKey(request.key);
-        const absolutePath = resolvePathInsideRoot(rootDirectory, key);
-        const [fileContent, fileStats] = await Promise.all([
-          readFile(absolutePath),
-          stat(absolutePath),
-        ]);
+        const absolutePath = resolvePathInsideRoot(
+          rootDirectory,
+          resolveOrganizationStorageKey(
+            key,
+            options.organizationContextProvider,
+          ),
+        );
+        const fileStats = await stat(absolutePath);
+        if (
+          request.maximumBytes !== undefined &&
+          fileStats.size > request.maximumBytes
+        ) {
+          return createRetrieveArtifactFailureResult<TContent>(
+            createContractError(
+              "unavailable",
+              "Artifact exceeds the permitted read size.",
+              {
+                requestId: requestContext.requestId,
+                correlationId: requestContext.correlationId,
+                details: {
+                  operation: "retrieveArtifact",
+                  maximumBytes: request.maximumBytes,
+                  sizeBytes: fileStats.size,
+                },
+              },
+            ),
+            requestContext,
+          );
+        }
+        const fileContent = await readFile(absolutePath);
 
         return createRetrieveArtifactSuccessResult(
           {
@@ -480,7 +548,13 @@ export function createFilesystemArtifactObjectStorageAdapter(
       const requestContext = resolveRequestContext(request, context);
       try {
         const key = normalizeStorageArtifactKey(request.key);
-        const absolutePath = resolvePathInsideRoot(rootDirectory, key);
+        const absolutePath = resolvePathInsideRoot(
+          rootDirectory,
+          resolveOrganizationStorageKey(
+            key,
+            options.organizationContextProvider,
+          ),
+        );
         const fileStats = await stat(absolutePath);
 
         return createHasArtifactSuccessResult(true, {
@@ -521,13 +595,21 @@ export function createFilesystemArtifactObjectStorageAdapter(
       const requestContext = resolveRequestContext(request, context);
       try {
         const key = normalizeStorageArtifactKey(request.key);
-        const absolutePath = resolvePathInsideRoot(rootDirectory, key);
+        const absolutePath = resolvePathInsideRoot(
+          rootDirectory,
+          resolveOrganizationStorageKey(
+            key,
+            options.organizationContextProvider,
+          ),
+        );
         await unlink(absolutePath);
 
         // Best-effort cleanup of empty parent directories under the root.
         const parentDirectory = path.dirname(absolutePath);
         if (path.relative(rootDirectory, parentDirectory) !== "") {
-          await rm(parentDirectory, { recursive: false, force: false }).catch(() => {});
+          await rm(parentDirectory, { recursive: false, force: false }).catch(
+            () => {},
+          );
         }
 
         return createDeleteArtifactSuccessResult(true, requestContext);
@@ -552,7 +634,6 @@ export function createFilesystemArtifactObjectStorageAdapter(
     },
   };
 }
-
 
 /**
  * Backward-compatible alias for artifact-object storage adapter naming.

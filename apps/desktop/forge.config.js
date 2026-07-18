@@ -8,7 +8,15 @@ const rendererConfig = require('./webpack.renderer.config');
 
 /** @type {import('@electron-forge/shared-types').ForgeConfig} */
 module.exports = {
-  packagerConfig: {},
+  packagerConfig: {
+    // Mirror the webpack plugin's default: package only generated bundles. The
+    // plugin writes package.json during packageAfterCopy.
+    ignore: (file) => {
+      if (!file) return false;
+      if (/[^/\\]+\.js\.map$/.test(file)) return true;
+      return !/^[/\\]\.webpack($|[/\\]).*$/.test(file);
+    },
+  },
   makers: [
     new MakerSquirrel({}),
     new MakerZIP({}, ['darwin']),

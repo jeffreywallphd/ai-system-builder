@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
 
-import { TermWithHint } from "../../../../../../modules/ui/shared";
+import { ApplicationIcon, TermWithHint, TypeBadge } from "../../../../../../modules/ui/shared";
 import { formatUploadedFileSize } from "../hooks/formatUploadedFileSize";
 
 export type UploadStatus = "idle" | "uploading" | "success" | "partial" | "error" | "canceled";
@@ -71,7 +71,8 @@ export function ArtifactUploadForm({
           onChange={onFileChange}
         />
         <button className="ui-button artifact-ingestion-mobile-button" type="submit" disabled={viewState.status === "uploading"}>
-          {viewState.status === "uploading" ? "Uploading..." : "Upload files"}
+          <ApplicationIcon name="upload" />
+          <span className="ui-button__label">{viewState.status === "uploading" ? "Uploading..." : "Upload files"}</span>
         </button>
         <button
           className="ui-button artifact-ingestion-mobile-button"
@@ -79,7 +80,8 @@ export function ArtifactUploadForm({
           disabled={viewState.status !== "uploading" && selectedFiles.length === 0}
           onClick={onCancelUpload}
         >
-          Cancel upload
+          <ApplicationIcon name="close" />
+          <span className="ui-button__label">Cancel upload</span>
         </button>
         <p className="ui-text-muted">Upload starts automatically after file selection. Use Upload files to retry if needed.</p>
 
@@ -98,7 +100,7 @@ export function ArtifactUploadForm({
             <ul className="ui-stack ui-stack--sm">
               {uploadResults.map((result) => (
                 <li className="ui-panel ui-stack ui-stack--sm" key={`${result.fileName}-${result.key ?? result.message}`}>
-                  <strong>{result.fileName}</strong>
+                  <div className="ui-type-label"><TypeBadge value={result.mediaType ?? result.fileName} /><strong>{result.fileName}</strong></div>
                   <p>{result.status === "success" ? "Stored successfully." : `Failed: ${result.message}`}</p>
                   {result.status === "success" ? (
                     <dl className="ui-stack ui-stack--xs">
@@ -122,7 +124,7 @@ export function ArtifactUploadForm({
           <p>{selectedFiles.length === 1 ? "Selected file:" : `Selected files (${selectedFiles.length}):`}</p>
           <ul>
             {selectedFiles.map((file) => (
-              <li key={`${file.name}-${file.size}-${file.lastModified}`}>{file.name} ({file.type || "unknown"})</li>
+              <li className="ui-type-row" key={`${file.name}-${file.size}-${file.lastModified}`}><TypeBadge value={file.type || file.name} /><span>{file.name} ({file.type || "unknown"})</span></li>
             ))}
           </ul>
         </section>

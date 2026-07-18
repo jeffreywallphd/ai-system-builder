@@ -18,23 +18,61 @@ import { normalizeArtifactMediaBytes } from "../helpers/artifactMediaBytes";
 
 export interface DesktopArtifactBrowserClient {
   getHuggingFaceTokenStatus: () => Promise<DesktopHuggingFaceTokenStatus>;
-  setHuggingFaceToken: (input: { token: string }) => Promise<DesktopHuggingFaceTokenStatus>;
+  setHuggingFaceToken: (input: {
+    token: string;
+  }) => Promise<DesktopHuggingFaceTokenStatus>;
   clearHuggingFaceToken: () => Promise<DesktopHuggingFaceTokenStatus>;
-  browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<DesktopHuggingFaceNamespaceDataset[]>;
-  browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<DesktopHuggingFaceDatasetParquetFile[]>;
+  browseHuggingFaceNamespaceDatasets?: (input: {
+    namespace: string;
+  }) => Promise<DesktopHuggingFaceNamespaceDataset[]>;
+  browseHuggingFaceDatasetParquetFiles?: (input: {
+    repository: string;
+    revision?: string;
+  }) => Promise<DesktopHuggingFaceDatasetParquetFile[]>;
   importHuggingFaceFiles?: (input: {
     repositories?: Array<{ repository: string; revision?: string }>;
-    files?: Array<{ repository: string; path: string; revision?: string; mediaType?: string }>;
+    files?: Array<{
+      repository: string;
+      path: string;
+      revision?: string;
+      mediaType?: string;
+    }>;
   }) => Promise<DesktopHuggingFaceFilesImportResult>;
-  browseArtifacts: (input?: { artifactFamily?: DesktopArtifactFamily; workspaceId?: string }) => Promise<DesktopArtifactBrowseItem[]>;
-  browseUnregisteredArtifacts?: (input?: { workspaceId?: string }) => Promise<DesktopUnregisteredArtifactBrowseItem[]>;
-  registerUnregisteredArtifact?: (input: { storageKey: string; workspaceId?: string }) => Promise<{ storageKey: string }>;
-  deleteUnregisteredArtifact?: (input: { storageKey: string; workspaceId?: string }) => Promise<{ storageKey: string }>;
-  deleteRegisteredArtifact?: (input: { storageKey: string; workspaceId?: string }) => Promise<{ storageKey: string }>;
-  readArtifactDetail: (locator: DesktopArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<DesktopArtifactDetail>;
-  readArtifactContent: (locator: DesktopArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<DesktopArtifactContentDescriptor>;
-  createArtifactMediaViewUrl: (locator: DesktopArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<string>;
-  readArtifactMedia: (locator: DesktopArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<{ mediaType?: string; bytes: Uint8Array }>;
+  browseArtifacts: (input?: {
+    artifactFamily?: DesktopArtifactFamily;
+    workspaceId?: string;
+  }) => Promise<DesktopArtifactBrowseItem[]>;
+  browseUnregisteredArtifacts?: (input?: {
+    workspaceId?: string;
+  }) => Promise<DesktopUnregisteredArtifactBrowseItem[]>;
+  registerUnregisteredArtifact?: (input: {
+    storageKey: string;
+    workspaceId?: string;
+  }) => Promise<{ storageKey: string }>;
+  deleteUnregisteredArtifact?: (input: {
+    storageKey: string;
+    workspaceId?: string;
+  }) => Promise<{ storageKey: string }>;
+  deleteRegisteredArtifact?: (input: {
+    storageKey: string;
+    workspaceId?: string;
+  }) => Promise<{ storageKey: string }>;
+  readArtifactDetail: (
+    locator: DesktopArtifactBrowserLocator,
+    input?: { workspaceId?: string },
+  ) => Promise<DesktopArtifactDetail>;
+  readArtifactContent: (
+    locator: DesktopArtifactBrowserLocator,
+    input?: { workspaceId?: string },
+  ) => Promise<DesktopArtifactContentDescriptor>;
+  createArtifactMediaViewUrl: (
+    locator: DesktopArtifactBrowserLocator,
+    input?: { workspaceId?: string; maximumBytes?: number },
+  ) => Promise<string>;
+  readArtifactMedia: (
+    locator: DesktopArtifactBrowserLocator,
+    input?: { workspaceId?: string; maximumBytes?: number },
+  ) => Promise<{ mediaType?: string; bytes: Uint8Array }>;
   publishArtifactToHuggingFace: (input: {
     artifactId: string;
     repository: string;
@@ -87,7 +125,10 @@ function toBrowseItems(value: unknown): DesktopArtifactBrowseItem[] {
     return payload.registered.items;
   }
 
-  if (payload.registeredItemsMap && typeof payload.registeredItemsMap === "object") {
+  if (
+    payload.registeredItemsMap &&
+    typeof payload.registeredItemsMap === "object"
+  ) {
     return Object.values(payload.registeredItemsMap);
   }
 
@@ -99,11 +140,19 @@ function ensureSuccess<T>(
   pick: (value: unknown) => T,
   fallback: string,
 ): T {
-  if (typeof response !== "object" || response === null || !("ok" in response)) {
+  if (
+    typeof response !== "object" ||
+    response === null ||
+    !("ok" in response)
+  ) {
     throw new Error(fallback);
   }
 
-  const envelope = response as { ok: boolean; value?: unknown; error?: { message?: string } };
+  const envelope = response as {
+    ok: boolean;
+    value?: unknown;
+    error?: { message?: string };
+  };
   if (!envelope.ok) {
     throw new Error(envelope.error?.message ?? fallback);
   }
@@ -151,9 +200,14 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
 
     async browseHuggingFaceNamespaceDatasets(input) {
       return ensureSuccess(
-        await desktopApi.browseHuggingFaceNamespaceDatasets({ namespace: input.namespace }),
+        await desktopApi.browseHuggingFaceNamespaceDatasets({
+          namespace: input.namespace,
+        }),
         (value) => {
-          const datasets = (value as { datasets?: DesktopHuggingFaceNamespaceDataset[] } | undefined)?.datasets;
+          const datasets = (
+            value as
+              { datasets?: DesktopHuggingFaceNamespaceDataset[] } | undefined
+          )?.datasets;
           return Array.isArray(datasets) ? datasets : [];
         },
         "Failed to browse Hugging Face namespace datasets.",
@@ -167,7 +221,10 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
           revision: input.revision,
         }),
         (value) => {
-          const files = (value as { files?: DesktopHuggingFaceDatasetParquetFile[] } | undefined)?.files;
+          const files = (
+            value as
+              { files?: DesktopHuggingFaceDatasetParquetFile[] } | undefined
+          )?.files;
           return Array.isArray(files) ? files : [];
         },
         "Failed to browse Hugging Face dataset parquet files.",
@@ -176,7 +233,9 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
 
     async importHuggingFaceFiles(input) {
       if (!desktopApi.importHuggingFaceFiles) {
-        throw new Error("Desktop preload Hugging Face import bridge is unavailable.");
+        throw new Error(
+          "Desktop preload Hugging Face import bridge is unavailable.",
+        );
       }
       return ensureSuccess(
         await desktopApi.importHuggingFaceFiles({
@@ -190,7 +249,13 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
 
     async browseArtifacts(input = {}) {
       return ensureSuccess(
-        await desktopApi.browseArtifacts({ artifactFamily: input.artifactFamily, workspaceId: input.workspaceId }, { workspaceId: input.workspaceId }),
+        await desktopApi.browseArtifacts(
+          {
+            artifactFamily: input.artifactFamily,
+            workspaceId: input.workspaceId,
+          },
+          { workspaceId: input.workspaceId },
+        ),
         (value) => toBrowseItems(value),
         "Failed to browse artifacts.",
       );
@@ -201,9 +266,15 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
         return [];
       }
       return ensureSuccess(
-        await desktopApi.browseUnregisteredArtifacts({ workspaceId: input?.workspaceId }, { workspaceId: input?.workspaceId }),
+        await desktopApi.browseUnregisteredArtifacts(
+          { workspaceId: input?.workspaceId },
+          { workspaceId: input?.workspaceId },
+        ),
         (value) => {
-          const items = (value as { items?: DesktopUnregisteredArtifactBrowseItem[] } | undefined)?.items;
+          const items = (
+            value as
+              { items?: DesktopUnregisteredArtifactBrowseItem[] } | undefined
+          )?.items;
           return Array.isArray(items) ? items : [];
         },
         "Failed to browse unregistered artifacts.",
@@ -212,10 +283,15 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
 
     async registerUnregisteredArtifact(input) {
       if (!desktopApi.registerUnregisteredArtifact) {
-        throw new Error("Desktop preload unregistered artifact register bridge is unavailable.");
+        throw new Error(
+          "Desktop preload unregistered artifact register bridge is unavailable.",
+        );
       }
       return ensureSuccess(
-        await desktopApi.registerUnregisteredArtifact({ storageKey: input.storageKey, workspaceId: input.workspaceId }, { workspaceId: input.workspaceId }),
+        await desktopApi.registerUnregisteredArtifact(
+          { storageKey: input.storageKey, workspaceId: input.workspaceId },
+          { workspaceId: input.workspaceId },
+        ),
         (value) => value as { storageKey: string },
         "Failed to register unregistered artifact.",
       );
@@ -223,22 +299,31 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
 
     async deleteUnregisteredArtifact(input) {
       if (!desktopApi.deleteUnregisteredArtifact) {
-        throw new Error("Desktop preload unregistered artifact delete bridge is unavailable.");
+        throw new Error(
+          "Desktop preload unregistered artifact delete bridge is unavailable.",
+        );
       }
       return ensureSuccess(
-        await desktopApi.deleteUnregisteredArtifact({ storageKey: input.storageKey, workspaceId: input.workspaceId }, { workspaceId: input.workspaceId }),
+        await desktopApi.deleteUnregisteredArtifact(
+          { storageKey: input.storageKey, workspaceId: input.workspaceId },
+          { workspaceId: input.workspaceId },
+        ),
         (value) => value as { storageKey: string },
         "Failed to delete unregistered artifact.",
       );
     },
 
-
     async deleteRegisteredArtifact(input) {
       if (!desktopApi.deleteRegisteredArtifact) {
-        throw new Error("Desktop preload registered artifact delete bridge is unavailable.");
+        throw new Error(
+          "Desktop preload registered artifact delete bridge is unavailable.",
+        );
       }
       return ensureSuccess(
-        await desktopApi.deleteRegisteredArtifact({ storageKey: input.storageKey, workspaceId: input.workspaceId }, { workspaceId: input.workspaceId }),
+        await desktopApi.deleteRegisteredArtifact(
+          { storageKey: input.storageKey, workspaceId: input.workspaceId },
+          { workspaceId: input.workspaceId },
+        ),
         (value) => value as { storageKey: string },
         "Failed to delete registered artifact.",
       );
@@ -246,9 +331,13 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
 
     async readArtifactDetail(locator, input = {}) {
       return ensureSuccess(
-        await desktopApi.readArtifactDetail(locator, { workspaceId: input.workspaceId }),
+        await desktopApi.readArtifactDetail(locator, {
+          workspaceId: input.workspaceId,
+        }),
         (value) => {
-          const artifact = (value as { artifact?: DesktopArtifactDetail } | undefined)?.artifact;
+          const artifact = (
+            value as { artifact?: DesktopArtifactDetail } | undefined
+          )?.artifact;
           if (!artifact) {
             throw new Error("Artifact detail response is missing artifact.");
           }
@@ -261,11 +350,17 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
 
     async readArtifactContent(locator, input = {}) {
       return ensureSuccess(
-        await desktopApi.readArtifactContentDescriptor(locator, { workspaceId: input.workspaceId }),
+        await desktopApi.readArtifactContentDescriptor(locator, {
+          workspaceId: input.workspaceId,
+        }),
         (value) => {
-          const content = (value as { content?: DesktopArtifactContentDescriptor } | undefined)?.content;
+          const content = (
+            value as { content?: DesktopArtifactContentDescriptor } | undefined
+          )?.content;
           if (!content) {
-            throw new Error("Artifact content response is missing content descriptor.");
+            throw new Error(
+              "Artifact content response is missing content descriptor.",
+            );
           }
 
           return content;
@@ -276,17 +371,26 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
 
     async readArtifactMedia(locator, input = {}) {
       const media = ensureSuccess(
-        await desktopApi.readArtifactViewerMedia(locator, { workspaceId: input.workspaceId }),
+        await desktopApi.readArtifactViewerMedia(locator, {
+          workspaceId: input.workspaceId,
+          maximumBytes: input.maximumBytes,
+        }),
         (value) => value as { mediaType?: string; bytes: Uint8Array },
         "Failed to read artifact media.",
       );
 
-      return { mediaType: media.mediaType, bytes: normalizeArtifactMediaBytes(media.bytes) };
+      return {
+        mediaType: media.mediaType,
+        bytes: normalizeArtifactMediaBytes(media.bytes),
+      };
     },
 
     async createArtifactMediaViewUrl(locator, input = {}) {
       const media = ensureSuccess(
-        await desktopApi.readArtifactViewerMedia(locator, { workspaceId: input.workspaceId }),
+        await desktopApi.readArtifactViewerMedia(locator, {
+          workspaceId: input.workspaceId,
+          maximumBytes: input.maximumBytes,
+        }),
         (value) => value as { mediaType?: string; bytes: Uint8Array },
         "Failed to read artifact media.",
       );
@@ -324,7 +428,9 @@ export function createDesktopArtifactBrowserClient(): DesktopArtifactBrowserClie
 
     async verifyImportedSourceBacking(input) {
       if (!desktopApi.verifyImportedArtifactSourceBacking) {
-        throw new Error("Desktop preload source verification bridge is unavailable.");
+        throw new Error(
+          "Desktop preload source verification bridge is unavailable.",
+        );
       }
       return ensureSuccess(
         await desktopApi.verifyImportedArtifactSourceBacking({

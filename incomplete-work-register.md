@@ -68,15 +68,19 @@ Do not use this register for:
 
 ### IW-20260605-004
 
-- Status: open
+- Status: addressed
 - Severity: medium
 - Area: Run & Test conversational UI
 - Evidence:
   - `docs/architecture/controlled-conversational-system-execution.md`: states that selected-system context, wording, DTO mapping, UI state, behavior tests, and final documentation remain separate UI repair work.
   - `docs/context/packs/controlled-conversational-system-execution.pack.md`: says Run & Test UI correctness remains a distinct responsibility.
-- Summary: The controlled conversational non-UI boundary is described as repaired, but the Run & Test UI still has incomplete correctness work.
-- Decision needed: Decide whether to finish the Run & Test UI repair now, keep it explicitly deferred, or remove UI affordances that imply completion.
-- Notes: This is related to, but separate from, the text-generation adapter support-status mismatch.
+- Summary: The conversational Run & Test UI now shares one desktop/thin
+  presenter, consumes actual execution-plan summaries, projects authoritative
+  action availability, bounds input/transcript rendering, and has host/parity,
+  accessibility, long-conversation, and DTO-envelope regression coverage.
+- Decision needed: None for the repaired initial controlled-text slice.
+- Notes: Tools, retrieval, memory, multimodal IO, streaming, cancel, and retry
+  remain explicitly unsupported unless implemented end to end.
 
 ### IW-20260605-005
 

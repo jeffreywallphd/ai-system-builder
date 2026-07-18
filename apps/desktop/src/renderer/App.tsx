@@ -9,7 +9,7 @@ import { desktopLazyPages, type DesktopLazyPageDiagnosticContext, type DesktopLa
 import { resolveDesktopWorkspaceRouteBoundary } from "./routes/workspaceRouteBoundary";
 import { recordRendererMemorySnapshot } from "./diagnostics/rendererMemoryDiagnostics";
 
-type DesktopWorkspacePageKey = Extract<DesktopPageKey, "artifacts" | "assets" | "user-library" | "models" | "image-generation">;
+type DesktopWorkspacePageKey = Extract<DesktopPageKey, "artifacts" | "assets" | "user-library" | "models" | "image-generation" | "systems">;
 
 export function App() {
   useEffect(() => {
@@ -86,6 +86,10 @@ export function WorkspaceAwareDesktopApp({ lazyPages = desktopLazyPages }: Works
         const ImageGenerationPage = lazyPages["image-generation"];
         return <ImageGenerationPage __lazyLoadContext={lazyLoadContext} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
       }
+      case "systems": {
+        const SystemBuilderPage = lazyPages.systems;
+        return <SystemBuilderPage __lazyLoadContext={lazyLoadContext} workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
+      }
     }
   };
 
@@ -98,10 +102,6 @@ export function WorkspaceAwareDesktopApp({ lazyPages = desktopLazyPages }: Works
       case "settings": {
         const SettingsPage = lazyPages.settings;
         return <SettingsPage __lazyLoadContext={lazyLoadContext} />;
-      }
-      case "system": {
-        const SystemPage = lazyPages.system;
-        return <SystemPage __lazyLoadContext={lazyLoadContext} />;
       }
       default:
         return <WorkspaceRequiredSurface />;

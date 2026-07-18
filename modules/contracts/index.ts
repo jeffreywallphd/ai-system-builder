@@ -7,8 +7,10 @@ export * as runtime from "./runtime";
 export * as storage from "./storage";
 export * as asset from "./asset";
 export * as workspace from "./workspace";
+export * as organization from "./organization";
 export * as userLibrary from "./user-library";
 export * as assetAuthoring from "./asset-authoring";
+export * as assetStudio from "./asset-studio";
 export * as artifact from "./artifact";
 export * as artifactBrowser from "./artifact-browser";
 export * as transform from "./transform";
@@ -30,6 +32,8 @@ export * as security from "./security";
 export * as effectiveAssetProjections from "./effective-asset-projections";
 
 export * as assetComposition from "./asset-composition";
+export * as systemBuilder from "./system-builder";
+export * as systemReview from "./system-review";
 
 export * as runtimeReadiness from "./runtime-readiness";
 export * as executionPlans from "./execution-plans";

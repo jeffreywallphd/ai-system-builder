@@ -1,6 +1,6 @@
 # ADR-0020: Asset Composition Planning
 
-- Status: Accepted
+- Status: accepted
 - Date: 2026-05-20
 
 ## Context

@@ -1,11 +1,20 @@
 require.extensions[".svg"] = (module: NodeModule) => {
   module.exports = "logo.svg";
 };
+require.extensions[".png"] = (module: NodeModule) => {
+  module.exports = "page-art.png";
+};
 
 import { JSDOM } from "jsdom";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, testDouble } from "../../../../../modules/testing/node-test";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  testDouble,
+} from "../../../../../modules/testing/node-test";
 
 let AppComponent: typeof import("../App").App | undefined;
 
@@ -14,7 +23,9 @@ async function loadApp() {
   return AppComponent;
 }
 
-const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "http://localhost/" });
+const dom = new JSDOM("<!doctype html><html><body></body></html>", {
+  url: "http://localhost/",
+});
 (globalThis as any).window = dom.window;
 (globalThis as any).document = dom.window.document;
 (globalThis as any).Event = dom.window.Event;
@@ -54,7 +65,7 @@ describe("desktop renderer page composition", () => {
     mountedContainer = undefined;
   });
 
-  it("renders landing Home page by default and switches to Data/Settings/System pages", async () => {
+  it("renders Home and switches between workspace pages, Settings, and Systems", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -62,32 +73,108 @@ describe("desktop renderer page composition", () => {
     mountedRoot = root;
     mountedContainer = container;
 
-    const workspaces = [{ workspaceId: "research-workspace", displayName: "Research Workspace", status: "active", createdAt: "2026-05-14T00:00:00.000Z" }];
+    const workspaces = [
+      {
+        workspaceId: "research-workspace",
+        displayName: "Research Workspace",
+        status: "active",
+        createdAt: "2026-05-14T00:00:00.000Z",
+      },
+    ];
     let selectedWorkspaceId: string | undefined;
     window.desktopApi = {
-      listWorkspaces: testDouble.fn(async () => ({ ok: true, value: { workspaces } })),
-      readActiveWorkspaceSelection: testDouble.fn(async () => ({ ok: true, value: selectedWorkspaceId ? { workspaceId: selectedWorkspaceId } : {} })),
-      saveActiveWorkspaceSelection: testDouble.fn(async (selection: { workspaceId?: string }) => { selectedWorkspaceId = selection.workspaceId; return { ok: true, value: { selection } }; }),
-      clearActiveWorkspaceSelection: testDouble.fn(async () => { selectedWorkspaceId = undefined; return { ok: true, value: {} }; }),
-      createWorkspace: testDouble.fn(async (input: { command: { displayName: string; includeSystemFoundationAssets?: boolean } }) => { const workspace = { workspaceId: "workspace.created", displayName: input.command.displayName, status: "active", createdAt: "2026-05-14T00:00:00.000Z", settings: { defaultIncludeSystemFoundationAssets: input.command.includeSystemFoundationAssets } }; workspaces.push(workspace); selectedWorkspaceId = workspace.workspaceId; return { ok: true, value: { workspace } }; }),
+      listWorkspaces: testDouble.fn(async () => ({
+        ok: true,
+        value: { workspaces },
+      })),
+      readActiveWorkspaceSelection: testDouble.fn(async () => ({
+        ok: true,
+        value: selectedWorkspaceId ? { workspaceId: selectedWorkspaceId } : {},
+      })),
+      saveActiveWorkspaceSelection: testDouble.fn(
+        async (selection: { workspaceId?: string }) => {
+          selectedWorkspaceId = selection.workspaceId;
+          return { ok: true, value: { selection } };
+        },
+      ),
+      clearActiveWorkspaceSelection: testDouble.fn(async () => {
+        selectedWorkspaceId = undefined;
+        return { ok: true, value: {} };
+      }),
+      createWorkspace: testDouble.fn(
+        async (input: {
+          command: {
+            displayName: string;
+            includeSystemFoundationAssets?: boolean;
+          };
+        }) => {
+          const workspace = {
+            workspaceId: "workspace.created",
+            displayName: input.command.displayName,
+            status: "active",
+            createdAt: "2026-05-14T00:00:00.000Z",
+            settings: {
+              defaultIncludeSystemFoundationAssets:
+                input.command.includeSystemFoundationAssets,
+            },
+          };
+          workspaces.push(workspace);
+          selectedWorkspaceId = workspace.workspaceId;
+          return { ok: true, value: { workspace } };
+        },
+      ),
       uploadArtifact: testDouble.fn().mockRejectedValue(new Error("unused")),
-      browseArtifacts: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
-      readArtifactDetail: testDouble.fn().mockRejectedValue(new Error("unused")),
-      readArtifactContentDescriptor: testDouble.fn().mockRejectedValue(new Error("unused")),
-      readArtifactViewerMedia: testDouble.fn().mockRejectedValue(new Error("unused")),
-      publishArtifactToRepo: testDouble.fn().mockRejectedValue(new Error("unused")),
-      verifyPublishedArtifactBacking: testDouble.fn().mockRejectedValue(new Error("unused")),
-      registerArtifactFromRepo: testDouble.fn().mockRejectedValue(new Error("unused")),
-      localizeArtifactFromRepo: testDouble.fn().mockRejectedValue(new Error("unused")),
-      listAssetDefinitions: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
-      readAssetDefinition: testDouble.fn().mockRejectedValue(new Error("unused")),
-      readAssetDefinitionVersion: testDouble.fn().mockRejectedValue(new Error("unused")),
-      listAssetResourceBackedViews: testDouble.fn().mockResolvedValue({ ok: true, value: { items: [] } }),
-      readAssetResourceBackedView: testDouble.fn().mockRejectedValue(new Error("unused")),
-      registerResourceBackedViewAsAsset: testDouble.fn().mockRejectedValue(new Error("unused")),
-      finalizeGeneratedOutputAsAsset: testDouble.fn().mockRejectedValue(new Error("unused")),
-      importExternalRepositoryObjectAsAsset: testDouble.fn().mockRejectedValue(new Error("unused")),
-      localizeExternalRepositoryObjectAsAsset: testDouble.fn().mockRejectedValue(new Error("unused")),
+      browseArtifacts: testDouble
+        .fn()
+        .mockResolvedValue({ ok: true, value: { items: [] } }),
+      readArtifactDetail: testDouble
+        .fn()
+        .mockRejectedValue(new Error("unused")),
+      readArtifactContentDescriptor: testDouble
+        .fn()
+        .mockRejectedValue(new Error("unused")),
+      readArtifactViewerMedia: testDouble
+        .fn()
+        .mockRejectedValue(new Error("unused")),
+      publishArtifactToRepo: testDouble
+        .fn()
+        .mockRejectedValue(new Error("unused")),
+      verifyPublishedArtifactBacking: testDouble
+        .fn()
+        .mockRejectedValue(new Error("unused")),
+      registerArtifactFromRepo: testDouble
+        .fn()
+        .mockRejectedValue(new Error("unused")),
+      localizeArtifactFromRepo: testDouble
+        .fn()
+        .mockRejectedValue(new Error("unused")),
+      listAssetDefinitions: testDouble
+        .fn()
+        .mockResolvedValue({ ok: true, value: { items: [] } }),
+      readAssetDefinition: testDouble
+        .fn()
+        .mockRejectedValue(new Error("unused")),
+      readAssetDefinitionVersion: testDouble
+        .fn()
+        .mockRejectedValue(new Error("unused")),
+      listAssetResourceBackedViews: testDouble
+        .fn()
+        .mockResolvedValue({ ok: true, value: { items: [] } }),
+      readAssetResourceBackedView: testDouble
+        .fn()
+        .mockRejectedValue(new Error("unused")),
+      registerResourceBackedViewAsAsset: testDouble
+        .fn()
+        .mockRejectedValue(new Error("unused")),
+      finalizeGeneratedOutputAsAsset: testDouble
+        .fn()
+        .mockRejectedValue(new Error("unused")),
+      importExternalRepositoryObjectAsAsset: testDouble
+        .fn()
+        .mockRejectedValue(new Error("unused")),
+      localizeExternalRepositoryObjectAsAsset: testDouble
+        .fn()
+        .mockRejectedValue(new Error("unused")),
       readPythonRuntimeStatus: testDouble.fn().mockResolvedValue({
         ok: true,
         value: {
@@ -108,25 +195,144 @@ describe("desktop renderer page composition", () => {
           logs: [],
         },
       }),
-      browseModels: testDouble.fn().mockResolvedValue({ ok: true, value: { models: [] } }),
-      getModelDetails: testDouble.fn().mockResolvedValue({ ok: true, value: { model: { provider: "huggingface", modelId: "org/demo", displayName: "Demo" } } }),
-      listModels: testDouble.fn().mockResolvedValue({ ok: true, value: { models: [] } }),
-      saveModelReference: testDouble.fn().mockResolvedValue({ ok: true, value: { model: { modelRecordId: "m1", displayName: "Demo", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-04-27T00:00:00.000Z" } } }),
-      updateModelRecord: testDouble.fn().mockResolvedValue({ ok: true, value: { model: { modelRecordId: "m1", displayName: "Demo", source: "huggingface", lifecycleStatus: "saved-reference", artifactForm: "full-model", provider: "huggingface", createdAt: "2026-04-27T00:00:00.000Z" } } }),
-      deleteModelRecord: testDouble.fn().mockResolvedValue({ ok: true, value: { deletedModelRecordId: "m1", deletedRegistryRecord: true, deletedLocalFiles: false, deletedBackingArtifactIds: [] } }),
+      browseModels: testDouble
+        .fn()
+        .mockResolvedValue({ ok: true, value: { models: [] } }),
+      getModelDetails: testDouble.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          model: {
+            provider: "huggingface",
+            modelId: "org/demo",
+            displayName: "Demo",
+          },
+        },
+      }),
+      listModels: testDouble
+        .fn()
+        .mockResolvedValue({ ok: true, value: { models: [] } }),
+      saveModelReference: testDouble.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          model: {
+            modelRecordId: "m1",
+            displayName: "Demo",
+            source: "huggingface",
+            lifecycleStatus: "saved-reference",
+            artifactForm: "full-model",
+            provider: "huggingface",
+            createdAt: "2026-04-27T00:00:00.000Z",
+          },
+        },
+      }),
+      updateModelRecord: testDouble.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          model: {
+            modelRecordId: "m1",
+            displayName: "Demo",
+            source: "huggingface",
+            lifecycleStatus: "saved-reference",
+            artifactForm: "full-model",
+            provider: "huggingface",
+            createdAt: "2026-04-27T00:00:00.000Z",
+          },
+        },
+      }),
+      deleteModelRecord: testDouble.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          deletedModelRecordId: "m1",
+          deletedRegistryRecord: true,
+          deletedLocalFiles: false,
+          deletedBackingArtifactIds: [],
+        },
+      }),
     };
 
     await act(async () => {
       root.render(<App />);
     });
 
-    await waitForText(container, "Choose your working context");
-    expect(container.textContent).toContain("Choose your working context");
-    expect(container.querySelector("header")?.textContent).toContain("AI System Builder");
-    expect(container.textContent).toContain("Open System");
-    expect(container.querySelector("header")?.textContent).not.toContain("Create workspace");
+    await waitForText(container, "Choose a Workspace");
+    expect(container.textContent).toContain("Choose a Workspace");
+    expect(container.querySelector("#home-title")?.tagName).toBe("H1");
+    expect(container.textContent).toContain(
+      "The project context that controls which data, assets, models, and settings are visible while you work.",
+    );
+    expect(container.querySelector("header")?.textContent).toContain(
+      "AI System Builder",
+    );
+    expect(container.textContent).toContain("Open Systems");
+    expect(container.querySelector("header")?.textContent).not.toContain(
+      "Create workspace",
+    );
+    expect(
+      container
+        .querySelector(".home-workspace-card")
+        ?.classList.contains("ui-panel"),
+    ).toBe(false);
+    expect(
+      container
+        .querySelector(".home-area-card__main")
+        ?.firstElementChild?.classList.contains("home-card-illustration"),
+    ).toBe(true);
 
-    const menu = container.querySelector(".ui-shell__menu") as HTMLDetailsElement | null;
+    const buildGroupButton = Array.from(
+      container.querySelectorAll(".ui-shell__sidebar-label"),
+    ).find((button) => button.textContent?.trim() === "Build");
+    expect(buildGroupButton?.getAttribute("aria-expanded")).toBe("true");
+
+    await act(async () => {
+      buildGroupButton?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    expect(buildGroupButton?.getAttribute("aria-expanded")).toBe("false");
+    expect(
+      buildGroupButton?.parentElement
+        ?.querySelector(".ui-shell__sidebar-items")
+        ?.hasAttribute("hidden"),
+    ).toBe(true);
+    expect(
+      window.localStorage.getItem(
+        "ai-system-builder.ui.collapsed-navigation-groups",
+      ),
+    ).toContain("build");
+
+    await act(async () => {
+      buildGroupButton?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    expect(buildGroupButton?.getAttribute("aria-expanded")).toBe("true");
+
+    const collapseButton = container.querySelector(
+      "button[aria-label='Collapse sidebar']",
+    );
+    expect(Boolean(collapseButton)).toBe(true);
+
+    await act(async () => {
+      collapseButton?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    expect(container.querySelector(".ui-shell")?.className).toContain(
+      "ui-shell--sidebar-collapsed",
+    );
+    expect(
+      Boolean(container.querySelector("button[aria-label='Expand sidebar']")),
+    ).toBe(true);
+    expect(
+      window.localStorage.getItem("ai-system-builder.ui.sidebar-collapsed"),
+    ).toBe("true");
+
+    await act(async () => {
+      container
+        .querySelector("button[aria-label='Expand sidebar']")
+        ?.dispatchEvent(new Event("click", { bubbles: true }));
+    });
+
+    const menu = container.querySelector(
+      ".ui-shell__menu",
+    ) as HTMLDetailsElement | null;
     expect(menu).toBeDefined();
     if (menu) {
       menu.open = true;
@@ -136,16 +342,18 @@ describe("desktop renderer page composition", () => {
       expect(menu.open).toBe(false);
     }
 
-    const artifactsButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Data",
-    );
+    const artifactsButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent === "Data");
     expect(artifactsButton).toBeDefined();
 
     await act(async () => {
       artifactsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("Create a workspace to use Assets, Artifacts, Data, Models, and Images.");
+    expect(container.textContent).toContain(
+      "Create a workspace to use Systems, Assets, Artifacts, Data, Models, and Images.",
+    );
     expect(container.textContent).toContain("Create workspace");
     expect(container.textContent).not.toContain("Data Artifact Ingester");
     expect(window.desktopApi?.browseArtifacts).not.toHaveBeenCalled();
@@ -167,34 +375,48 @@ describe("desktop renderer page composition", () => {
     await act(async () => {
       assetsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
-    await waitForText(container, "Asset Library");
-    expect(container.textContent).toContain("Asset Library");
-    expect(container.querySelector("button[aria-current='page']")?.textContent).toBe("Assets");
+    await waitForText(container, "Search assets");
+    expect(container.textContent).toContain("Search assets");
+    expect(
+      Boolean(container.querySelector(".ui-shell__page-art--assets img")),
+    ).toBe(true);
+    expect(
+      container.querySelector("button[aria-current='page']")?.textContent,
+    ).toBe("Assets");
     expect(window.desktopApi?.listAssetDefinitions).toHaveBeenCalled();
 
-    const settingsButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Settings",
-    );
+    const settingsButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent === "Settings");
     expect(settingsButton).toBeDefined();
 
     await act(async () => {
       settingsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
-    await waitForText(container, "Settings");
+    await waitForText(container, "Manage global desktop defaults");
     expect(container.textContent).toContain("Settings");
-    expect(container.querySelector("button[aria-current='page']")?.getAttribute("aria-label")).toBe("Settings");
+    expect(container.textContent).toContain("Software status");
+    expect(
+      container
+        .querySelector("button[aria-current='page']")
+        ?.getAttribute("aria-label"),
+    ).toBe("Settings");
 
-    const systemButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "System",
+    const systemsButton = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Systems",
     );
-    expect(systemButton).toBeDefined();
+    expect(systemsButton).toBeDefined();
 
     await act(async () => {
-      systemButton?.dispatchEvent(new Event("click", { bubbles: true }));
+      systemsButton?.dispatchEvent(new Event("click", { bubbles: true }));
     });
 
-    await waitForText(container, "Basic diagnostics");
-    expect(container.textContent).toContain("Basic diagnostics");
-    expect(container.querySelector("button[aria-current='page']")?.textContent).toBe("System");
+    await waitForText(container, "System Builder");
+    expect(container.textContent).toContain("System Builder");
+    expect(container.textContent).not.toContain("Basic diagnostics");
+    expect(window.desktopApi?.readPythonRuntimeStatus).not.toHaveBeenCalled();
+    expect(
+      container.querySelector("button[aria-current='page']")?.textContent,
+    ).toBe("Systems");
   });
 });

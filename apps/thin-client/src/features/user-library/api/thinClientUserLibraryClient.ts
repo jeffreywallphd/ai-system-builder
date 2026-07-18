@@ -2,7 +2,7 @@ import type {
   UserLibraryAssetRecord,
   UserLibraryEffectiveSourceSummary,
   WorkspaceUserLibraryLinkRecord,
-} from '../../../../../modules/contracts/user-library';
+} from '../../../../../../modules/contracts/user-library';
 import { parseApiEnvelope } from '../../../security/apiErrorEnvelope';
 import { secureFetch } from '../../../security/secureFetch';
 

@@ -1,6 +1,11 @@
 # System Overview
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0001-repository-structure.md`, `docs/adr/ADR-0003-host-model-and-transport-separation.md`, `docs/adr/ADR-0004-persistence-and-storage-separation.md`, `docs/adr/ADR-0015-security-architecture-and-policy-boundaries.md`, `docs/adr/ADR-0016-asset-kernel-terminology-and-architecture-baseline.md`, `docs/adr/ADR-0023-controlled-conversational-system-execution.md`, `docs/adr/ADR-0025-deployment-shaped-structured-persistence.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 - effective asset projections baseline: `docs/architecture/effective-asset-projections.md` defines workspace-scoped safe materialized/effective asset projections for planning-readiness (non-executing).
+
 ## Purpose of this repository
 
 `ai-system-builder` is a fresh rebuild intended to replace earlier architectural sprawl with a simpler and more disciplined structure.
@@ -155,7 +160,6 @@ Server/thin-client mode is also a remote execution authority for future resource
 
 Runtime roots and artifact storage roots are separate concerns and should remain independently configured per host.
 
-
 Transport technologies are adapters, not application definitions.
 
 - Express is the default server API transport adapter.
@@ -174,7 +178,10 @@ Transport technologies are adapters, not application definitions.
 
 ## Persistence and storage posture
 
-- Persistence: structured durable records (default adapter target: Postgres).
+- Persistence: structured durable records, targeting SQLite for local deployment
+  and PostgreSQL for campus, corporate, and cloud server deployments. Desktop
+  composition actively uses SQLite, and explicit managed server shapes actively
+  use PostgreSQL after the fail-closed legacy import/cutover step.
 - Storage adapters: a broad architectural category for non-relational durable/semi-durable content concerns with a thin shared foundation.
 - Storage is family-oriented (not one flat abstraction): artifact-object storage and artifact-repo storage are peer first-class specialized families.
 - Artifact-object storage centers on artifact keys, bytes, checksums, and artifact metadata.
@@ -189,6 +196,7 @@ They are separate architectural concerns even if they share physical disk territ
 
 Image upload remains an implemented specialized intake path and should align to staged artifact descriptor semantics rather than defining a parallel semantic world.
 The initial image vertical slice now includes both write and read direction:
+
 - write/intake through artifact upload as specialized ingestion,
 - read-side artifact browser behavior through image-backed `artifact.browse` (list metadata), `artifact.read` (detail metadata), and `artifact.content.read` (separate content retrieval).
 
@@ -222,8 +230,6 @@ The following are intentionally open and should not be over-specified yet:
 
 Until formalized, contributors should follow the boundaries in this architecture set and document significant decisions in ADRs.
 
-
-
 ### Server-host artifact-repo slice (current)
 
 Server composition now wires both storage families as peers:
@@ -245,7 +251,6 @@ Desktop composition now mirrors the same publish orchestration path used by serv
 
 Desktop renderer artifact-browser publish/re-check UX should call the preload-backed bridge and shared hook logic, not raw IPC and not desktop-only business logic.
 
-
 ### Artifact repo registration slice (current)
 
 - In addition to publish/re-check, the system now supports first-slice remote registration (`artifact.register.from-repo`) through shared application use-case wiring.
@@ -264,7 +269,14 @@ Desktop renderer artifact-browser publish/re-check UX should call the preload-ba
 
 ## Security architecture posture
 
-Security is cross-cutting and layered rather than a monolithic module. The first implementation target is **HTTPS + LAN pairing bearer token** (`lan-https-token`). Transport security remains adapter-based and swappable, while authorization policy is shared but enforced at both transport and application/resource boundaries. Storage and runtime security concerns remain separate from transport security and are enforced in their own adapter/application seams. ADR-0015 is the canonical security architecture reference.
+Security is cross-cutting and layered rather than a monolithic module. HTTPS +
+LAN pairing bearer tokens remain an implemented private-LAN mode. Managed
+production uses OIDC plus explicit organization selection, active membership,
+pooled organization isolation by default, and premium one-organization placement
+over the same release. Transport security remains adapter-based and swappable,
+while authorization policy is shared and enforced at transport,
+application/resource, persistence, and storage boundaries. ADR-0015 and ADR-0029
+are the canonical security and tenancy references.
 
 ## Workspace Model
 
@@ -274,7 +286,7 @@ Workspace system-pack activation records reference system packs such as `system.
 
 ### Workspace-gated product surfaces
 
-Workspace-scoped UI surfaces are unavailable without an active workspace. Asset, artifact/data, model, image-generation, generated-output, and other resource-backed pages must show a workspace-required call to action rather than empty global records when no workspace is active. Global-safe pages such as home, settings, security diagnostics, and system/about-style views may remain available when they do not expose workspace-owned resources.
+Workspace-scoped UI surfaces are unavailable without an active workspace. Systems, asset, artifact/data, model, image-generation, generated-output, and other workspace-owned pages must show a workspace-required call to action rather than empty global records when no workspace is active. Global-safe pages such as home, Settings, and security/software diagnostics may remain available when they do not expose workspace-owned resources.
 
 Workspace creation may offer `system.foundation@1.0.0` activation by reference via the user-facing "Include System Foundation assets" choice. This does not expose the system pack installer, copy system pack definitions, add pack import/export/install UI, or bypass workspace effective-view/resource scoping.
 
@@ -288,7 +300,7 @@ Artifact and upload isolation requires workspace pages and transports to send an
 
 ### Workspace-aware desktop and thin-client surfaces
 
-Desktop and thin-client users can see the active workspace in the shell and on workspace-scoped pages. Assets, Artifacts/Data, Models, Images, generated-output/data/model surfaces remain gated without an active workspace; Settings, safe diagnostics, and system/status pages remain globally accessible when they do not display workspace-owned records.
+Desktop and thin-client users can see the active workspace in the shell and on their implemented workspace-scoped pages. The desktop Systems destination and the shared Assets, Artifacts/Data, Models, Images, and generated-output/data/model surfaces remain gated without an active workspace. Settings and safe security/software diagnostics remain globally accessible when they do not display workspace-owned records; thin-client System Builder parity is deferred.
 
 The UI uses real workspace clients/transports for create/select/switch, never derives workspace ids from display names, and never creates a hidden default workspace. Creating a workspace may include System Foundation assets via a `system.foundation@1.0.0` activation reference. Workspace-scoped feature clients must include the active workspace id and must not fall back to global records. User-library/cross-workspace reuse, collaboration, invites, sync, and marketplace/pack-management behavior remain out of scope.
 
@@ -304,20 +316,26 @@ User Library reuse is defined by **User Library and Cross-Workspace Asset Reuse*
 
 Related architecture topics are defined by their own canonical docs and ADRs; this overview should not carry a hand-maintained phase/topic map.
 
-
 ## Asset Composition Planning
 
 Asset Composition Planning is defined in `docs/architecture/asset-composition-planning.md` and ADR-0020. It consumes effective asset projections effective projection summaries as planning inputs and does not execute workflows/runtime behavior.
 
 ### Asset composition planning UI status
 
-- Composition planning is exposed inside the **Assets** area as a `Plans` tab, not as a separate top-level page.
+- General composition planning is exposed inside the **Assets** area as a `Plans` tab.
+- The top-level **Systems** area owns future system-specific assembly and System Builder records while reusing these planning and Asset Kernel contracts.
 - The asset composition planning UI is structured form/list planning (plans, assets in plan, connections, check plan), not visual canvas authoring.
 - `valid` means **Ready for planning** only; it does not mean runtime-ready or execution-ready.
 - Runtime-readiness binding and workflow/runtime/model execution remain separate responsibilities.
 - API/IPC/preload/client exposure is the boundary used by UI operations; unsupported operations must render as unavailable in UI.
 
 Effective asset projection infrastructure enriches the **Assets** experience; it is not a separate primary navigation destination in normal user flows.
+
+## System Builder
+
+System Builder is defined in `docs/architecture/system-builder.md` and ADR-0024. The workspace-scoped **Systems** destination is reserved for constructing systems from Asset Kernel definitions, instances, bindings, and compositions. The initial contract family and desktop preparation shell do not imply CRUD, persistence, transport, editing, runtime, or execution support.
+
+Builder-application diagnostics, feature lifecycle state, Python controls, ComfyUI install/repair status, and resource utilization are **Software status** concerns under **Settings**. They must not be modeled as a composed system or stored on System Builder records.
 
 ## Runtime Readiness Binding
 
@@ -333,6 +351,8 @@ Controlled conversational execution is the runnable conversational-system archit
 
 The conversational proof must originate from reusable conversational assets composed from referenced `system.foundation` primitives where relevant, then execute through controlled runtime session/run records.
 
-- Assets now includes a Run & Test tab for conversational composed-system proof flows (plan-derived session creation, approval, transcript, and safe message submission via existing clients).
+- Systems owns Run & Test for conversational composed-system proof flows
+  (execution-plan-derived session creation, approval, bounded transcript, and
+  safe message submission through the shared desktop/thin presenter).
 - Conversational read models use verified source evidence and application availability; API/IPC/preload/client session creation must not accept renderer/browser display identity claims.
 - Server and desktop host composition provide the conversational service family. Cancel, retry, and streaming remain unsupported unless a real application/runtime path supports them.

@@ -1,7 +1,6 @@
 # ADR-0012: Image Generation Runtime Architecture and Contracts
 
-## Status
-Accepted
+- Status: accepted
 
 ## Context
 

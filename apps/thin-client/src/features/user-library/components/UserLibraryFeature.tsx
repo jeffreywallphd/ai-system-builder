@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { UserLibraryAssetRecord, UserLibraryEffectiveSourceKind, UserLibraryEffectiveSourceSummary, WorkspaceUserLibraryLinkRecord } from '../../../../../modules/contracts/user-library';
+import type { UserLibraryAssetRecord, UserLibraryEffectiveSourceKind, UserLibraryEffectiveSourceSummary, WorkspaceUserLibraryLinkRecord } from '../../../../../../modules/contracts/user-library';
 import { createThinClientUserLibraryClient } from '../api/thinClientUserLibraryClient';
 
 type AssetViewModel = { assetId: string; version: string; title: string };

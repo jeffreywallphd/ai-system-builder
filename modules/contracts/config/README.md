@@ -5,6 +5,12 @@
 Typed configuration contracts for host, runtime, logging, persistence, and
 storage concerns.
 
+The config family also defines the finite structured-persistence target mapping:
+`local` uses SQLite with embedded single-host access; `campus-server`,
+`corporate-server`, and `cloud` use PostgreSQL with client/server access. This is
+a deployment target contract, not proof that an adapter is active in host
+composition.
+
 This family is intentionally small:
 
 - concern-specific config shapes (`host`, `runtime`, `logging`, `persistence`,

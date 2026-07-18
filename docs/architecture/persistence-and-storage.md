@@ -1,8 +1,12 @@
 # Persistence and Storage
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0004-persistence-and-storage-separation.md`, `docs/adr/ADR-0025-deployment-shaped-structured-persistence.md`, `docs/adr/ADR-0026-local-sqlite-runtime.md`, `docs/adr/ADR-0027-managed-postgresql-runtime.md`, `docs/adr/ADR-0028-atomic-structured-document-mutations.md`, `docs/adr/ADR-0029-organization-tenancy-identity-and-authorization.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 ## Asset Kernel relationship
 
-The Asset Kernel is the semantic composition model for reusable building blocks. Persistence and storage remain separate lower-level architecture concerns. Asset metadata may be persisted as structured records for asset definitions, instances, bindings, compositions, lifecycle, and provenance; binary/content payloads remain storage concerns. The current Asset Kernel persistence stack includes a minimal local JSON record adapter with schema-version manifest metadata and descriptor-only resource-backed mapping/view helpers. This does not add a migration framework, durable resource-backed mapping repository, or version-history service.
+The Asset Kernel is the semantic composition model for reusable building blocks. Persistence and storage remain separate lower-level architecture concerns. Asset metadata may be persisted as structured records for asset definitions, instances, bindings, compositions, lifecycle, and provenance; binary/content payloads remain storage concerns. The current Asset Kernel persistence stack uses typed local repository adapters over the active host's structured-document seam, while retaining its schema-versioned JSON layout only for unshaped development compatibility and explicit legacy import. Descriptor-only resource-backed mapping/view helpers remain separate. This does not add a durable resource-backed mapping repository or version-history service.
 
 Resource-backed assets should reference artifact/resource storage identities instead of embedding raw file paths or bytes in asset metadata. Generated outputs produced by runtime tasks become reusable only after finalization/registration as artifacts or resource-backed assets. Hugging Face repository objects remain external repository objects until registered/imported as resource-backed assets. Existing artifact, model, dataset, and image concepts should not be renamed during Asset Kernel contract baseline.
 
@@ -38,11 +42,139 @@ At minimum, storage distinguishes two contract families over a shared foundation
 Repo-backed storage is still storage.
 It must not be collapsed into persistence-record concerns and should not be flattened into the same contract shape as artifact/object key-byte operations.
 
-## Default persistence adapter target
+## Deployment-shaped persistence targets
 
-Postgres is the default persistence adapter target for structured records.
+Structured records use a deployment-specific database target:
 
-This establishes a default operational direction for schema/migrations and relational data handling, without forcing every module to know Postgres specifics.
+| Deployment shape | Default adapter | Required access boundary |
+| --- | --- | --- |
+| Local desktop/application | SQLite | Embedded and single-host |
+| Campus server | PostgreSQL | Client/server |
+| Corporate server | PostgreSQL | Client/server |
+| Cloud | PostgreSQL | Client/server |
+
+`modules/contracts/config` owns the finite deployment-shape vocabulary and the
+default target mapping. It describes deployment intent; it does not by itself
+select an active runtime adapter. Host composition remains responsible for
+loading environment-specific configuration and selecting an implemented adapter.
+
+### Local SQLite policy
+
+The local database belongs at
+`<desktop-app-data>/persistence/ai-system-builder.sqlite3`. This path is adapter
+configuration, never a public contract or diagnostic. Artifact storage and
+runtime roots remain separate sibling concerns.
+
+Every local SQLite connection must enable WAL journaling, full synchronous
+durability, foreign-key enforcement, and a finite busy timeout. WAL supports
+concurrent readers with a single writer but requires all database access to stay
+on the same host. Do not place the database or its WAL sidecars on a network
+filesystem, synchronize them as ordinary live files, or use SQLite as the shared
+database for campus, corporate, or cloud deployments.
+
+Live backup must use the selected driver's online backup facility (or a
+transactionally equivalent database-aware snapshot), with restore verification.
+Copying only an open `.sqlite3` file is not an accepted backup procedure because
+committed state may also be present in WAL sidecars.
+
+### Shared PostgreSQL policy
+
+Campus, corporate, and cloud hosts use PostgreSQL for structured records. The
+server owns connection lifecycle, health, and adapter selection; credentials and
+connection material enter only through secret/environment configuration at the
+composition boundary. Application/domain modules must not receive connection
+strings, pools, transactions, SQL, or driver errors.
+
+Backup method, recovery objective, replication, failover, tenant layout, and
+retention vary by managed environment and require explicit operational decisions.
+Selecting PostgreSQL does not claim those capabilities are already implemented.
+
+### Organization partitioning and placement
+
+Managed structured persistence defaults to pooled organization tenancy. Schema
+version 2 keeps platform/legacy records in `structured_documents` and stores
+organization-owned records in `organization_documents`, keyed by organization,
+namespace, and document key. SQLite implements the same explicit logical
+partition for local mode. PostgreSQL additionally enables and forces row-level
+security, with visibility and writes tied to transaction-local
+`app.organization_id`. Adapters include explicit organization predicates and
+bind the setting on a checked-out transaction. Missing request context never
+falls back to platform records.
+
+Premium dedicated placement accepts exactly one configured organization before
+persistence or storage access. It uses the same schema, contracts, migrations,
+and release as pooled placement. Existing records are never assigned during
+ordinary startup; use the fingerprinted assignment procedure in the operations
+runbook.
+
+Managed filesystem artifact adapters preserve contract-level logical keys while
+deriving a physical `organizations/<organization-id>/...` prefix from the
+authenticated request scope. The prefix is adapter-owned and cannot be supplied
+by callers. Object reads, writes, existence checks, deletes, generated-image
+finalization, and unregistered-file access fail closed without organization
+context. A future external object-service adapter must preserve those ownership
+semantics rather than expose provider bucket/key construction to use cases.
+
+### Database portability and migrations
+
+- Repository ports and record contracts define semantic behavior independent of
+  a database engine.
+- SQLite and PostgreSQL adapters may use engine-specific SQL and migrations; do
+  not leak dialect compromises into application contracts.
+- Every database maintains a monotonic migration ledger. Schema migration runs
+  before repository activation, under an exclusive migration lock appropriate to
+  the engine, and fails startup safely when the schema is newer than the binary.
+- Each record family needs round-trip, malformed-data, constraint, workspace
+  isolation, transaction, and concurrency coverage against every supported
+  database adapter.
+- Schema changes that remove or reinterpret data require an export/rollback plan
+  and explicit approval; application startup must not perform an unbounded or
+  destructive conversion silently.
+- Both active database adapters expose a deterministic, transactionally
+  consistent NDJSON export with a versioned manifest, document count, and digest.
+  This is a portability/inspection artifact, not a replacement for engine-native
+  disaster-recovery backup.
+
+### Atomic mutation and retry policy
+
+Database-backed repository collection changes use revision compare-and-swap,
+including insert-if-absent revision `0`, so independent server processes cannot
+silently replace an entire collection with a stale copy. Repository adapters
+must use record-store mutation methods; a fitness test rejects direct collection
+writes from repository factories. Mutation callbacks are pure computation and
+may be re-evaluated after a conflict. The default conflict budget is bounded at
+64 attempts.
+
+PostgreSQL application transactions run at Serializable isolation and retry the
+complete callback, up to four attempts, for serialization failure (`40001`) and
+deadlock detected (`40P01`). JSON compatibility mode serializes same-file
+mutations only within one Node process and is not valid shared-server
+persistence. These mechanics prevent collection-wide lost updates; they do not
+invent domain merge rules for two writers replacing the same logical record.
+
+### Operational boundary
+
+The server publishes process-only liveness separately from dependency-aware
+readiness. Readiness combines database schema/query/pool state with artifact-root
+access/capacity and sanitizes all failures. Production server shapes require
+managed OIDC over HTTPS and drain their pool on restart, SIGINT, or SIGTERM.
+Shape profiles and deployment templates are under `config/environments/server`
+and `deployments/server`; the compatibility, backup/restore, rollout, and
+qualification rules are in `docs/operations`. ADR-0029 decides organization
+tenancy and placement. The templates do not decide retention, RPO/RTO, HA, or
+the external object-service provider.
+
+### JSON adapter transition
+
+Desktop composition now opens and migrates SQLite before IPC registration,
+inventories only allowlisted legacy JSON/NDJSON structured-data families, retains
+a rollback copy, imports and reconciles in one transaction, records an activation
+marker, and then routes typed repositories to SQLite. Once marked, changed JSON is
+treated as divergent state and startup fails; there is no automatic fallback or
+dual write. Explicit campus, corporate, and cloud server shapes now select the
+PostgreSQL implementation and same import seam before API registration. An
+unshaped non-production server remains a named JSON compatibility mode for local
+development; production requires an explicit deployment shape.
 
 ## Shared persistence contract baseline
 
@@ -62,19 +194,20 @@ Persistence family invariants:
 - persistence family barrels should export persistence-only surfaces so consumers get a predictable family boundary.
 - application persistence ports should stay record-oriented and operation-aware (not generic CRUD bags) and should depend on persistence contracts, not adapter-native query APIs.
 
-This keeps Postgres as the default adapter direction without coupling application/domain boundaries to Postgres-specific APIs.
+This permits deployment-shaped database adapters without coupling
+application/domain boundaries to SQLite- or PostgreSQL-specific APIs.
 
 
 ### Asset Kernel local record adapter checkpoint
 
-`modules/adapters/persistence/asset` provides the current minimal local Asset Kernel persistence adapter. It stores JSON-compatible `AssetDefinition`, `AssetInstance`, `AssetComposition`, and `AssetBinding` records under a host-supplied root in `asset-kernel/manifest.json`, `definitions.json`, `instances.json`, `compositions.json`, and `bindings.json`; the manifest currently uses `schemaVersion: 1` and `storeKind: "asset-kernel-local-store"`. The adapter implements application repository ports and remains infrastructure-only: it does not own Asset Kernel validation, business rules, host composition, API/IPC/UI exposure, resource-backed mapping helpers, artifact/object storage, workflow execution, graph execution, runtime readiness, prompt assembly, embeddings, or AI-generated context.
+`modules/adapters/persistence/asset` provides the current local Asset Kernel persistence adapter. It stores JSON-compatible `AssetDefinition`, `AssetInstance`, `AssetComposition`, and `AssetBinding` records through the active host's structured-document store. Its compatibility/legacy layout remains `asset-kernel/manifest.json`, `definitions.json`, `instances.json`, `compositions.json`, and `bindings.json`; the manifest uses `schemaVersion: 1` and `storeKind: "asset-kernel-local-store"`. The adapter implements application repository ports and remains infrastructure-only: it does not own Asset Kernel validation, business rules, host composition, API/IPC/UI exposure, resource-backed mapping helpers, artifact/object storage, workflow execution, graph execution, runtime readiness, prompt assembly, embeddings, or AI-generated context.
 
 The local adapter persists records and references only. It must not embed raw file/blob bytes, generated model/image/dataset payload bytes, secrets, environment values, local filesystem handles, or adapter-native paths in asset records or public errors. Durable resource-backed asset mapping persistence and explicit persistence-to-storage linkage remain deferred beyond this checkpoint.
 
 
 ### Workspace local persistence checkpoint
 
-Workspace application repository ports and local file-backed persistence adapters store workspace records/indexes, active workspace selection, and workspace system-pack activation records. The local layout is under a host-supplied storage root at `workspaces/index.json`, `workspaces/active-workspace.json`, `workspaces/<workspaceId>/workspace.json`, and `workspaces/<workspaceId>/activations/system-packs.json`. This adapter stores records and references only: active workspace selection is a persisted preference/read model rather than global application-service state, and system-pack activations reference packs by id/version such as `system.foundation@1.0.0` without installing, copying, embedding, or mutating pack manifests, assets, or definitions. Workspace record save and activation save are create-or-replace seams; workspace record update and activation update are existing-record-only and must not create missing records.
+Workspace application repository ports and local persistence adapters store workspace records/indexes, active workspace selection, and workspace system-pack activation records through the active structured-document store. The compatibility/legacy layout remains `workspaces/index.json`, `workspaces/active-workspace.json`, `workspaces/<workspaceId>/workspace.json`, and `workspaces/<workspaceId>/activations/system-packs.json`. This adapter stores records and references only: active workspace selection is a persisted preference/read model rather than global application-service state, and system-pack activations reference packs by id/version such as `system.foundation@1.0.0` without installing, copying, embedding, or mutating pack manifests, assets, or definitions. Workspace record save and activation save are create-or-replace seams; workspace record update and activation update are existing-record-only and must not create missing records.
 
 Workspace persistence must avoid raw local path leakage in public errors/read models. Workspace creation writes only through workspace ports, validates display names, generates safe workspace IDs, persists workspace records, may persist active workspace selection only when explicitly requested, and may create a reference-only `system.foundation@1.0.0` activation record. UI-created workspaces must be backend-resolvable workspace records, active workspace selection remains a persisted preference/read model rather than global mutable application-service state, and the System Foundation checkbox persists a reference-only activation. Workspace persistence does not add pack import/export/install UI or collaboration behavior.
 
@@ -106,7 +239,12 @@ These concerns belong behind storage ports/contracts and adapters (for example i
 
 Physical location can vary by host mode:
 
+- Desktop local structured persistence targets a SQLite database under the
+  desktop application-data persistence root.
 - Desktop mode may store artifacts under OS-specific app data locations.
+- Campus, corporate, and cloud server structured persistence targets PostgreSQL;
+  the database is reached through a configured client/server connection rather
+  than a shared SQLite file.
 - Server mode may store artifacts in configured file paths, mounted volumes, or object/blob services.
 - Server or hybrid compositions may also include repo-backed providers where the primary storage identity is provider/repository/revision rather than local filesystem path.
 - For the current server app, the default filesystem storage root is resolved from the server app/module location so
@@ -303,7 +441,7 @@ The Hugging Face adapter remains one provider behind the generic artifact-repo p
 
 ## Asset Kernel local record persistence
 
-Local Asset Kernel persistence is structured record persistence, not artifact/blob storage. `composeLocalAssetKernel` composes it from a durable storage root, and the adapter owns the `<storageRoot>/asset-kernel/` layout for `manifest.json`, definitions, instances, compositions, and bindings. The helper returns path-safe diagnostics (`storeKind`, `schemaVersion`, and initialized state) rather than local filesystem paths, and it does not store artifact/resource bytes, generated image/model/dataset payloads, secrets, tokens, runtime installs, or provider-native file handles.
+Local Asset Kernel persistence is structured record persistence, not artifact/blob storage. `composeLocalAssetKernel` receives the host-selected document store; its root-relative Asset Kernel identities also define the explicit legacy JSON import layout. The helper returns path-safe diagnostics (`storeKind`, `schemaVersion`, and initialized state) rather than local filesystem paths, and it does not store artifact/resource bytes, generated image/model/dataset payloads, secrets, tokens, runtime installs, or provider-native file handles.
 
 Desktop and server host registration initialize this store for internal host composition under `storageRootDirectory` only; runtime roots must not be used for Asset Kernel records or resource-backed provider reads. Built-in definition seeding and trusted system-pack installation are explicit internal application services. They validate before save, persist normal Asset Kernel definitions with safe seed/pack/source metadata, are idempotent, and fail user/custom conflicts without overwrite. They do not write files directly, import persistence adapters, create migrations, create durable active-pack records, apply override/resolver behavior, expose public install/import/export surfaces, or run automatically during host startup.
 
@@ -361,3 +499,20 @@ workspace foundations final cleanup hardens resource reads at the storage bounda
 workspace foundations is Workspace Foundations. Workspace-owned persistence and storage reads/mutations must receive an explicit workspace id from contracts, clients, transports, use cases, ports, providers, and adapters; UI gating alone is not sufficient. Missing workspace context must fail safely or return sanitized diagnostics rather than falling back to global records.
 
 `system.foundation@1.0.0` remains system-owned and is activated by workspace reference only. Persistence must not copy definitions into workspace storage, call the system foundation pack baseline installer, seed on startup, create hidden/default workspaces, or auto-migrate legacy global resources. Until deeper per-workspace Asset Kernel storage exists, adapters may use safe metadata/source ownership filtering for workspace-scoped duplicate/read paths, but must not expose raw paths, storage roots, task payloads, prompts, workflow JSON, or unsafe provider data in diagnostics.
+
+## Approved-release system-data persistence
+
+`createStructuredSystemDataRepository` stores release-owned records and
+append-only audit evidence through the shared structured-document seam. Keys
+include workspace, release, entity, and record/audit identity; organization
+partitioning remains adapter-owned. Record creation/update and audit append are
+one transaction, record updates require the expected application revision, and
+there is no audit mutation/delete operation in the repository port.
+
+SQLite production-runtime integration covers round-trip, audit, stale-write
+rollback, backup, and restore on the Electron database implementation.
+PostgreSQL live conformance covers the same repository semantics, serializable
+retry, and organization RLS isolation when a disposable `TEST_POSTGRES_URL`
+target is available. The reference migration-plan artifact is release evidence;
+it does not execute destructive DDL or replace the monotonic database migration
+ledger.

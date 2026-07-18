@@ -35,6 +35,9 @@
 - Workspace-owned operations must carry explicit workspace context through contracts, clients, transports, use cases, ports, providers, and persistence.
 - System Foundation is system-owned and made available to a workspace through a `system.foundation@1.0.0` activation reference.
 - Resource-backed Asset Registry views are computed, sanitized, descriptor-only, and read-only unless an explicit controlled mutation workflow is in scope.
+- Systems is the workspace-scoped System Builder area for composed systems; builder-application and runtime status belongs to Settings / Software status.
+- Executable implementations, package bytes, build evidence, and system releases are separate from Asset Kernel semantic records; route implementation/package work through ADR-0030 through ADR-0034.
+- Imported/authored code never runs in product, Electron main/preload, API server, or database processes; require the accepted sandbox and capability-broker boundary.
 - Runtime readiness is host-owned capability availability; it does not start/install/repair runtimes during read operations.
 - Security is layered and adapter-based; use ADR-0015 and `security.pack.md` for auth, route policy, TLS, token, audit, and sanitization work.
 - Historical implementation details belong in issues, PRs, or release notes, not in this reusable baseline.
@@ -54,6 +57,10 @@ Use only the docs needed for the current task:
 - `docs/architecture/module-dependency-rules.md` - dependency direction and boundary constraints.
 - `docs/architecture/system-overview.md` - repository shape and packaging posture.
 - `docs/architecture/asset-kernel.md` - canonical Asset Kernel terminology and boundaries.
+- `docs/architecture/asset-implementations-and-packages.md` - implementation releases, package trust, compatibility, and functional defaults.
+- `docs/architecture/asset-authoring-and-execution-security.md` - coding-model and sandbox/capability boundaries.
+- `docs/architecture/system-builder.md` - composed-system records, vocabulary, and product-area placement.
+- `docs/architecture/system-build-and-release.md` - revision, build, release, policy, and workflow boundaries.
 - `docs/architecture/workspace-model.md` - workspace identity, selection, scoping, and activation semantics.
 - `docs/architecture/persistence-and-storage.md` - persistence/storage separation and artifact storage rules.
 - `docs/architecture/runtime-model.md` - runtime ownership, capability, and execution model.
@@ -74,8 +81,15 @@ Use only the docs needed for the current task:
 ## Prompt Assembly Notes
 
 - Always include this pack first.
-- Use `docs/context/prompt-routing.md` to choose companion packs.
-- Typical order: `index` -> task-specific pack(s) -> targeted canonical docs.
+- Use `docs/context/pack-catalog.json` and `docs/context/prompt-routing.md` to choose companion packs.
+- Typical order: `index` -> one primary pack -> at most one evidenced adjacent pack -> targeted canonical docs.
 - For debugging, add `debugging-error-handling` first, then the affected host/runtime/storage/UI pack.
-- For Asset Kernel, workspace, user-library, authoring, projection, composition, readiness, execution-plan, or conversational-execution work, include only the relevant pack chain named by prompt routing.
-- Common planning chain paths: `docs/context/packs/effective-asset-projections.pack.md`, `docs/context/packs/asset-composition-planning.pack.md`, `docs/context/packs/runtime-readiness-binding.pack.md`, `docs/context/packs/execution-plan-preparation.pack.md`, `docs/context/packs/controlled-conversational-system-execution.pack.md`.
+- For Asset Kernel, workspace, user-library, authoring, projection, composition, readiness, execution-plan, or conversational-execution work, select the owning pack and only the immediate neighbor proven relevant by repository inspection.
+- For work spanning projection, composition, readiness, planning, and execution, retrieve and validate one boundary at a time instead of preloading the entire chain.
+
+Frequently adjacent late-stage planning packs remain explicitly discoverable here while the catalog
+stays authoritative for the complete inventory:
+
+- `docs/context/packs/runtime-readiness-binding.pack.md`
+- `docs/context/packs/execution-plan-preparation.pack.md`
+- `docs/context/packs/controlled-conversational-system-execution.pack.md`

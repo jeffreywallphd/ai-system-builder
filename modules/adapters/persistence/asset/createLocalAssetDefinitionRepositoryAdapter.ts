@@ -8,8 +8,10 @@ export function createLocalAssetDefinitionRepositoryAdapter(options: LocalAssetR
 
   return {
     async saveDefinition(definition: AssetDefinition): Promise<AssetDefinition> {
-      const definitions = await store.readCollection("definitions");
-      await store.writeCollection("definitions", upsertRecord(definitions, definition, definitionStorageKey));
+      await store.mutateCollection("definitions", (definitions) => ({
+        records: upsertRecord(definitions, definition, definitionStorageKey),
+        result: undefined,
+      }));
       return cloneJson(definition);
     },
 
@@ -32,12 +34,13 @@ export function createLocalAssetDefinitionRepositoryAdapter(options: LocalAssetR
     },
 
     async deleteDefinition(reference: AssetReference): Promise<void> {
-      const definitions = await store.readCollection("definitions");
       const key = reference.kind === "asset-definition-version" ? `${reference.id}@${reference.version ?? ""}` : String(reference.id);
-      const next = reference.kind === "asset-definition-version"
-        ? deleteRecord(definitions, key, definitionStorageKey)
-        : definitions.filter((definition) => definition.definitionId !== reference.id);
-      await store.writeCollection("definitions", next);
+      await store.mutateCollection("definitions", (definitions) => ({
+        records: reference.kind === "asset-definition-version"
+          ? deleteRecord(definitions, key, definitionStorageKey)
+          : definitions.filter((definition) => definition.definitionId !== reference.id),
+        result: undefined,
+      }));
     },
   };
 }

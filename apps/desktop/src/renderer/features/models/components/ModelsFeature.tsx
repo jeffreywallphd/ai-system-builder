@@ -9,11 +9,15 @@ import { BrowseModelsTab } from "./BrowseModelsTab";
 import { ManageModelsTab } from "./ManageModelsTab";
 import { TrainModelTab } from "./TrainModelTab";
 
-export function ModelsFeature(props: { client?: DesktopModelsClient; workspaceId?: string; workspaceName?: string }) {
+export function ModelsFeature(props: {
+  client?: DesktopModelsClient;
+  workspaceId?: string;
+  workspaceName?: string;
+}) {
   const state = useModelsFeature(props.client, props.workspaceId);
   const [activeTabId, setActiveTabId] = useState("browse-models");
   return (
-    <section className="ui-panel ui-panel--elevated ui-stack ui-stack--sm">
+    <section className="models-feature ui-stack ui-stack--sm">
       <TabbedPanel
         tabListAriaLabel="Model workspace panels"
         defaultTabId="browse-models"
@@ -32,7 +36,12 @@ export function ModelsFeature(props: { client?: DesktopModelsClient; workspaceId
           {
             id: "train-model",
             label: "Train Model",
-            content: <DeferredTrainModelTab client={props.client} workspaceId={props.workspaceId} />,
+            content: (
+              <DeferredTrainModelTab
+                client={props.client}
+                workspaceId={props.workspaceId}
+              />
+            ),
           },
         ]}
       />
@@ -41,7 +50,13 @@ export function ModelsFeature(props: { client?: DesktopModelsClient; workspaceId
   );
 }
 
-function DeferredTrainModelTab({ client, workspaceId }: { client?: DesktopModelsClient; workspaceId?: string }) {
+function DeferredTrainModelTab({
+  client,
+  workspaceId,
+}: {
+  client?: DesktopModelsClient;
+  workspaceId?: string;
+}) {
   const trainingState = useModelTrainingFeature(client, workspaceId);
   return <TrainModelTab state={trainingState} />;
 }

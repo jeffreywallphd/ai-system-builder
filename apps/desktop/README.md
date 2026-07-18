@@ -16,6 +16,19 @@ From the repository root:
 - `npm run package`
 - `npm run make`
 
+## Local structured persistence
+
+Desktop startup opens `<userData>/persistence/ai-system-builder.sqlite3`, applies
+the versioned SQLite migration, inventories and imports allowlisted legacy JSON
+with a rollback copy, then composes all typed structured repositories on SQLite
+before IPC registration. Changed legacy source after activation fails startup;
+there is no JSON fallback or dual write. Artifact bytes remain in the separate
+artifact-storage root.
+
+Use `npm run persistence:sqlite -- ...` for health, online backup, guarded
+restore, and portable export as documented in
+`docs/operations/persistence-operations.md`.
+
 ## Preload Bridge Surface
 
 The preload layer exposes a narrow desktop API at `window.desktopApi` for UI-to-host transport.

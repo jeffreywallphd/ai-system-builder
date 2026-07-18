@@ -1,0 +1,184 @@
+name: Repository validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  documentation:
+    name: Documentation and agent-support integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Check documentation
+        run: npm run docs:check
+      - name: Check agent-support assets
+        run: npm run agent-support:check
+
+  tests:
+    name: Architecture and non-browser tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Check architecture dependencies
+        run: npm run architecture:check
+      - name: Run tests
+        run: npm test
+
+  dependency-security:
+    name: Dependency and supply-chain evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Check runtime and toolchain advisories and validate the runtime SBOM
+        run: npm run security:dependencies
+
+  postgresql-qualification:
+    name: PostgreSQL 18 live conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:18-bookworm@sha256:1961f96e6029a02c3812d7cb329a3b03a3ac2bb067058dec17b0f5596aca9296
+        env:
+          POSTGRES_DB: ai_system_builder_qualification
+          POSTGRES_USER: ai_system_builder
+          POSTGRES_PASSWORD: qualification-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ai_system_builder -d ai_system_builder_qualification"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run live PostgreSQL conformance
+        run: npm run test:postgres-live
+        env:
+          TEST_POSTGRES_URL: postgresql://ai_system_builder:qualification-only@127.0.0.1:5432/ai_system_builder_qualification
+          TEST_POSTGRES_SSL_MODE: disable
+      - name: Run destructive PostgreSQL backup and restore drill
+        run: npm run test:postgres-recovery
+        env:
+          TEST_POSTGRES_URL: postgresql://ai_system_builder:qualification-only@127.0.0.1:5432/ai_system_builder_qualification
+          TEST_POSTGRES_SSL_MODE: disable
+          RECOVERY_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          RECOVERY_POSTGRES_DATABASE: ai_system_builder_qualification
+          RECOVERY_POSTGRES_USER: ai_system_builder
+      - name: Retain recovery evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: postgres-recovery-evidence
+          path: artifacts/qualification/postgres-recovery
+          if-no-files-found: error
+          retention-days: 14
+
+  deployment-artifacts:
+    name: OCI, Compose, and Kubernetes qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Create qualification evidence directory
+        run: mkdir -p artifacts/qualification/deployment
+      - name: Check deployment artifact invariants
+        run: npm run deployment:check
+      - name: Validate Compose model
+        run: docker compose -f deployments/server/compose.qualification.yaml config --quiet
+        env:
+          POSTGRES_PASSWORD: qualification-only
+      - name: Build and start isolated managed shape
+        run: docker compose -f deployments/server/compose.qualification.yaml up --build --detach --wait --wait-timeout 240
+        env:
+          POSTGRES_PASSWORD: qualification-only
+      - name: Smoke test managed server probes
+        run: npm run deployment:smoke
+      - name: Retain image configuration evidence
+        run: docker image inspect ai-system-builder:qualification --format '{{json .Config}}' > artifacts/qualification/deployment/image-config.json
+      - name: Validate Kubernetes resource syntax
+        run: kubectl create --dry-run=client --validate=false -f deployments/server/kubernetes-deployment.example.yaml -o yaml > artifacts/qualification/deployment/kubernetes-rendered.yaml
+      - name: Scan image for fixed critical vulnerabilities
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+        with:
+          image: ai-system-builder:qualification
+          fail-build: true
+          severity-cutoff: critical
+          only-fixed: true
+          output-format: json
+          output-file: artifacts/qualification/deployment/grype.json
+      - name: Retain deployment evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: deployment-qualification-evidence
+          path: artifacts/qualification/deployment
+          if-no-files-found: error
+          retention-days: 14
+      - name: Tear down isolated managed shape
+        if: ${{ always() }}
+        run: docker compose -f deployments/server/compose.qualification.yaml down --volumes --remove-orphans
+        env:
+          POSTGRES_PASSWORD: qualification-only

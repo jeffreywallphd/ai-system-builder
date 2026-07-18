@@ -510,6 +510,58 @@ const specs: readonly FormPrimitiveSpec[] = [
     tags: ["field", "radio"],
   },
   {
+    id: "builtin.form.date-time-field",
+    displayName: "Date and Time Field",
+    family: "structural",
+    description:
+      "Semantic date, time, or date-time field with portable range and format intent.",
+    purpose:
+      "Collect an ISO-compatible date/time value without embedding locale formatting or parser code.",
+    userSummary: "Collects a date, time, or date-and-time value.",
+    capabilities: [
+      "Declares date/time kind, requirement, range, and autocomplete intent.",
+      "Exposes the same semantic value and validation event ports as other fields.",
+    ],
+    configurationFields: [
+      stringField("label", "Label"),
+      textAreaField("helpText", "Help text"),
+      booleanField("required", "Required", false),
+      enumField("dateTimeKind", "Value kind", ["date", "time", "date-time"], "date"),
+      stringField("defaultValue", "Default ISO value"),
+      stringField("minimum", "Earliest ISO value"),
+      stringField("maximum", "Latest ISO value"),
+      stringField("autocompleteHint", "Autocomplete hint"),
+      booleanField("disabled", "Disabled", false),
+      stringField("visibilityCondition", "Visibility condition", "", "Declarative condition name, not code."),
+      stringField("accessibilityLabel", "Accessibility label"),
+    ],
+    defaultConfiguration: {
+      label: "",
+      helpText: "",
+      required: false,
+      dateTimeKind: "date",
+      defaultValue: "",
+      minimum: "",
+      maximum: "",
+      autocompleteHint: "",
+      disabled: false,
+      visibilityCondition: "",
+      accessibilityLabel: "",
+    },
+    ports: fieldPorts("semantic-date-time-value"),
+    compositionRules: fieldCompositionRules,
+    configurationGuidance:
+      "Use ISO-compatible values and dateTimeKind; renderers localize presentation but preserve the semantic value.",
+    compositionGuidance:
+      "Place date/time fields inside forms or field groups and bind their semantic value through typed ports.",
+    validationGuidance:
+      "Range and format constraints are declarative; the trusted form runtime validates submitted values again.",
+    accessibilityGuidance:
+      "Use visible labels and help text to explain expected dates, times, time zones, and range constraints.",
+    exampleDescription: "A required due-date field in a secured request form.",
+    tags: ["field", "date", "time"],
+  },
+  {
     id: "builtin.form.validation-message",
     displayName: "Validation Message",
     family: "context",

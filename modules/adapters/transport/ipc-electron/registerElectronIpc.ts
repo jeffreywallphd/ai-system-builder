@@ -11,6 +11,12 @@ import { registerUserLibraryIpc, type RegisterUserLibraryIpcDependencies } from 
 import { registerEffectiveAssetProjectionIpc, type RegisterEffectiveAssetProjectionIpcDependencies } from "./effective-asset-projections/registerEffectiveAssetProjectionIpc";
 import { registerAssetCompositionIpc, type RegisterAssetCompositionIpcDependencies } from "./asset-composition/registerAssetCompositionIpc";
 import { registerConversationExecutionIpc, type RegisterConversationExecutionIpcDependencies } from "./conversations/registerConversationExecutionIpc";
+import { registerAssetImplementationIpc, type RegisterAssetImplementationIpcDependencies } from "./asset-implementation/registerAssetImplementationIpc";
+import { registerAssetPackageIpc, type RegisterAssetPackageIpcDependencies } from "./asset-package/registerAssetPackageIpc";
+import { registerAssetStudioIpc, type RegisterAssetStudioIpcDependencies } from "./asset-studio/registerAssetStudioIpc";
+import { registerSystemBuilderIpc, type RegisterSystemBuilderIpcDependencies } from "./system-builder/registerSystemBuilderIpc";
+import { registerSystemBuildIpc, type RegisterSystemBuildIpcDependencies } from "./system-build/registerSystemBuildIpc";
+import { registerSystemDataIpc, type RegisterSystemDataIpcDependencies } from "./system-data/registerSystemDataIpc";
 export type { AsyncFeatureProvider, LazyProvidedObjectOptions } from "./lazyFeatureProvider";
 
 export type DesktopIpcRegistrationMilestoneRecorder = (milestone: string) => void;
@@ -29,6 +35,12 @@ export interface RegisterElectronIpcDependencies {
   effectiveAssetProjections?: RegisterEffectiveAssetProjectionIpcDependencies;
   assetComposition?: RegisterAssetCompositionIpcDependencies;
   conversations?: RegisterConversationExecutionIpcDependencies;
+  assetImplementations?: RegisterAssetImplementationIpcDependencies;
+  assetPackages?: RegisterAssetPackageIpcDependencies;
+  assetStudio?: RegisterAssetStudioIpcDependencies;
+  systemBuilder?: RegisterSystemBuilderIpcDependencies;
+  systemBuild?: RegisterSystemBuildIpcDependencies;
+  systemData?: RegisterSystemDataIpcDependencies;
   recordMilestone?: DesktopIpcRegistrationMilestoneRecorder;
 }
 
@@ -62,6 +74,24 @@ export function registerElectronIpc(dependencies: RegisterElectronIpcDependencie
   if (dependencies.conversations) {
     registerGroup(dependencies.recordMilestone, "conversations-group", () => registerConversationExecutionIpc(dependencies.conversations!));
   }
+  if (dependencies.assetImplementations) {
+    registerGroup(dependencies.recordMilestone, "asset-implementations-group", () => registerAssetImplementationIpc(dependencies.assetImplementations!));
+  }
+  if (dependencies.assetPackages) {
+    registerGroup(dependencies.recordMilestone, "asset-packages-group", () => registerAssetPackageIpc(dependencies.assetPackages!));
+  }
+  if (dependencies.assetStudio) {
+    registerGroup(dependencies.recordMilestone, "asset-studio-group", () => registerAssetStudioIpc(dependencies.assetStudio!));
+  }
+  if (dependencies.systemBuilder) {
+    registerGroup(dependencies.recordMilestone, "system-builder-group", () => registerSystemBuilderIpc(dependencies.systemBuilder!));
+  }
+  if (dependencies.systemBuild) {
+    registerGroup(dependencies.recordMilestone, "system-build-group", () => registerSystemBuildIpc(dependencies.systemBuild!));
+  }
+  if (dependencies.systemData) {
+    registerGroup(dependencies.recordMilestone, "system-data-group", () => registerSystemDataIpc(dependencies.systemData!));
+  }
 }
 
 export type {
@@ -78,4 +108,8 @@ export type {
   RegisterEffectiveAssetProjectionIpcDependencies,
   RegisterAssetCompositionIpcDependencies,
   RegisterConversationExecutionIpcDependencies,
+  RegisterAssetImplementationIpcDependencies,
+  RegisterAssetPackageIpcDependencies,
+  RegisterAssetStudioIpcDependencies,
+  RegisterSystemBuilderIpcDependencies,
 };

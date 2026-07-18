@@ -1,5 +1,8 @@
 # Testing Standards
 
+- Status: accepted
+- Verification: `npm test`
+
 ## Purpose
 
 Tests in `ai-system-builder` protect meaningful behavior and architectural intent.
@@ -10,6 +13,9 @@ They are not written to satisfy vanity coverage metrics or performative CI check
 
 - `node:test` is the canonical default runner for non-browser tests.
 - Use `node:assert/strict`-backed assertions for non-browser test coverage.
+- The canonical runner supplies its transpiled test files to Node's programmatic
+  `run()` API with `isolation: "none"`; do not pre-import the same files and then
+  invoke `run()`, which can double-register execution under Node 24.
 - Browser/renderer-focused test tooling is handled separately and is not the non-browser default path.
 - Canonical repo commands:
   - `npm test` (root default alias for non-browser coverage)

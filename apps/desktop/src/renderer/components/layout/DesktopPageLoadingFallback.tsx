@@ -31,7 +31,12 @@ export function DesktopPageLoadingFallback({
   }, [activePage, visibleActivePage, workspaceStatus, routeRequiresWorkspace]);
 
   return (
-    <section className="ui-panel ui-stack ui-stack--sm" aria-label="Page loading" role="status" aria-live="polite">
+    <section
+      className="ui-panel ui-page-loading-surface ui-stack ui-stack--sm"
+      aria-label="Page loading"
+      role="status"
+      aria-live="polite"
+    >
       <p>Loading page…</p>
     </section>
   );

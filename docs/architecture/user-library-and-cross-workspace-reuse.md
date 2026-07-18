@@ -1,5 +1,9 @@
 # User Library and Cross-Workspace Asset Reuse
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0017-user-library-and-cross-workspace-reuse.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 - Effective asset projections: `docs/architecture/effective-asset-projections.md` defines how linked/copied/imported/user-library sources contribute to workspace-scoped effective projections without live cross-workspace links.
 
 ## Purpose

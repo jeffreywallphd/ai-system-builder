@@ -22,6 +22,24 @@ describe("resolveServerSecurityConfig", () => {
     expect(() => resolveServerSecurityConfig({ AI_SYSTEM_BUILDER_SECURITY_MODE: "lan-https-token" }, "/tmp/storage")).toThrow(/AI_SYSTEM_BUILDER_TLS_CERT_PATH|SERVER_TOKEN_HASH_SECRET|TLS/);
   });
 
+  it("supports OIDC bearer only with HTTPS", () => {
+    const cfg = resolveServerSecurityConfig({
+      AI_SYSTEM_BUILDER_SECURITY_MODE: "oidc-bearer",
+      AI_SYSTEM_BUILDER_TLS_CERT_MODE: "auto-self-signed",
+    }, "/tmp/storage");
+    expect(cfg.mode).toBe("oidc-bearer");
+    expect(cfg.authRequired).toBe(true);
+    expect(cfg.httpsEnabled).toBe(true);
+    expect(cfg.httpsRequired).toBe(true);
+    expect(cfg.pairingEnabled).toBe(false);
+  });
+
+  it("rejects declared but unimplemented server security modes", () => {
+    expect(() => resolveServerSecurityConfig({
+      AI_SYSTEM_BUILDER_SECURITY_MODE: "api-key",
+    }, "/tmp/storage")).toThrow(/must be one of/);
+  });
+
   it("enables dev toggle only in disabled-dev", () => {
     expect(resolveServerSecurityConfig({ AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED: "true" }, "/tmp/storage").devSecurityToggleEnabled).toBe(true);
     const cfg = resolveServerSecurityConfig({ AI_SYSTEM_BUILDER_SECURITY_MODE: "lan-https-token", AI_SYSTEM_BUILDER_DEV_SECURITY_TOGGLE_ENABLED: "true", AI_SYSTEM_BUILDER_TLS_CERT_PATH: "/tmp/cert.pem", AI_SYSTEM_BUILDER_TLS_KEY_PATH: "/tmp/key.pem" }, "/tmp/storage");

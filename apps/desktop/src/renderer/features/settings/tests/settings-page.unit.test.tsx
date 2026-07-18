@@ -78,6 +78,7 @@ describe("SettingsPage", () => {
     expect(container.textContent).toContain("Runtime");
     expect(container.textContent).toContain("Dataset Preparation");
     expect(container.textContent).toContain("Publishing");
+    expect(container.textContent).toContain("Software status");
   });
 
   it("updates non-secret and masks secret set/clear", async () => {

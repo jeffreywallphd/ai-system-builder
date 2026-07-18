@@ -1,5 +1,29 @@
 # Manual Security Smoke Test
 
+## Managed OIDC and organization isolation smoke
+
+1. Provision two test organizations and exact issuer/subject memberships with
+   `npm run tenancy:postgres`; retain only sanitized command output.
+2. Start a qualification deployment in `oidc-bearer` mode with pooled placement,
+   a real test IdP, HTTPS, and a non-owner, non-superuser PostgreSQL runtime role
+   without `BYPASSRLS`.
+3. Confirm missing/malformed organization context and inactive or absent
+   membership fail. Provider email, domain, scopes, and organization claims alone
+   must not grant membership.
+4. Write the same logical workspace/document/artifact key in both organizations;
+   confirm each principal reads only its records and physical object prefix.
+5. Confirm a missing database tenant setting sees no organization rows and a
+   reused pooled connection does not retain the previous transaction-local value.
+6. Repeat with premium dedicated placement. Omit the header and confirm the fixed
+   organization works; send the other id and confirm rejection before data access.
+7. Confirm denials emit redacted audit events with request/correlation identity
+   but no token, claims, payload, prompt, content, or path.
+8. Rotate a test IdP signing key and reject invalid issuer, audience, algorithm,
+   and signature cases.
+
+These checks supplement automation; they do not qualify public ingress, the IdP,
+database roles, object service, or audit retention by themselves.
+
 ## Shared setup
 
 1. Generate a strong `SERVER_TOKEN_HASH_SECRET` (do not commit or screenshot it):

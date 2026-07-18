@@ -26,7 +26,7 @@ export type DesktopLazyPagePropsByKey = {
   readonly models: WorkspaceScopedPageProps;
   readonly "image-generation": WorkspaceScopedPageProps;
   readonly settings: object;
-  readonly system: object;
+  readonly systems: WorkspaceScopedPageProps;
 };
 
 export type DesktopLazyPageDiagnosticContext = {
@@ -127,7 +127,7 @@ export function createLazyDesktopPageRegistry(
     models: lazyDesktopPage("models", loaders.models),
     "image-generation": lazyDesktopPage("image-generation", loaders["image-generation"]),
     settings: lazyDesktopPage("settings", loaders.settings),
-    system: lazyDesktopPage("system", loaders.system),
+    systems: lazyDesktopPage("systems", loaders.systems),
   };
 }
 
@@ -160,8 +160,8 @@ export const desktopLazyPages = createLazyDesktopPageRegistry({
     const module = await import("../pages/SettingsPage");
     return { default: module.SettingsPage };
   },
-  system: async () => {
-    const module = await import("../pages/SystemPage");
-    return { default: module.SystemPage };
+  systems: async () => {
+    const module = await import("../pages/SystemBuilderPage");
+    return { default: module.SystemBuilderPage };
   },
 });

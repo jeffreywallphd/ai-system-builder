@@ -1,5 +1,7 @@
 import type { WorkspaceRepository, WorkspaceSelectionRepository } from "../../../../application/ports/workspace";
 import type { CreateWorkspaceUseCase } from "../../../../application/use-cases/workspace";
+import type { Request } from "express";
+import { getExpressOrganizationContext } from "../security";
 import { createWorkspaceId, type ActiveWorkspaceSelection } from "../../../../contracts/workspace";
 import {
   API_WORKSPACE_CREATE_OPERATION,
@@ -65,6 +67,9 @@ export function registerWorkspaceApiRoutes(dependencies: RegisterWorkspaceApiRou
       const payload = requireCreatePayload(request.body);
       const result = await dependencies.createWorkspaceUseCase.execute({
         command: payload.command,
+        ...(getExpressOrganizationContext(request as Request)?.organizationId
+          ? { organizationId: getExpressOrganizationContext(request as Request)!.organizationId }
+          : {}),
         selectAfterCreate: payload.selectAfterCreate === true,
       });
 

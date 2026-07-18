@@ -8,8 +8,8 @@ import { pageRecords, replaceRecord, textValuesMatch, upsertRecord, userLibraryA
 export function createLocalWorkspaceUserLibraryLinkRepositoryAdapter(options: LocalUserLibraryRecordStoreOptions): WorkspaceUserLibraryLinkRepositoryPort {
   const store = new LocalUserLibraryRecordStore(options);
   return {
-    async saveWorkspaceUserLibraryLinkRecord(record) { const validRecord = normalizeWorkspaceUserLibraryLinkRecord(record); const links = await store.readCollection("workspaceLinks"); await store.writeCollection("workspaceLinks", sortLinks(upsertRecord(links, validRecord, linkStorageKey))); return cloneJson(validRecord); },
-    async updateWorkspaceUserLibraryLinkRecord(record) { const validRecord = normalizeWorkspaceUserLibraryLinkRecord(record); const links = await store.readCollection("workspaceLinks"); await store.writeCollection("workspaceLinks", sortLinks(replaceRecord(links, validRecord, linkStorageKey, "Workspace user-library link record does not exist."))); return cloneJson(validRecord); },
+    async saveWorkspaceUserLibraryLinkRecord(record) { const validRecord = normalizeWorkspaceUserLibraryLinkRecord(record); await store.mutateCollection("workspaceLinks", (links) => ({ records: sortLinks(upsertRecord(links, validRecord, linkStorageKey)), result: undefined })); return cloneJson(validRecord); },
+    async updateWorkspaceUserLibraryLinkRecord(record) { const validRecord = normalizeWorkspaceUserLibraryLinkRecord(record); await store.mutateCollection("workspaceLinks", (links) => ({ records: sortLinks(replaceRecord(links, validRecord, linkStorageKey, "Workspace user-library link record does not exist.")), result: undefined })); return cloneJson(validRecord); },
     async readWorkspaceUserLibraryLinkRecord(targetWorkspaceId: WorkspaceId, linkId: UserLibraryLinkId) {
       const safeWorkspaceId = createWorkspaceId(targetWorkspaceId); const safeLinkId = createUserLibraryLinkId(linkId);
       const match = (await store.readCollection("workspaceLinks")).map(normalizeWorkspaceUserLibraryLinkRecord).find((l) => l.targetWorkspaceId === safeWorkspaceId && l.linkId === safeLinkId);

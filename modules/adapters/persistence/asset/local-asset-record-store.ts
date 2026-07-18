@@ -4,9 +4,21 @@ import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { Stream } from "node:stream";
 import { join } from "node:path";
 
-import type { AssetBinding, AssetComposition, AssetDefinition, AssetInstance } from "../../../contracts/asset";
+import type {
+  AssetBinding,
+  AssetComposition,
+  AssetDefinition,
+  AssetInstance,
+} from "../../../contracts/asset";
+import {
+  mutateDocumentRecord,
+  readDocumentRecord,
+  writeDocumentRecord,
+  type StructuredDocumentStore,
+} from "../shared";
 
-export const ASSET_KERNEL_LOCAL_STORE_KIND = "asset-kernel-local-store" as const;
+export const ASSET_KERNEL_LOCAL_STORE_KIND =
+  "asset-kernel-local-store" as const;
 export const ASSET_KERNEL_LOCAL_SCHEMA_VERSION = 1 as const;
 
 export interface LocalAssetKernelManifest {
@@ -26,6 +38,7 @@ export interface LocalAssetKernelStoreSnapshot {
 export interface LocalAssetRecordStoreOptions {
   readonly rootDir: string;
   readonly now?: () => string;
+  readonly documents?: StructuredDocumentStore;
 }
 
 export class LocalAssetRecordStoreError extends Error {
@@ -39,7 +52,8 @@ export class LocalAssetRecordStoreError extends Error {
   }
 }
 
-type AssetKernelCollectionName = "definitions" | "instances" | "compositions" | "bindings";
+type AssetKernelCollectionName =
+  "definitions" | "instances" | "compositions" | "bindings";
 
 interface AssetKernelCollectionMap {
   definitions: AssetDefinition;
@@ -58,10 +72,14 @@ const COLLECTION_FILES = {
 export class LocalAssetRecordStore {
   private readonly storeDir: string;
   private readonly now: () => string;
+  private readonly rootDir: string;
+  private readonly documents?: StructuredDocumentStore;
   private writeQueue: Promise<void> = Promise.resolve();
 
   public constructor(options: LocalAssetRecordStoreOptions) {
     this.storeDir = join(options.rootDir, "asset-kernel");
+    this.rootDir = options.rootDir;
+    this.documents = options.documents;
     this.now = options.now ?? (() => new Date().toISOString());
   }
 
@@ -70,23 +88,27 @@ export class LocalAssetRecordStore {
   }
 
   public initializeSync(): void {
+    if (this.documents) return;
     this.ensureStoreFilesSync();
   }
 
   public async readManifest(): Promise<LocalAssetKernelManifest> {
     await this.ensureStoreDirectory();
-    return validateManifest(await this.readJsonFile<unknown>("manifest.json", this.createManifest()));
+    return validateManifest(
+      await this.readJsonFile<unknown>("manifest.json", this.createManifest()),
+    );
   }
 
   public async readSnapshot(): Promise<LocalAssetKernelStoreSnapshot> {
     await this.ensureStoreFiles();
-    const [manifest, definitions, instances, compositions, bindings] = await Promise.all([
-      this.readManifest(),
-      this.readCollection("definitions"),
-      this.readCollection("instances"),
-      this.readCollection("compositions"),
-      this.readCollection("bindings"),
-    ]);
+    const [manifest, definitions, instances, compositions, bindings] =
+      await Promise.all([
+        this.readManifest(),
+        this.readCollection("definitions"),
+        this.readCollection("instances"),
+        this.readCollection("compositions"),
+        this.readCollection("bindings"),
+      ]);
     return { manifest, definitions, instances, compositions, bindings };
   }
 
@@ -94,7 +116,10 @@ export class LocalAssetRecordStore {
     name: Name,
   ): Promise<readonly AssetKernelCollectionMap[Name][]> {
     await this.ensureStoreDirectory();
-    return this.readJsonFile<readonly AssetKernelCollectionMap[Name][]>(COLLECTION_FILES[name], []);
+    return this.readJsonFile<readonly AssetKernelCollectionMap[Name][]>(
+      COLLECTION_FILES[name],
+      [],
+    );
   }
 
   public async writeCollection<Name extends AssetKernelCollectionName>(
@@ -107,6 +132,36 @@ export class LocalAssetRecordStore {
     );
     this.writeQueue = writeOperation.catch(() => undefined);
     await writeOperation;
+  }
+
+  public async mutateCollection<
+    Name extends AssetKernelCollectionName,
+    TResult,
+  >(
+    name: Name,
+    mutation: (records: readonly AssetKernelCollectionMap[Name][]) => {
+      records: readonly AssetKernelCollectionMap[Name][];
+      result: TResult;
+    },
+  ): Promise<TResult> {
+    await this.ensureStoreDirectory();
+    const result = await mutateDocumentRecord(
+      { rootDirectory: this.rootDir, documents: this.documents },
+      `asset-kernel/${COLLECTION_FILES[name]}`,
+      [] as AssetKernelCollectionMap[Name][],
+      (current) => {
+        if (!Array.isArray(current)) {
+          throw new LocalAssetRecordStoreError(
+            "Asset Kernel local store collection is invalid.",
+          );
+        }
+        const next = mutation(cloneJson(current));
+        assertJsonCompatibleAssetRecord(next.records);
+        return { value: cloneJson([...next.records]), result: next.result };
+      },
+    );
+    await this.writeJsonFile("manifest.json", this.createManifest());
+    return result;
   }
 
   private async writeCollectionNow<Name extends AssetKernelCollectionName>(
@@ -123,8 +178,8 @@ export class LocalAssetRecordStore {
     await this.ensureStoreDirectory();
     await this.ensureJsonFile("manifest.json", this.createManifest());
     await Promise.all(
-      (Object.keys(COLLECTION_FILES) as AssetKernelCollectionName[]).map((name) =>
-        this.ensureJsonFile(COLLECTION_FILES[name], []),
+      (Object.keys(COLLECTION_FILES) as AssetKernelCollectionName[]).map(
+        (name) => this.ensureJsonFile(COLLECTION_FILES[name], []),
       ),
     );
   }
@@ -132,12 +187,15 @@ export class LocalAssetRecordStore {
   private ensureStoreFilesSync(): void {
     this.ensureStoreDirectorySync();
     this.ensureJsonFileSync("manifest.json", this.createManifest());
-    for (const name of Object.keys(COLLECTION_FILES) as AssetKernelCollectionName[]) {
+    for (const name of Object.keys(
+      COLLECTION_FILES,
+    ) as AssetKernelCollectionName[]) {
       this.ensureJsonFileSync(COLLECTION_FILES[name], []);
     }
   }
 
   private async ensureStoreDirectory(): Promise<void> {
+    if (this.documents) return;
     await mkdir(this.storeDir, { recursive: true });
   }
 
@@ -145,9 +203,25 @@ export class LocalAssetRecordStore {
     mkdirSync(this.storeDir, { recursive: true });
   }
 
-  private async ensureJsonFile(fileName: string, fallback: unknown): Promise<void> {
+  private async ensureJsonFile(
+    fileName: string,
+    fallback: unknown,
+  ): Promise<void> {
+    if (this.documents) {
+      const result = await readDocumentRecord(
+        { rootDirectory: this.rootDir, documents: this.documents },
+        `asset-kernel/${fileName}`,
+        fallback,
+      );
+      this.validateInitializedFile(fileName, result.value);
+      if (!result.found) await this.writeJsonFile(fileName, fallback);
+      return;
+    }
     try {
-      this.validateInitializedFile(fileName, await this.readJsonFile(fileName, fallback));
+      this.validateInitializedFile(
+        fileName,
+        await this.readJsonFile(fileName, fallback),
+      );
     } catch (error) {
       if (error instanceof LocalAssetRecordStoreError) throw error;
       throw error;
@@ -163,7 +237,10 @@ export class LocalAssetRecordStore {
 
   private ensureJsonFileSync(fileName: string, fallback: unknown): void {
     try {
-      this.validateInitializedFile(fileName, this.readJsonFileSync(fileName, fallback));
+      this.validateInitializedFile(
+        fileName,
+        this.readJsonFileSync(fileName, fallback),
+      );
     } catch (error) {
       if (error instanceof LocalAssetRecordStoreError) throw error;
       throw error;
@@ -173,13 +250,24 @@ export class LocalAssetRecordStore {
       readFileSync(this.filePath(fileName), "utf8");
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        throw new LocalAssetRecordStoreError("Asset Kernel local store could not be read.", { cause: error });
+        throw new LocalAssetRecordStoreError(
+          "Asset Kernel local store could not be read.",
+          { cause: error },
+        );
       }
       this.writeJsonFileSync(fileName, fallback);
     }
   }
 
   private async readJsonFile<T>(fileName: string, fallback: T): Promise<T> {
+    if (this.documents) {
+      const result = await readDocumentRecord(
+        { rootDirectory: this.rootDir, documents: this.documents },
+        `asset-kernel/${fileName}`,
+        fallback,
+      );
+      return cloneJson(result.value);
+    }
     try {
       const source = await readFile(this.filePath(fileName), "utf8");
       const parsed = JSON.parse(source) as unknown;
@@ -206,7 +294,9 @@ export class LocalAssetRecordStore {
     }
 
     if (!Array.isArray(value)) {
-      throw new LocalAssetRecordStoreError("Asset Kernel local store collection is invalid.");
+      throw new LocalAssetRecordStoreError(
+        "Asset Kernel local store collection is invalid.",
+      );
     }
   }
 
@@ -215,28 +305,56 @@ export class LocalAssetRecordStore {
       return cloneJson(fallback);
     }
     if (error instanceof SyntaxError) {
-      throw new LocalAssetRecordStoreError("Asset Kernel local store contains malformed JSON.", { cause: error });
+      throw new LocalAssetRecordStoreError(
+        "Asset Kernel local store contains malformed JSON.",
+        { cause: error },
+      );
     }
-    throw new LocalAssetRecordStoreError("Asset Kernel local store could not be read.", { cause: error });
+    throw new LocalAssetRecordStoreError(
+      "Asset Kernel local store could not be read.",
+      { cause: error },
+    );
   }
 
   private async writeJsonFile(fileName: string, value: unknown): Promise<void> {
+    if (this.documents) {
+      await writeDocumentRecord(
+        { rootDirectory: this.rootDir, documents: this.documents },
+        `asset-kernel/${fileName}`,
+        value,
+      );
+      return;
+    }
     const path = this.filePath(fileName);
     const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
     try {
-      await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+      await writeFile(
+        temporaryPath,
+        `${JSON.stringify(value, null, 2)}\n`,
+        "utf8",
+      );
       await rename(temporaryPath, path);
     } catch (error) {
       await unlink(temporaryPath).catch(() => undefined);
-      throw new LocalAssetRecordStoreError("Asset Kernel local store could not be written.", { cause: error });
+      throw new LocalAssetRecordStoreError(
+        "Asset Kernel local store could not be written.",
+        { cause: error },
+      );
     }
   }
 
   private writeJsonFileSync(fileName: string, value: unknown): void {
     try {
-      writeFileSync(this.filePath(fileName), `${JSON.stringify(value, null, 2)}\n`, "utf8");
+      writeFileSync(
+        this.filePath(fileName),
+        `${JSON.stringify(value, null, 2)}\n`,
+        "utf8",
+      );
     } catch (error) {
-      throw new LocalAssetRecordStoreError("Asset Kernel local store could not be written.", { cause: error });
+      throw new LocalAssetRecordStoreError(
+        "Asset Kernel local store could not be written.",
+        { cause: error },
+      );
     }
   }
 
@@ -262,65 +380,100 @@ export function assertJsonCompatibleAssetRecord(value: unknown): void {
     assertJsonCompatibleValue(value, new Set());
   } catch (error) {
     if (error instanceof LocalAssetRecordStoreError) throw error;
-    throw new LocalAssetRecordStoreError("Asset Kernel local store record must be JSON-compatible.");
+    throw new LocalAssetRecordStoreError(
+      "Asset Kernel local store record must be JSON-compatible.",
+    );
   }
 }
 
 function validateManifest(value: unknown): LocalAssetKernelManifest {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new LocalAssetRecordStoreError("Asset Kernel local store manifest is invalid.");
+    throw new LocalAssetRecordStoreError(
+      "Asset Kernel local store manifest is invalid.",
+    );
   }
 
   const manifest = value as Partial<LocalAssetKernelManifest>;
   if (manifest.schemaVersion !== ASSET_KERNEL_LOCAL_SCHEMA_VERSION) {
-    throw new LocalAssetRecordStoreError("Asset Kernel local store manifest schema version is unsupported.");
+    throw new LocalAssetRecordStoreError(
+      "Asset Kernel local store manifest schema version is unsupported.",
+    );
   }
 
   if (manifest.storeKind !== ASSET_KERNEL_LOCAL_STORE_KIND) {
-    throw new LocalAssetRecordStoreError("Asset Kernel local store manifest kind is unsupported.");
+    throw new LocalAssetRecordStoreError(
+      "Asset Kernel local store manifest kind is unsupported.",
+    );
   }
 
   if (typeof manifest.updatedAt !== "string") {
-    throw new LocalAssetRecordStoreError("Asset Kernel local store manifest is invalid.");
+    throw new LocalAssetRecordStoreError(
+      "Asset Kernel local store manifest is invalid.",
+    );
   }
 
   return cloneJson(manifest as LocalAssetKernelManifest);
 }
 
 function assertJsonCompatibleValue(value: unknown, seen: Set<object>): void {
-  if (value === null || typeof value === "string" || typeof value === "boolean") return;
+  if (value === null || typeof value === "string" || typeof value === "boolean")
+    return;
 
   if (typeof value === "number") {
     if (!Number.isFinite(value)) {
-      throw new LocalAssetRecordStoreError("Asset Kernel local store record must be JSON-compatible.");
+      throw new LocalAssetRecordStoreError(
+        "Asset Kernel local store record must be JSON-compatible.",
+      );
     }
     return;
   }
 
-  if (typeof value === "undefined" || typeof value === "function" || typeof value === "symbol" || typeof value === "bigint") {
-    throw new LocalAssetRecordStoreError("Asset Kernel local store record must be JSON-compatible.");
+  if (
+    typeof value === "undefined" ||
+    typeof value === "function" ||
+    typeof value === "symbol" ||
+    typeof value === "bigint"
+  ) {
+    throw new LocalAssetRecordStoreError(
+      "Asset Kernel local store record must be JSON-compatible.",
+    );
   }
 
   if (typeof value !== "object") return;
 
-  if (value instanceof Date || Buffer.isBuffer(value) || value instanceof Stream) {
-    throw new LocalAssetRecordStoreError("Asset Kernel local store record must be JSON-compatible.");
+  if (
+    value instanceof Date ||
+    Buffer.isBuffer(value) ||
+    value instanceof Stream
+  ) {
+    throw new LocalAssetRecordStoreError(
+      "Asset Kernel local store record must be JSON-compatible.",
+    );
   }
 
   if (seen.has(value)) {
-    throw new LocalAssetRecordStoreError("Asset Kernel local store record must be JSON-compatible.");
+    throw new LocalAssetRecordStoreError(
+      "Asset Kernel local store record must be JSON-compatible.",
+    );
   }
 
   const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== Array.prototype && prototype !== null) {
-    throw new LocalAssetRecordStoreError("Asset Kernel local store record must be JSON-compatible.");
+  if (
+    prototype !== Object.prototype &&
+    prototype !== Array.prototype &&
+    prototype !== null
+  ) {
+    throw new LocalAssetRecordStoreError(
+      "Asset Kernel local store record must be JSON-compatible.",
+    );
   }
 
   seen.add(value);
   if (Array.isArray(value)) {
     for (const entry of value) assertJsonCompatibleValue(entry, seen);
   } else {
-    for (const entry of Object.values(value as Record<string, unknown>)) assertJsonCompatibleValue(entry, seen);
+    for (const entry of Object.values(value as Record<string, unknown>))
+      assertJsonCompatibleValue(entry, seen);
   }
   seen.delete(value);
 }

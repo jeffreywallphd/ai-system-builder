@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
+  ARTIFACT_PREVIEW_MAX_BYTES,
   createCompressedImagePreviewObjectUrl,
   createIdleArtifactPreview,
   createLoadingArtifactPreview,
@@ -28,6 +29,8 @@ import {
   type ThinClientPublishedBacking,
 } from "../api/apiArtifactBrowserClient";
 import { useArtifactBrowserClient } from "./useArtifactBrowserClient";
+
+const ARTIFACT_MEDIA_PREVIEW_MAX_BYTES = 2 * 1024 * 1024;
 
 export interface UseArtifactBrowserFeatureResult {
   items: ThinClientArtifactBrowseItem[];
@@ -88,8 +91,12 @@ export interface UseArtifactBrowserFeatureResult {
   browseHuggingFaceDatasetParquetFiles: (repository: string) => Promise<void>;
   closeHuggingFaceDatasetParquetFiles: () => void;
   huggingFaceNamespaceDatasets: ThinClientHuggingFaceNamespaceDataset[];
-  getHuggingFaceDatasetParquetFiles: (repository: string) => ThinClientHuggingFaceDatasetParquetFile[];
-  getHuggingFaceDatasetFilesState: (repository: string) => ArtifactBrowserViewState;
+  getHuggingFaceDatasetParquetFiles: (
+    repository: string,
+  ) => ThinClientHuggingFaceDatasetParquetFile[];
+  getHuggingFaceDatasetFilesState: (
+    repository: string,
+  ) => ArtifactBrowserViewState;
   expandedHuggingFaceDataset?: string;
   localizeArtifactFromRepo: () => Promise<void>;
   recheckPublishedBacking: () => Promise<void>;
@@ -118,16 +125,15 @@ export function useArtifactBrowserFeature(
 
   const withHuggingFaceAuthGuidance = (message: string): string => {
     const normalized = message.toLowerCase();
-    const mentionsAuth = normalized.includes("hugging face")
-      && (
-        normalized.includes("token")
-        || normalized.includes("auth")
-        || normalized.includes("401")
-        || normalized.includes("403")
-        || normalized.includes("access denied")
-        || normalized.includes("private")
-        || normalized.includes("gated")
-      );
+    const mentionsAuth =
+      normalized.includes("hugging face") &&
+      (normalized.includes("token") ||
+        normalized.includes("auth") ||
+        normalized.includes("401") ||
+        normalized.includes("403") ||
+        normalized.includes("access denied") ||
+        normalized.includes("private") ||
+        normalized.includes("gated"));
     if (!mentionsAuth) {
       return message;
     }
@@ -137,30 +143,55 @@ export function useArtifactBrowserFeature(
 
   const artifactClient = useArtifactBrowserClient(client);
   const [items, setItems] = useState<ThinClientArtifactBrowseItem[]>([]);
-  const [selectedStorageKey, setSelectedStorageKey] = useState<string | undefined>();
+  const [selectedStorageKey, setSelectedStorageKey] = useState<
+    string | undefined
+  >();
   const [detail, setDetail] = useState<ThinClientArtifactDetail | undefined>();
-  const [content, setContent] = useState<ThinClientArtifactContentDescriptor | undefined>();
+  const [content, setContent] = useState<
+    ThinClientArtifactContentDescriptor | undefined
+  >();
   const [imageViewUrl, setImageViewUrl] = useState<string | undefined>();
-  const [artifactPreview, setArtifactPreview] = useState<ArtifactPreviewView>(() => createIdleArtifactPreview());
+  const [artifactPreview, setArtifactPreview] = useState<ArtifactPreviewView>(
+    () => createIdleArtifactPreview(),
+  );
   const activeImagePreviewObjectUrl = useRef<string | undefined>(undefined);
-  const [viewState, setViewState] = useState<ArtifactBrowserViewState>({ status: "idle" });
-  const [registerState, setRegisterState] = useState<ArtifactBrowserViewState>({ status: "idle" });
-  const [localizeState, setLocalizeState] = useState<ArtifactBrowserViewState>({ status: "idle" });
-  const [sourceVerifyState, setSourceVerifyState] = useState<ArtifactBrowserViewState>({ status: "idle" });
-  const [localizedArtifact, setLocalizedArtifact] = useState<ThinClientLocalizedArtifactFromRepo | undefined>();
+  const [viewState, setViewState] = useState<ArtifactBrowserViewState>({
+    status: "idle",
+  });
+  const [registerState, setRegisterState] = useState<ArtifactBrowserViewState>({
+    status: "idle",
+  });
+  const [localizeState, setLocalizeState] = useState<ArtifactBrowserViewState>({
+    status: "idle",
+  });
+  const [sourceVerifyState, setSourceVerifyState] =
+    useState<ArtifactBrowserViewState>({ status: "idle" });
+  const [localizedArtifact, setLocalizedArtifact] = useState<
+    ThinClientLocalizedArtifactFromRepo | undefined
+  >();
   const [registerRepository, setRegisterRepository] = useState("");
   const [registerNamespace, setRegisterNamespace] = useState("");
   const [registerPathInRepo, setRegisterPathInRepo] = useState("");
   const [registerRevision, setRegisterRevision] = useState("main");
   const [registerMediaType, setRegisterMediaType] = useState("");
   const [showRegisterForm, setShowRegisterForm] = useState(false);
-  const [huggingFaceNamespaceDatasets, setHuggingFaceNamespaceDatasets] = useState<ThinClientHuggingFaceNamespaceDataset[]>([]);
-  const [datasetFilesByRepository, setDatasetFilesByRepository] = useState<Record<string, DatasetFilesPanelState>>({});
-  const [expandedHuggingFaceDataset, setExpandedHuggingFaceDataset] = useState<string | undefined>();
-  const [pendingDeleteStorageKey, setPendingDeleteStorageKey] = useState<string | undefined>();
+  const [huggingFaceNamespaceDatasets, setHuggingFaceNamespaceDatasets] =
+    useState<ThinClientHuggingFaceNamespaceDataset[]>([]);
+  const [datasetFilesByRepository, setDatasetFilesByRepository] = useState<
+    Record<string, DatasetFilesPanelState>
+  >({});
+  const [expandedHuggingFaceDataset, setExpandedHuggingFaceDataset] = useState<
+    string | undefined
+  >();
+  const [pendingDeleteStorageKey, setPendingDeleteStorageKey] = useState<
+    string | undefined
+  >();
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState("");
-  const [selectedArtifactKeys, setSelectedArtifactKeys] = useState<string[]>([]);
-  const [bulkDeleteConfirmationInput, setBulkDeleteConfirmationInput] = useState("");
+  const [selectedArtifactKeys, setSelectedArtifactKeys] = useState<string[]>(
+    [],
+  );
+  const [bulkDeleteConfirmationInput, setBulkDeleteConfirmationInput] =
+    useState("");
 
   function revokeManagedImagePreviewUrl(): void {
     if (!activeImagePreviewObjectUrl.current) {
@@ -185,19 +216,24 @@ export function useArtifactBrowserFeature(
     setImageViewUrl(nextUrl);
   }
 
-  const publishLogic = useArtifactBrowserPublishLogic<ThinClientArtifactDetail>({
-    selectedStorageKey,
-    client: artifactClient,
-    async readSelectedArtifactDetail() {
-      if (!selectedStorageKey) {
-        return undefined;
-      }
+  const publishLogic = useArtifactBrowserPublishLogic<ThinClientArtifactDetail>(
+    {
+      selectedStorageKey,
+      client: artifactClient,
+      async readSelectedArtifactDetail() {
+        if (!selectedStorageKey) {
+          return undefined;
+        }
 
-      const artifactDetail = await artifactClient.readArtifactDetail({ storageKey: selectedStorageKey }, { workspaceId });
-      setDetail(artifactDetail);
-      return artifactDetail;
+        const artifactDetail = await artifactClient.readArtifactDetail(
+          { storageKey: selectedStorageKey },
+          { workspaceId },
+        );
+        setDetail(artifactDetail);
+        return artifactDetail;
+      },
     },
-  });
+  );
 
   async function refreshArtifacts(): Promise<void> {
     setViewState({ status: "loading", message: "Loading data artifacts..." });
@@ -209,20 +245,33 @@ export function useArtifactBrowserFeature(
         setContent(undefined);
         setUnmanagedImagePreviewUrl(undefined);
         setArtifactPreview(createIdleArtifactPreview());
-        setViewState({ status: "success", message: "No data artifacts found yet." });
+        setViewState({
+          status: "success",
+          message: "No data artifacts found yet.",
+        });
         return;
       }
       const browseItems = await artifactClient.browseArtifacts({ workspaceId });
       setItems(browseItems);
-      setSelectedStorageKey((current) => browseItems.some((item) => item.storageKey === current) ? current : undefined);
+      setSelectedStorageKey((current) =>
+        browseItems.some((item) => item.storageKey === current)
+          ? current
+          : undefined,
+      );
       setViewState({
         status: "success",
-        message: browseItems.length > 0 ? "Loaded data artifacts." : "No data artifacts found yet.",
+        message:
+          browseItems.length > 0
+            ? "Loaded data artifacts."
+            : "No data artifacts found yet.",
       });
     } catch (error) {
       setViewState({
         status: "error",
-        message: error instanceof Error ? error.message : "Failed to load data artifacts.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to load data artifacts.",
       });
     }
   }
@@ -231,9 +280,12 @@ export function useArtifactBrowserFeature(
     void refreshArtifacts();
   }, [artifactClient, workspaceId]);
 
-  useEffect(() => () => {
-    revokeManagedImagePreviewUrl();
-  }, []);
+  useEffect(
+    () => () => {
+      revokeManagedImagePreviewUrl();
+    },
+    [],
+  );
 
   async function selectArtifact(storageKey: string): Promise<void> {
     setSelectedStorageKey(storageKey);
@@ -242,12 +294,17 @@ export function useArtifactBrowserFeature(
 
     try {
       const locator = { storageKey };
-      const artifactDetail = await artifactClient.readArtifactDetail(locator, { workspaceId });
+      const artifactDetail = await artifactClient.readArtifactDetail(locator, {
+        workspaceId,
+      });
       setDetail(artifactDetail);
       publishLogic.setPublishedBackingFromDetail(artifactDetail);
 
       try {
-        const contentDescriptor = await artifactClient.readArtifactContent(locator, { workspaceId });
+        const contentDescriptor = await artifactClient.readArtifactContent(
+          locator,
+          { workspaceId },
+        );
         setContent(contentDescriptor);
         const previewSource: ArtifactPreviewSource = {
           storageKey,
@@ -264,45 +321,96 @@ export function useArtifactBrowserFeature(
           if (previewDescriptor.kind === "image") {
             if (artifactClient.readArtifactMedia) {
               try {
-                const media = await artifactClient.readArtifactMedia(locator, { workspaceId });
-                const compressedUrl = await createCompressedImagePreviewObjectUrl(
-                  media.bytes,
-                  media.mediaType ?? previewSource.mediaType,
-                );
+                const media = await artifactClient.readArtifactMedia(locator, {
+                  workspaceId,
+                  maximumBytes: ARTIFACT_MEDIA_PREVIEW_MAX_BYTES,
+                });
+                const compressedUrl =
+                  await createCompressedImagePreviewObjectUrl(
+                    media.bytes,
+                    media.mediaType ?? previewSource.mediaType,
+                  );
                 setManagedImagePreviewUrl(compressedUrl);
-                setArtifactPreview(createMediaArtifactPreview(
-                  { ...previewSource, mediaType: media.mediaType ?? previewSource.mediaType },
-                  compressedUrl,
-                ));
+                setArtifactPreview(
+                  createMediaArtifactPreview(
+                    {
+                      ...previewSource,
+                      mediaType: media.mediaType ?? previewSource.mediaType,
+                    },
+                    compressedUrl,
+                  ),
+                );
               } catch {
-                const fallbackUrl = artifactClient.createArtifactMediaViewUrl(locator, { workspaceId });
+                const fallbackUrl = artifactClient.createArtifactMediaViewUrl(
+                  locator,
+                  {
+                    workspaceId,
+                    maximumBytes: ARTIFACT_MEDIA_PREVIEW_MAX_BYTES,
+                  },
+                );
                 setUnmanagedImagePreviewUrl(fallbackUrl);
-                setArtifactPreview(createMediaArtifactPreview(previewSource, fallbackUrl));
+                setArtifactPreview(
+                  createMediaArtifactPreview(previewSource, fallbackUrl),
+                );
               }
             } else {
-              const mediaUrl = artifactClient.createArtifactMediaViewUrl(locator, { workspaceId });
+              const mediaUrl = artifactClient.createArtifactMediaViewUrl(
+                locator,
+                {
+                  workspaceId,
+                  maximumBytes: ARTIFACT_MEDIA_PREVIEW_MAX_BYTES,
+                },
+              );
               setUnmanagedImagePreviewUrl(mediaUrl);
-              setArtifactPreview(createMediaArtifactPreview(previewSource, mediaUrl));
+              setArtifactPreview(
+                createMediaArtifactPreview(previewSource, mediaUrl),
+              );
             }
           } else {
-            const mediaUrl = artifactClient.createArtifactMediaViewUrl(locator, { workspaceId });
+            const mediaUrl = artifactClient.createArtifactMediaViewUrl(
+              locator,
+              {
+                workspaceId,
+                maximumBytes: ARTIFACT_MEDIA_PREVIEW_MAX_BYTES,
+              },
+            );
             setUnmanagedImagePreviewUrl(undefined);
-            setArtifactPreview(createMediaArtifactPreview(previewSource, mediaUrl));
+            setArtifactPreview(
+              createMediaArtifactPreview(previewSource, mediaUrl),
+            );
           }
         } else if (isTextArtifactPreviewKind(previewDescriptor.kind)) {
           setUnmanagedImagePreviewUrl(undefined);
           if (artifactClient.readArtifactMedia) {
             try {
-              const media = await artifactClient.readArtifactMedia(locator, { workspaceId });
-              setArtifactPreview(createTextArtifactPreview(
-                { ...previewSource, mediaType: media.mediaType ?? previewSource.mediaType },
-                media.bytes,
-              ));
+              const media = await artifactClient.readArtifactMedia(locator, {
+                workspaceId,
+                maximumBytes: ARTIFACT_PREVIEW_MAX_BYTES,
+              });
+              setArtifactPreview(
+                createTextArtifactPreview(
+                  {
+                    ...previewSource,
+                    mediaType: media.mediaType ?? previewSource.mediaType,
+                  },
+                  media.bytes,
+                ),
+              );
             } catch {
-              setArtifactPreview(createUnavailableArtifactPreview(previewSource, "Preview text could not be prepared for this artifact."));
+              setArtifactPreview(
+                createUnavailableArtifactPreview(
+                  previewSource,
+                  "Preview text could not be prepared for this artifact.",
+                ),
+              );
             }
           } else {
-            setArtifactPreview(createUnavailableArtifactPreview(previewSource, "Preview text is unavailable in this connection."));
+            setArtifactPreview(
+              createUnavailableArtifactPreview(
+                previewSource,
+                "Preview text is unavailable in this connection.",
+              ),
+            );
           }
         } else {
           setUnmanagedImagePreviewUrl(undefined);
@@ -327,7 +435,10 @@ export function useArtifactBrowserFeature(
       publishLogic.setPublishedBackingFromDetail(undefined);
       setViewState({
         status: "error",
-        message: error instanceof Error ? error.message : "Failed to load artifact detail.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to load artifact detail.",
       });
     }
   }
@@ -347,18 +458,27 @@ export function useArtifactBrowserFeature(
       return;
     }
     if (!workspaceId) {
-      setViewState({ status: "error", message: "Select a workspace before deleting artifacts." });
+      setViewState({
+        status: "error",
+        message: "Select a workspace before deleting artifacts.",
+      });
       return;
     }
     if (deleteConfirmationInput !== "Delete") {
-      setViewState({ status: "error", message: "Type Delete to confirm artifact deletion." });
+      setViewState({
+        status: "error",
+        message: "Type Delete to confirm artifact deletion.",
+      });
       return;
     }
 
     const storageKey = pendingDeleteStorageKey;
     setViewState({ status: "loading", message: `Deleting ${storageKey}...` });
     try {
-      await artifactClient.deleteRegisteredArtifact({ storageKey }, { workspaceId });
+      await artifactClient.deleteRegisteredArtifact(
+        { storageKey },
+        { workspaceId },
+      );
       setPendingDeleteStorageKey(undefined);
       setDeleteConfirmationInput("");
       if (selectedStorageKey === storageKey) {
@@ -374,12 +494,17 @@ export function useArtifactBrowserFeature(
     } catch (error) {
       setViewState({
         status: "error",
-        message: error instanceof Error ? error.message : "Failed to delete artifact.",
+        message:
+          error instanceof Error ? error.message : "Failed to delete artifact.",
       });
     }
   }
   function toggleSelectedArtifactKey(storageKey: string): void {
-    setSelectedArtifactKeys((current) => (current.includes(storageKey) ? current.filter((key) => key !== storageKey) : [...current, storageKey]));
+    setSelectedArtifactKeys((current) =>
+      current.includes(storageKey)
+        ? current.filter((key) => key !== storageKey)
+        : [...current, storageKey],
+    );
   }
   function clearSelectedArtifactKeys(): void {
     setSelectedArtifactKeys([]);
@@ -387,8 +512,11 @@ export function useArtifactBrowserFeature(
   }
 
   const listedArtifactKeys = items.map((item) => item.storageKey);
-  const areAllArtifactKeysSelected = listedArtifactKeys.length > 0
-    && listedArtifactKeys.every((storageKey) => selectedArtifactKeys.includes(storageKey));
+  const areAllArtifactKeysSelected =
+    listedArtifactKeys.length > 0 &&
+    listedArtifactKeys.every((storageKey) =>
+      selectedArtifactKeys.includes(storageKey),
+    );
 
   function toggleAllArtifactKeys(): void {
     if (areAllArtifactKeysSelected) {
@@ -402,17 +530,36 @@ export function useArtifactBrowserFeature(
   async function deleteSelectedArtifacts(): Promise<void> {
     if (selectedArtifactKeys.length === 0) return;
     if (!workspaceId) {
-      setViewState({ status: "error", message: "Select a workspace before deleting artifacts." });
+      setViewState({
+        status: "error",
+        message: "Select a workspace before deleting artifacts.",
+      });
       return;
     }
     if (bulkDeleteConfirmationInput !== "Delete All") {
-      setViewState({ status: "error", message: "Type Delete All to confirm bulk artifact deletion." });
+      setViewState({
+        status: "error",
+        message: "Type Delete All to confirm bulk artifact deletion.",
+      });
       return;
     }
-    setViewState({ status: "loading", message: `Deleting ${selectedArtifactKeys.length} artifact(s)...` });
+    setViewState({
+      status: "loading",
+      message: `Deleting ${selectedArtifactKeys.length} artifact(s)...`,
+    });
     try {
-      await Promise.all(selectedArtifactKeys.map(async (storageKey) => artifactClient.deleteRegisteredArtifact({ storageKey }, { workspaceId })));
-      if (selectedStorageKey && selectedArtifactKeys.includes(selectedStorageKey)) {
+      await Promise.all(
+        selectedArtifactKeys.map(async (storageKey) =>
+          artifactClient.deleteRegisteredArtifact(
+            { storageKey },
+            { workspaceId },
+          ),
+        ),
+      );
+      if (
+        selectedStorageKey &&
+        selectedArtifactKeys.includes(selectedStorageKey)
+      ) {
         setSelectedStorageKey(undefined);
         setDetail(undefined);
         setContent(undefined);
@@ -423,9 +570,18 @@ export function useArtifactBrowserFeature(
       const deletedCount = selectedArtifactKeys.length;
       clearSelectedArtifactKeys();
       await refreshArtifacts();
-      setViewState({ status: "success", message: `Deleted ${deletedCount} artifact(s).` });
+      setViewState({
+        status: "success",
+        message: `Deleted ${deletedCount} artifact(s).`,
+      });
     } catch (error) {
-      setViewState({ status: "error", message: error instanceof Error ? error.message : "Failed to delete selected artifacts." });
+      setViewState({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to delete selected artifacts.",
+      });
     }
   }
 
@@ -437,7 +593,10 @@ export function useArtifactBrowserFeature(
       mediaType?: string;
     } = {},
   ): Promise<void> {
-    setRegisterState({ status: "loading", message: "Registering remote artifact..." });
+    setRegisterState({
+      status: "loading",
+      message: "Registering remote artifact...",
+    });
     const repository = input.repository ?? registerRepository;
     const pathInRepo = input.pathInRepo ?? registerPathInRepo;
     const revision = input.revision ?? registerRevision;
@@ -461,7 +620,10 @@ export function useArtifactBrowserFeature(
         message: `Registered ${registered.artifactId} from Hugging Face.`,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to register artifact from repo.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to register artifact from repo.";
       setRegisterState({
         status: "error",
         message: withHuggingFaceAuthGuidance(message),
@@ -470,7 +632,10 @@ export function useArtifactBrowserFeature(
   }
 
   async function registerHuggingFaceNamespace(): Promise<void> {
-    setRegisterState({ status: "loading", message: "Loading namespace datasets..." });
+    setRegisterState({
+      status: "loading",
+      message: "Loading namespace datasets...",
+    });
     try {
       if (!artifactClient.browseHuggingFaceNamespaceDatasets) {
         throw new Error("Namespace browsing is unavailable for this client.");
@@ -483,28 +648,42 @@ export function useArtifactBrowserFeature(
       setExpandedHuggingFaceDataset(undefined);
       setRegisterState({
         status: "success",
-        message: datasets.length > 0
-          ? `Registered namespace ${registerNamespace} and loaded datasets.`
-          : `Registered namespace ${registerNamespace}. No datasets found.`,
+        message:
+          datasets.length > 0
+            ? `Registered namespace ${registerNamespace} and loaded datasets.`
+            : `Registered namespace ${registerNamespace}. No datasets found.`,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load namespace datasets.";
-      setRegisterState({ status: "error", message: withHuggingFaceAuthGuidance(message) });
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to load namespace datasets.";
+      setRegisterState({
+        status: "error",
+        message: withHuggingFaceAuthGuidance(message),
+      });
     }
   }
 
-  async function browseHuggingFaceDatasetParquetFiles(repository: string): Promise<void> {
+  async function browseHuggingFaceDatasetParquetFiles(
+    repository: string,
+  ): Promise<void> {
     setExpandedHuggingFaceDataset(repository);
     setDatasetFilesByRepository((current) => ({
       ...current,
       [repository]: {
         files: current[repository]?.files ?? [],
-        state: { status: "loading", message: `Loading files for ${repository}...` },
+        state: {
+          status: "loading",
+          message: `Loading files for ${repository}...`,
+        },
       },
     }));
     try {
       if (!artifactClient.browseHuggingFaceDatasetParquetFiles) {
-        throw new Error("Dataset file browsing is unavailable for this client.");
+        throw new Error(
+          "Dataset file browsing is unavailable for this client.",
+        );
       }
       const files = await artifactClient.browseHuggingFaceDatasetParquetFiles({
         repository,
@@ -517,17 +696,26 @@ export function useArtifactBrowserFeature(
           files,
           state: {
             status: "success",
-            message: files.length > 0 ? `Loaded ${files.length} file(s).` : "No files found for this dataset.",
+            message:
+              files.length > 0
+                ? `Loaded ${files.length} file(s).`
+                : "No files found for this dataset.",
           },
         },
       }));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to load dataset files.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to load dataset files.";
       setDatasetFilesByRepository((current) => ({
         ...current,
         [repository]: {
           files: current[repository]?.files ?? [],
-          state: { status: "error", message: withHuggingFaceAuthGuidance(message) },
+          state: {
+            status: "error",
+            message: withHuggingFaceAuthGuidance(message),
+          },
         },
       }));
     }
@@ -537,21 +725,36 @@ export function useArtifactBrowserFeature(
     setExpandedHuggingFaceDataset(undefined);
   }
 
-  function getHuggingFaceDatasetParquetFiles(repository: string): ThinClientHuggingFaceDatasetParquetFile[] {
+  function getHuggingFaceDatasetParquetFiles(
+    repository: string,
+  ): ThinClientHuggingFaceDatasetParquetFile[] {
     return datasetFilesByRepository[repository]?.files ?? [];
   }
 
-  function getHuggingFaceDatasetFilesState(repository: string): ArtifactBrowserViewState {
-    return datasetFilesByRepository[repository]?.state ?? { status: "idle", message: "Select View Files to load files." };
+  function getHuggingFaceDatasetFilesState(
+    repository: string,
+  ): ArtifactBrowserViewState {
+    return (
+      datasetFilesByRepository[repository]?.state ?? {
+        status: "idle",
+        message: "Select View Files to load files.",
+      }
+    );
   }
 
   async function localizeArtifactFromRepo(): Promise<void> {
     if (!selectedStorageKey) {
-      setLocalizeState({ status: "error", message: "Select an artifact before localizing." });
+      setLocalizeState({
+        status: "error",
+        message: "Select an artifact before localizing.",
+      });
       return;
     }
 
-    setLocalizeState({ status: "loading", message: "Localizing imported artifact bytes..." });
+    setLocalizeState({
+      status: "loading",
+      message: "Localizing imported artifact bytes...",
+    });
     try {
       const localized = await artifactClient.localizeArtifactFromRepo({
         artifactId: selectedStorageKey,
@@ -564,7 +767,10 @@ export function useArtifactBrowserFeature(
         message: `Localized ${localized.artifactId} to local object storage.`,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to localize imported artifact.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to localize imported artifact.";
       setLocalizeState({
         status: "error",
         message: withHuggingFaceAuthGuidance(message),
@@ -574,11 +780,17 @@ export function useArtifactBrowserFeature(
 
   async function recheckSourceBacking(): Promise<void> {
     if (!selectedStorageKey) {
-      setSourceVerifyState({ status: "error", message: "Select an artifact before verification." });
+      setSourceVerifyState({
+        status: "error",
+        message: "Select an artifact before verification.",
+      });
       return;
     }
 
-    setSourceVerifyState({ status: "loading", message: "Verifying imported source backing..." });
+    setSourceVerifyState({
+      status: "loading",
+      message: "Verifying imported source backing...",
+    });
     try {
       if (!artifactClient.verifyImportedSourceBacking) {
         throw new Error("Source verification is unavailable for this client.");
@@ -593,7 +805,10 @@ export function useArtifactBrowserFeature(
         message: "Imported source backing verification refreshed.",
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to verify imported source backing.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to verify imported source backing.";
       setSourceVerifyState({
         status: "error",
         message: withHuggingFaceAuthGuidance(message),
@@ -616,12 +831,16 @@ export function useArtifactBrowserFeature(
     await refreshArtifacts();
   }
 
-  const imageItems = items.filter((item) => item.artifactFamily === "image" || item.mediaType?.startsWith("image/"));
+  const imageItems = items.filter(
+    (item) =>
+      item.artifactFamily === "image" || item.mediaType?.startsWith("image/"),
+  );
   const selectedImageIndex = selectedStorageKey
     ? imageItems.findIndex((item) => item.storageKey === selectedStorageKey)
     : -1;
   const canSelectPreviousImage = selectedImageIndex > 0;
-  const canSelectNextImage = selectedImageIndex >= 0 && selectedImageIndex < imageItems.length - 1;
+  const canSelectNextImage =
+    selectedImageIndex >= 0 && selectedImageIndex < imageItems.length - 1;
 
   async function selectAdjacentImage(offset: -1 | 1): Promise<void> {
     const nextItem = imageItems[selectedImageIndex + offset];

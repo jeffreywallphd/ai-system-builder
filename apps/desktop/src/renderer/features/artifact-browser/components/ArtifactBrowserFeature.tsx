@@ -5,8 +5,11 @@ import {
   deriveArtifactListStatusLabels,
   derivePublishedBackingDisplayRows,
   derivePublishedBackingVerificationPresentation,
+  ApplicationIcon,
   ArtifactPreviewPanel,
+  PanelHeading,
   TermWithHint,
+  TypeBadge,
   type PublishedBackingView,
 } from "../../../../../../../modules/ui/shared";
 import type { DesktopArtifactBrowserClient } from "../api/desktopArtifactBrowserClient";
@@ -183,7 +186,7 @@ export function ArtifactBrowserFeature({ client, workspaceId }: ArtifactBrowserF
   return (
     <section className="ui-panel ui-panel--elevated ui-panel--sectioned">
       <header className="ui-panel__section-header">
-        <h2 className="ui-panel__title">Artifact Browser</h2>
+        <PanelHeading icon="browse" tone="violet">Artifact Browser</PanelHeading>
       </header>
       <div className="ui-panel__section-body ui-stack ui-stack--sm">
       {viewState.message ? <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p> : null}
@@ -218,7 +221,8 @@ export function ArtifactBrowserFeature({ client, workspaceId }: ArtifactBrowserF
       </section>
       <div className="artifact-browser__toolbar">
         <button className="ui-button" type="button" onClick={() => void refreshArtifacts()}>
-          Refresh
+          <ApplicationIcon name="refresh" />
+          <span className="ui-button__label">Refresh</span>
         </button>
       </div>
       {pendingDeleteConfirmation ? (
@@ -265,14 +269,15 @@ export function ArtifactBrowserFeature({ client, workspaceId }: ArtifactBrowserF
             {uploadedItems.map((item) => (
               <article className="artifact-browser__artifact-card ui-stack ui-stack--sm" key={item.storageKey}>
                 <div className="ui-stack ui-stack--sm">
-                  <h4 className="artifact-browser__artifact-card-title">{item.originalName ?? item.storageKey}</h4>
+                  <div className="ui-type-label"><TypeBadge value={item.mediaType ?? item.originalName ?? item.storageKey} /><h4 className="artifact-browser__artifact-card-title">{item.originalName ?? item.storageKey}</h4></div>
                   <p className="artifact-browser__artifact-card-key">{item.storageKey}</p>
                 </div>
                 <p className="artifact-browser__artifact-card-status">
                   Status: {item.metadata?.backingState ? deriveArtifactListStatusLabels(item.metadata.backingState).join(" | ") : "local"}
                 </p>
                 <button className="ui-button" type="button" onClick={() => void openArtifactDetails(item.storageKey)} disabled={viewState.status === "loading" && selectedStorageKey === item.storageKey}>
-                  View Details
+                  <ApplicationIcon name="browse" />
+                  <span className="ui-button__label">View Details</span>
                 </button>                
               </article>
             ))}
@@ -284,13 +289,14 @@ export function ArtifactBrowserFeature({ client, workspaceId }: ArtifactBrowserF
             ) : null}
             {generatedItems.map((item) => (
               <section key={item.storageKey}>
-                <p>{item.originalName ?? item.storageKey}</p>
+                <p className="ui-type-label"><TypeBadge value={item.mediaType ?? item.originalName ?? item.storageKey} /><span>{item.originalName ?? item.storageKey}</span></p>
                 <p>Status: {item.metadata?.backingState ? (
                   <small>{deriveArtifactListStatusLabels(item.metadata.backingState).join(" · ")}</small>
                 ) : null}
                 </p>
                 <button className="ui-button" type="button" onClick={() => void openArtifactDetails(item.storageKey)} disabled={viewState.status === "loading" && selectedStorageKey === item.storageKey}>
-                  View Details
+                  <ApplicationIcon name="browse" />
+                  <span className="ui-button__label">View Details</span>
                 </button>
               </section>
             ))}
@@ -303,7 +309,7 @@ export function ArtifactBrowserFeature({ client, workspaceId }: ArtifactBrowserF
               ) : null}
               {unregisteredItems.map((item) => (
                 <li key={item.storageKey}>
-                  <p>{item.relativePath}</p>
+                  <p className="ui-type-label"><TypeBadge value={item.mediaType ?? item.relativePath} /><span>{item.relativePath}</span></p>
                   <small>{item.mediaType ?? "unknown media type"} · {item.storageKey.split(".").pop() ?? "unknown"}</small>
                   <div className="ui-grid ui-grid--two">
                     <button
@@ -340,7 +346,7 @@ export function ArtifactBrowserFeature({ client, workspaceId }: ArtifactBrowserF
               <dt><TermWithHint termId="storedKey">Selected key</TermWithHint></dt>
               <dd>{detail.locator.storageKey}</dd>
               <dt><TermWithHint termId="mediaType">Media type</TermWithHint></dt>
-              <dd>{detail.mediaType ?? "unknown"}</dd>
+              <dd className="ui-type-label"><TypeBadge value={detail.mediaType ?? detail.originalName ?? detail.locator.storageKey} /><span>{detail.mediaType ?? "unknown"}</span></dd>
               <dt><TermWithHint termId="artifactFamily">Artifact family</TermWithHint></dt>
               <dd>{detail.artifactFamily}</dd>
               <dt><TermWithHint termId="source">Source</TermWithHint></dt>

@@ -6,6 +6,7 @@ import type {
   WorkspaceSystemPackActivation,
 } from "../../../contracts/workspace";
 import { isWorkspaceId } from "../../../contracts/workspace";
+import type { OrganizationId } from "../../../contracts/organization";
 import type {
   WorkspaceRepository,
   WorkspaceSelectionRepository,
@@ -27,10 +28,12 @@ export interface CreateWorkspaceUseCaseDependencies {
   readonly workspaceRepository: WorkspaceRepository;
   readonly systemPackActivationRepository: WorkspaceSystemPackActivationRepository;
   readonly workspaceSelectionRepository?: WorkspaceSelectionRepository;
+  readonly organizationId?: OrganizationId;
 }
 
 export interface CreateWorkspaceUseCaseInput {
   readonly command: CreateWorkspaceCommand;
+  readonly organizationId?: OrganizationId;
   readonly now?: () => Date;
   readonly generateWorkspaceId?: () => WorkspaceId;
   readonly selectAfterCreate?: boolean;
@@ -91,9 +94,11 @@ export class CreateWorkspaceUseCase {
     }
 
     const createdAt = (input.now ?? (() => new Date()))().toISOString();
+    const organizationId = input.organizationId ?? this.dependencies.organizationId;
     const includeSystemFoundationAssets = input.command.includeSystemFoundationAssets !== false;
     const description = normalizeWorkspaceDescription(input.command.description);
     const workspace: WorkspaceRecord = {
+      ...(organizationId ? { organizationId } : {}),
       workspaceId,
       displayName: normalizedDisplayName.displayName,
       ...(description ? { description } : {}),

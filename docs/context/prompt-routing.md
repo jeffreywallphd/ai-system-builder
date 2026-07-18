@@ -6,6 +6,9 @@ Use this guide to select **minimum-sufficient** context packs. Start with `index
 
 - Always include `docs/context/packs/index.pack.md`.
 - Read `docs/README.md` before assembling task context.
+- Use `docs/context/pack-catalog.json` for machine-readable task/path signals and applicable checks.
+- Default to no more than two additional packs: one primary concern and one adjacent boundary.
+- Add another pack only after repository search proves that boundary is materially affected; for broad work, stage context and implementation by boundary instead of preloading everything.
 - Packs are routing aids and compact summaries; canonical ADRs, architecture docs, and standards win on conflict.
 
 ## Pack Selection Table
@@ -19,6 +22,7 @@ Use this guide to select **minimum-sufficient** context packs. Start with `index
 | custom asset creation, authored drafts, revisions, overrides, promotion readiness | `docs/context/packs/asset-authoring.pack.md` |
 | effective/materialized projections, projection readiness, blockers, diagnostics | `docs/context/packs/effective-asset-projections.pack.md` |
 | asset composition plans, compatibility, dependencies, planning blockers | `docs/context/packs/asset-composition-planning.pack.md` |
+| composed systems, System Builder records, Systems navigation, software-status placement | `docs/context/packs/system-builder.pack.md` |
 | runtime readiness, capability matching, runtime resources, execution-output readiness | `docs/context/packs/runtime-readiness-binding.pack.md` |
 | execution plans, dry-run/preflight, planned steps/inputs/outputs, safety gates | `docs/context/packs/execution-plan-preparation.pack.md` |
 | conversational runnable systems, sessions, turns, runs, text-generation adapters | `docs/context/packs/controlled-conversational-system-execution.pack.md` |
@@ -32,24 +36,25 @@ Use this guide to select **minimum-sufficient** context packs. Start with `index
 | renderer CSS/style architecture, shared style layers, tokens | `docs/context/packs/desktop-styling.pack.md` |
 | server lifecycle, Express APIs, thin-client coupling, API route handlers | `docs/context/packs/server-host.pack.md` |
 | persistence/storage, artifacts/uploads, storage keys, AppData/server roots, model/artifact storage | `docs/context/packs/persistence-storage.pack.md` |
-| authn/authz, route policy, HTTPS/TLS, tokens, credentials, audit, sanitization | `docs/context/packs/security.pack.md` |
+| authn/authz, OIDC, organization tenancy/placement, route policy, HTTPS/TLS, tokens, credentials, audit, sanitization | `docs/context/packs/security.pack.md` + `docs/context/packs/persistence-storage.pack.md` when data isolation changes |
 | structured logging, diagnostic events, verbosity, safe failure reporting | `docs/context/packs/logging.pack.md` |
-| documentation governance, canonical-vs-context updates | `docs/context/packs/docs-standards.pack.md` |
+| documentation governance, agent change planning, decision readiness, change impact, canonical-vs-context updates | `docs/context/packs/docs-standards.pack.md` |
 | test strategy, regression coverage, test placement | `docs/context/packs/testing.pack.md` |
 | debugging, failures, stack traces, hangs, timeouts, broken UI/API/runtime behavior | `docs/context/packs/debugging-error-handling.pack.md` |
 
 ## Common Pack Chains
 
-- Debugging: `index` + `debugging-error-handling`, then add affected host/runtime/storage/UI/feature packs.
-- Image generation defects: add `image-generation`, `runtime`, `runtime-task-registry`, `runtime-installer`, `persistence-storage`, `server-host` or `desktop-host` as applicable.
-- Asset Library or Asset Registry UI/API/IPC work: add `asset-kernel`, `security`, `testing`, and the affected host/client packs.
-- Workspace-scoped assets/resources: add `asset-kernel`, `persistence-storage`, `security`, `testing`, and affected host/client packs.
-- User-library reuse: add `user-library`, `asset-kernel`, `persistence-storage`, `security`, `testing`.
-- Asset authoring/customization: add `asset-authoring`, `asset-kernel`, `user-library` if source reuse matters, plus `security` and `testing`.
-- Projection/composition/readiness/execution output boundaries: add packs in order from `effective-asset-projections` -> `asset-composition-planning` -> `runtime-readiness-binding` -> `execution-plan-preparation`.
-- Controlled conversational execution: add `controlled-conversational-system-execution` plus execution/readiness/composition packs only when those layers are in scope.
-- Security changes: add `security` plus the host/client/feature packs whose public boundary changes.
-- Desktop renderer styling: add `desktop-implementation` + `desktop-styling`.
+- Debugging: `index` + `debugging-error-handling` + the single pack owning the first failing seam.
+- Image generation defect: `index` + `image-generation`; add only one of `runtime`, `runtime-task-registry`, `runtime-installer`, `persistence-storage`, or the affected host after localization.
+- Asset Library/Registry: `index` + `asset-kernel` + the affected UI, transport/host, persistence, or security pack.
+- Workspace-scoped persistence: `index` + the owning feature pack + `persistence-storage`; load security or a host pack only when that boundary also changes.
+- User Library: `index` + `user-library` + either `asset-kernel` for semantics or `persistence-storage` for repository behavior.
+- Asset authoring: `index` + `asset-authoring` + either `asset-kernel`, `user-library`, or `effective-asset-projections` based on the adjacent behavior.
+- Projection/composition/readiness/planning: select the one owning layer plus one immediate neighbor; move forward through the chain in separate reasoning stages.
+- System Builder: `index` + `system-builder`; add `asset-kernel` or `asset-composition-planning` for data semantics, or `desktop-implementation` for Systems/Settings UI placement.
+- Controlled conversational execution: `index` + `controlled-conversational-system-execution`; add the execution-plan or runtime pack only when that exact boundary changes.
+- Security: `index` + `security` + the one public host/client/feature boundary being changed.
+- Desktop renderer styling: `index` + `desktop-styling` + `desktop-implementation`.
 
 ## Canonical Escalation Rules
 
@@ -59,6 +64,8 @@ Read and update canonical docs when the task:
 - changes dependency direction, host/transport/runtime responsibility, persistence/storage responsibility, security policy, or workspace scope,
 - changes Asset Kernel semantics, pack/source semantics, mutation behavior, resolver behavior, or public transport/UI exposure,
 - exposes a context-pack summary that is incomplete, stale, or ambiguous.
+
+Before architecture-sensitive implementation, consult `docs/adr/decision-readiness.md`. Proposed or decision-required areas must return to decision work instead of being implemented from inference.
 
 ## Boundary Split Rules
 

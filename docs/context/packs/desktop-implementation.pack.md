@@ -35,6 +35,7 @@
 - Do not duplicate reusable feature logic into page-specific copies.
 - Keep desktop-specific composition/wiring in desktop app and host composition layers, not clean-architecture core modules.
 - Desktop layer must not become an ad hoc shell/orchestration system.
+- Keep the workspace-scoped Systems page focused on composed-system building; place builder-application, host, and runtime diagnostics under Settings / Software status.
 
 ## Canonical Source Docs
 

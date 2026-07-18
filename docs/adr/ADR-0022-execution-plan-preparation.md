@@ -1,7 +1,7 @@
 # ADR-0022: Execution Plan Preparation
 
-- **Status:** Accepted
-- **Date:** 2026-05-21
+- Status: accepted
+- Date: 2026-05-21
 
 ## Context
 

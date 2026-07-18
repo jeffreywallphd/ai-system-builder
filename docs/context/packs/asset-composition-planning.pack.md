@@ -56,7 +56,8 @@ Asset composition planning prepares validated composition plan outputs for **Run
 
 ## UI Placement
 
-- Composition planning is exposed inside the **Assets** area as a `Plans` tab, not as a separate top-level page.
+- General composition planning remains inside **Assets / Plans**.
+- **Systems** owns future system-specific assembly and System Builder records, reusing or referencing these plans rather than creating a parallel planner.
 - The UI is structured form/list planning (plans, assets in plan, connections, check plan), not visual canvas authoring.
 - `valid` means **Ready for planning** only; it does not mean runtime-ready or execution-ready.
 - Runtime-readiness binding and workflow/runtime/model execution remain downstream.

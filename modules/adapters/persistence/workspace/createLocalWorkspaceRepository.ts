@@ -6,34 +6,64 @@ import {
   isWorkspaceStatus,
 } from "../../../contracts/workspace";
 import { LocalWorkspacePersistenceError } from "./localWorkspacePersistenceErrors";
-import { cloneJson, readJsonDocument, writeJsonDocument } from "./localWorkspacePersistenceJson";
+import { cloneJson, mutateJsonDocument, readJsonDocument, writeJsonDocument } from "./localWorkspacePersistenceJson";
 import {
   resolveWorkspaceIndexFile,
   resolveWorkspaceRecordFile,
 } from "./localWorkspacePersistencePaths";
+import type { StructuredDocumentStore } from "../shared";
 
 export interface LocalWorkspaceRepositoryOptions {
   readonly rootDirectory: string;
+  readonly documents?: StructuredDocumentStore;
 }
 
 export function createLocalWorkspaceRepository(options: LocalWorkspaceRepositoryOptions): WorkspaceRepository {
   const rootDirectory = options.rootDirectory;
+  const persistence = { rootDirectory, documents: options.documents };
 
   async function readIndex(): Promise<WorkspaceRecord[]> {
-    const value = await readJsonDocument<unknown>(resolveWorkspaceIndexFile(rootDirectory), [], "workspace-persistence-read-failed");
+    const value = await readJsonDocument<unknown>(resolveWorkspaceIndexFile(rootDirectory), [], "workspace-persistence-read-failed", persistence);
     if (!Array.isArray(value)) {
       throw new LocalWorkspacePersistenceError("workspace-persistence-invalid-record");
     }
 
-    return sortWorkspaces(value.map(assertWorkspaceRecord));
+    return sortWorkspaces(value.map((record) => assertWorkspaceRecord(record, options.documents?.organizationId)));
   }
 
-  async function writeIndex(records: readonly WorkspaceRecord[]): Promise<void> {
-    await writeJsonDocument(resolveWorkspaceIndexFile(rootDirectory), sortWorkspaces(records), "workspace-persistence-write-failed");
+  async function writeWorkspaceRecord(workspace: WorkspaceRecord, target = persistence): Promise<void> {
+    await writeJsonDocument(resolveWorkspaceRecordFile(rootDirectory, workspace.workspaceId), workspace, "workspace-persistence-write-failed", target);
   }
 
-  async function writeWorkspaceRecord(workspace: WorkspaceRecord): Promise<void> {
-    await writeJsonDocument(resolveWorkspaceRecordFile(rootDirectory, workspace.workspaceId), workspace, "workspace-persistence-write-failed");
+  async function writeWorkspaceAndIndex(
+    workspace: WorkspaceRecord,
+    updateIndex: (index: readonly WorkspaceRecord[]) => WorkspaceRecord[],
+  ): Promise<void> {
+    if (options.documents) {
+      await options.documents.runInTransaction(async (transaction) => {
+        const target = { rootDirectory, documents: transaction };
+        await writeWorkspaceRecord(workspace, target);
+        await mutateJsonDocument(
+          resolveWorkspaceIndexFile(rootDirectory),
+          [] as WorkspaceRecord[],
+          "workspace-persistence-write-failed",
+          (current) => ({
+            value: updateIndex(current.map((record) => assertWorkspaceRecord(record, transaction.organizationId))),
+            result: undefined,
+          }),
+          target,
+        );
+      });
+      return;
+    }
+    await writeWorkspaceRecord(workspace);
+    const current = await readIndex();
+    await writeJsonDocument(
+      resolveWorkspaceIndexFile(rootDirectory),
+      updateIndex(current),
+      "workspace-persistence-write-failed",
+      persistence,
+    );
   }
 
   return {
@@ -47,28 +77,24 @@ export function createLocalWorkspaceRepository(options: LocalWorkspaceRepository
         resolveWorkspaceRecordFile(rootDirectory, safeWorkspaceId),
         undefined,
         "workspace-persistence-read-failed",
+        persistence,
       );
       if (value === undefined) return undefined;
-      return cloneJson(assertWorkspaceRecord(value));
+      return cloneJson(assertWorkspaceRecord(value, options.documents?.organizationId));
     },
 
     async saveWorkspace(workspace: WorkspaceRecord): Promise<void> {
-      const validWorkspace = assertWorkspaceRecord(workspace);
-      await writeWorkspaceRecord(validWorkspace);
-      const index = await readIndex();
-      await writeIndex(upsertWorkspace(index, validWorkspace));
+      const validWorkspace = assertWorkspaceRecord(workspace, options.documents?.organizationId);
+      await writeWorkspaceAndIndex(validWorkspace, (index) => upsertWorkspace(index, validWorkspace));
     },
 
     async updateWorkspace(workspace: WorkspaceRecord): Promise<void> {
-      const validWorkspace = assertWorkspaceRecord(workspace);
+      const validWorkspace = assertWorkspaceRecord(workspace, options.documents?.organizationId);
       const existing = await this.readWorkspace(validWorkspace.workspaceId);
       if (!existing) {
         throw new LocalWorkspacePersistenceError("workspace-persistence-missing-record");
       }
-      const index = await readIndex();
-      const updatedIndex = replaceWorkspace(index, validWorkspace);
-      await writeWorkspaceRecord(validWorkspace);
-      await writeIndex(updatedIndex);
+      await writeWorkspaceAndIndex(validWorkspace, (index) => replaceWorkspace(index, validWorkspace));
     },
 
     async archiveWorkspace(workspaceId: WorkspaceId, archivedAt: string): Promise<WorkspaceRecord | undefined> {
@@ -110,7 +136,10 @@ function sortWorkspaces(records: readonly WorkspaceRecord[]): WorkspaceRecord[] 
   });
 }
 
-function assertWorkspaceRecord(value: unknown): WorkspaceRecord {
+function assertWorkspaceRecord(
+  value: unknown,
+  expectedOrganizationId?: WorkspaceRecord["organizationId"],
+): WorkspaceRecord {
   if (!value || typeof value !== "object") {
     throw new LocalWorkspacePersistenceError("workspace-persistence-invalid-record");
   }
@@ -123,6 +152,9 @@ function assertWorkspaceRecord(value: unknown): WorkspaceRecord {
     typeof record.createdAt !== "string" ||
     typeof record.updatedAt !== "string"
   ) {
+    throw new LocalWorkspacePersistenceError("workspace-persistence-invalid-record");
+  }
+  if (expectedOrganizationId !== undefined && record.organizationId !== expectedOrganizationId) {
     throw new LocalWorkspacePersistenceError("workspace-persistence-invalid-record");
   }
 

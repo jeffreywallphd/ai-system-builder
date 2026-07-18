@@ -25,9 +25,10 @@ Use one of: `proposed`, `accepted`, `superseded`, `deprecated`.
 
 ## Workflow
 
-1. Create a new ADR from `template.md`.
-2. Link related ADRs and docs/context packs when relevant.
-3. Keep decision and rationale aligned with current code.
+1. Check `decision-readiness.md` to determine whether an accepted decision already governs the work.
+2. Create a new ADR from `template.md` when an architecturally significant choice remains open or changes an accepted decision.
+3. Link related ADRs and docs/context packs when relevant.
+4. Keep decision, consequences, readiness, and current code aligned.
 
 ## Inventory Rule
 

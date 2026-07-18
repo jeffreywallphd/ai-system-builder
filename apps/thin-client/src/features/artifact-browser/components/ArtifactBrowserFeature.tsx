@@ -5,8 +5,11 @@ import {
   deriveArtifactListStatusLabels,
   derivePublishedBackingDisplayRows,
   derivePublishedBackingVerificationPresentation,
+  ApplicationIcon,
   ArtifactPreviewPanel,
+  PanelHeading,
   TermWithHint,
+  TypeBadge,
   type PublishedBackingView,
 } from "../../../../../../modules/ui/shared";
 import type { ArtifactBrowserApiClient } from "../api/apiArtifactBrowserClient";
@@ -109,11 +112,11 @@ export function ArtifactBrowserFeature({ client, workspaceId }: ArtifactBrowserF
   return (
     <section className="ui-panel ui-panel--elevated ui-panel--sectioned">
       <header className="ui-panel__section-header">
-        <h2 className="ui-panel__title">Artifact Browser</h2>
+        <PanelHeading icon="browse" tone="violet">Artifact Browser</PanelHeading>
       </header>
       <div className="ui-panel__section-body ui-stack ui-stack--sm">
       <div className="artifact-browser__toolbar">
-        <button className="ui-button" type="button" onClick={() => void refreshArtifacts()}>Refresh</button>
+        <button className="ui-button" type="button" onClick={() => void refreshArtifacts()}><ApplicationIcon name="refresh" /><span className="ui-button__label">Refresh</span></button>
       </div>
       {viewState.message ? <p role={viewState.status === "error" ? "alert" : "status"}>{viewState.message}</p> : null}
       {pendingDeleteStorageKey ? (
@@ -251,15 +254,14 @@ export function ArtifactBrowserFeature({ client, workspaceId }: ArtifactBrowserF
         </li>
         {items.map((item) => (
           <li key={item.storageKey}>
-            <input type="checkbox" checked={selectedArtifactKeys.includes(item.storageKey)} onChange={() => toggleSelectedArtifactKey(item.storageKey)} />
-            <button
-              className="ui-button"
-              type="button"
-              onClick={() => void selectArtifact(item.storageKey)}
-              disabled={viewState.status === "loading" && selectedStorageKey === item.storageKey}
-            >
-              {item.originalName ?? item.storageKey}
-            </button>
+            <div className="ui-type-row">
+              <input type="checkbox" checked={selectedArtifactKeys.includes(item.storageKey)} onChange={() => toggleSelectedArtifactKey(item.storageKey)} />
+              <TypeBadge value={item.mediaType ?? item.originalName ?? item.storageKey} />
+              <button className="ui-button" type="button" onClick={() => void selectArtifact(item.storageKey)} disabled={viewState.status === "loading" && selectedStorageKey === item.storageKey}>
+                <ApplicationIcon name="browse" />
+                <span className="ui-button__label">{item.originalName ?? item.storageKey}</span>
+              </button>
+            </div>
             {item.metadata?.backingState ? (
               <small>{deriveArtifactListStatusLabels(item.metadata.backingState).join(" - ")}</small>
             ) : null}
@@ -272,7 +274,7 @@ export function ArtifactBrowserFeature({ client, workspaceId }: ArtifactBrowserF
           <dt><TermWithHint termId="storedKey">Selected key</TermWithHint></dt>
           <dd>{detail.locator.storageKey}</dd>
           <dt><TermWithHint termId="mediaType">Media type</TermWithHint></dt>
-          <dd>{detail.mediaType ?? "unknown"}</dd>
+          <dd className="ui-type-label"><TypeBadge value={detail.mediaType ?? detail.originalName ?? detail.locator.storageKey} /><span>{detail.mediaType ?? "unknown"}</span></dd>
           <dt><TermWithHint termId="artifactFamily">Artifact family</TermWithHint></dt>
           <dd>{detail.artifactFamily}</dd>
           <dt><TermWithHint termId="source">Source</TermWithHint></dt>

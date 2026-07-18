@@ -12,6 +12,7 @@ import {
   SYSTEM_FOUNDATION_PACK_MANIFEST,
   SYSTEM_FOUNDATION_PACK_SOURCE_LAYER,
   FORM_PRIMITIVE_ENTRIES,
+  FUNCTIONAL_DEFAULT_ENTRIES,
   SHELL_PRIMITIVE_ENTRIES,
   CONVERSATION_ASSET_ENTRIES,
   UI_STRUCTURAL_PRIMITIVE_ENTRIES,
@@ -29,6 +30,13 @@ const expectedCategoryGroups = [
   "page-feature-shells",
   "workflow-system-shells",
   "conversational-systems",
+  "data-modeling",
+  "security-policy",
+  "artifact-preview",
+  "ai-context",
+  "logic-workflow",
+  "test-observability",
+  "reference-features",
 ] as const;
 
 describe("system foundation pack manifest", () => {
@@ -54,6 +62,7 @@ describe("system foundation pack manifest", () => {
         ...DISPLAY_PRIMITIVE_ENTRIES,
         ...SHELL_PRIMITIVE_ENTRIES,
         ...CONVERSATION_ASSET_ENTRIES,
+        ...FUNCTIONAL_DEFAULT_ENTRIES,
       ].map((entry) => entry.entryId),
     );
     assert.equal(
@@ -94,7 +103,7 @@ describe("system foundation pack manifest", () => {
     assert.deepEqual(SYSTEM_FOUNDATION_PACK_MANIFEST.metadata, {
       declarativeOnly: true,
       catalogKind: "system-foundation",
-      catalogStatus: "in-progress",
+      catalogStatus: "functional",
       catalogVersion: "1.0.0",
       categoryCount: SYSTEM_FOUNDATION_PACK_CATEGORIES.length,
       containsDefinitions: true,
@@ -145,10 +154,17 @@ describe("system foundation pack manifest", () => {
           "page-feature-shells",
           "workflow-system-shells",
           "conversational-systems",
+          "data-modeling",
+          "security-policy",
+          "artifact-preview",
+          "ai-context",
+          "logic-workflow",
+          "test-observability",
+          "reference-features",
         ].includes(entry.category),
       );
       assert.equal(entry.sourceLayer, SYSTEM_FOUNDATION_PACK_SOURCE_LAYER);
-      assert.match(entry.entryId, /^system\.foundation\.(?:(?:ui|form|display|state|shell|workflow|system)\.|conversation[.-])[a-z0-9.-]+$/);
+      assert.match(entry.entryId, /^system\.foundation\.[a-z0-9.-]+$/);
       assert.match(entry.fingerprint, /^fnv1a:[a-f0-9]{8}$/);
       assert.equal(entryIds.has(entry.entryId), false, entry.entryId);
       assert.equal(refKeys.has(`${entry.definitionRef.id}@${entry.definitionRef.version}`), false);

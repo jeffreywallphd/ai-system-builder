@@ -12,6 +12,8 @@
 
 - Pack name:
 
+Add the same id/path, concise task signals, path signals, and applicable repository commands to `docs/context/pack-catalog.json`. Every selectable pack must also have coverage in `dev-tools/agent-evals/scenarios.json`.
+
 ## Purpose
 
 - What this pack helps an implementer/agent do faster and more accurately.
@@ -56,3 +58,4 @@ If code and docs are known to disagree, cite `docs/docs-mismatch-register.md` an
 - Recommended companion packs/docs.
 - Typical ordering when assembling prompts.
 - Minimum-sufficient assembly guidance (what to include first, what to omit by default).
+- Prefer one primary pack plus one adjacent-boundary pack. Explain the repository evidence before recommending broader context.

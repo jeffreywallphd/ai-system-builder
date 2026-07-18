@@ -52,7 +52,7 @@
 - `docs/architecture/host-model.md`
 - `docs/architecture/module-dependency-rules.md`
 - `docs/architecture/runtime-model.md`
-- `docs/adr/ADR-0013-cross-host-runtime-ownership.md`
+- `docs/adr/ADR-0013-host-owned-runtime-execution-and-feature-placement.md`
 
 ## Companion Packs
 

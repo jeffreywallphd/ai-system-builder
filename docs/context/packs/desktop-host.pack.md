@@ -58,7 +58,7 @@
 
 - `docs/architecture/host-model.md` - desktop host responsibilities.
 - `docs/adr/ADR-0003-host-model-and-transport-separation.md` - host/transport separation.
-- `docs/adr/ADR-0013-cross-host-runtime-ownership.md` - local/remote runtime ownership.
+- `docs/adr/ADR-0013-host-owned-runtime-execution-and-feature-placement.md` - local/remote runtime ownership.
 - `docs/architecture/module-dependency-rules.md` - host/adapter dependency boundaries.
 - `docs/standards/coding-standards.md` - host/transport anti-patterns.
 - `docs/standards/logging-standards.md` - startup and boundary diagnostics.

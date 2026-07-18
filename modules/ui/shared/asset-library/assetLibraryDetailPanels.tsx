@@ -3,6 +3,7 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 import type { AssetMetadata } from "../../../contracts/asset";
 import { TermWithHint, type GlossaryTermId } from "../glossary";
 import type { AssetLibraryDefinitionDetail } from "./assetLibraryReadModels";
+import { FoundationAssetPreview } from "../foundation-assets";
 import {
   buildAssetLibraryAdvancedSections,
   type AssetLibraryAdvancedSectionKey,
@@ -204,6 +205,12 @@ export function AssetLibraryDefinitionDetailView({
           {detail.sourcePackDisplayName ? <AssetLibraryDetailRow label="From" value={`From ${detail.sourcePackDisplayName}`} /> : null}
         </dl>
       </AssetLibraryDetailSection>
+
+      {detail.systemDefault ? (
+        <AssetLibraryDetailSection title="Preview">
+          <FoundationAssetPreview definitionId={detail.definitionId} displayName={detail.displayName} />
+        </AssetLibraryDetailSection>
+      ) : null}
 
       {advancedSections.length > 0 ? (
         <AssetLibraryDetailSection title="Advanced Details" className="asset-library-detail__advanced">

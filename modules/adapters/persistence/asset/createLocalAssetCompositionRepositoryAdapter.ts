@@ -8,8 +8,10 @@ export function createLocalAssetCompositionRepositoryAdapter(options: LocalAsset
 
   return {
     async saveComposition(composition: AssetComposition): Promise<AssetComposition> {
-      const compositions = await store.readCollection("compositions");
-      await store.writeCollection("compositions", upsertRecord(compositions, composition, compositionStorageKey));
+      await store.mutateCollection("compositions", (compositions) => ({
+        records: upsertRecord(compositions, composition, compositionStorageKey),
+        result: undefined,
+      }));
       return cloneJson(composition);
     },
 
@@ -30,7 +32,10 @@ export function createLocalAssetCompositionRepositoryAdapter(options: LocalAsset
 
     async deleteComposition(reference: AssetReference): Promise<void> {
       if (reference.kind !== "asset-composition") return;
-      await store.writeCollection("compositions", deleteRecord(await store.readCollection("compositions"), String(reference.id), compositionStorageKey));
+      await store.mutateCollection("compositions", (compositions) => ({
+        records: deleteRecord(compositions, String(reference.id), compositionStorageKey),
+        result: undefined,
+      }));
     },
   };
 }

@@ -10,11 +10,14 @@ import {
 
 describe("non-browser test runner core helpers", () => {
   it("builds node:test run options with repository runner defaults", () => {
-    const runOptions = buildNonBrowserNodeTestRunOptions();
+    const files = ["C:/repo/test-a.mjs", "C:/repo/test-b.mjs"];
+    const runOptions = buildNonBrowserNodeTestRunOptions({ files, cwd: "C:/repo" });
 
-    assert.equal(runOptions.concurrency, true);
-    assert.equal("files" in runOptions, false);
-    assert.equal("isolation" in runOptions, false);
+    assert.equal(runOptions.cwd, "C:/repo");
+    assert.deepEqual(runOptions.files, files);
+    assert.notEqual(runOptions.files, files);
+    assert.equal(runOptions.isolation, "none");
+    assert.equal("concurrency" in runOptions, false);
   });
 
   it("applies diagnostic metrics to summary counts and duration", () => {

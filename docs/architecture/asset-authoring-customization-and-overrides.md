@@ -1,5 +1,10 @@
 # Asset Authoring, Customization, and Override Management
 
+- Status: current
+- Implementation: semantic draft/revision/override authoring plus the bounded Asset Studio source-proposal and human-review workflow are current
+- Related decisions: `docs/adr/ADR-0018-asset-authoring-customization-and-overrides.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 - Effective asset projections: `docs/architecture/effective-asset-projections.md` and ADR-0019 define how authored/customized records become workspace-scoped effective projections with explicit status/blockers.
 
 ## Purpose
@@ -88,6 +93,11 @@ Override records are durable, explicit, workspace-visible records that capture w
 16. No startup seeding.
 17. No legacy/global auto-migration.
 18. Public contracts/provenance/diagnostics/UI must never expose raw paths, storage roots, provider payloads, prompt text, workflow JSON, tokens/secrets, stack traces, command lines, environment values, bytes/blobs/base64, or signed URLs.
+
+Asset Studio source and diff responses are the narrow exception for an
+authorized authoring session: they may expose bounded relative source paths and
+source text after workspace authorization. Those values remain outside Asset
+Kernel metadata, list/readiness DTOs, logs, and safe diagnostics.
 
 ## Ownership model by source relationship
 
@@ -216,6 +226,26 @@ These classifications are user-facing authoring metadata on workspace-local draf
 - arbitrary JSON blobs.
 
 These remain deferred pending explicit schemas, validation, diagnostics, and tests.
+
+## Asset Studio implementation workflow
+
+Asset Studio extends, rather than replaces, authored definitions. An author
+selects an exact definition version, starts a separate implementation draft,
+and submits either a manual source proposal or a provider-neutral coding-model
+request. Both modes produce the same bounded plan/file/dependency/capability
+proposal. Proposal content is stored as a verified immutable artifact; the
+structured workflow record retains only counts, digests, safe diagnostics,
+status, and provenance.
+
+The model port has no shell, filesystem, network, persistence, secret,
+activation, or publication methods. Repository content is untrusted context,
+not authority. Paths, extensions, size, dependency allowlist, capability
+allowlist, duplicate identities, and secret-like content are validated before
+review. Human approval must exactly match dependencies and capabilities and an
+optimistic revision; approval produces an immutable source snapshot. Build,
+preview, release, activation, and deployment remain separate gates. A host
+without a configured coding-model provider returns an explicit unavailable
+result while retaining the complete manual workflow.
 
 ## Versioning and conflict baseline
 

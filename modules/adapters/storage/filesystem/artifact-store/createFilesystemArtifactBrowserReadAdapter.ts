@@ -36,6 +36,8 @@ import {
 } from "../../../../contracts/storage";
 import { isWorkspaceId, type WorkspaceId } from "../../../../contracts/workspace";
 import { resolveArtifactFamily } from "../../../../application/shared/artifact-family-classifier";
+import type { OrganizationRequestContextProviderPort } from "../../../../application/ports/organization";
+import { resolveOrganizationStorageKey } from "../organizationStorageScope";
 
 export interface FilesystemArtifactBrowserReadAdapter
   extends ArtifactBrowserMetadataReadPort,
@@ -48,6 +50,7 @@ export interface CreateFilesystemArtifactBrowserReadAdapterOptions {
   artifactCatalogAppend: ArtifactCatalogAppendPort;
   storage?: Pick<ArtifactObjectStoragePort, "hasArtifact">;
   artifactBindingRead?: Pick<ArtifactStorageBindingPort, "readArtifactStorageBindings">;
+  organizationContextProvider?: OrganizationRequestContextProviderPort;
 }
 
 const UPLOADS_ROOT_SEGMENT = "uploads";
@@ -286,7 +289,10 @@ function toContentValue(record: ArtifactCatalogRecord): ArtifactContentReadSucce
 export function createFilesystemArtifactBrowserReadAdapter(
   options: CreateFilesystemArtifactBrowserReadAdapterOptions,
 ): FilesystemArtifactBrowserReadAdapter {
-  const uploadsRoot = path.resolve(options.rootDirectory, UPLOADS_ROOT_SEGMENT);
+  const resolveUploadsRoot = () => path.resolve(
+    options.rootDirectory,
+    resolveOrganizationStorageKey(UPLOADS_ROOT_SEGMENT, options.organizationContextProvider),
+  );
 
   return {
     async browseArtifacts(
@@ -421,6 +427,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
     },
 
     async browseUnregisteredArtifacts(context: ApplicationRequestContext = {}) {
+      const uploadsRoot = resolveUploadsRoot();
       const [catalogResult, uploadRelativePaths] = await Promise.all([
         options.artifactCatalogRead.browseArtifactCatalogRecords({ workspaceId: requireWorkspaceId(context) }, context),
         listRelativeFilesRecursively(uploadsRoot),
@@ -465,7 +472,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
 
       const [catalogResult, fileStats] = await Promise.all([
         options.artifactCatalogRead.browseArtifactCatalogRecords({ workspaceId: requireWorkspaceId(context) }, context),
-        stat(path.resolve(options.rootDirectory, storageKey)).catch(() => undefined),
+        stat(path.resolve(options.rootDirectory, resolveOrganizationStorageKey(storageKey, options.organizationContextProvider))).catch(() => undefined),
       ]);
 
       if (!catalogResult.ok) {
@@ -531,7 +538,7 @@ export function createFilesystemArtifactBrowserReadAdapter(
       }
 
       try {
-        await unlink(path.resolve(options.rootDirectory, storageKey));
+        await unlink(path.resolve(options.rootDirectory, resolveOrganizationStorageKey(storageKey, options.organizationContextProvider)));
       } catch {
         return createFailureResult(
           createContractError("not-found", `Unregistered artifact file not found for "${storageKey}".`),

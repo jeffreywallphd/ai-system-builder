@@ -1,5 +1,9 @@
 # Module Dependency Rules
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0001-repository-structure.md`, `docs/adr/ADR-0003-host-model-and-transport-separation.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 This document defines practical dependency rules for `ai-system-builder`.
 
 The objective is simple: keep core logic independent, keep boundaries explicit, and stop accidental coupling early.
@@ -150,10 +154,11 @@ Avoid these patterns even if they "work":
 
 ## Enforcement status
 
-Some automated rule enforcement may be added later (lint/import rules/build checks), but full tooling is **not yet finalized**.
+`npm run architecture:check` scans production TypeScript imports, re-exports, `require` calls, and dynamic imports under `modules/` and `apps/` against `dev-tools/config/architecture-boundaries.json`. It enforces the stable cross-layer prohibitions in this document and reports boundary-specific remediation.
 
-Current baseline enforcement already includes contract-surface and anti-drift invariant tests under `modules/contracts/**/tests` and `modules/contracts/tests`.
-Treat this document as mandatory review criteria in addition to those tests.
+The generic guard excludes tests because boundary tests intentionally inspect outer layers. Contract-surface, transport-parity, public-exposure, and feature-specific anti-drift invariants remain covered by focused tests under `modules/**/tests` and the full `npm test` suite.
+
+The current guard evaluates repository-relative source edges. Exact existing exceptions must include a mismatch-register link and remediation reason in the machine-readable configuration; exceptions do not authorize another source to repeat the dependency. Package-alias, transitive external dependency, business-policy placement, and app bootstrap quality still require focused tests and review.
 
 ## Lightweight review checklist
 

@@ -1,7 +1,10 @@
 import { secureFetch } from "../../../security/secureFetch";
 import type { ArtifactBrowseItem as ArtifactBrowseContractItem } from "../../../../../../modules/contracts/artifact-browser";
 import { resolveArtifactFamily as resolveCanonicalArtifactFamily } from "../../../../../../modules/application/shared/artifact-family-classifier";
-import { parseApiEnvelope, toThinClientApiError } from "../../../security/apiErrorEnvelope";
+import {
+  parseApiEnvelope,
+  toThinClientApiError,
+} from "../../../security/apiErrorEnvelope";
 
 export interface ArtifactBrowserLocator {
   storageKey: string;
@@ -147,21 +150,57 @@ export interface ThinClientHuggingFaceFilesImportResult {
 }
 
 export interface ArtifactBrowserApiClient {
-  getHuggingFaceTokenStatus: () => Promise<{ configured: boolean; maskedToken?: string }>;
-  setHuggingFaceToken: (input: { token: string }) => Promise<{ configured: boolean; maskedToken?: string }>;
-  clearHuggingFaceToken: () => Promise<{ configured: boolean; maskedToken?: string }>;
-  browseHuggingFaceNamespaceDatasets?: (input: { namespace: string }) => Promise<ThinClientHuggingFaceNamespaceDataset[]>;
-  browseHuggingFaceDatasetParquetFiles?: (input: { repository: string; revision?: string }) => Promise<ThinClientHuggingFaceDatasetParquetFile[]>;
+  getHuggingFaceTokenStatus: () => Promise<{
+    configured: boolean;
+    maskedToken?: string;
+  }>;
+  setHuggingFaceToken: (input: {
+    token: string;
+  }) => Promise<{ configured: boolean; maskedToken?: string }>;
+  clearHuggingFaceToken: () => Promise<{
+    configured: boolean;
+    maskedToken?: string;
+  }>;
+  browseHuggingFaceNamespaceDatasets?: (input: {
+    namespace: string;
+  }) => Promise<ThinClientHuggingFaceNamespaceDataset[]>;
+  browseHuggingFaceDatasetParquetFiles?: (input: {
+    repository: string;
+    revision?: string;
+  }) => Promise<ThinClientHuggingFaceDatasetParquetFile[]>;
   importHuggingFaceFiles?: (input: {
     repositories?: Array<{ repository: string; revision?: string }>;
-    files?: Array<{ repository: string; path: string; revision?: string; mediaType?: string }>;
+    files?: Array<{
+      repository: string;
+      path: string;
+      revision?: string;
+      mediaType?: string;
+    }>;
   }) => Promise<ThinClientHuggingFaceFilesImportResult>;
-  browseArtifacts: (input?: { artifactFamily?: ThinClientArtifactFamily; workspaceId?: string }) => Promise<ThinClientArtifactBrowseItem[]>;
-  readArtifactDetail: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<ThinClientArtifactDetail>;
-  readArtifactContent: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<ThinClientArtifactContentDescriptor>;
-  deleteRegisteredArtifact: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<{ storageKey: string }>;
-  createArtifactMediaViewUrl: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => string;
-  readArtifactMedia?: (locator: ArtifactBrowserLocator, input?: { workspaceId?: string }) => Promise<{ mediaType?: string; bytes: Uint8Array }>;
+  browseArtifacts: (input?: {
+    artifactFamily?: ThinClientArtifactFamily;
+    workspaceId?: string;
+  }) => Promise<ThinClientArtifactBrowseItem[]>;
+  readArtifactDetail: (
+    locator: ArtifactBrowserLocator,
+    input?: { workspaceId?: string },
+  ) => Promise<ThinClientArtifactDetail>;
+  readArtifactContent: (
+    locator: ArtifactBrowserLocator,
+    input?: { workspaceId?: string },
+  ) => Promise<ThinClientArtifactContentDescriptor>;
+  deleteRegisteredArtifact: (
+    locator: ArtifactBrowserLocator,
+    input?: { workspaceId?: string },
+  ) => Promise<{ storageKey: string }>;
+  createArtifactMediaViewUrl: (
+    locator: ArtifactBrowserLocator,
+    input?: { workspaceId?: string; maximumBytes?: number },
+  ) => string;
+  readArtifactMedia?: (
+    locator: ArtifactBrowserLocator,
+    input?: { workspaceId?: string; maximumBytes?: number },
+  ) => Promise<{ mediaType?: string; bytes: Uint8Array }>;
   publishArtifactToHuggingFace: (input: {
     artifactId: string;
     repository: string;
@@ -189,28 +228,67 @@ export interface ArtifactBrowserApiClient {
 interface ApiResponseEnvelope {
   ok: boolean;
   value?: unknown;
-  error?: { code?: string; message?: string; details?: unknown; endpoint?: string };
+  error?: {
+    code?: string;
+    message?: string;
+    details?: unknown;
+    endpoint?: string;
+  };
 }
 
-export class ArtifactBrowserApiError extends Error { constructor(message: string, public readonly code?: string, public readonly details?: unknown, public readonly status?: number, public readonly endpoint?: string){ super(message);} }
+export class ArtifactBrowserApiError extends Error {
+  constructor(
+    message: string,
+    public readonly code?: string,
+    public readonly details?: unknown,
+    public readonly status?: number,
+    public readonly endpoint?: string,
+  ) {
+    super(message);
+  }
+}
 
 function createApiUrl(apiBaseUrl: string, suffix: string): string {
   return `${apiBaseUrl.trim().replace(/\/+$/, "") || "/api"}${suffix}`;
 }
 
-function ensureEnvelope(value: unknown): ApiResponseEnvelope { return parseApiEnvelope(value) as ApiResponseEnvelope; }
+function ensureEnvelope(value: unknown): ApiResponseEnvelope {
+  return parseApiEnvelope(value) as ApiResponseEnvelope;
+}
 
-function ensureSuccess<T>(response: ApiResponseEnvelope, status: number, endpoint: string, pick: (value: unknown) => T): T {
+function ensureSuccess<T>(
+  response: ApiResponseEnvelope,
+  status: number,
+  endpoint: string,
+  pick: (value: unknown) => T,
+): T {
   if (!response.ok) {
     const err = toThinClientApiError(status, endpoint, response);
-    throw new ArtifactBrowserApiError(err.message, err.code, err.details, err.status, err.endpoint);
+    throw new ArtifactBrowserApiError(
+      err.message,
+      err.code,
+      err.details,
+      err.status,
+      err.endpoint,
+    );
   }
   return pick(response.value);
 }
 
-async function requestJson(endpoint: string, init: RequestInit): Promise<{status:number; endpoint:string; envelope:ApiResponseEnvelope}> {
+async function requestJson(
+  endpoint: string,
+  init: RequestInit,
+): Promise<{
+  status: number;
+  endpoint: string;
+  envelope: ApiResponseEnvelope;
+}> {
   const response = await secureFetch(endpoint, init);
-  return { status: response.status, endpoint, envelope: ensureEnvelope((await response.json()) as unknown) };
+  return {
+    status: response.status,
+    endpoint,
+    envelope: ensureEnvelope((await response.json()) as unknown),
+  };
 }
 
 export interface CreateApiArtifactBrowserClientOptions {
@@ -226,107 +304,188 @@ export function createApiArtifactBrowserClient(
 
   return {
     async getHuggingFaceTokenStatus() {
-      const { status, endpoint, envelope } = await requestJson(createApiUrl(apiBaseUrl, "/config/huggingface-token"), { method: "GET" });
-      return ensureSuccess(envelope, status, endpoint, (value) => value as { configured: boolean; maskedToken?: string });
+      const { status, endpoint, envelope } = await requestJson(
+        createApiUrl(apiBaseUrl, "/config/huggingface-token"),
+        { method: "GET" },
+      );
+      return ensureSuccess(
+        envelope,
+        status,
+        endpoint,
+        (value) => value as { configured: boolean; maskedToken?: string },
+      );
     },
 
     async setHuggingFaceToken(input) {
-      const { status, endpoint, envelope } = await requestJson(createApiUrl(apiBaseUrl, "/config/huggingface-token"), { method: "POST", headers: {"content-type": "application/json"}, body: JSON.stringify({ token: input.token }) });
-      return ensureSuccess(envelope, status, endpoint, (value) => value as { configured: boolean; maskedToken?: string });
+      const { status, endpoint, envelope } = await requestJson(
+        createApiUrl(apiBaseUrl, "/config/huggingface-token"),
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ token: input.token }),
+        },
+      );
+      return ensureSuccess(
+        envelope,
+        status,
+        endpoint,
+        (value) => value as { configured: boolean; maskedToken?: string },
+      );
     },
 
     async clearHuggingFaceToken() {
-      const { status, endpoint, envelope } = await requestJson(createApiUrl(apiBaseUrl, "/config/huggingface-token"), { method: "DELETE" });
-      return ensureSuccess(envelope, status, endpoint, (value) => value as { configured: boolean; maskedToken?: string });
+      const { status, endpoint, envelope } = await requestJson(
+        createApiUrl(apiBaseUrl, "/config/huggingface-token"),
+        { method: "DELETE" },
+      );
+      return ensureSuccess(
+        envelope,
+        status,
+        endpoint,
+        (value) => value as { configured: boolean; maskedToken?: string },
+      );
     },
 
     async browseHuggingFaceNamespaceDatasets(input) {
-      const response = await secureFetch(createApiUrl(apiBaseUrl, "/huggingface/namespace/datasets"), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      const response = await secureFetch(
+        createApiUrl(apiBaseUrl, "/huggingface/namespace/datasets"),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            namespace: input.namespace,
+            source,
+          }),
         },
-        body: JSON.stringify({
-          namespace: input.namespace,
-          source,
-        }),
-      });
+      );
       const envelope = ensureEnvelope((await response.json()) as unknown);
-      return ensureSuccess(envelope, response.status, createApiUrl(apiBaseUrl, "/huggingface/namespace/datasets"), (value) => {
-        const datasets = (value as { datasets?: ThinClientHuggingFaceNamespaceDataset[] } | undefined)?.datasets;
-        return Array.isArray(datasets) ? datasets : [];
-      });
+      return ensureSuccess(
+        envelope,
+        response.status,
+        createApiUrl(apiBaseUrl, "/huggingface/namespace/datasets"),
+        (value) => {
+          const datasets = (
+            value as
+              { datasets?: ThinClientHuggingFaceNamespaceDataset[] } | undefined
+          )?.datasets;
+          return Array.isArray(datasets) ? datasets : [];
+        },
+      );
     },
 
     async browseHuggingFaceDatasetParquetFiles(input) {
-      const response = await secureFetch(createApiUrl(apiBaseUrl, "/huggingface/dataset/parquet-files"), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      const response = await secureFetch(
+        createApiUrl(apiBaseUrl, "/huggingface/dataset/parquet-files"),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            repository: input.repository,
+            revision: input.revision,
+            source,
+          }),
         },
-        body: JSON.stringify({
-          repository: input.repository,
-          revision: input.revision,
-          source,
-        }),
-      });
+      );
       const envelope = ensureEnvelope((await response.json()) as unknown);
-      return ensureSuccess(envelope, response.status, createApiUrl(apiBaseUrl, "/huggingface/dataset/parquet-files"), (value) => {
-        const files = (value as { files?: ThinClientHuggingFaceDatasetParquetFile[] } | undefined)?.files;
-        return Array.isArray(files) ? files : [];
-      });
+      return ensureSuccess(
+        envelope,
+        response.status,
+        createApiUrl(apiBaseUrl, "/huggingface/dataset/parquet-files"),
+        (value) => {
+          const files = (
+            value as
+              { files?: ThinClientHuggingFaceDatasetParquetFile[] } | undefined
+          )?.files;
+          return Array.isArray(files) ? files : [];
+        },
+      );
     },
 
     async importHuggingFaceFiles(input) {
-      const response = await secureFetch(createApiUrl(apiBaseUrl, "/huggingface/files/import"), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      const response = await secureFetch(
+        createApiUrl(apiBaseUrl, "/huggingface/files/import"),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            repositories: input.repositories,
+            files: input.files,
+            source,
+          }),
         },
-        body: JSON.stringify({
-          repositories: input.repositories,
-          files: input.files,
-          source,
-        }),
-      });
+      );
       const envelope = ensureEnvelope((await response.json()) as unknown);
-      return ensureSuccess(envelope, response.status, createApiUrl(apiBaseUrl, "/huggingface/files/import"), (value) => {
-        const result = value as ThinClientHuggingFaceFilesImportResult;
-        if (!result || typeof result !== "object" || !("summary" in result)) {
-          throw new Error("Hugging Face import response is missing summary information.");
-        }
-        return result;
-      });
+      return ensureSuccess(
+        envelope,
+        response.status,
+        createApiUrl(apiBaseUrl, "/huggingface/files/import"),
+        (value) => {
+          const result = value as ThinClientHuggingFaceFilesImportResult;
+          if (!result || typeof result !== "object" || !("summary" in result)) {
+            throw new Error(
+              "Hugging Face import response is missing summary information.",
+            );
+          }
+          return result;
+        },
+      );
     },
 
     async browseArtifacts(input = {}): Promise<ThinClientArtifactBrowseItem[]> {
-      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/browse"), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      const response = await secureFetch(
+        createApiUrl(apiBaseUrl, "/artifact/browse"),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            artifactFamily: input.artifactFamily,
+            workspaceId: input.workspaceId,
+            source,
+          }),
         },
-        body: JSON.stringify({ artifactFamily: input.artifactFamily, workspaceId: input.workspaceId, source }),
-      });
+      );
 
       const envelope = ensureEnvelope((await response.json()) as unknown);
       return ensureSuccess(envelope, response.status, "", (value) => {
-        const items = (value as { items?: ThinClientArtifactBrowseItem[] } | undefined)?.items;
+        const items = (
+          value as { items?: ThinClientArtifactBrowseItem[] } | undefined
+        )?.items;
         return Array.isArray(items) ? items : [];
       });
     },
 
-    async readArtifactDetail(locator: ArtifactBrowserLocator, input = {}): Promise<ThinClientArtifactDetail> {
-      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/read"), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+    async readArtifactDetail(
+      locator: ArtifactBrowserLocator,
+      input = {},
+    ): Promise<ThinClientArtifactDetail> {
+      const response = await secureFetch(
+        createApiUrl(apiBaseUrl, "/artifact/read"),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            locator,
+            workspaceId: input.workspaceId,
+            source,
+          }),
         },
-        body: JSON.stringify({ locator, workspaceId: input.workspaceId, source }),
-      });
+      );
 
       const envelope = ensureEnvelope((await response.json()) as unknown);
       return ensureSuccess(envelope, response.status, "", (value) => {
-        const artifact = (value as { artifact?: ThinClientArtifactDetail } | undefined)?.artifact;
+        const artifact = (
+          value as { artifact?: ThinClientArtifactDetail } | undefined
+        )?.artifact;
         if (!artifact) {
           throw new Error("Artifact read response is missing artifact detail.");
         }
@@ -339,61 +498,107 @@ export function createApiArtifactBrowserClient(
       locator: ArtifactBrowserLocator,
       input = {},
     ): Promise<ThinClientArtifactContentDescriptor> {
-      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/content/read"), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      const response = await secureFetch(
+        createApiUrl(apiBaseUrl, "/artifact/content/read"),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            locator,
+            workspaceId: input.workspaceId,
+            source,
+          }),
         },
-        body: JSON.stringify({ locator, workspaceId: input.workspaceId, source }),
-      });
+      );
 
       const envelope = ensureEnvelope((await response.json()) as unknown);
       return ensureSuccess(envelope, response.status, "", (value) => {
-        const content = (value as { content?: ThinClientArtifactContentDescriptor } | undefined)?.content;
+        const content = (
+          value as { content?: ThinClientArtifactContentDescriptor } | undefined
+        )?.content;
         if (!content) {
-          throw new Error("Artifact content-read response is missing descriptor content.");
+          throw new Error(
+            "Artifact content-read response is missing descriptor content.",
+          );
         }
 
         return content;
       });
     },
 
-    async deleteRegisteredArtifact(locator: ArtifactBrowserLocator, input = {}): Promise<{ storageKey: string }> {
-      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/delete"), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+    async deleteRegisteredArtifact(
+      locator: ArtifactBrowserLocator,
+      input = {},
+    ): Promise<{ storageKey: string }> {
+      const response = await secureFetch(
+        createApiUrl(apiBaseUrl, "/artifact/delete"),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            locator,
+            workspaceId: input.workspaceId,
+            source,
+          }),
         },
-        body: JSON.stringify({ locator, workspaceId: input.workspaceId, source }),
-      });
+      );
 
       const envelope = ensureEnvelope((await response.json()) as unknown);
       return ensureSuccess(envelope, response.status, "", (value) => {
         const deleted = value as { storageKey?: unknown };
         if (!deleted || typeof deleted.storageKey !== "string") {
-          throw new Error("Artifact delete response is missing deleted storage key.");
+          throw new Error(
+            "Artifact delete response is missing deleted storage key.",
+          );
         }
 
         return { storageKey: deleted.storageKey };
       });
     },
 
-    createArtifactMediaViewUrl(locator: ArtifactBrowserLocator, input = {}): string {
+    createArtifactMediaViewUrl(
+      locator: ArtifactBrowserLocator,
+      input = {},
+    ): string {
       const query = new URLSearchParams({ storageKey: locator.storageKey });
       if (input.workspaceId) {
         query.set("workspaceId", input.workspaceId);
       }
-      return createApiUrl(apiBaseUrl, `/artifact/media/view?${query.toString()}`);
+      if (input.maximumBytes !== undefined) {
+        query.set("maximumBytes", String(input.maximumBytes));
+      }
+      return createApiUrl(
+        apiBaseUrl,
+        `/artifact/media/view?${query.toString()}`,
+      );
     },
 
-    async readArtifactMedia(locator: ArtifactBrowserLocator, input = {}): Promise<{ mediaType?: string; bytes: Uint8Array }> {
+    async readArtifactMedia(
+      locator: ArtifactBrowserLocator,
+      input = {},
+    ): Promise<{ mediaType?: string; bytes: Uint8Array }> {
       const query = new URLSearchParams({ storageKey: locator.storageKey });
       if (input.workspaceId) {
         query.set("workspaceId", input.workspaceId);
       }
-      const response = await secureFetch(createApiUrl(apiBaseUrl, `/artifact/media/view?${query.toString()}`), { method: "GET" });
+      if (input.maximumBytes !== undefined) {
+        query.set("maximumBytes", String(input.maximumBytes));
+      }
+      const response = await secureFetch(
+        createApiUrl(apiBaseUrl, `/artifact/media/view?${query.toString()}`),
+        { method: "GET" },
+      );
       if (!response.ok) {
-        throw new ArtifactBrowserApiError("Failed to read artifact preview media.", undefined, undefined, response.status);
+        throw new ArtifactBrowserApiError(
+          "Failed to read artifact preview media.",
+          undefined,
+          undefined,
+          response.status,
+        );
       }
 
       return {
@@ -402,134 +607,169 @@ export function createApiArtifactBrowserClient(
       };
     },
 
-    async publishArtifactToHuggingFace(input): Promise<ThinClientPublishedBacking> {
-      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/publish"), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          artifactId: input.artifactId,
-          target: {
-            provider: "huggingface",
-            repository: input.repository,
-            revision: input.revision,
-            path: input.path,
+    async publishArtifactToHuggingFace(
+      input,
+    ): Promise<ThinClientPublishedBacking> {
+      const response = await secureFetch(
+        createApiUrl(apiBaseUrl, "/artifact/publish"),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
           },
-          mediaType: input.mediaType,
-          verify: true,
-          source,
-        }),
-      });
-
-      const envelope = ensureEnvelope((await response.json()) as unknown);
-      return ensureSuccess(envelope, response.status, "", (value) => {
-        const backing = value as ThinClientPublishedBacking;
-        if (!backing || typeof backing !== "object") {
-          throw new Error("Artifact publish response is missing backing information.");
-        }
-
-        return backing;
-      });
-    },
-
-    async verifyPublishedArtifactBacking(input): Promise<ThinClientPublishedBacking> {
-      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/publish/verify"), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+          body: JSON.stringify({
+            artifactId: input.artifactId,
+            target: {
+              provider: "huggingface",
+              repository: input.repository,
+              revision: input.revision,
+              path: input.path,
+            },
+            mediaType: input.mediaType,
+            verify: true,
+            source,
+          }),
         },
-        body: JSON.stringify({
-          artifactId: input.artifactId,
-          source,
-        }),
-      });
+      );
 
       const envelope = ensureEnvelope((await response.json()) as unknown);
       return ensureSuccess(envelope, response.status, "", (value) => {
         const backing = value as ThinClientPublishedBacking;
         if (!backing || typeof backing !== "object") {
-          throw new Error("Artifact publish verify response is missing backing information.");
+          throw new Error(
+            "Artifact publish response is missing backing information.",
+          );
         }
 
         return backing;
       });
     },
 
-    async verifyImportedSourceBacking(input): Promise<ThinClientPublishedBacking> {
-      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/source/verify"), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+    async verifyPublishedArtifactBacking(
+      input,
+    ): Promise<ThinClientPublishedBacking> {
+      const response = await secureFetch(
+        createApiUrl(apiBaseUrl, "/artifact/publish/verify"),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            artifactId: input.artifactId,
+            source,
+          }),
         },
-        body: JSON.stringify({
-          artifactId: input.artifactId,
-          source,
-        }),
-      });
+      );
 
       const envelope = ensureEnvelope((await response.json()) as unknown);
       return ensureSuccess(envelope, response.status, "", (value) => {
         const backing = value as ThinClientPublishedBacking;
         if (!backing || typeof backing !== "object") {
-          throw new Error("Artifact source verify response is missing backing information.");
+          throw new Error(
+            "Artifact publish verify response is missing backing information.",
+          );
         }
 
         return backing;
       });
     },
 
-    async registerArtifactFromRepo(input): Promise<ThinClientRegisteredArtifactFromRepo> {
+    async verifyImportedSourceBacking(
+      input,
+    ): Promise<ThinClientPublishedBacking> {
+      const response = await secureFetch(
+        createApiUrl(apiBaseUrl, "/artifact/source/verify"),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            artifactId: input.artifactId,
+            source,
+          }),
+        },
+      );
+
+      const envelope = ensureEnvelope((await response.json()) as unknown);
+      return ensureSuccess(envelope, response.status, "", (value) => {
+        const backing = value as ThinClientPublishedBacking;
+        if (!backing || typeof backing !== "object") {
+          throw new Error(
+            "Artifact source verify response is missing backing information.",
+          );
+        }
+
+        return backing;
+      });
+    },
+
+    async registerArtifactFromRepo(
+      input,
+    ): Promise<ThinClientRegisteredArtifactFromRepo> {
       const artifactFamily = resolveCanonicalArtifactFamily({
         mediaType: input.mediaType,
         fileName: input.path,
       });
-      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/register-from-repo"), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          target: {
-            provider: "huggingface",
-            repository: input.repository,
-            revision: input.revision,
-            path: input.path,
+      const response = await secureFetch(
+        createApiUrl(apiBaseUrl, "/artifact/register-from-repo"),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
           },
-          artifactFamily,
-          mediaType: input.mediaType,
-          source,
-        }),
-      });
+          body: JSON.stringify({
+            target: {
+              provider: "huggingface",
+              repository: input.repository,
+              revision: input.revision,
+              path: input.path,
+            },
+            artifactFamily,
+            mediaType: input.mediaType,
+            source,
+          }),
+        },
+      );
 
       const envelope = ensureEnvelope((await response.json()) as unknown);
       return ensureSuccess(envelope, response.status, "", (value) => {
         const registered = value as ThinClientRegisteredArtifactFromRepo;
         if (!registered || typeof registered !== "object") {
-          throw new Error("Artifact register-from-repo response is missing registration information.");
+          throw new Error(
+            "Artifact register-from-repo response is missing registration information.",
+          );
         }
 
         return registered;
       });
     },
 
-    async localizeArtifactFromRepo(input): Promise<ThinClientLocalizedArtifactFromRepo> {
-      const response = await secureFetch(createApiUrl(apiBaseUrl, "/artifact/localize-from-repo"), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+    async localizeArtifactFromRepo(
+      input,
+    ): Promise<ThinClientLocalizedArtifactFromRepo> {
+      const response = await secureFetch(
+        createApiUrl(apiBaseUrl, "/artifact/localize-from-repo"),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            artifactId: input.artifactId,
+            source,
+          }),
         },
-        body: JSON.stringify({
-          artifactId: input.artifactId,
-          source,
-        }),
-      });
+      );
 
       const envelope = ensureEnvelope((await response.json()) as unknown);
       return ensureSuccess(envelope, response.status, "", (value) => {
         const localized = value as ThinClientLocalizedArtifactFromRepo;
         if (!localized || typeof localized !== "object") {
-          throw new Error("Artifact localize-from-repo response is missing localization information.");
+          throw new Error(
+            "Artifact localize-from-repo response is missing localization information.",
+          );
         }
 
         return localized;

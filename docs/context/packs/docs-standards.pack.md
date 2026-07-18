@@ -12,6 +12,7 @@
 - Repository structure changes.
 - Any implementation likely to change documented behavior.
 - Creating/updating context packs, ADRs, architecture docs, or standards docs.
+- Planning repository-scale or architecture-sensitive automated development.
 
 ## Do Not Use When
 
@@ -31,6 +32,9 @@
 - When contract export/import discipline changes, update canonical docs and cross-family invariant guidance together so automation inherits one stable extension surface.
 - If implementation changes documented behavior, structure, boundaries, or standards and canonical docs are not updated, the work is incomplete.
 - Mark what is decided versus intentionally not finalized.
+- Classify decision readiness before implementation; proposed or explicitly open architecture is not authorization to choose silently.
+- Use the change-impact matrix to inspect callers, consumers, host wiring, tests, and downstream docs before editing.
+- Follow the tool-neutral agent work cycle: discover, classify, analyze impact, plan, implement, verify, and reconcile knowledge.
 - Run `npm run docs:check` after documentation-heavy work.
 - Every README must keep the AI documentation reminder that points updates toward related ADRs, architecture docs, context packs, and README files.
 
@@ -44,6 +48,14 @@
 ## Canonical Source Docs
 
 - `docs/standards/documentation-standards.md` - canonical documentation hierarchy and update rules.
+- `docs/standards/ai-agent-development-standards.md` - required development cycle, scope controls, safety rules, and completion evidence.
+- `docs/standards/change-impact-matrix.md` - boundary-specific inspection, update, and verification requirements.
+- `docs/standards/documentation-metadata-standards.md` - minimal canonical metadata and evidence rules.
+- `docs/standards/agent-support-evaluation-standards.md` - deterministic harness checks and reproducible model-in-loop evaluation rules.
+- `docs/adr/decision-readiness.md` - current decision gates for architecture-sensitive work.
+- `docs/architecture/architecture-verification.md` - direct, representative, and missing architecture fitness coverage.
+- `docs/context/pack-catalog.json` - machine-readable retrieval and verification signals.
+- `dev-tools/agent-evals/scenarios.json` - representative proceed/escalate agent-support scenarios.
 - `docs/adr/README.md` - ADR lifecycle and status conventions.
 - `docs/architecture/README.md` - architecture docs role and maintenance expectations.
 - `docs/context/packs/pack.template.md` - context pack structure and brevity requirements.

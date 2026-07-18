@@ -10,6 +10,7 @@ import { UserLibraryPage } from "./pages/UserLibraryPage";
 import { ActiveWorkspaceProvider, WorkspaceGate, WorkspaceRequiredSurface, useActiveWorkspace, type WorkspaceUiRecord } from "./features/workspace";
 import { SecurityPage } from "./pages/SecurityPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { SystemBuilderPage } from "./pages/SystemBuilderPage";
 import {
   resolveThinClientPage,
   thinClientPageDefinitions,
@@ -18,10 +19,10 @@ import {
 } from "./routes/thinClientPages";
 import { resolveThinClientWorkspaceRouteBoundary } from "./routes/workspaceRouteBoundary";
 
-type ThinClientWorkspacePageKey = Extract<ThinClientPageKey, "artifacts" | "assets" | "user-library" | "models" | "image-generation">;
+type ThinClientWorkspacePageKey = Extract<ThinClientPageKey, "systems" | "artifacts" | "assets" | "user-library" | "models" | "image-generation">;
 
 function navigateToPage(page: ThinClientPageKey): void {
-  const path = page === "artifacts" ? "/artifacts" : page === "assets" ? "/assets" : page === "user-library" ? "/user-library" : page === "image-generation" ? "/image-generation" : page === "models" ? "/models" : page === "security" ? "/security" : page === "settings" ? "/settings" : "/";
+  const path = page === "systems" ? "/systems" : page === "artifacts" ? "/artifacts" : page === "assets" ? "/assets" : page === "user-library" ? "/user-library" : page === "image-generation" ? "/image-generation" : page === "models" ? "/models" : page === "security" ? "/security" : page === "settings" ? "/settings" : "/";
   window.history.pushState({}, "", path);
 }
 
@@ -47,6 +48,8 @@ function WorkspaceAwareThinClientApp() {
 
   const renderWorkspacePageContent = (page: ThinClientWorkspacePageKey, activeWorkspace: WorkspaceUiRecord): ReactNode => {
     switch (page) {
+      case "systems":
+        return <SystemBuilderPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
       case "artifacts":
         return <ArtifactsPage workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.displayName} />;
       case "image-generation":

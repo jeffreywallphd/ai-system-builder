@@ -1,5 +1,9 @@
 # Effective Asset Projections (effective asset projections Baseline)
 
+- Status: current
+- Related decisions: `docs/adr/ADR-0019-effective-asset-projections.md`
+- Verification: `docs/architecture/architecture-verification.md`
+
 ## Purpose and area placement
 
 effective asset projections establishes a conservative architecture baseline for **materialized/effective asset projections**.

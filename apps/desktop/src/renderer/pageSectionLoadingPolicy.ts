@@ -1,7 +1,7 @@
 export type PageSectionLoadingTrigger = "initial" | "deferred" | "expanded" | "selected-item" | "search-triggered" | "refresh" | "user-action" | "task-driven" | "train-tab" | "initial-ui-only";
 
 export interface PageSectionLoadingPolicyEntry {
-  readonly page: "models" | "artifacts" | "asset-library" | "image-generation" | "settings" | "system";
+  readonly page: "models" | "artifacts" | "asset-library" | "image-generation" | "settings" | "systems";
   readonly section: string;
   readonly trigger: PageSectionLoadingTrigger | readonly PageSectionLoadingTrigger[];
   readonly notes: string;
@@ -36,9 +36,11 @@ export const pageSectionLoadingPolicy: readonly PageSectionLoadingPolicyEntry[] 
   { page: "settings", section: "runtime settings", trigger: "expanded", notes: "Runtime settings load only when expanded." },
   { page: "settings", section: "dataset settings", trigger: "expanded", notes: "Dataset settings load only when expanded." },
   { page: "settings", section: "publishing settings", trigger: "expanded", notes: "Publishing settings load only when expanded." },
-  { page: "system", section: "basic shell", trigger: "initial", notes: "System page shell renders immediately." },
-  { page: "system", section: "lifecycle diagnostics", trigger: ["expanded", "refresh"], notes: "Lifecycle state loads only when diagnostics are enabled and expanded/refreshed." },
-  { page: "system", section: "Python runtime controls", trigger: ["expanded", "user-action"], notes: "Status/log reads are expanded; start/stop/restart are explicit actions." },
-  { page: "system", section: "ComfyUI install status", trigger: ["expanded", "refresh"], notes: "Install status loads on expansion/refresh without starting ComfyUI." },
-  { page: "system", section: "ComfyUI repair/install/start", trigger: "user-action", notes: "Repair/install/start are explicit actions." },
+  { page: "settings", section: "software status", trigger: "expanded", notes: "Operational software diagnostics mount only when Software status is expanded." },
+  { page: "settings", section: "lifecycle diagnostics", trigger: ["expanded", "refresh"], notes: "Lifecycle state loads only when diagnostics are enabled and expanded/refreshed." },
+  { page: "settings", section: "Python runtime controls", trigger: ["expanded", "user-action"], notes: "Status/log reads are expanded; start/stop/restart are explicit actions." },
+  { page: "settings", section: "ComfyUI install status", trigger: ["expanded", "refresh"], notes: "Install status loads on expansion/refresh without starting ComfyUI." },
+  { page: "settings", section: "ComfyUI repair/install/start", trigger: "user-action", notes: "Repair/install/start are explicit actions." },
+  { page: "systems", section: "builder shell", trigger: "initial-ui-only", notes: "The workspace-scoped System Builder preparation shell performs no operational status reads." },
+  { page: "systems", section: "system records", trigger: "deferred", notes: "System record operations remain unavailable until explicit contracts and use cases are implemented." },
 ] as const;

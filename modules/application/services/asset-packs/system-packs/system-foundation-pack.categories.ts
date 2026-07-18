@@ -48,6 +48,48 @@ export const SYSTEM_FOUNDATION_PACK_CATEGORIES = [
     description: "Reusable conversational composite assets that preserve lineage to foundational primitives.",
     sortOrder: 70,
   },
+  {
+    categoryId: "data-modeling",
+    displayName: "Data Modeling",
+    description: "Portable data types, entities, fields, relationships, validation, queries, and bindings.",
+    sortOrder: 80,
+  },
+  {
+    categoryId: "security-policy",
+    displayName: "Security and Audit",
+    description: "Fail-closed authentication, authorization, permission, and audit declarations.",
+    sortOrder: 90,
+  },
+  {
+    categoryId: "artifact-preview",
+    displayName: "Artifact and Data Preview",
+    description: "Safe bounded previews for artifact and data resources.",
+    sortOrder: 100,
+  },
+  {
+    categoryId: "ai-context",
+    displayName: "AI Models and Context",
+    description: "Model references and bounded AI-readable context declarations.",
+    sortOrder: 110,
+  },
+  {
+    categoryId: "logic-workflow",
+    displayName: "Logic and Workflow",
+    description: "Finite conditions, mappings, and branches without arbitrary code evaluation.",
+    sortOrder: 120,
+  },
+  {
+    categoryId: "test-observability",
+    displayName: "Test and Observability",
+    description: "Fixtures, mock data, assertions, and safe operational event declarations.",
+    sortOrder: 130,
+  },
+  {
+    categoryId: "reference-features",
+    displayName: "Reference Features",
+    description: "Composed functional defaults made only from lower-level foundation assets.",
+    sortOrder: 140,
+  },
 ] as const satisfies readonly SystemFoundationPackCategory[];
 
 export const SYSTEM_FOUNDATION_PACK_CATEGORY_IDS =

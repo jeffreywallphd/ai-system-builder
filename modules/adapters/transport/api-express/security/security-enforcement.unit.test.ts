@@ -4,6 +4,7 @@ import { API_ROUTE_POLICIES, resolveApiRoutePolicy } from "./apiRouteSecurityPol
 import { createExpressSecurityMiddleware } from "./createExpressSecurityMiddleware";
 import { createSecurityApplicationError } from "../../../../contracts/security";
 import { createInMemoryDevSecurityEnforcementStore } from "./devSecurityEnforcement";
+import { getExpressOrganizationContext } from "./expressOrganizationContext";
 
 describe("api route security policy coverage", () => {
   it("has explicit policy entries for registered API routes", () => {
@@ -19,6 +20,13 @@ describe("api route security policy coverage", () => {
     expect(API_ROUTE_POLICIES.get("GET /api/assets/definitions")).toMatchObject({ public: false, scopes: ["asset:read"] });
     expect(API_ROUTE_POLICIES.get("GET /api/assets/resource-backed-views")).toMatchObject({ public: false, scopes: ["asset:read"] });
     expect(API_ROUTE_POLICIES.get("POST /api/assets/register-resource-backed-view")).toMatchObject({ public: false, scopes: ["asset:write"] });
+    expect(API_ROUTE_POLICIES.get("GET /api/asset-implementations/releases")).toMatchObject({ public: false, scopes: ["asset:read"] });
+    expect(API_ROUTE_POLICIES.get("POST /api/asset-implementations/resolve")).toMatchObject({ public: false, scopes: ["asset:read"] });
+    expect(API_ROUTE_POLICIES.get("POST /api/asset-packages/inspect")).toMatchObject({ public: false, scopes: ["asset:write"] });
+    expect(API_ROUTE_POLICIES.get("GET /api/systems")).toMatchObject({ public: false, scopes: ["asset:read"] });
+    expect(API_ROUTE_POLICIES.get("POST /api/systems/revisions/save")).toMatchObject({ public: false, scopes: ["asset:write"] });
+    expect(API_ROUTE_POLICIES.get("GET /api/systems/data/form")).toMatchObject({ public: false, scopes: ["asset:read"] });
+    expect(API_ROUTE_POLICIES.get("POST /api/systems/data/records/update")).toMatchObject({ public: false, scopes: ["asset:write"] });
     expect(API_ROUTE_POLICIES.get("GET /api/asset-authoring/workspaces/:workspaceId/drafts")).toMatchObject({ public: false, scopes: ["asset:read"] });
     expect(API_ROUTE_POLICIES.get("POST /api/asset-authoring/workspaces/:workspaceId/drafts")).toMatchObject({ public: false, scopes: ["asset:write"] });
     expect(API_ROUTE_POLICIES.get("POST /api/asset-authoring/workspaces/:workspaceId/drafts/:draftId/publish")).toMatchObject({ public: false, scopes: ["asset:write"] });
@@ -80,5 +88,62 @@ describe("security middleware", () => {
     const res:any = { statusCode: 200, body: undefined, status(code:number){this.statusCode=code;return this;}, json(body:unknown){this.body=body;return this;} };
     await middleware(req,res,()=>{});
     expect(res.body.error.code).toBe("unauthorized");
+  });
+
+  it("requires valid organization context for pooled OIDC requests", async () => {
+    const middleware = createExpressSecurityMiddleware({
+      httpsRequired: true,
+      authRequired: true,
+      mode: "oidc-bearer",
+      verifyToken: async () => ({
+        authenticated: true,
+        authMethod: "oidc-bearer",
+        principal: {
+          principalId: "principal-1",
+          kind: "user",
+          roles: [],
+          scopes: ["workspace:read"],
+        },
+      }),
+    });
+    const res:any = { statusCode: 200, body: undefined, status(code:number){this.statusCode=code;return this;}, json(body:unknown){this.body=body;return this;} };
+    const missing:any = { method: "GET", path: "/api/workspaces", protocol: "https", headers: { authorization: "Bearer signed" } };
+    await middleware(missing,res,()=>{});
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error.operation).toBe("security.organization-required");
+
+    const request:any = { method: "GET", path: "/api/workspaces", protocol: "https", headers: { authorization: "Bearer signed", "x-organization-id": "org-a" } };
+    let nextCalled = false;
+    await middleware(request,res,()=>{ nextCalled = true; });
+    expect(nextCalled).toBe(true);
+    expect(getExpressOrganizationContext(request)).toMatchObject({
+      organizationId: "org-a",
+      principalId: "principal-1",
+    });
+  });
+
+  it("defaults premium requests to its one organization and rejects another", async () => {
+    const middleware = createExpressSecurityMiddleware({
+      httpsRequired: true,
+      authRequired: true,
+      mode: "oidc-bearer",
+      tenantPlacement: { mode: "dedicated", organizationId: "org-premium" as any },
+      verifyToken: async () => ({
+        authenticated: true,
+        authMethod: "oidc-bearer",
+        principal: { principalId: "principal-1", kind: "user", roles: [], scopes: ["workspace:read"] },
+      }),
+    });
+    const response = () => ({ statusCode: 200, body: undefined as any, status(code:number){this.statusCode=code;return this;}, json(body:unknown){this.body=body;return this;} });
+    const defaulted:any = { method: "GET", path: "/api/workspaces", protocol: "https", headers: { authorization: "Bearer signed" } };
+    let nextCalled = false;
+    await middleware(defaulted,response(),()=>{ nextCalled = true; });
+    expect(nextCalled).toBe(true);
+    expect(getExpressOrganizationContext(defaulted)?.organizationId).toBe("org-premium");
+
+    const rejectedResponse = response();
+    const other:any = { method: "GET", path: "/api/workspaces", protocol: "https", headers: { authorization: "Bearer signed", "x-organization-id": "org-other" } };
+    await middleware(other,rejectedResponse,()=>{});
+    expect(rejectedResponse.statusCode).toBe(403);
   });
 });

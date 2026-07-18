@@ -46,6 +46,12 @@ import { createDesktopRuntimeReadinessService } from "./composeDesktopRuntimeRea
 import { createDesktopFeatureLifecycleRegistry, type DesktopFeatureDisposeReason, type DesktopFeatureDisposeResult, type DesktopFeatureLifecyclePolicy, type DesktopFeatureLifecycleStateEntry } from "./featureLifecycle";
 import { createUnavailablePythonRuntimeStatus, resolvePythonRuntimeBaseUrl, type DesktopPythonRuntimeFeature } from "./desktopPythonRuntimeHelpers";
 import { createPythonConversationalRuntimeAdapterCatalog, createPythonConversationalRuntimeGuard, createPythonConversationalTextGenerationInvocationAdapter } from "../../../adapters/runtime/conversational-text-generation";
+import type { StructuredDocumentStore } from "../../../adapters/persistence/shared";
+import { composeSystemBuilder } from "../../shared/composition/composeSystemBuilder";
+import type { SystemBuildArtifactPort } from "../../../application/ports/system-build";
+import { createSha256SystemBuildHasher, createSystemBuildArtifactAdapter } from "../../../adapters/storage/system-build";
+import { composeSystemBuild } from "../../shared/composition/composeSystemBuild";
+import { composeSystemData } from "../../shared/composition/composeSystemData";
 export { createDesktopRuntimeReadinessService, type CreateDesktopRuntimeReadinessServiceOptions } from "./composeDesktopRuntimeReadiness";
 
 const HUGGING_FACE_TOKEN_SETTING_KEY = "huggingface.token" as const;
@@ -104,6 +110,10 @@ export interface ComposeDesktopHostLoggingOptions {
 }
 
 export interface ComposeDesktopHostOptions {
+  persistence?: {
+    documents: StructuredDocumentStore;
+    organizationDocuments?: StructuredDocumentStore;
+  };
   logging?: ComposeDesktopHostLoggingOptions;
   logSink?: StructuredLogSink;
   now?: () => string;
@@ -171,6 +181,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
   const featureLifecycle = createDesktopFeatureLifecycleRegistry({ loggingPort, recordMilestone: recordHostMemorySnapshot });
 
   const now = options.now ?? (() => new Date().toISOString());
+  const organizationDocuments = options.persistence?.organizationDocuments ?? options.persistence?.documents;
   const runtimeLogs: DesktopPythonRuntimeLogEntry[] = [];
   let lastObservedRuntimeHealthSnapshot: { supervisorStatus: string; runtimeStatus: string; healthy: boolean } | undefined;
   const pushRuntimeLog = (entry: DesktopPythonRuntimeLogEntry) => {
@@ -187,7 +198,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
   const tokenConfigStore = createHuggingFaceTokenConfigStore({ filePath: options.artifactRepo?.huggingFaceTokenConfigFilePath ?? "/tmp/ai-system-builder/desktop/hugging-face-token.json", fallbackToken: options.artifactRepo?.huggingFaceAccessToken });
   recordHostMemorySnapshot("desktop.host.token-config.ready", { tokenConfigured: Boolean(options.artifactRepo?.huggingFaceAccessToken?.trim()), tokenConfigPathConfigured: Boolean(options.artifactRepo?.huggingFaceTokenConfigFilePath?.trim()) });
 
-  const applicationSettings = createLocalApplicationSettingsAdapter({ filePath: options.settings?.localSettingsFilePath ?? "/tmp/ai-system-builder/desktop/application-settings.json" });
+  const applicationSettings = createLocalApplicationSettingsAdapter({ filePath: options.settings?.localSettingsFilePath ?? "/tmp/ai-system-builder/desktop/application-settings.json", documents: options.persistence?.documents });
   recordHostMemorySnapshot("desktop.host.settings.ready", { settingsPathConfigured: Boolean(options.settings?.localSettingsFilePath?.trim()) });
   const baseApplicationSecrets = createInMemorySecretsAdapter();
   const applicationSecrets: ApplicationSecretsPort = {
@@ -292,10 +303,10 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
     registerDesktopIpc(registerOptions) {
       recordHostMemorySnapshot("desktop.host.ipc-registration.enter", { hasRuntimeRootDirectory: Boolean(registerOptions.runtimeRootDirectory), hasStorageRootDirectory: Boolean(registerOptions.storageRootDirectory) });
       const getStartupWorkspaceShell = memoizeSyncFeature("desktop.host.startup-workspace-shell.compose", () => {
-        const workspaceRepository = createLocalWorkspaceRepository({ rootDirectory: registerOptions.storageRootDirectory });
-        const workspaceSelectionRepository = createLocalWorkspaceSelectionRepository({ rootDirectory: registerOptions.storageRootDirectory });
-        const systemPackActivationRepository = createLocalWorkspaceSystemPackActivationRepository({ rootDirectory: registerOptions.storageRootDirectory });
-        const createWorkspaceUseCase = new CreateWorkspaceUseCase({ workspaceRepository, workspaceSelectionRepository, systemPackActivationRepository });
+        const workspaceRepository = createLocalWorkspaceRepository({ rootDirectory: registerOptions.storageRootDirectory, documents: organizationDocuments });
+        const workspaceSelectionRepository = createLocalWorkspaceSelectionRepository({ rootDirectory: registerOptions.storageRootDirectory, documents: organizationDocuments });
+        const systemPackActivationRepository = createLocalWorkspaceSystemPackActivationRepository({ rootDirectory: registerOptions.storageRootDirectory, documents: organizationDocuments });
+        const createWorkspaceUseCase = new CreateWorkspaceUseCase({ workspaceRepository, workspaceSelectionRepository, systemPackActivationRepository, organizationId: organizationDocuments?.organizationId });
         return { workspaceRepository, workspaceSelectionRepository, systemPackActivationRepository, createWorkspaceUseCase };
       });
       const startupWorkspaceShell = getStartupWorkspaceShell();
@@ -307,7 +318,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
       });
       const getArtifactFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "artifact-local", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["artifact-local"], milestoneBase: "desktop.host.artifact-features", importFeature: async () => {
         const module = await import("./composeDesktopArtifactFeature");
-        return () => module.composeDesktopArtifactFeature({ storageRootDirectory: registerOptions.storageRootDirectory, loggingPort, now: options.now, workspaceShell: startupWorkspaceShell });
+        return () => module.composeDesktopArtifactFeature({ storageRootDirectory: registerOptions.storageRootDirectory, loggingPort, now: options.now, workspaceShell: startupWorkspaceShell, documents: organizationDocuments });
       }});
       const getArtifactRemoteFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "artifact-remote", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["artifact-remote"], milestoneBase: "desktop.host.artifact-remote-features", importFeature: async () => {
         const module = await import("./composeDesktopArtifactRemoteFeature");
@@ -315,7 +326,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
       }});
       const getAssetFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "asset-registry", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["asset-registry"], milestoneBase: "desktop.host.asset-features", importFeature: async () => {
         const module = await import("./composeDesktopAssetFeature");
-        return async () => module.composeDesktopAssetFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, readSharedModelStorageDirectory, artifacts: await getArtifactFeatures(), onInternalAssetRegistry: (registry) => { internalAssetRegistry = registry; } });
+        return async () => module.composeDesktopAssetFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, readSharedModelStorageDirectory, artifacts: await getArtifactFeatures(), documents: organizationDocuments, onInternalAssetRegistry: (registry) => { internalAssetRegistry = registry; } });
       }});
       const getComfyUiInstallFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "comfyui-install", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["comfyui-install"], milestoneBase: "desktop.host.comfyui-install-features", importFeature: async () => {
         const module = await import("./composeDesktopComfyUiInstallFeature");
@@ -331,7 +342,7 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
       }});
       const getModelFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "model-registry", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["model-registry"], milestoneBase: "desktop.host.model-features", importFeature: async () => {
         const module = await import("./composeDesktopModelFeature");
-        return () => module.composeDesktopModelFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, tokenProvider: () => tokenConfigStore.getToken(), readSharedModelStorageDirectory, getArtifacts: getArtifactFeatures, getRuntimeTaskFeatures, getPythonRuntimeFoundation });
+        return () => module.composeDesktopModelFeature({ storageRootDirectory: registerOptions.storageRootDirectory, now, documents: organizationDocuments, tokenProvider: () => tokenConfigStore.getToken(), readSharedModelStorageDirectory, getArtifacts: getArtifactFeatures, getRuntimeTaskFeatures, getPythonRuntimeFoundation });
       }});
       const getImageGenerationFeatures = featureLifecycle.registerAsyncFeature({ featureKey: "image-generation", policy: DESKTOP_FEATURE_LIFECYCLE_POLICIES["image-generation"], milestoneBase: "desktop.host.image-generation-features", importFeature: async () => {
         const module = await import("./composeDesktopImageGenerationFeature");
@@ -345,13 +356,44 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
         const module = await import("./composeDesktopDatasetPreparationFeature");
         return async () => module.composeDesktopDatasetPreparationFeature({ artifacts: await getArtifactFeatures(), runtime: await getRuntimeTaskFeatures(), getArtifactRemoteFeatures, now: options.now });
       }});
-      const userLibraryAssetRepository = createLocalUserLibraryAssetRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
-      const authoredAssetRepository = createLocalAuthoredAssetRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
-      const assetDraftRepository = createLocalAssetDraftRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
-      const assetRevisionRepository = createLocalAssetRevisionRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
-      const assetOverrideRepository = createLocalAssetOverrideRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
-      const effectiveAssetProjectionRepository = createLocalEffectiveAssetProjectionRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
-      const assetCompositionPlanRepository = createLocalAssetCompositionPlanRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const structuredRepositoryOptions = { rootDir: registerOptions.storageRootDirectory, now: options.now, documents: organizationDocuments };
+      const systemBuilder = organizationDocuments ? composeSystemBuilder({
+        documents: organizationDocuments,
+        definitions: {
+          async readExactDefinition(reference) {
+            await getAssetFeatures();
+            return internalAssetRegistry?.assetKernel.repositories.definitionRepository.getDefinition(reference);
+          },
+        },
+        generateSystemId: () => `system.${randomUUID()}`,
+        now: options.now,
+      }) : undefined;
+      const systemBuildArtifacts: SystemBuildArtifactPort = {
+        async putImmutable(request) { return createSystemBuildArtifactAdapter((await getArtifactFeatures()).storage).putImmutable(request); },
+        async readVerified(workspaceId, descriptor) { return createSystemBuildArtifactAdapter((await getArtifactFeatures()).storage).readVerified(workspaceId, descriptor); },
+      };
+      const systemBuild = organizationDocuments && systemBuilder ? composeSystemBuild({
+        documents: organizationDocuments,
+        systemBuilder,
+        resolver: { async resolve(request) { const implementation = (await getAssetFeatures()).assetImplementation; if (!implementation) return { status: "blocked", definitionRef: request.definitionRef, selectedFacets: [], diagnostics: [{ severity: "error", code: "implementation.unavailable", message: "Asset implementation storage is unavailable." }] }; return implementation.useCases.resolve.execute(request); } },
+        artifacts: systemBuildArtifacts,
+        hasher: createSha256SystemBuildHasher(),
+        now: options.now,
+      }) : undefined;
+      const systemData = organizationDocuments && systemBuild ? composeSystemData({
+        documents: organizationDocuments,
+        builds: systemBuild.repository,
+        artifacts: systemBuildArtifacts,
+        generateAuditId: () => `system-data-audit.${randomUUID()}`,
+        now: options.now,
+      }) : undefined;
+      const userLibraryAssetRepository = createLocalUserLibraryAssetRepositoryAdapter(structuredRepositoryOptions);
+      const authoredAssetRepository = createLocalAuthoredAssetRepositoryAdapter(structuredRepositoryOptions);
+      const assetDraftRepository = createLocalAssetDraftRepositoryAdapter(structuredRepositoryOptions);
+      const assetRevisionRepository = createLocalAssetRevisionRepositoryAdapter(structuredRepositoryOptions);
+      const assetOverrideRepository = createLocalAssetOverrideRepositoryAdapter(structuredRepositoryOptions);
+      const effectiveAssetProjectionRepository = createLocalEffectiveAssetProjectionRepositoryAdapter(structuredRepositoryOptions);
+      const assetCompositionPlanRepository = createLocalAssetCompositionPlanRepositoryAdapter(structuredRepositoryOptions);
       const unavailableCustomizationTargetReader: AssetCustomizationTargetReaderPort = {
         async readCustomizationTargetByReference() {
           return undefined;
@@ -369,14 +411,14 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
       };
       const effectiveAssetProjectionReadModel = new WorkspaceEffectiveAssetProjectionReadModelService({ projectionRepository: effectiveAssetProjectionRepository });
       const assetCompositionReadModel = new WorkspaceAssetCompositionReadModelService({ compositionPlanRepository: assetCompositionPlanRepository });
-      const workspaceUserLibraryLinkRepository = createLocalWorkspaceUserLibraryLinkRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const workspaceUserLibraryLinkRepository = createLocalWorkspaceUserLibraryLinkRepositoryAdapter(structuredRepositoryOptions);
 
-      const runtimeInventoryRepository = createLocalRuntimeInventoryRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
-      const runtimeReadinessBindingRepository = createLocalRuntimeReadinessBindingRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
-      const executionPlanRepository = createLocalExecutionPlanRepositoryAdapter({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const runtimeInventoryRepository = createLocalRuntimeInventoryRepositoryAdapter(structuredRepositoryOptions);
+      const runtimeReadinessBindingRepository = createLocalRuntimeReadinessBindingRepositoryAdapter(structuredRepositoryOptions);
+      const executionPlanRepository = createLocalExecutionPlanRepositoryAdapter(structuredRepositoryOptions);
       const executionPlanServices = composeExecutionPlanServices({ executionPlanRepository, runtimeReadinessBindingRepository, compositionPlanRepository: assetCompositionPlanRepository, now: options.now });
-      const conversationRepositories = createLocalConversationRepositoryAdapters({ rootDir: registerOptions.storageRootDirectory, now: options.now });
-      const executionRunRepositories = createLocalExecutionRunRepositoryAdapters({ rootDir: registerOptions.storageRootDirectory, now: options.now });
+      const conversationRepositories = createLocalConversationRepositoryAdapters(structuredRepositoryOptions);
+      const executionRunRepositories = createLocalExecutionRunRepositoryAdapters(structuredRepositoryOptions);
       const conversationExecutionServices = composeConversationExecutionServices({
         ...conversationRepositories,
         ...executionRunRepositories,
@@ -511,6 +553,43 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           ipcMain: registerOptions.ipcMain,
           conversations: conversationExecutionServices,
         },
+        assetImplementations: {
+          ipcMain: registerOptions.ipcMain,
+          listReleases: {
+            async execute(workspaceId) {
+              const implementation = (await getAssetFeatures()).assetImplementation;
+              if (!implementation) throw new Error("Asset implementation storage is unavailable.");
+              return implementation.useCases.listReleases.execute(workspaceId);
+            },
+          },
+          resolve: {
+            async execute(request) {
+              const implementation = (await getAssetFeatures()).assetImplementation;
+              if (!implementation) throw new Error("Asset implementation storage is unavailable.");
+              return implementation.useCases.resolve.execute(request);
+            },
+          },
+        },
+        assetPackages: {
+          ipcMain: registerOptions.ipcMain,
+          inspect: { async execute(command) { const feature = (await getAssetFeatures()).assetPackages; if (!feature) throw new Error("Asset package storage is unavailable."); return feature.useCases.inspect.execute(command); } },
+          admit: { async execute(command) { const feature = (await getAssetFeatures()).assetPackages; if (!feature) throw new Error("Asset package storage is unavailable."); return feature.useCases.admit.execute(command); } },
+          list: { async execute(workspaceId) { const feature = (await getAssetFeatures()).assetPackages; if (!feature) throw new Error("Asset package storage is unavailable."); return feature.useCases.list.execute(workspaceId); } },
+          activate: { async execute(command) { const feature = (await getAssetFeatures()).assetPackages; if (!feature) throw new Error("Asset package storage is unavailable."); return feature.useCases.activate.execute(command); } },
+          disable: { async execute(command) { const feature = (await getAssetFeatures()).assetPackages; if (!feature) throw new Error("Asset package storage is unavailable."); return feature.useCases.disable.execute(command); } },
+          rollback: { async execute(command) { const feature = (await getAssetFeatures()).assetPackages; if (!feature) throw new Error("Asset package storage is unavailable."); return feature.useCases.rollback.execute(command); } },
+        },
+        assetStudio: {
+          ipcMain: registerOptions.ipcMain,
+          start: { async execute(command) { const feature = (await getAssetFeatures()).assetStudio; if (!feature) throw new Error("Asset Studio storage is unavailable."); return feature.useCases.start.execute(command); } },
+          propose: { async execute(command) { const feature = (await getAssetFeatures()).assetStudio; if (!feature) throw new Error("Asset Studio storage is unavailable."); return feature.useCases.propose.execute(command); } },
+          review: { async execute(command) { const feature = (await getAssetFeatures()).assetStudio; if (!feature) throw new Error("Asset Studio storage is unavailable."); return feature.useCases.review.execute(command); } },
+          read: { async execute(workspaceId, workflowId) { const feature = (await getAssetFeatures()).assetStudio; if (!feature) throw new Error("Asset Studio storage is unavailable."); return feature.useCases.read.execute(workspaceId, workflowId); } },
+          list: { async execute(workspaceId) { const feature = (await getAssetFeatures()).assetStudio; if (!feature) throw new Error("Asset Studio storage is unavailable."); return feature.useCases.list.execute(workspaceId); } },
+        },
+        ...(systemBuilder ? { systemBuilder: { ipcMain: registerOptions.ipcMain, ...systemBuilder.useCases } } : {}),
+        ...(systemBuild ? { systemBuild: { ipcMain: registerOptions.ipcMain, ...systemBuild.useCases } } : {}),
+        ...(systemData ? { systemData: { ipcMain: registerOptions.ipcMain, runtime: systemData.runtime } } : {}),
       });
       recordHostMemorySnapshot("desktop.host.ipc-registration.lazy-handlers.after");
       recordHostMemorySnapshot("desktop.host.ipc-registration.return");

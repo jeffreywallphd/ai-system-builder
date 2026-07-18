@@ -88,7 +88,9 @@ Tools/function-calling, retrieval/RAG, memory, multimodal IO, image generation/C
 - Current action availability comes from application eligibility/approval/readiness/runtime/host state. Provenance text alone must not enable submission.
 - Transcript is the intentional full visible-content read surface. Operational read models, activity, capability summaries, cancel/retry results, diagnostics, and errors stay content-safe.
 - Desktop and server hosts may expose only capabilities they actually compose. Cancel, retry, and streaming remain unsupported/deferred unless an application/runtime path genuinely supports them.
-- Run & Test UI correctness remains a distinct responsibility; boundary cleanup may only keep compilation aligned with repaired boundary/client types.
+- Systems Run & Test uses the shared desktop/thin presenter, real execution-plan
+  identity, application-projected actions, bounded accessible transcript
+  rendering, and truthful host capability states.
 
 ## Conversational Source Invariant
 
@@ -100,5 +102,10 @@ Tools/function-calling, retrieval/RAG, memory, multimodal IO, image generation/C
 
 Application-facing conversational invocation seams exist for protected context preparation, adapter catalog selection, runtime guard checks, single-turn orchestration, and the supported Python text-generation runtime adapter path. Approval/session eligibility, reviewed execution-plan identity, runtime readiness, and asset-derived source boundaries remain mandatory prerequisites.
 
-- The first user-facing Assets-area **Run & Test** surface for composed conversational systems uses existing safe desktop/thin-client conversation clients and preserves approval/readiness/execution-plan boundaries.
+- The first user-facing Systems **Run & Test** surface for composed
+  conversational systems uses the same safe desktop/thin-client conversation
+  clients and preserves approval/readiness/execution-plan boundaries.
+- `reference.controlled-chatbot@1.0.0` is a closed Asset Kernel composition;
+  release approval does not activate it or bypass reviewed plan, readiness, and
+  session approval requirements.
 - No fake response generator is allowed in production host composition. Hosts may expose only capabilities they actually compose; cancel, retry, and streaming stay unsupported unless implemented end to end.

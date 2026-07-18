@@ -2,7 +2,9 @@ import type { ServerListener } from "./createServer";
 import { createServer, createServerListener } from "./createServer";
 
 let activeListener: ServerListener | undefined;
+let closeActivePersistence: (() => Promise<void>) | undefined;
 let restartQueue = Promise.resolve();
+let shutdownQueue: Promise<void> | undefined;
 
 async function startServer(): Promise<void> {
   const createdServer = await createServer({
@@ -12,6 +14,7 @@ async function startServer(): Promise<void> {
   });
   const listener = createServerListener(createdServer);
   activeListener = listener;
+  closeActivePersistence = createdServer.closePersistence;
 
   listener.listen(createdServer.config.port, () => {
     void createdServer.loggingPort.log({
@@ -46,6 +49,8 @@ async function closeActiveListener(): Promise<void> {
   const listener = activeListener;
   activeListener = undefined;
   if (!listener) {
+    await closeActivePersistence?.();
+    closeActivePersistence = undefined;
     return;
   }
 
@@ -58,11 +63,21 @@ async function closeActiveListener(): Promise<void> {
       resolve();
     });
   });
+  await closeActivePersistence?.();
+  closeActivePersistence = undefined;
 }
 
 async function restartServer(): Promise<void> {
   await closeActiveListener();
   await startServer();
 }
+
+function beginShutdown(): void {
+  shutdownQueue ??= closeActiveListener().then(() => undefined);
+  void shutdownQueue;
+}
+
+process.once("SIGINT", beginShutdown);
+process.once("SIGTERM", beginShutdown);
 
 void startServer();

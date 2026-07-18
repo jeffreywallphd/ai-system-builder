@@ -32,6 +32,9 @@ When existing code has moved ahead of canonical docs, record the conflict in `do
   - Not every task or feature needs feature/epic/story context files.
 - `docs/context/prompt-routing.md`
   - Lightweight decision guide for choosing which packs to include.
+- `docs/context/pack-catalog.json`
+  - Machine-readable pack identifiers, retrieval signals, path signals, and verification commands.
+  - The default budget is one primary pack plus at most one adjacent-boundary pack; expand only from repository evidence.
 
 ## Template Location Clarification
 
@@ -48,6 +51,6 @@ When existing code has moved ahead of canonical docs, record the conflict in `do
   - Select for debugging/error-fix prompts (errors, exceptions, hangs, timeout, transport disconnect, runtime still running).
   - Focuses on execution timeline, invariants, lifecycle-safe error handling, and boundary-preserving fixes.
 
-Use `docs/context/prompt-routing.md` for full pack selection rules and minimal-context routing.
+Use `docs/context/pack-catalog.json` for machine-readable discovery and `docs/context/prompt-routing.md` for human-readable selection rules.
 
-Run `npm run docs:check` after editing context packs.
+Run `npm run docs:check` and `npm run agent-support:check` after editing context packs or routing metadata.
