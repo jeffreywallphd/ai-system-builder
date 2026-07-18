@@ -148,11 +148,56 @@ configuration/context boundaries and are absent from public build summaries,
 approval results, operational diagnostics, and session summaries. Tools,
 retrieval, memory, multimodal IO, streaming, cancel, and retry are not implied.
 
+## Secured data-review reference system
+
+Increment 9 adds the closed `reference.secured-data-review@1.0.0` template and
+the release-bound `system-review` application family. The template composes
+exact-version shell, artifact browser/filter/detail, masking, audit,
+authentication, finite workflow, and explicit text/table/raster-image/PDF/
+unsupported preview assets without embedding stored files in Asset Kernel
+definitions.
+
+Runtime policy is derived only from one integrity-verified approved release.
+The trusted application layer enforces workspace ownership, authenticated
+narrowing roles, opaque artifact references, metadata masking, bounded list and
+preview quotas, conservative content classification, and redacted audit. The
+shared desktop/thin-client Run & Test presenter consumes those safe read models;
+it cannot choose a principal, reveal host paths/provider payloads, or turn a
+successful build into deployment authority. SVG and Office content remain
+unsupported, and malformed, oversized, unavailable, or unauthorized reads fail
+closed with safe states.
+
 ## Remaining increment-gated gaps
 
-- deployment activation/rollback and approved-release execution handoff;
 - independent qualified rebuild and higher assurance claims;
+- qualified imported/authored execution sandboxes and portable standalone packaging;
 - collaboration, permissions, import/export, marketplace, and deployment synchronization.
+
+## Multi-shape deployment handoff
+
+`modules/contracts/system-deployment` and its application, persistence,
+runtime, transport, and shared UI families keep operational state separate from
+System Builder designs and immutable releases. Install re-verifies release
+artifacts and manifest classification, checks the frozen deployment profile,
+host API/runtime ABI, implementation trust/runtime facts, required host
+capabilities, and sandbox qualification before calling a runtime adapter.
+
+Desktop owns `local-desktop`; server maps campus/corporate to `campus-server`
+and cloud to `cloud-server`. The trusted adapter recognizes only the three
+closed reference-system kinds and returns a bounded release-bound handoff. Thin
+client can install, activate, inspect health/history, roll back, revoke, and
+request a server run through authenticated HTTP, but it never receives local
+runtime, filesystem, secret, capability, sandbox, organization, or principal
+authority. The shared `SystemDeploymentWorkflow` presents these truthful
+states in both hosts.
+
+Policy is deny-by-default and can only narrow platform ceilings. Capability,
+opaque secret-reference, HTTPS-origin egress, duration, memory, output, and
+concurrency checks run before runtime invocation. Activation/readiness failure,
+interruption, cancellation, rollback, and revocation preserve explicit safe
+state and bounded redacted audit. Imported/authored execution returns
+`deployment.sandbox-unavailable` unless a separately qualified adapter is
+injected; the managed runner template is operator evidence, not sandbox proof.
 
 Build/release support must not be inferred from design validation, and a release
 must not be treated as deployed or running. See

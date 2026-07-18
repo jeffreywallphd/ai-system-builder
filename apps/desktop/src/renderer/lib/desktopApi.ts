@@ -69,6 +69,7 @@ import type {
   SystemBuilderComposition,
   SystemBuilderTemplateId,
 } from "../../../../../modules/contracts/system-builder";
+import type { SystemDeploymentCapabilityPolicy } from "../../../../../modules/contracts/system-deployment";
 
 export interface DesktopArtifactUploadInput {
   workspaceId: string;
@@ -685,6 +686,88 @@ interface DesktopApiBridge {
       entityType: string;
       limit?: number;
     },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  describeSystemReview?: (
+    input: { workspaceId: string; releaseId: string },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  browseSystemReviewArtifacts?: (
+    input: {
+      workspaceId: string;
+      releaseId: string;
+      nameQuery?: string;
+      limit?: number;
+    },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  readSystemReviewArtifact?: (
+    input: { workspaceId: string; releaseId: string; artifactRef: string },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  previewSystemReviewArtifact?: (
+    input: { workspaceId: string; releaseId: string; artifactRef: string },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  listSystemReviewAudit?: (
+    input: { workspaceId: string; releaseId: string; limit?: number },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  installSystemDeployment?: (
+    input: {
+      workspaceId: string;
+      deploymentId: string;
+      releaseId: string;
+      deploymentProfile: string;
+      policy: SystemDeploymentCapabilityPolicy;
+    },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  activateSystemDeployment?: (
+    input: { workspaceId: string; deploymentId: string },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  reconcileSystemDeploymentHealth?: (
+    input: { workspaceId: string; deploymentId: string },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  rollbackSystemDeployment?: (
+    input: { workspaceId: string; deploymentId: string },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  revokeSystemDeployment?: (
+    input: { workspaceId: string; deploymentId: string },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  readSystemDeployment?: (
+    input: { workspaceId: string; deploymentId: string },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  listSystemDeployments?: (
+    input: { workspaceId: string; releaseId?: string },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  startSystemDeploymentRun?: (
+    input: {
+      workspaceId: string;
+      deploymentId: string;
+      runId: string;
+      requestedCapabilities: readonly string[];
+      requestedSecretReferences: readonly string[];
+      requestedEgressOrigins: readonly string[];
+    },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  cancelSystemDeploymentRun?: (
+    input: { workspaceId: string; runId: string },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  listSystemDeploymentRuns?: (
+    input: { workspaceId: string; deploymentId?: string; limit?: number },
+    context?: DesktopBridgeRequestContext,
+  ) => Promise<unknown>;
+  listSystemDeploymentAudit?: (
+    input: { workspaceId: string; deploymentId: string; limit?: number },
     context?: DesktopBridgeRequestContext,
   ) => Promise<unknown>;
   inspectAssetPackage?: (

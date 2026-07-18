@@ -432,7 +432,14 @@ import {
   DESKTOP_SYSTEM_DATA_OPERATIONS,
   DESKTOP_SYSTEM_DATA_CHANNELS,
   createDesktopSystemDataRequest,
+  DESKTOP_SYSTEM_REVIEW_OPERATIONS,
+  DESKTOP_SYSTEM_REVIEW_CHANNELS,
+  createDesktopSystemReviewRequest,
+  DESKTOP_SYSTEM_DEPLOYMENT_OPERATIONS,
+  DESKTOP_SYSTEM_DEPLOYMENT_CHANNELS,
+  createDesktopSystemDeploymentRequest,
 } from "../../../../modules/contracts/ipc";
+import type { SystemDeploymentCapabilityPolicy } from "../../../../modules/contracts/system-deployment";
 import type {
   ActiveWorkspaceSelection,
   CreateWorkspaceCommand,
@@ -541,10 +548,32 @@ export interface DesktopSystemDataEnvelope {
   readonly value?: unknown;
   readonly error?: unknown;
 }
+export interface DesktopSystemReviewEnvelope {
+  readonly operation: string;
+  readonly channel: string;
+  readonly ok?: boolean;
+  readonly value?: unknown;
+  readonly error?: unknown;
+}
+export interface DesktopSystemDeploymentEnvelope {
+  readonly operation: string;
+  readonly channel: string;
+  readonly ok?: boolean;
+  readonly value?: unknown;
+  readonly error?: unknown;
+}
 type DesktopSystemDataContextInput = {
   workspaceId: string;
   releaseId: string;
   entityType: string;
+};
+type DesktopSystemReviewContextInput = {
+  workspaceId: string;
+  releaseId: string;
+};
+type DesktopSystemDeploymentContextInput = {
+  workspaceId: string;
+  deploymentId: string;
 };
 
 export interface DesktopPreloadApi {
@@ -1144,6 +1173,82 @@ export interface DesktopPreloadApi {
     input: DesktopSystemDataContextInput & { limit?: number },
     context?: DesktopArtifactUploadBridgeContext,
   ) => Promise<DesktopSystemDataEnvelope>;
+  describeSystemReview: (
+    input: DesktopSystemReviewContextInput,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemReviewEnvelope>;
+  browseSystemReviewArtifacts: (
+    input: DesktopSystemReviewContextInput & {
+      nameQuery?: string;
+      limit?: number;
+    },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemReviewEnvelope>;
+  readSystemReviewArtifact: (
+    input: DesktopSystemReviewContextInput & { artifactRef: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemReviewEnvelope>;
+  previewSystemReviewArtifact: (
+    input: DesktopSystemReviewContextInput & { artifactRef: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemReviewEnvelope>;
+  listSystemReviewAudit: (
+    input: DesktopSystemReviewContextInput & { limit?: number },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemReviewEnvelope>;
+  installSystemDeployment: (
+    input: DesktopSystemDeploymentContextInput & {
+      releaseId: string;
+      deploymentProfile: string;
+      policy: SystemDeploymentCapabilityPolicy;
+    },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemDeploymentEnvelope>;
+  activateSystemDeployment: (
+    input: DesktopSystemDeploymentContextInput,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemDeploymentEnvelope>;
+  reconcileSystemDeploymentHealth: (
+    input: DesktopSystemDeploymentContextInput,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemDeploymentEnvelope>;
+  rollbackSystemDeployment: (
+    input: DesktopSystemDeploymentContextInput,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemDeploymentEnvelope>;
+  revokeSystemDeployment: (
+    input: DesktopSystemDeploymentContextInput,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemDeploymentEnvelope>;
+  readSystemDeployment: (
+    input: DesktopSystemDeploymentContextInput,
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemDeploymentEnvelope>;
+  listSystemDeployments: (
+    input: { workspaceId: string; releaseId?: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemDeploymentEnvelope>;
+  startSystemDeploymentRun: (
+    input: DesktopSystemDeploymentContextInput & {
+      runId: string;
+      requestedCapabilities: readonly string[];
+      requestedSecretReferences: readonly string[];
+      requestedEgressOrigins: readonly string[];
+    },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemDeploymentEnvelope>;
+  cancelSystemDeploymentRun: (
+    input: { workspaceId: string; runId: string },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemDeploymentEnvelope>;
+  listSystemDeploymentRuns: (
+    input: { workspaceId: string; deploymentId?: string; limit?: number },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemDeploymentEnvelope>;
+  listSystemDeploymentAudit: (
+    input: DesktopSystemDeploymentContextInput & { limit?: number },
+    context?: DesktopArtifactUploadBridgeContext,
+  ) => Promise<DesktopSystemDeploymentEnvelope>;
   updateAssetDraft: (
     command: UpdateAssetDraftCommand,
     context?: DesktopArtifactUploadBridgeContext,
@@ -4314,6 +4419,54 @@ export function createDesktopPreloadApi(
     async listSystemDataAudit(input, context = {}) {
       return invokeSystemData(dependencies, "listAudit", input, context);
     },
+    async describeSystemReview(input, context = {}) {
+      return invokeSystemReview(dependencies, "describe", input, context);
+    },
+    async browseSystemReviewArtifacts(input, context = {}) {
+      return invokeSystemReview(dependencies, "browse", input, context);
+    },
+    async readSystemReviewArtifact(input, context = {}) {
+      return invokeSystemReview(dependencies, "detail", input, context);
+    },
+    async previewSystemReviewArtifact(input, context = {}) {
+      return invokeSystemReview(dependencies, "preview", input, context);
+    },
+    async listSystemReviewAudit(input, context = {}) {
+      return invokeSystemReview(dependencies, "listAudit", input, context);
+    },
+    async installSystemDeployment(input, context = {}) {
+      return invokeSystemDeployment(dependencies, "install", input, context);
+    },
+    async activateSystemDeployment(input, context = {}) {
+      return invokeSystemDeployment(dependencies, "activate", input, context);
+    },
+    async reconcileSystemDeploymentHealth(input, context = {}) {
+      return invokeSystemDeployment(dependencies, "health", input, context);
+    },
+    async rollbackSystemDeployment(input, context = {}) {
+      return invokeSystemDeployment(dependencies, "rollback", input, context);
+    },
+    async revokeSystemDeployment(input, context = {}) {
+      return invokeSystemDeployment(dependencies, "revoke", input, context);
+    },
+    async readSystemDeployment(input, context = {}) {
+      return invokeSystemDeployment(dependencies, "read", input, context);
+    },
+    async listSystemDeployments(input, context = {}) {
+      return invokeSystemDeployment(dependencies, "list", input, context);
+    },
+    async startSystemDeploymentRun(input, context = {}) {
+      return invokeSystemDeployment(dependencies, "startRun", input, context);
+    },
+    async cancelSystemDeploymentRun(input, context = {}) {
+      return invokeSystemDeployment(dependencies, "cancelRun", input, context);
+    },
+    async listSystemDeploymentRuns(input, context = {}) {
+      return invokeSystemDeployment(dependencies, "listRuns", input, context);
+    },
+    async listSystemDeploymentAudit(input, context = {}) {
+      return invokeSystemDeployment(dependencies, "listAudit", input, context);
+    },
   };
 }
 
@@ -4468,6 +4621,51 @@ async function invokeSystemData(
     channel: channels.response.value,
     message: `Received invalid desktop System Data ${operation} IPC response envelope.`,
   });
+}
+
+async function invokeSystemReview(
+  dependencies: CreateDesktopPreloadApiDependencies,
+  operation: keyof typeof DESKTOP_SYSTEM_REVIEW_OPERATIONS,
+  payload: unknown,
+  context: DesktopArtifactUploadBridgeContext,
+): Promise<DesktopSystemReviewEnvelope> {
+  const request = createDesktopSystemReviewRequest(operation, payload, context);
+  const channels = DESKTOP_SYSTEM_REVIEW_CHANNELS[operation];
+  const response = await dependencies.ipcRenderer.invoke(
+    channels.request.value,
+    request,
+  );
+  return assertDesktopEnvelopeResponse<DesktopSystemReviewEnvelope>(response, {
+    operation: DESKTOP_SYSTEM_REVIEW_OPERATIONS[operation],
+    channel: channels.response.value,
+    message: `Received invalid desktop System Review ${operation} IPC response envelope.`,
+  });
+}
+
+async function invokeSystemDeployment(
+  dependencies: CreateDesktopPreloadApiDependencies,
+  operation: keyof typeof DESKTOP_SYSTEM_DEPLOYMENT_OPERATIONS,
+  payload: unknown,
+  context: DesktopArtifactUploadBridgeContext,
+): Promise<DesktopSystemDeploymentEnvelope> {
+  const request = createDesktopSystemDeploymentRequest(
+    operation,
+    payload,
+    context,
+  );
+  const channels = DESKTOP_SYSTEM_DEPLOYMENT_CHANNELS[operation];
+  const response = await dependencies.ipcRenderer.invoke(
+    channels.request.value,
+    request,
+  );
+  return assertDesktopEnvelopeResponse<DesktopSystemDeploymentEnvelope>(
+    response,
+    {
+      operation: DESKTOP_SYSTEM_DEPLOYMENT_OPERATIONS[operation],
+      channel: channels.response.value,
+      message: `Received invalid desktop System Deployment ${operation} IPC response envelope.`,
+    },
+  );
 }
 import {
   DESKTOP_ASSET_AUTHORING_CREATE_WORKSPACE_AUTHORED_ASSET_OPERATION,

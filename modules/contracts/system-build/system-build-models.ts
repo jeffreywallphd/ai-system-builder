@@ -1,12 +1,36 @@
 import type { AssetReference } from "../asset";
-import type { AssetImplementationDeploymentProfile, AssetImplementationFacet } from "../asset-implementation";
+import type {
+  AssetImplementationDeploymentProfile,
+  AssetImplementationFacet,
+  AssetImplementationTrustLevel,
+} from "../asset-implementation";
 import type { WorkspaceId } from "../workspace";
-import type { SystemBuilderRevisionId, SystemBuilderSystemId } from "../system-builder";
-import type { SystemBuildArtifactId, SystemBuildId, SystemReleaseId } from "./system-build-id";
+import type {
+  SystemBuilderRevisionId,
+  SystemBuilderSystemId,
+} from "../system-builder";
+import type {
+  SystemBuildArtifactId,
+  SystemBuildId,
+  SystemReleaseId,
+} from "./system-build-id";
 
-export type SystemBuildStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
-export type SystemBuildAssurance = "repeatable" | "independently-reproduced" | "not-verified";
-export type SystemBuildArtifactKind = "manifest" | "ui-bundle" | "logic-bundle" | "workflow" | "policy" | "configuration-schema" | "migration-plan" | "sbom" | "provenance" | "evidence" | "log";
+export type SystemBuildStatus =
+  "queued" | "running" | "succeeded" | "failed" | "cancelled";
+export type SystemBuildAssurance =
+  "repeatable" | "independently-reproduced" | "not-verified";
+export type SystemBuildArtifactKind =
+  | "manifest"
+  | "ui-bundle"
+  | "logic-bundle"
+  | "workflow"
+  | "policy"
+  | "configuration-schema"
+  | "migration-plan"
+  | "sbom"
+  | "provenance"
+  | "evidence"
+  | "log";
 export type SystemBuildDigest = `sha256:${string}`;
 
 export interface SystemBuildDiagnostic {
@@ -30,6 +54,7 @@ export interface SystemBuildResolvedImplementation {
   readonly releaseId: string;
   readonly releaseVersion: string;
   readonly packageDigest: string;
+  readonly trustLevel: AssetImplementationTrustLevel;
   readonly facets: readonly AssetImplementationFacet[];
 }
 
@@ -93,13 +118,29 @@ export interface SystemRelease {
 
 export function normalizeSystemBuildDigest(value: string): SystemBuildDigest {
   const normalized = value.trim().toLowerCase();
-  if (!/^sha256:[a-f0-9]{64}$/.test(normalized)) throw new Error("System build digest must be a sha256 digest.");
+  if (!/^sha256:[a-f0-9]{64}$/.test(normalized))
+    throw new Error("System build digest must be a sha256 digest.");
   return normalized as SystemBuildDigest;
 }
 
-export function normalizeSystemBuildArtifactKind(value: string): SystemBuildArtifactKind {
-  const supported: readonly SystemBuildArtifactKind[] = ["manifest", "ui-bundle", "logic-bundle", "workflow", "policy", "configuration-schema", "migration-plan", "sbom", "provenance", "evidence", "log"];
+export function normalizeSystemBuildArtifactKind(
+  value: string,
+): SystemBuildArtifactKind {
+  const supported: readonly SystemBuildArtifactKind[] = [
+    "manifest",
+    "ui-bundle",
+    "logic-bundle",
+    "workflow",
+    "policy",
+    "configuration-schema",
+    "migration-plan",
+    "sbom",
+    "provenance",
+    "evidence",
+    "log",
+  ];
   const normalized = value.trim().toLowerCase() as SystemBuildArtifactKind;
-  if (!supported.includes(normalized)) throw new Error(`System build artifact kind is unsupported: ${value}.`);
+  if (!supported.includes(normalized))
+    throw new Error(`System build artifact kind is unsupported: ${value}.`);
   return normalized;
 }

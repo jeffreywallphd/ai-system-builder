@@ -20,12 +20,18 @@ Run from a clean dependency install using the supported Node LTS line:
 npm run docs:check
 npm run architecture:check
 npm run agent-support:check
+npm run asset-system:check
 npm run deployment:check
 npm test
 npm run build:server
 npm run build:thin-client
 npm run package
 ```
+
+Asset/system profiles and evidence truth rules are defined in
+[Asset and System Support Qualification](asset-system-support-qualification.md).
+Repository gates do not satisfy its controlled recovery, performance, security,
+accessibility, or cross-platform checks by themselves.
 
 CI additionally builds and scans the image, boots the isolated Compose stack,
 smokes both probes, and parses the Kubernetes resources. The equivalent local
@@ -97,6 +103,18 @@ digest, and validate server-side before rollout. The manifest deliberately keeps
 liveness independent of PostgreSQL while readiness includes PostgreSQL and
 artifact storage, so a dependency outage removes traffic without creating a
 restart storm.
+
+Render `deployments/server/kubernetes-runner.example.yaml` separately in an
+isolated qualification namespace. Keep the specimen job suspended; have the
+deployment controller create a fresh immutable job from a reviewed equivalent.
+Verify Restricted Pod Security admission, default-deny ingress and egress,
+namespace and per-container CPU/memory/ephemeral-storage limits, opaque tenant
+labels, secret-reference injection, active deadline, cancellation pre-stop,
+termination grace, and distinct startup/readiness/liveness behavior. Add only
+the DNS and destination-specific egress rules required by an admitted run. The
+template does not select or certify a container/WASI sandbox, and imported or
+authored execution must remain `sandbox-unavailable` until the injected adapter
+has separate escape, isolation, resource, and cancellation qualification.
 
 Until multi-replica tenancy, capacity, and target-platform qualification pass, the
 template enforces one replica with a `Recreate` strategy so a nominal

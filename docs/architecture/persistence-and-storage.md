@@ -46,12 +46,12 @@ It must not be collapsed into persistence-record concerns and should not be flat
 
 Structured records use a deployment-specific database target:
 
-| Deployment shape | Default adapter | Required access boundary |
-| --- | --- | --- |
-| Local desktop/application | SQLite | Embedded and single-host |
-| Campus server | PostgreSQL | Client/server |
-| Corporate server | PostgreSQL | Client/server |
-| Cloud | PostgreSQL | Client/server |
+| Deployment shape          | Default adapter | Required access boundary |
+| ------------------------- | --------------- | ------------------------ |
+| Local desktop/application | SQLite          | Embedded and single-host |
+| Campus server             | PostgreSQL      | Client/server            |
+| Corporate server          | PostgreSQL      | Client/server            |
+| Cloud                     | PostgreSQL      | Client/server            |
 
 `modules/contracts/config` owns the finite deployment-shape vocabulary and the
 default target mapping. It describes deployment intent; it does not by itself
@@ -197,13 +197,11 @@ Persistence family invariants:
 This permits deployment-shaped database adapters without coupling
 application/domain boundaries to SQLite- or PostgreSQL-specific APIs.
 
-
 ### Asset Kernel local record adapter checkpoint
 
 `modules/adapters/persistence/asset` provides the current local Asset Kernel persistence adapter. It stores JSON-compatible `AssetDefinition`, `AssetInstance`, `AssetComposition`, and `AssetBinding` records through the active host's structured-document store. Its compatibility/legacy layout remains `asset-kernel/manifest.json`, `definitions.json`, `instances.json`, `compositions.json`, and `bindings.json`; the manifest uses `schemaVersion: 1` and `storeKind: "asset-kernel-local-store"`. The adapter implements application repository ports and remains infrastructure-only: it does not own Asset Kernel validation, business rules, host composition, API/IPC/UI exposure, resource-backed mapping helpers, artifact/object storage, workflow execution, graph execution, runtime readiness, prompt assembly, embeddings, or AI-generated context.
 
 The local adapter persists records and references only. It must not embed raw file/blob bytes, generated model/image/dataset payload bytes, secrets, environment values, local filesystem handles, or adapter-native paths in asset records or public errors. Durable resource-backed asset mapping persistence and explicit persistence-to-storage linkage remain deferred beyond this checkpoint.
-
 
 ### Workspace local persistence checkpoint
 
@@ -219,6 +217,14 @@ Examples:
 - references, relationships, and lifecycle metadata,
 - job/task state records,
 - audit metadata designed for structured querying.
+
+System deployment uses database-neutral structured namespaces scoped by
+organization and workspace for deployments, runs, and bounded audit entries.
+Optimistic revisions protect lifecycle transitions. These mutable operational
+records reference immutable `SystemRelease` identities and digests; they do not
+embed release artifacts, secrets, host paths, provider payloads, or runner
+output. SQLite and PostgreSQL therefore share semantics while physical release
+artifacts remain behind the system-build artifact storage port.
 
 These concerns belong behind persistence ports/contracts and adapters (for example in `modules/adapters/persistence/`).
 
@@ -295,7 +301,6 @@ Storage family invariants:
 
 This keeps storage responsibilities explicit and separate from persistence-record modeling.
 
-
 ## Asset Kernel local persistence and resource-backed mapping boundary
 
 - Asset Kernel contract baseline local Asset Kernel persistence is record storage for definitions, instances, compositions, and bindings only. Its text filtering is simple deterministic substring matching over selected saved record values.
@@ -328,7 +333,6 @@ Repo-backed providers are a valid storage class under the storage adapter catego
 - Upload path support can vary by provider/repo configuration; behavior should be treated as adapter-level and validated per deployment environment.
 - Provider-native repository browsing/viewing semantics may exist, but they do not define internal system artifact-browser contracts.
 
-
 ## Ingestion and staged artifact semantic layer
 
 The repository now treats ingestion/staged-artifact as the canonical semantic layer for inbound content.
@@ -354,7 +358,7 @@ The first read-side browser/viewer slice is image-backed but artifact-shaped.
 - `artifact.read` is a single-artifact detail/read-model concern for selected artifact metadata from the same catalog seam.
 - `artifact.content.read` is a descriptor-oriented artifact-content contract and must not be collapsed into browse/detail contracts or byte payload contracts.
 - actual image/media bytes for rendering should be delivered through a separate retrieval path that still resolves by storage key at the boundary.
-- Preview rendering is a bounded read-side concern over that separate retrieval path: text-like previews should sample only a first-page-sized portion, image previews should prefer compressed/downscaled object URLs, video/PDF previews should stay visually constrained, and Office document/spreadsheet previews should remain placeholder-only until a safe parser is introduced.
+- Preview rendering is a bounded read-side concern over that separate retrieval path. The retrieval request may carry an application-owned maximum-byte ceiling, and object adapters must reject content above it before byte materialization; filesystem adapters stat before `readFile`. Text/JSON/CSV previews are sampled and bounded, raster images use an allowlist, SVG and Office content remain unsupported, and PDF object URLs render only in titled sandboxed frames. Full downloads remain a separate explicit operation.
 - Canonical browse/read/content contracts should remain descriptor/reference-oriented at public boundaries (locator + metadata + availability/retrieval hints), not raw-byte-first payload contracts.
 - Browser contracts stay storage-key based and path-agnostic; public browse/view contracts must not expose filesystem paths.
 - Browser list/read models may include artifact/backing-state metadata (for example remote-only/localized/published cues) while preserving artifact-first semantics and path-agnostic contracts.
@@ -384,7 +388,6 @@ Contract-family tests should protect this boundary model directly:
 - application persistence-port seam invariants in `modules/application/ports/persistence/tests/` (thin operation-aware record requests/results and no storage-key drift).
 
 If these invariants change, update canonical docs and context packs in the same change.
-
 
 ### Current server-exposed artifact-repo operations
 
@@ -420,7 +423,6 @@ The Hugging Face adapter remains one provider behind the generic artifact-repo p
   - internal artifact id is system-owned for new repo registrations/imports,
   - provider/repository/path/revision identify backing/source relationships.
 
-
 ### Repo-backing authority update (April 2026)
 
 - New publish and register-from-repo writes must populate structured `backing.target` fields (`provider`, `repository`, `path`, `revision`) on `ArtifactStorageBinding`.
@@ -429,7 +431,6 @@ The Hugging Face adapter remains one provider behind the generic artifact-repo p
 - Imported artifacts can now be explicitly localized/downloaded through shared orchestration (`artifact.localize.from-repo`) while keeping artifact browser as the primary surface.
 - Imported-source verification is exposed as a separate shared operation (`artifact.source.verify`) so source backing status can be refreshed distinctly from published backing status.
 
-
 ## Hugging Face token persistence
 
 - Hugging Face token configuration is stored as host-side config, not browser-only state.
@@ -437,13 +438,11 @@ The Hugging Face adapter remains one provider behind the generic artifact-repo p
 - Desktop path persists token under desktop AppData artifact config directory and surfaces masked status to renderer via preload/IPC.
 - Hugging Face artifact-repo storage adapter resolves token dynamically from this config seam for publish/register/localize/verify workflows.
 
-
-
 ## Asset Kernel local record persistence
 
 Local Asset Kernel persistence is structured record persistence, not artifact/blob storage. `composeLocalAssetKernel` receives the host-selected document store; its root-relative Asset Kernel identities also define the explicit legacy JSON import layout. The helper returns path-safe diagnostics (`storeKind`, `schemaVersion`, and initialized state) rather than local filesystem paths, and it does not store artifact/resource bytes, generated image/model/dataset payloads, secrets, tokens, runtime installs, or provider-native file handles.
 
-Desktop and server host registration initialize this store for internal host composition under `storageRootDirectory` only; runtime roots must not be used for Asset Kernel records or resource-backed provider reads. Built-in definition seeding and trusted system-pack installation are explicit internal application services. They validate before save, persist normal Asset Kernel definitions with safe seed/pack/source metadata, are idempotent, and fail user/custom conflicts without overwrite. They do not write files directly, import persistence adapters, create migrations, create durable active-pack records, apply override/resolver behavior, expose public install/import/export surfaces, or run automatically during host startup.
+Desktop and server host registration initialize this store for internal host composition under `storageRootDirectory` only; runtime roots must not be used for Asset Kernel records or resource-backed provider reads. Built-in definition seeding and trusted system-pack installation are explicit internal application services. Host startup invokes and awaits the installer with the guarded system-definition refresh option so product-owned immutable entries can advance with the compiled manifest while user/custom conflicts still fail without overwrite; failure to establish the foundation fails host feature composition closed. Managed hosts keep global immutable definitions on the deployment store while organization-owned instances, compositions, workspaces, implementation records, and related operations retain the request-context store. Trusted implementation seeding runs inside that active organization context, validates exact immutable release/binding fields, and skips compatible existing records. These services do not write files directly, import persistence adapters, create migrations, create durable active-pack records, apply override/resolver behavior, or expose public install/import/export surfaces.
 
 The registry read facade is an application-layer service only. It reads through repository ports and an optional computed resource-backed view provider, treats `system.foundation` records as system defaults only when trusted source metadata or an installer-managed marker proves that ownership, never scans storage, never executes seeding, and validates only when explicitly requested. Shared host-level `composeInternalAssetRegistry` wiring composes the local store, read facade, and safe resource-backed provider aggregate for private consumers while retaining path-safe diagnostics and no automatic seeding.
 
@@ -493,12 +492,11 @@ Workspace-owned resources require explicit workspace ids and must not fall back 
 
 workspace foundations final cleanup hardens resource reads at the storage boundary: artifact byte retrieval must first validate the workspace-owned catalog record and must not fetch bytes after missing, invalid, wrong-workspace, or unavailable catalog ownership checks. Missing catalog files represent an empty catalog, but non-`ENOENT` catalog read failures are operational failures and must not be hidden as empty lists. Storage/catalog/generated-image errors crossing application, API, IPC, preload, renderer, or thin-client boundaries must use fixed sanitized messages plus safe operation/error-code details only. Generated image persistence must validate/brand workspace ids before constructing `workspaces/<workspaceId>/generated/images/...` keys. Normal model UI/API read models omit raw `localPath`, `validationReportPath`, and equivalent filesystem diagnostics; upload clients require an active workspace id before sending API/IPC requests.
 
-
 ## Workspace persistence boundary
 
 workspace foundations is Workspace Foundations. Workspace-owned persistence and storage reads/mutations must receive an explicit workspace id from contracts, clients, transports, use cases, ports, providers, and adapters; UI gating alone is not sufficient. Missing workspace context must fail safely or return sanitized diagnostics rather than falling back to global records.
 
-`system.foundation@1.0.0` remains system-owned and is activated by workspace reference only. Persistence must not copy definitions into workspace storage, call the system foundation pack baseline installer, seed on startup, create hidden/default workspaces, or auto-migrate legacy global resources. Until deeper per-workspace Asset Kernel storage exists, adapters may use safe metadata/source ownership filtering for workspace-scoped duplicate/read paths, but must not expose raw paths, storage roots, task payloads, prompts, workflow JSON, or unsafe provider data in diagnostics.
+`system.foundation@1.0.0` remains system-owned and is activated by workspace reference only. Workspace activation persistence must not copy definitions into workspace storage, call the system foundation pack baseline installer, create workspace-scoped startup seeds, create hidden/default workspaces, or auto-migrate legacy global resources. This does not prevent the host-owned global foundation installer described above. Until deeper per-workspace Asset Kernel storage exists, adapters may use safe metadata/source ownership filtering for workspace-scoped duplicate/read paths, but must not expose raw paths, storage roots, task payloads, prompts, workflow JSON, or unsafe provider data in diagnostics.
 
 ## Approved-release system-data persistence
 

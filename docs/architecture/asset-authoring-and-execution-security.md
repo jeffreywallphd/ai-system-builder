@@ -94,6 +94,23 @@ create/update and their append-only audit entry share one database transaction.
 Audit entries contain actor, release/entity/action/outcome, record identity, and
 changed field names only; they never contain field values, prompts, credentials,
 provider payloads, or raw errors.
+
+## Approved-release artifact review
+
+The secured data-review runtime applies the same release-bound rule to artifact
+access. It accepts only host-derived authenticated principals and opaque
+artifact references, validates workspace ownership before storage access, and
+allows system policy to narrow but never widen platform roles. Browse/detail
+results mask configured metadata and never expose paths, storage keys, provider
+payloads, credentials, or parser diagnostics.
+
+Preview policy uses conservative media allowlists plus bounded signature checks.
+The application supplies a maximum-byte ceiling that storage enforces before
+reading. JSON/CSV parsing is sample-bounded and inert, formula-like cells are
+neutralized for display, HTML is never rendered as markup, raster images are
+allowlisted, SVG and Office formats are unsupported, and PDF frames are titled
+and sandboxed. Allow and denial audit events are bounded and redacted.
+
 ## Fail-closed requirements
 
 - Missing sandbox runtime: authored/imported build or execution is unavailable.
@@ -102,6 +119,22 @@ provider payloads, or raw errors.
 - Stale approval after source/dependency/capability change: invalidated.
 - Timeout, quota breach, malformed broker message, cleanup failure, or revoked release: terminate and audit.
 - Sandbox diagnostics are bounded and redacted before persistence or transport.
+
+## Deployment capability boundary
+
+Approved releases cross into operational state only through the
+`system-deployment` application boundary. The host supplies deployment profile,
+host/runtime version, available capabilities, and sandbox qualification; API
+and IPC callers cannot override them. Application policy computes a narrowing
+intersection for capabilities, opaque secret references, HTTPS egress origins,
+duration, memory, output, and concurrency before any adapter call.
+
+Only product-compiled mappings for secured data entry, controlled chatbot, and
+secured data review are enabled by the default desktop/server adapter. Unknown,
+imported, authored, sandbox-required, thin-client-owned, incompatible, revoked,
+or not-ready execution fails closed. Kubernetes Restricted security context,
+NetworkPolicy, quota, and immutable image settings are necessary operator
+controls but do not qualify a sandbox or authorize executable assets.
 
 ## Research basis
 

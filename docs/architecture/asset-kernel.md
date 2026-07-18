@@ -276,7 +276,7 @@ Foundation definitions remain semantic and host-neutral. Functional behavior is 
 
 Pack validation, quality gates, install diagnostics, resolver diagnostics, manifest serialization, and parsing must stay sanitized. Unsafe paths, credentials, signed URLs, raw provider payloads, stack traces, command lines, environment values, bytes/blob/base64/data URLs, prompt text, workflow JSON, and raw resource contents must be rejected or omitted.
 
-Install/seeding for `system.foundation` is explicit, internal, idempotent, and non-destructive. Host startup must not install or seed packs automatically.
+Install/seeding for `system.foundation` is explicit, internal, idempotent, and non-destructive. Shared composition helpers and workspace creation must not invoke it implicitly. The owning desktop/server asset-feature startup explicitly invokes and awaits the guarded global foundation installer before serving asset reads; startup fails closed if that product-owned baseline cannot be established. This is not workspace-scoped seeding, hidden workspace creation, or a public install/import path.
 
 The resolver is pure and non-destructive. It accepts explicit candidate definitions, manifests, source-layer ordering, and override rules supplied by the caller. Exact references bypass overrides by default. Semantic/default references may apply explicit enabled override rules only when the request allows overrides. Override rules select effective replacements during resolution and never mutate system records.
 

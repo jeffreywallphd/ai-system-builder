@@ -12,6 +12,7 @@ export interface ComposeInternalAssetRegistryOptions {
   readonly rootDirectory: string;
   readonly now?: () => string;
   readonly documents?: StructuredDocumentStore;
+  readonly definitionDocuments?: StructuredDocumentStore;
   readonly resourceBackedViewProvider?: AssetResourceBackedViewProvider;
   readonly resourceBackedViewProviders?: readonly AssetResourceBackedViewProvider[];
 }
@@ -41,7 +42,12 @@ export interface InternalAssetRegistryComposition {
 }
 
 export function composeInternalAssetRegistry(options: ComposeInternalAssetRegistryOptions): InternalAssetRegistryComposition {
-  const assetKernel = composeLocalAssetKernel({ rootDirectory: options.rootDirectory, now: options.now, documents: options.documents });
+  const assetKernel = composeLocalAssetKernel({
+    rootDirectory: options.rootDirectory,
+    now: options.now,
+    documents: options.documents,
+    definitionDocuments: options.definitionDocuments,
+  });
   const resourceBackedViewProvider = composeResourceBackedViewProvider(options);
   const workspaceRepository = createLocalWorkspaceRepository({ rootDirectory: options.rootDirectory, documents: options.documents });
   const workspaceSelectionRepository = createLocalWorkspaceSelectionRepository({ rootDirectory: options.rootDirectory, documents: options.documents });

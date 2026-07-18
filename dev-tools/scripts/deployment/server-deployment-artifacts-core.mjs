@@ -35,8 +35,14 @@ const checks = {
     [/read_only: true/, "Compose application root filesystem is writable"],
     [/no-new-privileges:true/, "Compose does not prevent privilege escalation"],
     [/cap_drop:\s*\n\s*- ALL/, "Compose does not drop Linux capabilities"],
-    [/AI_SYSTEM_BUILDER_SECURITY_MODE: oidc-bearer/, "Compose does not use managed OIDC"],
-    [/AI_SYSTEM_BUILDER_TENANT_PLACEMENT_MODE: pooled/, "Compose does not qualify the default pooled placement"],
+    [
+      /AI_SYSTEM_BUILDER_SECURITY_MODE: oidc-bearer/,
+      "Compose does not use managed OIDC",
+    ],
+    [
+      /AI_SYSTEM_BUILDER_TENANT_PLACEMENT_MODE: pooled/,
+      "Compose does not qualify the default pooled placement",
+    ],
     [
       /tmpfs:\s*\n\s*- \/tmp:/,
       "Compose does not provide bounded temporary storage",
@@ -93,7 +99,75 @@ const checks = {
       "Kubernetes image is not expressed as an immutable digest",
     ],
     [/value: oidc-bearer/, "Kubernetes template does not use managed OIDC"],
-    [/value: pooled/, "Kubernetes template does not declare pooled default placement"],
+    [
+      /value: pooled/,
+      "Kubernetes template does not declare pooled default placement",
+    ],
+  ],
+  runner: [
+    [
+      /pod-security\.kubernetes\.io\/enforce: restricted/,
+      "runner namespace does not enforce the Restricted Pod Security standard",
+    ],
+    [/kind: ResourceQuota/, "runner namespace has no aggregate resource quota"],
+    [
+      /kind: LimitRange/,
+      "runner namespace has no per-container resource defaults and ceilings",
+    ],
+    [
+      /kind: NetworkPolicy[\s\S]*podSelector: \{\}[\s\S]*- Egress/,
+      "runner namespace is not default-deny for network egress",
+    ],
+    [/suspend: true/, "runner specimen is not safely suspended"],
+    [/backoffLimit: 0/, "runner jobs may retry execution implicitly"],
+    [
+      /activeDeadlineSeconds: 300/,
+      "runner jobs have no bounded execution deadline",
+    ],
+    [
+      /automountServiceAccountToken: false/,
+      "runner mounts an unused service-account token",
+    ],
+    [/runAsNonRoot: true/, "runner does not require a non-root identity"],
+    [
+      /seccompProfile:\s*\n\s*type: RuntimeDefault/,
+      "runner does not use runtime-default seccomp",
+    ],
+    [/allowPrivilegeEscalation: false/, "runner permits privilege escalation"],
+    [/readOnlyRootFilesystem: true/, "runner root filesystem is writable"],
+    [
+      /capabilities:\s*\n\s*drop:\s*\n\s*- ALL/,
+      "runner does not drop all Linux capabilities",
+    ],
+    [
+      /startupProbe:[\s\S]*path: \/health\/startup/,
+      "runner startup probe is missing",
+    ],
+    [
+      /readinessProbe:[\s\S]*path: \/health\/ready/,
+      "runner readiness probe is missing",
+    ],
+    [
+      /livenessProbe:[\s\S]*path: \/health\/live/,
+      "runner liveness probe is missing",
+    ],
+    [
+      /preStop:[\s\S]*path: \/control\/cancel/,
+      "runner has no graceful cancellation hook",
+    ],
+    [/ephemeral-storage: 128Mi/, "runner temporary-storage limit is missing"],
+    [
+      /image: [^\s]+@sha256:/,
+      "runner image is not expressed as an immutable digest",
+    ],
+    [
+      /secretKeyRef:/,
+      "runner does not inject opaque secret references through the platform boundary",
+    ],
+    [
+      /tenant\.ai-system-builder\.io\/scope:/,
+      "runner workload has no opaque tenant scope label",
+    ],
   ],
   workflow: [
     [
@@ -137,6 +211,11 @@ export function inspectServerDeploymentArtifacts(sources) {
   if (/\bhostPath:/.test(sources.kubernetes)) {
     violations.push(
       "kubernetes: hostPath storage is not allowed in the managed template",
+    );
+  }
+  if (/\bhostPath:/.test(sources.runner)) {
+    violations.push(
+      "runner: hostPath storage is not allowed in the managed runner template",
     );
   }
   return violations;
