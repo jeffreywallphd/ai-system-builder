@@ -169,6 +169,21 @@ const checks = {
       "runner workload has no opaque tenant scope label",
     ],
   ],
+  kustomization: [
+    [
+      /apiVersion: kustomize\.config\.k8s\.io\/v1beta1/,
+      "Kustomize composition has no supported API version",
+    ],
+    [/kind: Kustomization/, "Kustomize composition has no resource kind"],
+    [
+      /- kubernetes-deployment\.example\.yaml/,
+      "Kustomize composition omits the managed deployment template",
+    ],
+    [
+      /- kubernetes-runner\.example\.yaml/,
+      "Kustomize composition omits the managed runner template",
+    ],
+  ],
   workflow: [
     [
       /deployment-artifacts:/,
@@ -179,8 +194,8 @@ const checks = {
       "CI does not wait for the Compose application to become healthy",
     ],
     [
-      /kubectl create --dry-run=client/,
-      "CI does not parse the Kubernetes resources",
+      /kubectl kustomize deployments\/server/,
+      "CI does not render the Kubernetes resources offline",
     ],
     [
       /anchore\/scan-action@[a-f0-9]{40}/,

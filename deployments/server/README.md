@@ -31,6 +31,9 @@ replaceable runtime installations and caches.
   resources. A host controller must create one immutable job per admitted run;
   operators must not unsuspend the placeholder or interpret these controls as
   qualification for imported or authored execution.
+- `kustomization.yaml` composes both reviewed Kubernetes templates for offline
+  `kubectl kustomize` parsing in CI. It is an inspection and rendering target,
+  not an automatic production deployment.
 - `config/environments/server/*.env.example` are shape-specific environment
   profiles. They intentionally omit secret values.
 

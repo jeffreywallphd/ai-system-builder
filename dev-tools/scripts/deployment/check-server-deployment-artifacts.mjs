@@ -10,6 +10,7 @@ const files = {
   compose: "deployments/server/compose.qualification.yaml",
   kubernetes: "deployments/server/kubernetes-deployment.example.yaml",
   runner: "deployments/server/kubernetes-runner.example.yaml",
+  kustomization: "deployments/server/kustomization.yaml",
   workflow: ".github/workflows/ci.yml",
 };
 

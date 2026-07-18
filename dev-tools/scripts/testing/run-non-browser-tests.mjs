@@ -16,6 +16,7 @@ import {
   applyIgnoredFailureAdjustments,
   applyDiagnosticSummaryMetric,
   buildNonBrowserNodeTestRunOptions,
+  formatNonBrowserFailureSummary,
   isIgnorableRunnerSpawnFailure,
 } from "./non-browser-test-runner-core.mjs";
 import { assertNoSourceTreeJavaScriptArtifacts } from "./source-tree-contamination-guard.mjs";
@@ -467,10 +468,12 @@ try {
     throw new Error("No non-browser test files were discovered.");
   }
 
-  const testsStream = run(buildNonBrowserNodeTestRunOptions({
-    files: discoveredRuntimeTestFiles,
-    cwd: repoRoot,
-  }));
+  const testsStream = run(
+    buildNonBrowserNodeTestRunOptions({
+      files: discoveredRuntimeTestFiles,
+      cwd: repoRoot,
+    }),
+  );
 
   for await (const streamEvent of testsStream) {
     const eventType = streamEvent?.type;
@@ -538,6 +541,10 @@ try {
   }
 } finally {
   writeReport();
+  const failureSummary = formatNonBrowserFailureSummary(report);
+  if (failureSummary.length > 0) {
+    console.error(failureSummary);
+  }
   console.log(
     "Review test report for failure details: artifacts/test-reports/non-browser-test-report.json",
   );

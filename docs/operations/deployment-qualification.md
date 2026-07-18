@@ -34,8 +34,8 @@ Repository gates do not satisfy its controlled recovery, performance, security,
 accessibility, or cross-platform checks by themselves.
 
 CI additionally builds and scans the image, boots the isolated Compose stack,
-smokes both probes, and parses the Kubernetes resources. The equivalent local
-container gate is:
+smokes both probes, and renders the checked-in Kubernetes Kustomize composition
+without contacting a cluster. The equivalent local container gate is:
 
 ```text
 POSTGRES_PASSWORD=<qualification-only> \
@@ -96,6 +96,11 @@ The profile intentionally uses unencrypted PostgreSQL only inside its private
 network; this does not qualify a production TLS connection.
 
 ## Kubernetes or managed platform qualification
+
+Repository CI runs `kubectl kustomize deployments/server` to parse and compose
+both reviewed example manifests without API discovery. This local render proves
+YAML and KRM composition only; it does not replace server-side validation
+against the target cluster version and admission policy.
 
 Render `deployments/server/kubernetes-deployment.example.yaml` through the owning
 platform's configuration system, replace the image placeholder with an immutable
