@@ -14,8 +14,16 @@ describe("artifact browser TypeScript regression guards", () => {
     );
 
     expect(source).toContain("useState<string | undefined>(undefined)");
-    expect(source).toContain("useState<DesktopArtifactDetail | undefined>(undefined)");
-    expect(source).toContain("useState<DesktopArtifactContentDescriptor | undefined>(undefined)");
+    expect(source).toMatchObject(
+      expect.stringMatching(
+        /useState<\s*DesktopArtifactDetail\s*\|\s*undefined\s*>\(\s*undefined\s*,?\s*\)/,
+      ),
+    );
+    expect(source).toMatchObject(
+      expect.stringMatching(
+        /useState<\s*DesktopArtifactContentDescriptor\s*\|\s*undefined\s*>\(\s*undefined\s*,?\s*\)/,
+      ),
+    );
     expect(source).toContain("useRef<string | undefined>(undefined)");
   });
 

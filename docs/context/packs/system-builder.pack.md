@@ -57,11 +57,27 @@
   and uses the shared `ConversationRunTest` presenter with real execution-plan
   identity. Protected instructions stay behind application boundaries; release
   approval is not runtime activation.
+- The closed secured data-review template composes reusable browser, masking,
+  policy, audit, and preview assets. Its `system-review` runtime resolves policy
+  only from a verified approved release, uses opaque artifact references,
+  bounds storage reads before byte materialization, masks metadata, and records
+  redacted audit. Desktop and thin client use the shared
+  `SystemReviewRunTest` presenter; release approval is still not deployment.
+- The separate `system-deployment` family now owns organization/workspace-scoped
+  install, activation, readiness, rollback, revocation, bounded run history,
+  and redacted audit. Desktop maps only the three closed references to the local
+  trusted adapter; managed server maps campus/corporate and cloud profiles.
+  Thin client is control/read only, and imported/authored execution remains
+  `sandbox-unavailable` without an independently qualified adapter.
+- `dev-tools/config/asset-system-qualification.json` owns the versioned
+  compatibility, deprecation, performance, admission, and profile evidence
+  matrix. Deployment re-reads frozen implementation revocations before every
+  privileged lifecycle transition; missing controlled/manual evidence keeps a
+  profile incomplete.
 - Operational diagnostics remain in
   `apps/desktop/src/renderer/features/settings/components/SoftwareStatusSection.tsx`.
-- Deployment activation and approved-release execution are not implied by the
-  design-time editor or a successful build; those remain later increment
-  boundaries.
+- Deployment is never implied by the design-time editor or a successful build;
+  it requires an explicit compatible install and readiness-verified activation.
 
 ## Canonical Source Docs
 
@@ -73,6 +89,7 @@
 - `docs/architecture/asset-composition-planning.md`
 - `docs/architecture/workspace-model.md`
 - `docs/architecture/module-dependency-rules.md`
+- `docs/operations/asset-system-support-qualification.md`
 
 ## Anti-Drift Rules
 

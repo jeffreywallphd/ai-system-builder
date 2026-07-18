@@ -52,6 +52,18 @@ producing a false pass.
 - Dependabot proposes npm, GitHub Actions, and server Docker input updates for
   review; it does not merge or deploy them automatically.
 
+## Asset implementation vulnerability response
+
+Imported asset packages and their implementation releases are separate from the
+product npm dependency tree, but use the same fail-closed principles. Correlate
+an advisory to exact package, SBOM, provenance, implementation-release, system
+lock, and deployment digests. Stop admission and revoke affected immutable
+releases; never rewrite a release, trust a mutable tag, auto-upgrade an admitted
+package, or treat provenance as proof of safety. Deployment operations re-read
+revocation truth and deny when that truth is unavailable. The controlled
+response and evidence procedure is
+[Asset and System Support Qualification](../operations/asset-system-support-qualification.md).
+
 ## Review checklist
 
 - Does the lockfile match every workspace manifest?

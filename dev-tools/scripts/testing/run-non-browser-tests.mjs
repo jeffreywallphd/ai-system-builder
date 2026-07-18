@@ -43,6 +43,7 @@ const discoveryRoots = [
   "dev-tools/scripts/architecture",
   "dev-tools/scripts/docs",
   "dev-tools/scripts/deployment",
+  "dev-tools/scripts/qualification",
   "dev-tools/scripts/server",
   "dev-tools/scripts/security",
   "dev-tools/scripts/thin-client",

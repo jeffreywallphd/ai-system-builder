@@ -52,6 +52,8 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Check architecture dependencies
         run: npm run architecture:check
+      - name: Check asset and system qualification policy
+        run: npm run asset-system:check
       - name: Run tests
         run: npm test
 
@@ -159,7 +161,7 @@ jobs:
       - name: Retain image configuration evidence
         run: docker image inspect ai-system-builder:qualification --format '{{json .Config}}' > artifacts/qualification/deployment/image-config.json
       - name: Validate Kubernetes resource syntax
-        run: kubectl create --dry-run=client --validate=false -f deployments/server/kubernetes-deployment.example.yaml -o yaml > artifacts/qualification/deployment/kubernetes-rendered.yaml
+        run: kubectl create --dry-run=client --validate=false -f deployments/server/kubernetes-deployment.example.yaml -f deployments/server/kubernetes-runner.example.yaml -o yaml > artifacts/qualification/deployment/kubernetes-rendered.yaml
       - name: Scan image for fixed critical vulnerabilities
         uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
         with:

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "../../../../testing/node-test";
-import { createPackageEntry as entry, createPackageFixture, encodePackage as encode } from "../../../../testing/fixtures/asset-package-fixture";
+import {
+  createPackageEntry as entry,
+  createPackageFixture,
+  encodePackage as encode,
+} from "../../../../testing/fixtures/asset-package-fixture";
 import { createWorkspaceId } from "../../../../contracts/workspace";
 import { createAisbPackageInspector } from "../createAisbPackageInspector";
 
@@ -22,7 +26,10 @@ describe(".aisb-package bounded inspector", () => {
   });
 
   it("fails closed for traversal, device paths, duplicates, oversize content, and digest tampering", async () => {
-    const inspector = createAisbPackageInspector({ maxEntryBytes: 32, maxExpandedBytes: 64 });
+    const inspector = createAisbPackageInspector({
+      maxEntryBytes: 32,
+      maxExpandedBytes: 64,
+    });
     const fixture = await createPackageFixture(inspector);
     const base = fixture.container;
     const maliciousEntries = [
@@ -30,7 +37,10 @@ describe(".aisb-package bounded inspector", () => {
       entry("CON.txt", "text/plain", "x"),
       entry("safe/duplicate.js", "application/javascript", "x"),
       entry("SAFE/DUPLICATE.js", "application/javascript", "x"),
-      { ...entry("safe/tampered.js", "application/javascript", "x"), digest: `sha256:${"0".repeat(64)}` as const },
+      {
+        ...entry("safe/tampered.js", "application/javascript", "x"),
+        digest: `sha256:${"0".repeat(64)}` as const,
+      },
       entry("safe/large.txt", "text/plain", "x".repeat(80)),
     ];
     const result = await inspector.inspect({
@@ -45,5 +55,45 @@ describe(".aisb-package bounded inspector", () => {
     expect(codes).toContain("package.entry.path-duplicate");
     expect(codes).toContain("package.entry.size-exceeded");
     expect(codes).toContain("package.entry.digest-mismatch");
+  });
+
+  it("bounds untrusted declaration arrays before admission", async () => {
+    const inspector = createAisbPackageInspector();
+    const fixture = await createPackageFixture(inspector);
+    const result = await inspector.inspect({
+      inspectionId: "inspection-declarations",
+      workspaceId: createWorkspaceId("workspace-a"),
+      bytes: encode({
+        ...fixture.container,
+        manifest: {
+          ...fixture.container.manifest,
+          requestedCapabilities: Array.from(
+            { length: 65 },
+            (_value, index) => `capability.${index}`,
+          ),
+          dependencies: Array.from({ length: 257 }, (_value, index) => ({
+            packageId: `dependency.${index}`,
+            versionRange: "*",
+            required: true,
+          })),
+          implementations: [
+            {
+              ...fixture.container.manifest.implementations[0],
+              facets: Array.from(
+                { length: 17 },
+                () => fixture.container.manifest.implementations[0].facets[0],
+              ),
+            },
+          ],
+        },
+      }),
+      inspectedAt: "2026-07-17T12:00:00.000Z",
+    });
+
+    expect(result.summary.eligibleForAdmission).toBe(false);
+    const codes = result.summary.issues.map((value) => value.code);
+    expect(codes).toContain("package.capability.invalid");
+    expect(codes).toContain("package.dependency-count.exceeded");
+    expect(codes).toContain("package.implementation.facet-count-exceeded");
   });
 });

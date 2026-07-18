@@ -36,6 +36,7 @@ export interface ComposeLocalAssetKernelOptions {
   readonly rootDirectory: string;
   readonly now?: () => string;
   readonly documents?: StructuredDocumentStore;
+  readonly definitionDocuments?: StructuredDocumentStore;
 }
 
 export interface LocalAssetKernelComposition {
@@ -73,7 +74,10 @@ export function composeLocalAssetKernel(options: ComposeLocalAssetKernelOptions)
   const storeOptions = { rootDir: options.rootDirectory, now: options.now, documents: options.documents };
   new LocalAssetRecordStore(storeOptions).initializeSync();
 
-  const definitionRepository = createLocalAssetDefinitionRepositoryAdapter(storeOptions);
+  const definitionRepository = createLocalAssetDefinitionRepositoryAdapter({
+    ...storeOptions,
+    documents: options.definitionDocuments ?? options.documents,
+  });
   const instanceRepository = createLocalAssetInstanceRepositoryAdapter(storeOptions);
   const compositionRepository = createLocalAssetCompositionRepositoryAdapter(storeOptions);
   const bindingRepository = createLocalAssetBindingRepositoryAdapter(storeOptions);

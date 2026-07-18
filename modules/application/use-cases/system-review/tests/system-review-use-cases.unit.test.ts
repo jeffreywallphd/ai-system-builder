@@ -51,7 +51,7 @@ function createRuntime(
   const item = {
     artifactId: storageKey,
     storageKey,
-    artifactFamily: "data" as const,
+    artifactFamily: "structured-text" as const,
     mediaType: "application/json",
     sizeBytes: options.sizeBytes ?? 24,
     originalName: "folder/data.json",
@@ -67,7 +67,7 @@ function createRuntime(
       },
     },
     artifacts: {
-      async browseArtifacts(_request, context) {
+      async browseArtifacts(_request: any, context: any) {
         return context?.workspaceId === workspaceId
           ? { ok: true as const, value: { items: [item] } }
           : {
@@ -75,7 +75,7 @@ function createRuntime(
               error: { code: "not-found" as const, message: "not found" },
             };
       },
-      async readArtifactDetail(_request, context) {
+      async readArtifactDetail(_request: any, context: any) {
         return context?.workspaceId === workspaceId
           ? {
               ok: true as const,
@@ -105,7 +105,7 @@ function createRuntime(
               error: { code: "not-found" as const, message: "not found" },
             };
       },
-    },
+    } as any,
     content: {
       async retrieveArtifactViewerMediaByStorageKey(request, context) {
         contentCalls.push({ request, context });
@@ -156,7 +156,7 @@ describe("release-bound system-review use cases", () => {
     expect(browse.value.items[0]).toEqual({
       artifactRef,
       displayName: "data.json",
-      artifactFamily: "data",
+      artifactFamily: "structured-text",
       mediaType: "application/json",
       sizeBytes: 24,
       createdAt: "2026-07-17T00:00:00.000Z",

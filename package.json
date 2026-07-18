@@ -28,6 +28,8 @@
     "agent-support:check": "node --preserve-symlinks --preserve-symlinks-main dev-tools/scripts/agent-support/check-agent-support.mjs",
     "security:dependencies": "node dev-tools/scripts/security/check-dependency-security.mjs",
     "deployment:check": "node --preserve-symlinks --preserve-symlinks-main dev-tools/scripts/deployment/check-server-deployment-artifacts.mjs",
+    "asset-system:check": "node dev-tools/scripts/qualification/check-asset-system-qualification.mjs",
+    "asset-system:performance": "node dev-tools/scripts/qualification/run-asset-system-performance-qualification.mjs",
     "deployment:smoke": "node --preserve-symlinks --preserve-symlinks-main dev-tools/scripts/deployment/smoke-managed-server.mjs",
     "dev:thin-client": "npm run dev -w @ai-system-builder/thin-client",
     "dev:secure-thin-client": "node --preserve-symlinks --preserve-symlinks-main dev-tools/scripts/thin-client/dev-secure-thin-client.mjs",

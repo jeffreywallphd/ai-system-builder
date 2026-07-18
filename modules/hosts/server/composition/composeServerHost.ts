@@ -171,6 +171,13 @@ import { composeAssetStudioWorkflow } from "../../shared/composition/composeAsse
 import { composeSystemBuilder } from "../../shared/composition/composeSystemBuilder";
 import { composeSystemBuild } from "../../shared/composition/composeSystemBuild";
 import { composeSystemData } from "../../shared/composition/composeSystemData";
+import { composeSystemReview } from "../../shared/composition/composeSystemReview";
+import {
+  composeSystemDeployment,
+  createDefaultSystemDeploymentPolicy,
+} from "../../shared/composition/composeSystemDeployment";
+import { createTrustedSystemDeploymentRuntimeAdapter } from "../../../adapters/runtime/system-deployment";
+import type { AssetImplementationDeploymentProfile } from "../../../contracts/asset-implementation";
 
 const PYTHON_RUNTIME_WORKER_RELATIVE_PATH = join(
   "modules",
@@ -285,6 +292,14 @@ export interface ComposeServerHostOptions {
   settings?: {
     localSettingsFilePath?: string;
   };
+}
+
+export function resolveServerSystemDeploymentProfile(
+  env: NodeJS.ProcessEnv = process.env,
+): AssetImplementationDeploymentProfile {
+  return env.DEPLOYMENT_SHAPE?.trim().toLowerCase() === "cloud"
+    ? "cloud-server"
+    : "campus-server";
 }
 
 export interface RegisterServerApiOptions {
@@ -490,6 +505,7 @@ export interface ServerHostComposition {
   setHuggingFaceToken: (token: string) => HuggingFaceTokenStatus;
   clearHuggingFaceToken: () => HuggingFaceTokenStatus;
   registerApi: (options: RegisterServerApiOptions) => void;
+  waitForAssetFoundation: () => Promise<void>;
   getInternalAssetRegistry: () => InternalAssetRegistryComposition | undefined;
 }
 
@@ -539,6 +555,7 @@ export function composeServerHost(
   });
 
   let internalAssetRegistry: InternalAssetRegistryComposition | undefined;
+  let assetFoundationReady: Promise<void> = Promise.resolve();
 
   return {
     loggingPort,
@@ -555,6 +572,9 @@ export function composeServerHost(
     },
     getInternalAssetRegistry() {
       return internalAssetRegistry;
+    },
+    waitForAssetFoundation() {
+      return assetFoundationReady;
     },
     registerApi(registerOptions) {
       const env = options.env ?? process.env;
@@ -1248,6 +1268,7 @@ export function composeServerHost(
         rootDirectory: registerOptions.storageRootDirectory,
         now: options.now,
         documents: organizationDocuments,
+        definitionDocuments: options.persistence?.documents,
         resourceBackedViewProvider: composeResourceBackedViewProviders({
           artifactBrowserMetadataRead: artifactBrowserRead,
           imageAssetDescriptorRead: imageAssetRegistry,
@@ -1264,6 +1285,7 @@ export function composeServerHost(
             throw new Error("System foundation assets are unavailable.");
           }
         });
+      assetFoundationReady = foundationReady;
       const assetImplementation = organizationDocuments
         ? composeAssetImplementationKernel({
             documents: organizationDocuments,
@@ -1274,11 +1296,10 @@ export function composeServerHost(
             now: options.now ?? (() => new Date().toISOString()),
           })
         : undefined;
-      const assetImplementationReady = assetImplementation
-        ? foundationReady.then(() =>
-            assetImplementation.ensureTrustedBuiltIns(),
-          )
-        : foundationReady;
+      const ensureAssetImplementationReady = async () => {
+        await foundationReady;
+        await assetImplementation?.ensureTrustedBuiltIns();
+      };
       const assetPackages =
         organizationDocuments && assetImplementation
           ? composeAssetPackageLifecycle({
@@ -1322,7 +1343,7 @@ export function composeServerHost(
               systemBuilder,
               resolver: {
                 async resolve(request) {
-                  await assetImplementationReady;
+                  await ensureAssetImplementationReady();
                   return assetImplementation.useCases.resolve.execute(request);
                 },
               },
@@ -1338,6 +1359,46 @@ export function composeServerHost(
               builds: systemBuild.repository,
               artifacts: systemBuildArtifacts,
               generateAuditId: () => `system-data-audit.${randomUUID()}`,
+              now: options.now,
+            })
+          : undefined;
+      const systemReview =
+        organizationDocuments && systemBuild
+          ? composeSystemReview({
+              documents: organizationDocuments,
+              builds: systemBuild.repository,
+              buildArtifacts: systemBuildArtifacts,
+              artifacts: artifactBrowserRead,
+              content: artifactMediaViewRetrieval,
+              generateAuditId: () => `system-review-audit.${randomUUID()}`,
+              now: options.now,
+            })
+          : undefined;
+      const systemDeploymentProfile = resolveServerSystemDeploymentProfile(env);
+      const systemDeployment =
+        organizationDocuments && systemBuild
+          ? composeSystemDeployment({
+              documents: organizationDocuments,
+              builds: systemBuild.repository,
+              artifacts: systemBuildArtifacts,
+              runtime: createTrustedSystemDeploymentRuntimeAdapter({
+                deploymentProfiles: [systemDeploymentProfile],
+                now: options.now,
+              }),
+              revocations: {
+                async listRevokedImplementationReleaseIds(
+                  _workspaceId,
+                  releaseIds,
+                ) {
+                  return (
+                    await assetImplementation!.repository.listRevocations(
+                      releaseIds,
+                    )
+                  ).map((item) => item.releaseId);
+                },
+              },
+              platformPolicy: createDefaultSystemDeploymentPolicy(),
+              generateAuditId: () => `system-deployment-audit.${randomUUID()}`,
               now: options.now,
             })
           : undefined;
@@ -1873,7 +1934,7 @@ export function composeServerHost(
               assetImplementationServices: {
                 listReleases: {
                   async execute(workspaceId) {
-                    await assetImplementationReady;
+                    await ensureAssetImplementationReady();
                     return assetImplementation.useCases.listReleases.execute(
                       workspaceId,
                     );
@@ -1881,7 +1942,7 @@ export function composeServerHost(
                 },
                 resolve: {
                   async execute(request) {
-                    await assetImplementationReady;
+                    await ensureAssetImplementationReady();
                     return assetImplementation.useCases.resolve.execute(
                       request,
                     );
@@ -1918,6 +1979,22 @@ export function composeServerHost(
           : {}),
         ...(systemData
           ? { systemDataServices: { runtime: systemData.runtime } }
+          : {}),
+        ...(systemReview
+          ? { systemReviewServices: { runtime: systemReview.runtime } }
+          : {}),
+        ...(systemDeployment
+          ? {
+              systemDeploymentServices: {
+                host: {
+                  deploymentProfiles: [systemDeploymentProfile],
+                  hostApiVersion: "1.0.0",
+                  capabilities: [],
+                  sandboxQualified: false,
+                },
+                ...systemDeployment.useCases,
+              },
+            }
           : {}),
         ...(systemBuild ? { systemBuildServices: systemBuild.useCases } : {}),
       });
