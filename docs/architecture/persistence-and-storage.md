@@ -499,3 +499,20 @@ workspace foundations final cleanup hardens resource reads at the storage bounda
 workspace foundations is Workspace Foundations. Workspace-owned persistence and storage reads/mutations must receive an explicit workspace id from contracts, clients, transports, use cases, ports, providers, and adapters; UI gating alone is not sufficient. Missing workspace context must fail safely or return sanitized diagnostics rather than falling back to global records.
 
 `system.foundation@1.0.0` remains system-owned and is activated by workspace reference only. Persistence must not copy definitions into workspace storage, call the system foundation pack baseline installer, seed on startup, create hidden/default workspaces, or auto-migrate legacy global resources. Until deeper per-workspace Asset Kernel storage exists, adapters may use safe metadata/source ownership filtering for workspace-scoped duplicate/read paths, but must not expose raw paths, storage roots, task payloads, prompts, workflow JSON, or unsafe provider data in diagnostics.
+
+## Approved-release system-data persistence
+
+`createStructuredSystemDataRepository` stores release-owned records and
+append-only audit evidence through the shared structured-document seam. Keys
+include workspace, release, entity, and record/audit identity; organization
+partitioning remains adapter-owned. Record creation/update and audit append are
+one transaction, record updates require the expected application revision, and
+there is no audit mutation/delete operation in the repository port.
+
+SQLite production-runtime integration covers round-trip, audit, stale-write
+rollback, backup, and restore on the Electron database implementation.
+PostgreSQL live conformance covers the same repository semantics, serializable
+retry, and organization RLS isolation when a disposable `TEST_POSTGRES_URL`
+target is available. The reference migration-plan artifact is release evidence;
+it does not execute destructive DDL or replace the monotonic database migration
+ledger.

@@ -48,8 +48,9 @@ describe("AssetLibraryPage", () => {
     });
 
     expect(container.textContent).toContain("Assets");
-    expect(container.textContent).toContain("Run & Test");
-    expect(container.textContent).toContain("Browse reusable building blocks available in this workspace.");
+    expect(container.textContent).not.toContain("Run & Test");
+    expect(container.textContent).not.toContain("Plans");
+    expect(container.textContent).toContain("Search assets");
   });
 
   it("registers a top-level Assets navigation item", () => {

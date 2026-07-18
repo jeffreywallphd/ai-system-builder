@@ -19,6 +19,7 @@ import modelsOrbitSrc from "../../../../../modules/ui/shared/assets/illustration
 import imageGenerationOrbitSrc from "../../../../../modules/ui/shared/assets/illustrations/image-generation-orbit.png";
 import settingsOrbitSrc from "../../../../../modules/ui/shared/assets/illustrations/settings-orbit.png";
 import securityOrbitSrc from "../../../../../modules/ui/shared/assets/illustrations/security-orbit.png";
+import systemsOrbitSrc from "../../../../../modules/ui/shared/assets/illustrations/systems-orbit.png";
 import { WorkspaceSwitcher } from "../../features/workspace";
 
 export interface AppShellProps {
@@ -50,7 +51,7 @@ export function AppShell({
     readonly label: string;
     readonly keys: readonly ThinClientPageKey[];
   }[] = [
-    { id: "build", label: "Build", keys: ["models", "image-generation"] },
+    { id: "build", label: "Build", keys: ["systems", "models", "image-generation"] },
     {
       id: "manage",
       label: "Manage",
@@ -259,6 +260,9 @@ function resolveThinClientPageArtwork(activePage?: ThinClientPageKey) {
   if (activePage === "artifacts") {
     return { src: dataOrbitSrc, tone: "data" } as const;
   }
+  if (activePage === "systems") {
+    return { src: systemsOrbitSrc, tone: "systems" } as const;
+  }
 
   if (activePage === "assets") {
     return { src: assetsOrbitSrc, tone: "assets" } as const;
@@ -289,6 +293,8 @@ function thinClientPageIcon(page: ThinClientPageKey): ApplicationIconName {
       return "home";
     case "artifacts":
       return "artifacts";
+    case "systems":
+      return "systems";
     case "assets":
       return "assets";
     case "user-library":

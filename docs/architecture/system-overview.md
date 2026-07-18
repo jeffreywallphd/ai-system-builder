@@ -5,6 +5,7 @@
 - Verification: `docs/architecture/architecture-verification.md`
 
 - effective asset projections baseline: `docs/architecture/effective-asset-projections.md` defines workspace-scoped safe materialized/effective asset projections for planning-readiness (non-executing).
+
 ## Purpose of this repository
 
 `ai-system-builder` is a fresh rebuild intended to replace earlier architectural sprawl with a simpler and more disciplined structure.
@@ -159,7 +160,6 @@ Server/thin-client mode is also a remote execution authority for future resource
 
 Runtime roots and artifact storage roots are separate concerns and should remain independently configured per host.
 
-
 Transport technologies are adapters, not application definitions.
 
 - Express is the default server API transport adapter.
@@ -196,6 +196,7 @@ They are separate architectural concerns even if they share physical disk territ
 
 Image upload remains an implemented specialized intake path and should align to staged artifact descriptor semantics rather than defining a parallel semantic world.
 The initial image vertical slice now includes both write and read direction:
+
 - write/intake through artifact upload as specialized ingestion,
 - read-side artifact browser behavior through image-backed `artifact.browse` (list metadata), `artifact.read` (detail metadata), and `artifact.content.read` (separate content retrieval).
 
@@ -229,8 +230,6 @@ The following are intentionally open and should not be over-specified yet:
 
 Until formalized, contributors should follow the boundaries in this architecture set and document significant decisions in ADRs.
 
-
-
 ### Server-host artifact-repo slice (current)
 
 Server composition now wires both storage families as peers:
@@ -251,7 +250,6 @@ Desktop composition now mirrors the same publish orchestration path used by serv
 - shared publish/verify use cases wired through Electron IPC and preload bridge (`artifact.publish`, `artifact.publish.verify`).
 
 Desktop renderer artifact-browser publish/re-check UX should call the preload-backed bridge and shared hook logic, not raw IPC and not desktop-only business logic.
-
 
 ### Artifact repo registration slice (current)
 
@@ -318,7 +316,6 @@ User Library reuse is defined by **User Library and Cross-Workspace Asset Reuse*
 
 Related architecture topics are defined by their own canonical docs and ADRs; this overview should not carry a hand-maintained phase/topic map.
 
-
 ## Asset Composition Planning
 
 Asset Composition Planning is defined in `docs/architecture/asset-composition-planning.md` and ADR-0020. It consumes effective asset projections effective projection summaries as planning inputs and does not execute workflows/runtime behavior.
@@ -354,6 +351,8 @@ Controlled conversational execution is the runnable conversational-system archit
 
 The conversational proof must originate from reusable conversational assets composed from referenced `system.foundation` primitives where relevant, then execute through controlled runtime session/run records.
 
-- Assets now includes a Run & Test tab for conversational composed-system proof flows (plan-derived session creation, approval, transcript, and safe message submission via existing clients).
+- Systems owns Run & Test for conversational composed-system proof flows
+  (execution-plan-derived session creation, approval, bounded transcript, and
+  safe message submission through the shared desktop/thin presenter).
 - Conversational read models use verified source evidence and application availability; API/IPC/preload/client session creation must not accept renderer/browser display identity claims.
 - Server and desktop host composition provide the conversational service family. Cancel, retry, and streaming remain unsupported unless a real application/runtime path supports them.

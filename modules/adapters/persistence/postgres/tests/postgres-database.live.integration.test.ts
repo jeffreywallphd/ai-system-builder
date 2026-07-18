@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import { createOrganizationId } from "../../../../contracts/organization";
+import { normalizeSystemReleaseId } from "../../../../contracts/system-build";
+import type { SystemDataAuditEntry, SystemDataRecord } from "../../../../contracts/system-data";
+import { createWorkspaceId } from "../../../../contracts/workspace";
 
 import {
   StructuredDocumentConflictError,
@@ -9,6 +12,7 @@ import {
 } from "../../shared";
 import { resolvePostgresPoolConfig } from "../client/createPostgresPool";
 import { openPostgresDatabase } from "../postgres-database";
+import { createStructuredSystemDataRepository } from "../../system-data";
 
 const liveDatabaseUrl = process.env.TEST_POSTGRES_URL?.trim();
 
@@ -26,6 +30,30 @@ test(
     );
     const [database] = databases;
     const namespace = `integration-${randomUUID()}`;
+    const systemDataWorkspaceId = createWorkspaceId(`workspace-${randomUUID()}`);
+    const systemDataReleaseId = normalizeSystemReleaseId(`release-${randomUUID()}`);
+    const systemDataEntityType = "service-request";
+    const systemDataRecordId = `record-${randomUUID()}`;
+    const systemDataRecordKey = [
+      systemDataWorkspaceId,
+      systemDataReleaseId,
+      systemDataEntityType,
+      systemDataRecordId,
+    ].join("/");
+    const systemDataCreateAuditKey = [
+      systemDataWorkspaceId,
+      systemDataReleaseId,
+      systemDataEntityType,
+      "2026-07-17T00:00:00.000Z",
+      "audit-postgres-create",
+    ].join("/");
+    const systemDataUpdateAuditKey = [
+      systemDataWorkspaceId,
+      systemDataReleaseId,
+      systemDataEntityType,
+      "2026-07-17T00:00:01.000Z",
+      "audit-postgres-update",
+    ].join("/");
     const orgA = database.documents.forOrganization(createOrganizationId(`org-a-${randomUUID()}`));
     const orgB = database.documents.forOrganization(createOrganizationId(`org-b-${randomUUID()}`));
     try {
@@ -80,6 +108,80 @@ test(
         ),
         undefined,
       );
+      const systemDataOrgA = createStructuredSystemDataRepository(orgA);
+      const systemDataOrgB = createStructuredSystemDataRepository(orgB);
+      const firstSystemDataRecord: SystemDataRecord = {
+        recordId: systemDataRecordId,
+        targetWorkspaceId: systemDataWorkspaceId,
+        releaseId: systemDataReleaseId,
+        entityType: systemDataEntityType,
+        revision: 1,
+        values: { title: "PostgreSQL first" },
+        createdAt: "2026-07-17T00:00:00.000Z",
+        createdBy: "person-postgres",
+        updatedAt: "2026-07-17T00:00:00.000Z",
+        updatedBy: "person-postgres",
+      };
+      const createAudit: SystemDataAuditEntry = {
+        auditId: "audit-postgres-create",
+        targetWorkspaceId: systemDataWorkspaceId,
+        releaseId: systemDataReleaseId,
+        entityType: systemDataEntityType,
+        action: "create",
+        outcome: "allowed",
+        actorId: "person-postgres",
+        recordId: systemDataRecordId,
+        changedFields: ["title"],
+        occurredAt: "2026-07-17T00:00:00.000Z",
+      };
+      await systemDataOrgA.createRecordWithAudit(firstSystemDataRecord, createAudit);
+      const secondSystemDataRecord: SystemDataRecord = {
+        ...firstSystemDataRecord,
+        revision: 2,
+        values: { title: "PostgreSQL updated" },
+        updatedAt: "2026-07-17T00:00:01.000Z",
+      };
+      const updateAudit: SystemDataAuditEntry = {
+        ...createAudit,
+        auditId: "audit-postgres-update",
+        action: "update",
+        occurredAt: "2026-07-17T00:00:01.000Z",
+      };
+      await systemDataOrgA.updateRecordWithAudit(secondSystemDataRecord, updateAudit, 1);
+      await assert.rejects(
+        () => systemDataOrgA.updateRecordWithAudit(
+          secondSystemDataRecord,
+          { ...updateAudit, auditId: "audit-postgres-stale" },
+          1,
+        ),
+        StructuredDocumentConflictError,
+      );
+      assert.deepEqual(
+        await systemDataOrgA.readRecord(
+          systemDataWorkspaceId,
+          systemDataReleaseId,
+          systemDataEntityType,
+          systemDataRecordId,
+        ),
+        secondSystemDataRecord,
+      );
+      assert.equal(
+        (await systemDataOrgA.listAudit(
+          systemDataWorkspaceId,
+          systemDataReleaseId,
+          systemDataEntityType,
+          20,
+        )).length,
+        2,
+      );
+      assert.deepEqual(
+        await systemDataOrgB.listRecords(
+          systemDataWorkspaceId,
+          systemDataReleaseId,
+          systemDataEntityType,
+        ),
+        [],
+      );
       await Promise.all(
         Array.from({ length: 24 }, (_, index) =>
           mutateDocumentRecord(
@@ -111,6 +213,9 @@ test(
       await orgB.deleteDocument(namespace, "shared");
       await database.documents.deleteDocument(namespace, "record");
       await database.documents.deleteDocument(namespace, "counter.json");
+      await orgA.deleteDocument("system-data/records", systemDataRecordKey);
+      await orgA.deleteDocument("system-data/audit", systemDataCreateAuditKey);
+      await orgA.deleteDocument("system-data/audit", systemDataUpdateAuditKey);
       await Promise.all(databases.map((opened) => opened.close()));
     }
   },

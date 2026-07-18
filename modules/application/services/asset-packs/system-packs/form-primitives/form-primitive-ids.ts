@@ -9,6 +9,7 @@ export const FORM_PRIMITIVE_IDS = [
   "builtin.form.select-field",
   "builtin.form.checkbox-field",
   "builtin.form.radio-group",
+  "builtin.form.date-time-field",
   "builtin.form.validation-message",
   "builtin.form.submit-action",
   "builtin.form.cancel-action",
@@ -17,7 +18,6 @@ export const FORM_PRIMITIVE_IDS = [
 export type FormPrimitiveId = (typeof FORM_PRIMITIVE_IDS)[number];
 
 export const DEFERRED_FORM_PRIMITIVE_IDS = [
-  "builtin.form.date-time-field",
   "builtin.form.file-upload-field",
 ] as const;
 

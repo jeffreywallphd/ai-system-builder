@@ -20,6 +20,7 @@ function record(): SystemBuilderRecord {
     targetWorkspaceId: createWorkspaceId("workspace.research"),
     name: "Research assistant",
     status: "in-composition",
+    revision: 1,
     composition: {
       compositionId: normalizeAssetId("composition.research-assistant"),
       compositionType: "system",
@@ -39,6 +40,8 @@ function record(): SystemBuilderRecord {
     },
     createdAt: "2026-07-16T00:00:00.000Z",
     updatedAt: "2026-07-16T00:00:00.000Z",
+    createdBy: "user-1",
+    updatedBy: "user-1",
   };
 }
 

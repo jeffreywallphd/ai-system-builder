@@ -6,6 +6,7 @@ export * from "./asset-library";
 export * from "./asset-package";
 export * from "./asset-studio";
 export * from "./foundation-assets";
+export * from "./system-builder";
 export * from "./glossary";
 export * from "./artifact-preview";
 export * from "./components/ApplicationIcon";

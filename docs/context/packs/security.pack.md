@@ -47,6 +47,11 @@
 - Pooled tenant placement is the default. Premium dedicated placement allows
   only one configured organization while retaining the same release and schema.
 - Thin-client secure fetch adds `Authorization: Bearer` when a paired token exists.
+- Release-bound system data derives a finite allowlist and narrowing roles from
+  one verified approved manifest. Host-derived principals, trusted validation,
+  protected-field masking, atomic record/audit writes, redacted field-name-only
+  audit evidence, and fail-closed duplicate/misbound declarations are enforced
+  below transports and UI.
 - Token hashes are persisted; raw bearer tokens and hash secrets must never be committed or logged.
 - The tracked npm lockfile is used by CI and server-image builds; the dependency
   security gate requires clean production and complete development trees and

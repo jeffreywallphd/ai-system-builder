@@ -85,6 +85,12 @@ assets/customizations
 
 A conversational system may include safe configuration such as display label, instruction reference, supported text-generation capability label, generation settings, greeting, and expected IO role semantics. Final prompt/materialization boundaries must stay behind explicit contracts and protected context handling.
 
+The closed `reference.controlled-chatbot@1.0.0` System Builder template proves
+this relationship with exact-version reusable shell, conversation, model,
+context, instruction, generation, policy, audit, inference, fallback, and state
+assets. The instruction configuration is marked protected and is not copied to
+public build, approval, operational-diagnostic, or session-summary surfaces.
+
 ## Conceptual model
 
 ### Conversational System Execution Session
@@ -180,13 +186,21 @@ This adapter path is a supported implementation of the first conversational slic
 
 ## UI direction
 
-In Assets / Plans / Setup: compact status/control area for preview state, readiness, conversational support, `Test this system`/`Start chat`, and blocked/review/setup messaging.
+Systems owns execution-plan selection and whole-system Run & Test. The shared
+desktop/thin presenter lists actual execution-plan summaries, creates sessions
+with the selected execution-plan id, projects application-owned action and
+availability state, and never treats a composition-plan id or display label as
+execution authority.
 
-In conversational run workspace: system identity, conversation history, composer, assistant response area, generating/cancel/retry states, safe diagnostics, and explicit association to selected composed system.
+The conversational run workspace provides conversation history, composer,
+assistant response area, safe diagnostics, approval state, and explicit
+association to the selected execution plan. Its visible transcript is bounded
+and exposed as an ordered live `role="log"`; message input is length-bounded.
+Cancel and retry controls appear only when both the application read model and
+host client advertise the operation.
 
-Nothing runs until the user starts a conversation or sends a message.
-
-The current Run & Test UI has incomplete correctness work around selected-system context, wording, DTO mapping, UI state, behavior tests, and final documentation. See `incomplete-work-register.md` entry IW-20260605-004.
+Nothing runs until the user starts a conversation, explicitly approves the
+session, and sends a message through the controlled invocation path.
 
 ## Transport split rule
 
@@ -244,3 +258,7 @@ Runtime records are operational records only and are never reusable asset substi
 - Transcript reads and completed submit results are the deliberate visible-content surfaces. Session summaries, action availability, activity, approval/cancel/retry, diagnostics, and errors remain operational and must not copy full transcript text or protected runtime/provider context.
 - API, IPC, preload, desktop-client, and thin-client surfaces use typed safe DTOs for conversational operations. Cancel and retry remain unsupported/deferred unless application behavior can actually perform them. Streaming remains deferred.
 - Real server and desktop hosts compose the conversational service family. Both expose session/read/approval boundaries; turn submission is wired only through the controlled application/orchestration/runtime-adapter path and must still pass approval/source/readiness/runtime guards. No production fake response generator is allowed.
+- Desktop and thin-client Systems surfaces share one Run & Test presenter. It
+  uses real execution-plan identity, bounded accessible transcript rendering,
+  safe nested transport-envelope normalization, and truthful unsupported
+  capability copy; the former UI correctness gap is closed.

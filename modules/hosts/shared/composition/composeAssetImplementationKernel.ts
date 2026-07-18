@@ -25,41 +25,16 @@ import {
   normalizeAssetImplementationBindingId,
   normalizeAssetImplementationFacetId,
   normalizeAssetImplementationReleaseId,
+  type AssetImplementationBinding,
   type AssetImplementationDeploymentProfile,
   type AssetImplementationFacetKind,
+  type AssetImplementationRelease,
   type AssetImplementationResolutionRequest,
   type TrustedBuiltInImplementationSeed,
 } from "../../../contracts/asset-implementation";
 import type { WorkspaceId } from "../../../contracts/workspace";
 
 const DEFAULT_PACKAGE_DIGEST = `sha256:${"c".repeat(64)}`;
-
-const LEGACY_TRUSTED_ASSET_IMPLEMENTATION_SEEDS: readonly TrustedBuiltInImplementationSeed[] = [
-    {
-      definitionRef: {
-        kind: "asset-definition-version",
-        id: normalizeAssetId("builtin.feature"),
-        version: "1.0.0",
-      },
-      releaseId: normalizeAssetImplementationReleaseId(
-        "implementation-release.builtin-feature.1",
-      ),
-      bindingId: normalizeAssetImplementationBindingId(
-        "implementation-binding.builtin-feature.1",
-      ),
-      version: "1.0.0",
-      entryKey: "foundation.feature",
-      facetKind: "ui",
-      runtimeKind: "trusted-built-in",
-      deploymentProfiles: [
-        "local-desktop",
-        "campus-server",
-        "cloud-server",
-        "thin-client",
-      ],
-      packageDigest: DEFAULT_PACKAGE_DIGEST,
-    },
-];
 
 /** Exact, closed implementation bindings for every immutable foundation entry. */
 export const SYSTEM_FOUNDATION_TRUSTED_IMPLEMENTATION_SEEDS: readonly TrustedBuiltInImplementationSeed[] =
@@ -87,10 +62,7 @@ export const SYSTEM_FOUNDATION_TRUSTED_IMPLEMENTATION_SEEDS: readonly TrustedBui
   });
 
 export const DEFAULT_TRUSTED_ASSET_IMPLEMENTATION_SEEDS: readonly TrustedBuiltInImplementationSeed[] =
-  [
-    ...LEGACY_TRUSTED_ASSET_IMPLEMENTATION_SEEDS,
-    ...SYSTEM_FOUNDATION_TRUSTED_IMPLEMENTATION_SEEDS,
-  ];
+  SYSTEM_FOUNDATION_TRUSTED_IMPLEMENTATION_SEEDS;
 
 export interface ComposeAssetImplementationKernelOptions {
   readonly documents: StructuredDocumentStore;
@@ -164,42 +136,42 @@ export function composeAssetImplementationKernel(
     async ensureTrustedBuiltIns(): Promise<void> {
       for (const seed of options.trustedSeeds ??
         DEFAULT_TRUSTED_ASSET_IMPLEMENTATION_SEEDS) {
-        const published = await publishRelease.execute({
-          releaseId: seed.releaseId,
-          definitionRef: seed.definitionRef,
-          version: seed.version,
-          trustLevel: "system-trusted",
-          facets: [
-            {
-              facetId: normalizeAssetImplementationFacetId(
-                `facet.${seed.releaseId}.${seed.facetKind}`,
-              ),
-              kind: seed.facetKind,
-              runtimeKind: seed.runtimeKind,
-              entryKey: seed.entryKey,
-              requiredCapabilities: [],
-              compatibility: {
-                definitionVersion: seed.definitionRef.version!,
-                hostApiRange: ">=1.0.0 <2.0.0",
-                deploymentProfiles: seed.deploymentProfiles,
-              },
-            },
-          ],
-          packageDigest: seed.packageDigest,
-          actorId: "system",
-        });
-        if (!published.ok) throw new Error(published.error.message);
+        const existingRelease = await repository.readRelease(seed.releaseId);
+        if (existingRelease) {
+          if (!matchesTrustedSeedRelease(existingRelease, seed)) {
+            throw new Error(
+              "Trusted built-in implementation release is incompatible.",
+            );
+          }
+        } else {
+          const published = await publishRelease.execute({
+            releaseId: seed.releaseId,
+            definitionRef: seed.definitionRef,
+            version: seed.version,
+            trustLevel: "system-trusted",
+            facets: [trustedSeedFacet(seed)],
+            packageDigest: seed.packageDigest,
+            actorId: "system",
+          });
+          if (!published.ok) throw new Error(published.error.message);
+        }
 
-        const bound = await bindRelease.execute({
-          bindingId: seed.bindingId,
-          definitionRef: seed.definitionRef,
-          releaseId: seed.releaseId,
-          priority: 1000,
-          actorId: "system",
-        });
-        if (!bound.ok) {
-          const existing = await repository.readBinding(seed.bindingId);
-          if (!existing) throw new Error(bound.error.message);
+        const existingBinding = await repository.readBinding(seed.bindingId);
+        if (existingBinding) {
+          if (!matchesTrustedSeedBinding(existingBinding, seed)) {
+            throw new Error(
+              "Trusted built-in implementation binding is incompatible.",
+            );
+          }
+        } else {
+          const bound = await bindRelease.execute({
+            bindingId: seed.bindingId,
+            definitionRef: seed.definitionRef,
+            releaseId: seed.releaseId,
+            priority: 1000,
+            actorId: "system",
+          });
+          if (!bound.ok) throw new Error(bound.error.message);
         }
       }
     },
@@ -242,3 +214,87 @@ export function composeAssetImplementationKernel(
 export type AssetImplementationKernelComposition = ReturnType<
   typeof composeAssetImplementationKernel
 >;
+
+function trustedSeedFacet(seed: TrustedBuiltInImplementationSeed) {
+  return {
+    facetId: normalizeAssetImplementationFacetId(
+      `facet.${seed.releaseId}.${seed.facetKind}`,
+    ),
+    kind: seed.facetKind,
+    runtimeKind: seed.runtimeKind,
+    entryKey: seed.entryKey,
+    requiredCapabilities: [],
+    compatibility: {
+      definitionVersion: seed.definitionRef.version!,
+      hostApiRange: ">=1.0.0 <2.0.0",
+      deploymentProfiles: seed.deploymentProfiles,
+    },
+  };
+}
+
+function matchesTrustedSeedRelease(
+  release: AssetImplementationRelease,
+  seed: TrustedBuiltInImplementationSeed,
+): boolean {
+  const facet = release.facets[0];
+  const expectedFacet = trustedSeedFacet(seed);
+  return (
+    release.workspaceId === undefined &&
+    release.organizationId === undefined &&
+    release.definitionRef.kind === seed.definitionRef.kind &&
+    release.definitionRef.id === seed.definitionRef.id &&
+    release.definitionRef.version === seed.definitionRef.version &&
+    release.version === seed.version &&
+    release.status === "published" &&
+    release.trustLevel === "system-trusted" &&
+    release.packageDigest === seed.packageDigest &&
+    release.publishedBy === "system" &&
+    release.sourceSnapshotId === undefined &&
+    release.sourceBuildId === undefined &&
+    release.evidenceArtifacts.length === 0 &&
+    release.facets.length === 1 &&
+    facet?.facetId === expectedFacet.facetId &&
+    facet.kind === expectedFacet.kind &&
+    facet.runtimeKind === expectedFacet.runtimeKind &&
+    facet.entryKey === expectedFacet.entryKey &&
+    facet.artifact === undefined &&
+    facet.requiredCapabilities.length === 0 &&
+    facet.compatibility.definitionVersion ===
+      expectedFacet.compatibility.definitionVersion &&
+    facet.compatibility.hostApiRange ===
+      expectedFacet.compatibility.hostApiRange &&
+    facet.compatibility.runtimeAbiRange === undefined &&
+    sameStrings(
+      facet.compatibility.deploymentProfiles,
+      expectedFacet.compatibility.deploymentProfiles,
+    )
+  );
+}
+
+function matchesTrustedSeedBinding(
+  binding: AssetImplementationBinding,
+  seed: TrustedBuiltInImplementationSeed,
+): boolean {
+  return (
+    binding.workspaceId === undefined &&
+    binding.organizationId === undefined &&
+    binding.definitionRef.kind === seed.definitionRef.kind &&
+    binding.definitionRef.id === seed.definitionRef.id &&
+    binding.definitionRef.version === seed.definitionRef.version &&
+    binding.releaseId === seed.releaseId &&
+    binding.status === "active" &&
+    binding.priority === 1000 &&
+    binding.revision === 1 &&
+    binding.approvedBy === "system"
+  );
+}
+
+function sameStrings(
+  left: readonly string[],
+  right: readonly string[],
+): boolean {
+  if (left.length !== right.length) return false;
+  const sortedLeft = [...left].sort();
+  const sortedRight = [...right].sort();
+  return sortedLeft.every((value, index) => value === sortedRight[index]);
+}

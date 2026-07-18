@@ -2,9 +2,15 @@ import { describe, expect, it } from "../../../../testing/node-test";
 import { createInMemoryStructuredDocumentStore } from "../../../../adapters/persistence/shared";
 import { createWorkspaceId } from "../../../../contracts/workspace";
 import { normalizeAssetId } from "../../../../contracts/asset";
-import { SYSTEM_FOUNDATION_FUNCTIONAL_DEFAULTS, SYSTEM_FOUNDATION_PACK_MANIFEST } from "../../../../application/services/asset-packs";
+import {
+  SYSTEM_FOUNDATION_FUNCTIONAL_DEFAULTS,
+  SYSTEM_FOUNDATION_PACK_MANIFEST,
+} from "../../../../application/services/asset-packs";
 import type { AssetDefinitionRepositoryPort } from "../../../../application/ports/asset";
-import { composeAssetImplementationKernel, DEFAULT_TRUSTED_ASSET_IMPLEMENTATION_SEEDS } from "../composeAssetImplementationKernel";
+import {
+  composeAssetImplementationKernel,
+  DEFAULT_TRUSTED_ASSET_IMPLEMENTATION_SEEDS,
+} from "../composeAssetImplementationKernel";
 
 const definitionRef = {
   kind: "asset-definition-version",
@@ -47,9 +53,22 @@ describe("asset implementation host composition", () => {
       const composition = composeAssetImplementationKernel({
         documents: createInMemoryStructuredDocumentStore(),
         definitions,
-        trustedSeeds: [DEFAULT_TRUSTED_ASSET_IMPLEMENTATION_SEEDS[0]!],
+        trustedSeeds: [
+          {
+            definitionRef,
+            releaseId: "implementation-release.builtin-feature.1" as never,
+            bindingId: "implementation-binding.builtin-feature.1" as never,
+            version: "1.0.0",
+            entryKey: "foundation.feature",
+            facetKind: "ui",
+            runtimeKind: "trusted-built-in",
+            deploymentProfiles: ["local-desktop", "campus-server"],
+            packageDigest: `sha256:${"c".repeat(64)}`,
+          },
+        ],
         now: () => "2026-07-17T12:00:00.000Z",
       });
+      await composition.ensureTrustedBuiltIns();
       await composition.ensureTrustedBuiltIns();
       const result = await composition.resolveTrustedBuiltIn(
         createWorkspaceId("workspace-a"),
@@ -94,7 +113,7 @@ describe("asset implementation host composition", () => {
     const composition = composeAssetImplementationKernel({
       documents: createInMemoryStructuredDocumentStore(),
       definitions: foundationDefinitions,
-      trustedSeeds: DEFAULT_TRUSTED_ASSET_IMPLEMENTATION_SEEDS.slice(1),
+      trustedSeeds: DEFAULT_TRUSTED_ASSET_IMPLEMENTATION_SEEDS,
       now: () => "2026-07-17T12:00:00.000Z",
     });
     await composition.ensureTrustedBuiltIns();

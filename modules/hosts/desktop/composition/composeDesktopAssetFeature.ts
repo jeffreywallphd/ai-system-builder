@@ -8,7 +8,10 @@ import {
 } from "../../../application/use-cases";
 import { createLocalImageAssetRegistryAdapter } from "../../../adapters/persistence/image";
 import { createLocalModelRegistryAdapter } from "../../../adapters/persistence/model";
-import { composeInternalAssetRegistry, type InternalAssetRegistryComposition } from "../../shared/composition/composeInternalAssetRegistry";
+import {
+  composeInternalAssetRegistry,
+  type InternalAssetRegistryComposition,
+} from "../../shared/composition/composeInternalAssetRegistry";
 import { composeResourceBackedViewProviders } from "../../shared/composition/composeResourceBackedViewProviders";
 import type { StructuredDocumentStore } from "../../../adapters/persistence/shared";
 import { createAssetImplementationArtifactAdapter } from "../../../adapters/storage/asset-implementation";
@@ -22,10 +25,14 @@ export interface ComposeDesktopAssetFeatureOptions {
   readSharedModelStorageDirectory?: () => Promise<string | undefined>;
   artifacts: any;
   documents?: StructuredDocumentStore;
-  onInternalAssetRegistry?: (registry: InternalAssetRegistryComposition) => void;
+  onInternalAssetRegistry?: (
+    registry: InternalAssetRegistryComposition,
+  ) => void;
 }
 
-export async function composeDesktopAssetFeature(options: ComposeDesktopAssetFeatureOptions): Promise<any> {
+export async function composeDesktopAssetFeature(
+  options: ComposeDesktopAssetFeatureOptions,
+): Promise<any> {
   const modelRegistry = createLocalModelRegistryAdapter({
     filePath: `${options.storageRootDirectory}/model-registry/models.json`,
     rootDirectory: options.storageRootDirectory,
@@ -38,7 +45,16 @@ export async function composeDesktopAssetFeature(options: ComposeDesktopAssetFea
       },
     },
   });
-  const imageAssetRegistry = createLocalImageAssetRegistryAdapter({ filePath: join(options.storageRootDirectory, ".catalog", "image-assets.json"), rootDirectory: options.storageRootDirectory, documents: options.documents, now: options.now });
+  const imageAssetRegistry = createLocalImageAssetRegistryAdapter({
+    filePath: join(
+      options.storageRootDirectory,
+      ".catalog",
+      "image-assets.json",
+    ),
+    rootDirectory: options.storageRootDirectory,
+    documents: options.documents,
+    now: options.now,
+  });
   const internalAssetRegistry = composeInternalAssetRegistry({
     rootDirectory: options.storageRootDirectory,
     now: options.now,
@@ -51,34 +67,50 @@ export async function composeDesktopAssetFeature(options: ComposeDesktopAssetFea
     }),
   });
   options.onInternalAssetRegistry?.(internalAssetRegistry);
-  await internalAssetRegistry.installSystemFoundationPack.install();
+  const foundationInstall =
+    await internalAssetRegistry.installSystemFoundationPack.install({
+      allowSystemDefinitionRefresh: true,
+    });
+  if (foundationInstall.status === "failed") {
+    throw new Error("System foundation assets are unavailable.");
+  }
   const assetImplementation = options.documents
     ? composeAssetImplementationKernel({
         documents: options.documents,
-        definitions: internalAssetRegistry.assetKernel.repositories.definitionRepository,
-        artifacts: createAssetImplementationArtifactAdapter(options.artifacts.storage),
+        definitions:
+          internalAssetRegistry.assetKernel.repositories.definitionRepository,
+        artifacts: createAssetImplementationArtifactAdapter(
+          options.artifacts.storage,
+        ),
         now: options.now,
       })
     : undefined;
   await assetImplementation?.ensureTrustedBuiltIns();
-  const assetPackages = options.documents && assetImplementation
-    ? composeAssetPackageLifecycle({
-        documents: options.documents,
-        definitions: internalAssetRegistry.assetKernel.repositories.definitionRepository,
-        implementations: assetImplementation.repository,
-        artifacts: createAssetImplementationArtifactAdapter(options.artifacts.storage),
-        nextInspectionId: () => `package-inspection.${randomUUID()}`,
-        now: options.now,
-      })
-    : undefined;
-  const assetStudio = options.documents && assetImplementation
-    ? composeAssetStudioWorkflow({
-        documents: options.documents,
-        implementations: assetImplementation,
-        artifacts: createAssetImplementationArtifactAdapter(options.artifacts.storage),
-        now: options.now,
-      })
-    : undefined;
+  const assetPackages =
+    options.documents && assetImplementation
+      ? composeAssetPackageLifecycle({
+          documents: options.documents,
+          definitions:
+            internalAssetRegistry.assetKernel.repositories.definitionRepository,
+          implementations: assetImplementation.repository,
+          artifacts: createAssetImplementationArtifactAdapter(
+            options.artifacts.storage,
+          ),
+          nextInspectionId: () => `package-inspection.${randomUUID()}`,
+          now: options.now,
+        })
+      : undefined;
+  const assetStudio =
+    options.documents && assetImplementation
+      ? composeAssetStudioWorkflow({
+          documents: options.documents,
+          implementations: assetImplementation,
+          artifacts: createAssetImplementationArtifactAdapter(
+            options.artifacts.storage,
+          ),
+          now: options.now,
+        })
+      : undefined;
   const generateInstanceId = () => `asset-instance.${randomUUID()}`;
   const repositories = internalAssetRegistry.assetKernel.repositories;
   return {
@@ -89,10 +121,39 @@ export async function composeDesktopAssetFeature(options: ComposeDesktopAssetFea
     assetPackages,
     assetStudio,
     assetMutationUseCases: {
-      registerResourceBackedViewAsAsset: new RegisterResourceBackedViewAsAssetInstanceUseCase({ assetRegistryRead: internalAssetRegistry.readFacade, definitionRepository: repositories.definitionRepository, instanceRepository: repositories.instanceRepository, now: options.now, generateInstanceId }),
-      finalizeGeneratedOutputAsAsset: new FinalizeGeneratedOutputAsAssetUseCase({ assetRegistryRead: internalAssetRegistry.readFacade, definitionRepository: repositories.definitionRepository, instanceRepository: repositories.instanceRepository, now: options.now, generateInstanceId }),
-      importExternalRepositoryObjectAsAsset: new ImportExternalRepositoryObjectAsAssetUseCase({ assetRegistryRead: internalAssetRegistry.readFacade, definitionRepository: repositories.definitionRepository, instanceRepository: repositories.instanceRepository, now: options.now, generateInstanceId }),
-      localizeExternalRepositoryObjectAsAsset: new LocalizeExternalRepositoryObjectAsAssetUseCase({ assetRegistryRead: internalAssetRegistry.readFacade, definitionRepository: repositories.definitionRepository, instanceRepository: repositories.instanceRepository, now: options.now, generateInstanceId }),
+      registerResourceBackedViewAsAsset:
+        new RegisterResourceBackedViewAsAssetInstanceUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: repositories.definitionRepository,
+          instanceRepository: repositories.instanceRepository,
+          now: options.now,
+          generateInstanceId,
+        }),
+      finalizeGeneratedOutputAsAsset: new FinalizeGeneratedOutputAsAssetUseCase(
+        {
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: repositories.definitionRepository,
+          instanceRepository: repositories.instanceRepository,
+          now: options.now,
+          generateInstanceId,
+        },
+      ),
+      importExternalRepositoryObjectAsAsset:
+        new ImportExternalRepositoryObjectAsAssetUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: repositories.definitionRepository,
+          instanceRepository: repositories.instanceRepository,
+          now: options.now,
+          generateInstanceId,
+        }),
+      localizeExternalRepositoryObjectAsAsset:
+        new LocalizeExternalRepositoryObjectAsAssetUseCase({
+          assetRegistryRead: internalAssetRegistry.readFacade,
+          definitionRepository: repositories.definitionRepository,
+          instanceRepository: repositories.instanceRepository,
+          now: options.now,
+          generateInstanceId,
+        }),
     },
   };
 }

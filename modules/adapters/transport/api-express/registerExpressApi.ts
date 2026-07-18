@@ -31,6 +31,9 @@ import { registerConversationExecutionApiRoutes, type RegisterConversationExecut
 import { registerAssetImplementationApiRoutes, type RegisterAssetImplementationApiRoutesDependencies } from "./asset-implementation/registerAssetImplementationApiRoutes";
 import { registerAssetPackageApiRoutes, type RegisterAssetPackageApiRoutesDependencies } from "./asset-package/registerAssetPackageApiRoutes";
 import { registerAssetStudioApiRoutes, type RegisterAssetStudioApiRoutesDependencies } from "./asset-studio/registerAssetStudioApiRoutes";
+import { registerSystemBuilderApiRoutes, type RegisterSystemBuilderApiRoutesDependencies } from "./system-builder/registerSystemBuilderApiRoutes";
+import { registerSystemBuildApiRoutes, type RegisterSystemBuildApiRoutesDependencies } from "./system-build/registerSystemBuildApiRoutes";
+import { registerSystemDataApiRoutes, type RegisterSystemDataApiRoutesDependencies } from "./system-data/registerSystemDataApiRoutes";
 
 export interface RegisterExpressApiDependencies {
   app: RegisterArtifactUploadApiRouteDependencies["app"]
@@ -50,7 +53,7 @@ export interface RegisterExpressApiDependencies {
     & RegisterEffectiveAssetProjectionApiRoutesDependencies["app"]
     & RegisterAssetCompositionApiRoutesDependencies["app"]
     & RegisterExecutionPlanApiRoutesDependencies["app"]
-    & RegisterConversationExecutionApiRoutesDependencies["app"];
+    & RegisterConversationExecutionApiRoutesDependencies["app"] & RegisterSystemDataApiRoutesDependencies["app"];
   getHuggingFaceTokenStatus: RegisterArtifactRepoApiRoutesDependencies["getHuggingFaceTokenStatus"];
   setHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["setHuggingFaceToken"];
   clearHuggingFaceToken: RegisterArtifactRepoApiRoutesDependencies["clearHuggingFaceToken"];
@@ -104,6 +107,9 @@ export interface RegisterExpressApiDependencies {
   assetImplementationServices?: Omit<RegisterAssetImplementationApiRoutesDependencies, "app">;
   assetPackageServices?: Omit<RegisterAssetPackageApiRoutesDependencies, "app">;
   assetStudioServices?: Omit<RegisterAssetStudioApiRoutesDependencies, "app">;
+  systemBuilderServices?: Omit<RegisterSystemBuilderApiRoutesDependencies, "app">;
+  systemBuildServices?: Omit<RegisterSystemBuildApiRoutesDependencies, "app">;
+  systemDataServices?: Omit<RegisterSystemDataApiRoutesDependencies, "app">;
 }
 
 export function registerExpressApi(
@@ -217,6 +223,15 @@ export function registerExpressApi(
   }
   if (dependencies.assetStudioServices) {
     registerAssetStudioApiRoutes({ app: dependencies.app, ...dependencies.assetStudioServices });
+  }
+  if (dependencies.systemBuilderServices) {
+    registerSystemBuilderApiRoutes({ app: dependencies.app, ...dependencies.systemBuilderServices });
+  }
+  if (dependencies.systemBuildServices) {
+    registerSystemBuildApiRoutes({ app: dependencies.app, ...dependencies.systemBuildServices });
+  }
+  if (dependencies.systemDataServices) {
+    registerSystemDataApiRoutes({ app: dependencies.app, ...dependencies.systemDataServices });
   }
 
   if (dependencies.assetRegistryRead) {

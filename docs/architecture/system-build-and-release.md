@@ -1,7 +1,7 @@
 # System Build and Release
 
 - Status: current
-- Implementation: System Builder persistence and builds remain increment-gated until their exit evidence passes
+- Implementation: deterministic build attempts and immutable release approval are implemented; deployment activation and generalized release execution remain increment-gated
 - Related decisions: ADR-0020, ADR-0021, ADR-0022, ADR-0023, ADR-0024, ADR-0029, ADR-0030, ADR-0033, ADR-0034
 - Verification: `docs/architecture/architecture-verification.md`
 
@@ -74,4 +74,36 @@ Systems owns system list, editor, validation, build, releases, and Run & Test. A
 
 ## Current implementation status
 
-The repository currently provides a design-time System Builder contract shell plus separate planning/readiness/execution families. CRUD, revisions, editor, build, release, deployment, and generalized workflow behavior remain unavailable until their increment evidence passes.
+The repository now implements the design/build/release boundary end to end for
+both desktop and server hosts:
+
+- `modules/contracts/system-build` separates attempts, frozen locks, artifacts,
+  evidence, releases, compatibility, and comparison results from design records;
+- `RequestSystemBuildUseCase` re-reads an exact immutable system revision,
+  reruns canonical composition validation, resolves permitted implementation
+  releases, creates a canonical lock, and materializes deterministic bundles;
+- the materializer emits a system manifest, applicable UI/logic/workflow
+  bundles, deny-by-default policy, configuration schema, non-destructive
+  migration intent, and SPDX 2.3 SBOM;
+- content-addressed storage verifies SHA-256 integrity at write and again before
+  release approval; releases derive their identity from the lock and artifact
+  set and are immutable;
+- automatically generated in-toto/SLSA-style provenance and bounded build
+  evidence distinguish same-environment `repeatable` results from a future
+  independently reproduced result;
+- workspace-scoped structured persistence, authenticated API routes, desktop
+  IPC/preload, and shared desktop/thin-client Build & Release UX use the same
+  application behavior; and
+- cancelled, invalid, unresolved, incompatible, secret-bearing, policy-missing,
+  and tampered builds fail without activating partial outputs.
+
+Build outputs live under a non-active content-addressed build namespace. Failed
+or interrupted output may be retained as quarantined evidence or garbage
+collected by operator retention policy; it is never a release until approval
+re-verifies every referenced artifact.
+
+Deployment records, activation/rollback, independent qualified rebuilds,
+generalized release execution, runtime quotas, and isolated managed builders are
+not implied by a successful build. Those remain owned by the runtime/deployment
+increment and must consume an approved `SystemRelease` rather than a mutable
+System Builder record.

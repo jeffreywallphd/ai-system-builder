@@ -2,6 +2,9 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 
 import { createOrganizationId } from "../../../../contracts/organization";
+import { normalizeSystemReleaseId } from "../../../../contracts/system-build";
+import type { SystemDataAuditEntry, SystemDataRecord } from "../../../../contracts/system-data";
+import { createWorkspaceId } from "../../../../contracts/workspace";
 import { CreateWorkspaceUseCase } from "../../../../application/use-cases/workspace/create-workspace.use-case";
 import {
   openLocalSqliteDatabase,
@@ -13,6 +16,7 @@ import {
   createLocalWorkspaceSelectionRepository,
   createLocalWorkspaceSystemPackActivationRepository,
 } from "../../workspace";
+import { createStructuredSystemDataRepository } from "../../system-data";
 
 async function main(): Promise<void> {
   const rootDirectory = process.argv[2];
@@ -26,6 +30,64 @@ async function main(): Promise<void> {
 
   const first = await database.documents.writeDocument("tests", "one", { value: 1 });
   const second = await database.documents.writeDocument("tests", "one", { value: 2 }, { expectedRevision: first.revision });
+  const systemDataWorkspaceId = createWorkspaceId("workspace-sqlite-system-data");
+  const systemDataReleaseId = normalizeSystemReleaseId("release-sqlite-system-data");
+  const systemDataRepository = createStructuredSystemDataRepository(database.documents);
+  const firstSystemDataRecord: SystemDataRecord = {
+    recordId: "record-sqlite",
+    targetWorkspaceId: systemDataWorkspaceId,
+    releaseId: systemDataReleaseId,
+    entityType: "service-request",
+    revision: 1,
+    values: { title: "SQLite first" },
+    createdAt: "2026-07-16T12:00:00.000Z",
+    createdBy: "person-sqlite",
+    updatedAt: "2026-07-16T12:00:00.000Z",
+    updatedBy: "person-sqlite",
+  };
+  const createAudit: SystemDataAuditEntry = {
+    auditId: "audit-sqlite-create",
+    targetWorkspaceId: systemDataWorkspaceId,
+    releaseId: systemDataReleaseId,
+    entityType: "service-request",
+    action: "create",
+    outcome: "allowed",
+    actorId: "person-sqlite",
+    recordId: "record-sqlite",
+    changedFields: ["title"],
+    occurredAt: "2026-07-16T12:00:00.000Z",
+  };
+  await systemDataRepository.createRecordWithAudit(firstSystemDataRecord, createAudit);
+  const secondSystemDataRecord: SystemDataRecord = {
+    ...firstSystemDataRecord,
+    revision: 2,
+    values: { title: "SQLite updated" },
+  };
+  const updateAudit: SystemDataAuditEntry = {
+    ...createAudit,
+    auditId: "audit-sqlite-update",
+    action: "update",
+  };
+  await systemDataRepository.updateRecordWithAudit(secondSystemDataRecord, updateAudit, 1);
+  let systemDataConflict = false;
+  try {
+    await systemDataRepository.updateRecordWithAudit(
+      secondSystemDataRecord,
+      { ...updateAudit, auditId: "audit-sqlite-stale" },
+      1,
+    );
+  } catch {
+    systemDataConflict = true;
+  }
+  const systemDataRoundTrip = await systemDataRepository.readRecord(
+    systemDataWorkspaceId,
+    systemDataReleaseId,
+    "service-request",
+    "record-sqlite",
+  );
+  const systemDataAuditCount = (
+    await systemDataRepository.listAudit(systemDataWorkspaceId, systemDataReleaseId, "service-request", 20)
+  ).length;
   const orgA = database.documents.forOrganization(createOrganizationId("org-a"));
   const orgB = database.documents.forOrganization(createOrganizationId("org-b"));
   await database.documents.writeDocument("tenant-test", "shared", { owner: "platform" });
@@ -103,6 +165,10 @@ async function main(): Promise<void> {
     backup,
     restore,
     secondRevision: second.revision,
+    systemDataRevision: systemDataRoundTrip?.revision,
+    systemDataTitle: systemDataRoundTrip?.values.title,
+    systemDataAuditCount,
+    systemDataConflict,
     restoredValue: restoredDocument?.value.value,
     rolledBackPresent: Boolean(rolledBack),
     workspaceDisplayName: persistedWorkspace?.displayName,

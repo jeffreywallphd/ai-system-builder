@@ -54,8 +54,9 @@ describe("thin-client AssetLibraryPage", () => {
     });
 
     expect(container.textContent).toContain("Assets");
-    expect(container.textContent).toContain("Run & Test");
-    expect(container.textContent).toContain("Browse reusable building blocks available in this workspace.");
+    expect(container.textContent).not.toContain("Run & Test");
+    expect(container.textContent).not.toContain("Plans");
+    expect(container.textContent).toContain("Search assets");
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("/api/assets/definitions?limit=50");
     expect((init as RequestInit).method).toBe("GET");

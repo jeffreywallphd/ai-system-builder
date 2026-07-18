@@ -33,10 +33,35 @@
 
 ## Current Implementation Shape
 
-- Baseline contracts: `modules/contracts/system-builder/`.
-- Desktop preparation shell: `apps/desktop/src/renderer/pages/SystemBuilderPage.tsx`.
-- Operational diagnostics: `apps/desktop/src/renderer/features/settings/components/SoftwareStatusSection.tsx`.
-- No repository, use case, API, IPC, persistence, editor, or execution support is implied yet.
+- Contracts and immutable revisions: `modules/contracts/system-builder/`.
+- Repository port and application behavior:
+  `modules/application/ports/system-builder/` and
+  `modules/application/use-cases/system-builder/`.
+- Shared structured persistence: `modules/adapters/persistence/system-builder/`.
+- Shared system validation:
+  `modules/application/services/system-builder/validate-system-builder-revision.service.ts`.
+- API/IPC transports and clients are present for both hosts; Systems uses the
+  shared `modules/ui/shared/system-builder/` editor in desktop and thin client.
+- Deterministic attempts and immutable releases live in the separate
+  `system-build` contract, application, persistence, storage, API/IPC, and
+  shared Build & Release workflow families. Approval re-verifies every artifact
+  and derives release identity from content.
+- Plans and whole-system Run & Test live under Systems, not Assets.
+- The closed secured data-entry template and its release-bound `system-data`
+  runtime are implemented. Runtime schema/policy comes only from one verified
+  approved manifest; application services own validation, authorization,
+  masking, optimistic writes, and redacted audit. Desktop and thin-client use
+  the shared `SystemDataRunTest` presenter.
+- The closed controlled-chatbot template composes reusable foundation and
+  conversation assets, builds through the existing immutable release pipeline,
+  and uses the shared `ConversationRunTest` presenter with real execution-plan
+  identity. Protected instructions stay behind application boundaries; release
+  approval is not runtime activation.
+- Operational diagnostics remain in
+  `apps/desktop/src/renderer/features/settings/components/SoftwareStatusSection.tsx`.
+- Deployment activation and approved-release execution are not implied by the
+  design-time editor or a successful build; those remain later increment
+  boundaries.
 
 ## Canonical Source Docs
 
@@ -54,7 +79,8 @@
 - Do not create a parallel asset/composition vocabulary in System Builder.
 - Do not put Python, ComfyUI, host lifecycle, resource utilization, or software status on System Builder records.
 - Do not make Systems globally accessible without an active workspace.
-- Do not claim CRUD, persistence, build, execution, or thin-client support until its increment implementation and evidence exist.
+- Do not claim deployment, execution, independent reproducibility, or a higher
+  SLSA assurance level until its implementation and qualifying evidence exist.
 - Do not mutate old system revisions/releases or store deployment/runtime status in design records.
 - Do not rename valid ownership terms such as `system.foundation` or `system-owned`.
 

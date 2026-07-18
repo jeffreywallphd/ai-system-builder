@@ -586,10 +586,11 @@ available only when a host supplies the narrow port. Isolated build/test and
 release publication are owned by Increment 6, and sandboxed runtime execution
 by Increment 10, so the Studio displays those gates as blocking until those
 increments supply qualifying evidence.
-  - source/model/toolchain/prompt-template/test/approver provenance without
-    storing protected prompts or provider payloads in general records;
-  - desktop and thin-client Studio parity, with builds and privileged execution
-    remaining host/server-owned.
+
+- source/model/toolchain/prompt-template/test/approver provenance without
+  storing protected prompts or provider payloads in general records;
+- desktop and thin-client Studio parity, with builds and privileged execution
+  remaining host/server-owned.
 - Minimum verification:
   - definition and implementation draft lifecycle tests;
   - customization/rebase/conflict and immutable-source tests;
@@ -702,7 +703,7 @@ Implementation evidence:
 
 ## Increment 5: System Builder CRUD and composition editor
 
-- Status: in progress
+- Status: implemented and verified
 - Purpose: make Systems the workspace-scoped place for assembling simple assets
   into pages, features, subsystems, systems, and systems of subsystems.
 - Deliverables:
@@ -763,6 +764,35 @@ and a semantic hierarchy with explicit move/add/remove actions; pointer
 enhancements cannot be the only editing path. Revision-safe saves follow the
 accepted ADR-0033 optimistic-token model, while all components remain canonical
 Asset Kernel instances and bindings.
+Research sources: the W3C [Tree View pattern](https://www.w3.org/WAI/ARIA/apg/patterns/treeview/),
+[Grid pattern](https://www.w3.org/WAI/ARIA/apg/patterns/grid/), and
+[keyboard-interface guidance](https://www.w3.org/WAI/ARIA/apg/practices/keyboard-interface/).
+
+Implementation evidence:
+
+- `SystemBuilderRecord` now uses optimistic record revisions and points to an
+  immutable `SystemBuilderRevision` snapshot containing the canonical
+  `AssetComposition`, `AssetInstance`, and `AssetBinding` graph;
+- the structured repository persists workspace-qualified records and revisions
+  through the same transactional document-store abstraction used by SQLite and
+  PostgreSQL, with atomic record/revision writes and no revision deletion path;
+- create, list, read, rename, archive, restore, clone, save, revision-read, and
+  revision-history use cases are composed once for both hosts;
+- validation pins exact definition versions, reuses Asset Kernel configuration
+  and port validation, rejects duplicates, orphans, missing endpoints,
+  incompatible ports, cardinality violations, and dependency/control cycles,
+  and returns at most 200 safe actionable issues;
+- authenticated API routes and Electron IPC handlers share operation identities,
+  actor assignment, workspace/organization-scoped persistence, and fail-closed
+  `asset:read` / `asset:write` route policy;
+- desktop and thin-client Systems pages use the same keyboard-operable
+  three-pane catalog/composition/inspector editor with explicit add, configure,
+  connect, remove, save, clone, archive, restore, conflict, and history states;
+- Plans and whole-system Run & Test are owned by Systems in both clients, and
+  the thin client now has workspace-gated `/systems` routing and navigation;
+- focused contract, persistence/use-case, graph-validation, composition-root,
+  API/IPC parity, and security-policy tests pass; thin-client typecheck and
+  production build pass.
 - Minimum verification:
   - CRUD/revision/conflict and persistence conformance tests;
   - missing-workspace and cross-organization denial tests;
@@ -777,7 +807,8 @@ Asset Kernel instances and bindings.
 
 ## Increment 6: System validation, build, and immutable release
 
-- Status: planned
+- Status: implemented and verified; approved-release runtime activation remains
+  explicitly owned by Increment 10
 - Purpose: turn a validated design into a reproducible build and runnable release
   without making design records runtime state.
 - Build flow:
@@ -795,6 +826,92 @@ Asset Kernel instances and bindings.
      tests;
   9. generate SBOM, provenance, digests, compatibility manifest, and evidence;
   10. require release approval and persist an immutable release.
+
+### Increment 6 implementation plan
+
+1. Add a normalized `system-build` contract family for build requests, frozen
+   lock manifests, attempt records, immutable release records, approvals,
+   compatibility, safe diagnostics, evidence descriptors, and API/IPC
+   operations. Keep design revisions, build attempts, releases, deployments,
+   and execution runs as distinct record families.
+2. Add workspace-scoped structured repository, content-addressed artifact,
+   canonical-serialization/digest, implementation-resolution, and deterministic
+   materializer ports. Compose adapters once for SQLite/PostgreSQL and
+   filesystem/object-backed hosts; artifact metadata never contains bytes,
+   credentials, raw paths, signed URLs, or provider payloads.
+3. Implement a fail-closed build orchestrator that reads one immutable System
+   Builder revision, reruns full graph/configuration validation, resolves one
+   permitted exact implementation and facet for every instance, verifies
+   deployment/capability compatibility, compiles finite policy/workflow/schema
+   manifests, materializes deterministic artifacts, writes bounded evidence,
+   and persists success or safe failure without activating partial output.
+4. Implement explicit approval and release publication. Approval must bind the
+   actor to the successful build digest; publication verifies every stored
+   artifact before inserting a content-addressed immutable release. Rebuild and
+   comparison operations must distinguish repeatability from independent
+   reproducibility and never mutate an old release.
+5. Expose build/list/read/cancel, approval, release/list/read/compare, and
+   verified-manifest operations through authenticated API and IPC transports,
+   preload, desktop/thin clients, and fail-closed route policy.
+6. Add a Systems `Build & release` workflow using the shared ordered-step UI:
+   target/readiness, frozen inputs/resolution, build evidence, approval, and
+   immutable release history. Preserve loading, empty, blocked, cancellation,
+   retry, conflict, safe-diagnostic, and keyboard-accessible states.
+7. Update architecture, context packs, security/operations guidance, and run
+   deterministic digest, ambiguous/revoked/incompatible implementation,
+   tamper, immutability, cancellation, storage, tenancy, transport parity,
+   accessibility, typecheck, build, docs, architecture, and full test gates.
+
+Research notes: SLSA 1.2 Build L1 requires automatically generated provenance
+describing the builder, build process, and top-level inputs, while higher levels
+add signed hosted/hardened builder guarantees; this increment records truthful
+local or managed assurance rather than claiming a higher level. SPDX 3.0.1
+provides an open BOM model covering software, build information, AI models,
+datasets, provenance, integrity, and relationships. NIST SSDF PS.3.2 calls for
+collecting and sharing provenance for release components, and NIST's DevSecOps
+reference model recommends ephemeral build/test/release environments plus
+integrity, signature, secret, dependency, and evidence checks. The Reproducible
+Builds project defines reproducibility as bit-for-bit identity from the same
+source, build environment, and instructions, so the implementation records a
+canonical lock/toolchain and labels same-host duplicate-output checks as
+`repeatable` until an independent qualified builder verifies them.
+
+Research sources:
+
+- [SLSA 1.2 Build track](https://slsa.dev/spec/v1.2/build-track-basics)
+- [SPDX 3.0.1 scope](https://spdx.github.io/spdx-spec/v3.0.1/scope/)
+- [NIST Secure Software Development Framework](https://csrc.nist.gov/projects/ssdf)
+- [NIST DevSecOps notional reference model](https://pages.nist.gov/nccoe-devsecops/notational-reference-model.html)
+- [Reproducible Builds documentation](https://reproducible-builds.org/docs/)
+
+Implementation evidence:
+
+- a distinct `system-build` family now owns build attempts, exact lock
+  manifests, safe diagnostics, artifact/evidence descriptors, content-addressed
+  releases, compatibility, and comparisons; design revisions remain unchanged;
+- the build orchestrator re-reads and validates an exact immutable System
+  Builder revision, resolves permitted implementation releases/facets for the
+  requested deployment profile, canonicalizes the lock, and fails closed for
+  unresolved, invalid, incompatible, or cancelled inputs;
+- deterministic materialization produces manifest, applicable UI/logic/workflow
+  bundles, deny-by-default policy, configuration schema, migration plan, and an
+  SPDX SBOM; raw secret-like configuration and mutation without a platform
+  policy are rejected;
+- content-addressed artifact storage verifies SHA-256 at write and approval;
+  in-toto/SLSA-style provenance plus bounded evidence are generated
+  automatically, and assurance is truthfully labeled `repeatable` until an
+  independent qualified builder verifies it;
+- release approval binds the authenticated actor to the reviewed lock digest,
+  re-verifies all output and evidence artifacts, derives an immutable release
+  identifier from content, and preserves prior releases for comparison;
+- SQLite/PostgreSQL-backed structured persistence semantics, server API,
+  desktop IPC/preload, route security, and one shared four-step desktop/thin
+  Build & Release workflow are wired through active host compositions; and
+- focused contract, deterministic output, secret/policy denial, unresolved and
+  tamper denial, workspace isolation, optimistic conflict, release
+  immutability, transport parity, actor-boundary, security-policy, and shared UI
+  tests pass. Server and thin-client production builds are required before this
+  increment is closed.
 - Deliverables:
   - build/release contracts, ports, use cases, persistence, storage, transports,
     clients, and UI;
@@ -822,7 +939,8 @@ Asset Kernel instances and bindings.
 
 ## Increment 7: Forms and secured data-entry reference system
 
-- Status: planned
+- Status: implemented and verified; live PostgreSQL conformance remains
+  environment-gated by `TEST_POSTGRES_URL`
 - Purpose: prove that users can build useful business software from simple
   assets rather than from a hidden feature-specific implementation.
 - Reference composition:
@@ -850,9 +968,102 @@ Asset Kernel instances and bindings.
     enter and revise data, enforce access policy, inspect audit evidence, and run
     the same logical release in local and managed shapes.
 
+### Increment 7 implementation plan
+
+1. Promote the remaining date/time primitive and add exact host-neutral entity
+   field, validation, persistence-operation, CRUD workflow, masking, and audit
+   defaults required by the reference composition. Keep definitions data-only;
+   rendering, authorization, validation, transactions, and writes remain
+   platform-owned implementations.
+2. Add a closed, versioned reference-system template registry and a
+   transaction-safe application use case that creates a System Builder record
+   plus its first immutable Asset Kernel revision. Expose template list/create
+   through API, IPC, preload, and shared Systems UX rather than assembling
+   privileged records in a renderer.
+3. Add approved-release-bound system data contracts and repositories for typed
+   record values, optimistic revisions, workspace/release/entity isolation, and
+   append-only safe audit entries. Use the shared structured-document seam so
+   SQLite and PostgreSQL retain equivalent application semantics.
+4. Implement a finite form/data runtime that reads the verified release
+   manifest, derives an allowlisted schema and narrowing role policy, validates
+   every value on the trusted application layer, masks protected fields,
+   authorizes each create/read/update/list action, commits record plus audit in
+   one transaction, and returns bounded safe diagnostics.
+5. Expose the same release-bound CRUD behavior through authenticated API and
+   desktop IPC clients and a shared accessible Run & Test form/list/detail UX.
+   Use native labeled controls, inline and summary errors, keyboard-complete
+   actions, loading/empty/denied/conflict/success states, and no client-only
+   security decisions.
+6. Verify exact template composition, deterministic build/approval, field
+   validation and masking, authorization denial, audit redaction, optimistic
+   conflicts, cross-workspace and cross-organization isolation, SQLite and
+   PostgreSQL repository semantics, transport parity, responsive accessibility,
+   and rebuild compatibility.
+7. Update foundation, System Builder, runtime, persistence, security, context,
+   operations, and roadmap documentation; run focused tests, production builds,
+   architecture/docs/agent gates, and the applicable full suite.
+
+Research notes: WCAG 2.2 requires detected input errors to be identified and
+described in text, provides error-prevention requirements for stored-data
+changes, and adds focus/target-size and redundant-entry criteria. W3C WAI form
+guidance recommends native labeled controls and makes clear that client
+validation improves usability but never replaces trusted server validation.
+OWASP ASVS requires positive allowlist/shape validation at the trusted service
+layer, least privilege, and fail-secure access control; its logging guidance
+calls for attributable create/update/delete audit trails while excluding access
+tokens, passwords, secrets, and sensitive data. JSON Schema 2020-12 remains the
+portable declarative schema vocabulary. SQLite permits only one simultaneous
+writer and requires explicit busy/conflict handling, while PostgreSQL
+Serializable transactions require retry on serialization failure. The shared
+repository therefore uses bounded optimistic commands and atomic transactions,
+with adapters responsible for native retry/busy translation.
+
+Research sources:
+
+- [WCAG 2.2](https://www.w3.org/TR/WCAG22/)
+- [W3C WAI validating input](https://www.w3.org/WAI/tutorials/forms/validation/)
+- [W3C native HTML form-control technique](https://www.w3.org/WAI/WCAG22/Techniques/html/H91.html)
+- [OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/)
+- [OWASP authorization guidance](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
+- [OWASP logging guidance](https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html)
+- [JSON Schema 2020-12](https://json-schema.org/draft/2020-12)
+- [SQLite transactions](https://www.sqlite.org/lang_transaction.html)
+- [PostgreSQL transaction isolation](https://www.postgresql.org/docs/current/transaction-iso.html)
+
+Implementation evidence:
+
+- the closed `reference.secured-data-entry@1.0.0` registry materializes 35
+  exact-version canonical instances spanning shell, page, auth/policy/mask,
+  typed data fields, form controls, CRUD operations/workflow, audit, display,
+  and complete interaction states; creation atomically stores its first
+  validated immutable revision;
+- deterministic build/approval emits and verifies the manifest, applicable
+  bundles, deny-by-default policy, configuration schema, migration plan, SPDX
+  SBOM, provenance, and evidence before deriving the immutable release;
+- the release resolver requires one verified approved manifest plus exact
+  single-instance security, entity, operation, workflow, and form declarations,
+  rejects ambiguity/cross-entity binding, and derives only finite allowlisted
+  field and narrowing-role definitions;
+- the trusted runtime validates typed values, bounds list/audit reads, enforces
+  per-action host-derived principals, masks protected fields, preserves
+  optimistic revisions, atomically commits record plus audit, and stores field
+  names rather than values in audit evidence;
+- authenticated API, desktop IPC/preload, desktop/thin clients, and one shared
+  accessible Run & Test form/list/detail presenter expose equivalent behavior
+  and safe loading, empty, validation, denied, conflict, masked, success, and
+  audit states;
+- focused contracts, template validation, resolver fail-closed cases,
+  authorization/masking/redaction, conflicts, workspace/organization isolation,
+  API/IPC/preload parity, shared UI, and composition-level
+  create-build-approve-run tests pass;
+- the production Electron SQLite integration suite now proves system-data
+  round-trip, audit, and stale-write behavior. The live PostgreSQL suite proves
+  the same semantics plus RLS organization isolation when
+  `TEST_POSTGRES_URL` is supplied.
+
 ## Increment 8: Chatbot reference system
 
-- Status: planned
+- Status: implemented and verified
 - Purpose: prove an AI-enabled system can be assembled from reusable UI, model,
   context, policy, and logic assets while preserving controlled execution.
 - Reference composition:
@@ -881,9 +1092,100 @@ Asset Kernel instances and bindings.
   - a user can compose, customize, build, approve, and run a chatbot without a
     chatbot-specific parallel architecture or direct provider calls from UI.
 
+### Increment 8 implementation plan
+
+1. Extend the functional foundation only with the finite reusable AI declarations
+   missing from the existing conversation family: protected instruction
+   reference/configuration, bounded generation settings, narrowing conversation
+   policy, controlled text-generation action, and safe fallback declaration.
+   These remain data-only assets; they cannot contain credentials, call a
+   provider, grant tools, or weaken host policy.
+2. Add a closed `reference.controlled-chatbot@1.0.0` System Builder template
+   composed from the existing conversation assets plus shell, model/context,
+   policy, approval/readiness, audit, and complete state assets. Make template
+   selection generic in shared Systems UX and keep template creation atomic,
+   exact-versioned, and validated.
+3. Reuse Increment 6 deterministic build and approval unchanged. Prove the
+   chatbot template produces immutable manifest/UI/workflow/policy evidence,
+   while preserving the explicit fact that release approval is not deployment
+   activation and controlled conversation execution still requires its reviewed
+   execution plan, current readiness binding, and separate session approval.
+4. Consolidate the duplicated desktop/thin conversational Run & Test presenter
+   into one shared component. List actual execution-plan summaries (never
+   composition-plan ids), project host-provided action/readiness state, render
+   the transcript as a bounded accessible `role="log"`, and preserve explicit
+   empty/loading/approval/stale/unsupported/failure/success states.
+5. Keep the existing controlled conversation application services, persistence,
+   API/IPC/preload clients, protected-context builder, runtime guards, adapter
+   catalog, and Python text-generation adapter as the only invocation path.
+   Do not add direct UI/provider calls or fake responses; tools, retrieval,
+   memory, multimodal, streaming, cancel, and retry remain visibly unsupported
+   unless the host already proves them end to end.
+6. Verify template composition and customization/rebuild, deterministic build
+   and approval, exact execution-plan identity, stale approval/readiness denial,
+   unsupported runtime/cancel/retry behavior, bounded input/transcript output,
+   prompt/context/provider-payload non-disclosure, host parity, accessibility,
+   long-conversation rendering, and the full controlled-execution regression
+   suite.
+7. Update foundation, System Builder, controlled-execution, security, UI,
+   context-pack, and roadmap documentation, then run focused tests, production
+   builds, architecture/docs/agent gates, and the applicable full suite.
+
+Research notes: NIST AI 600-1 treats generative-AI risk management as an
+ongoing govern/map/measure/manage activity and emphasizes documented
+pre-deployment testing, provenance, monitoring, and human oversight rather than
+assuming a model or prompt is intrinsically safe. OWASP identifies direct and
+indirect prompt injection as a control-bypass and data-exfiltration risk and
+warns that a system prompt is neither a secret store nor an authorization
+boundary. The implementation therefore keeps instructions/context behind
+protected application contracts, never embeds credentials, and preserves
+host-owned authorization and capability checks outside the model. WAI-ARIA
+defines a chat history as an ordered live `log` with polite announcements and
+supports `aria-busy` while a coherent update is in progress; the shared
+presenter uses those semantics without moving keyboard focus on every response.
+
+Research sources:
+
+- [NIST AI 600-1 Generative AI Profile](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.600-1.pdf)
+- [OWASP LLM01:2025 Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/)
+- [OWASP LLM07:2025 System Prompt Leakage](https://genai.owasp.org/llmrisk/llm072025-system-prompt-leakage/)
+- [OWASP prompt-injection prevention guidance](https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html)
+- [W3C ARIA23 chat-log technique](https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA23.html)
+- [WAI-ARIA 1.2 `aria-busy`](https://www.w3.org/TR/wai-aria/#aria-busy)
+
+Implementation evidence:
+
+- `system.foundation@1.0.0` now provides safe data-only instruction,
+  generation, conversation-policy, controlled-inference, and fallback
+  declarations without credentials, provider authority, or enabled tools;
+- `reference.controlled-chatbot@1.0.0` atomically creates a validated closed
+  composition of 31 exact-version shell, conversation, AI, policy, audit, and
+  complete-state assets;
+- the existing deterministic build and integrity-verified approval pipeline
+  builds and publishes the chatbot release without exposing protected
+  instruction content through public build, approval, or diagnostic results;
+- desktop and thin-client Systems surfaces use one shared Run & Test presenter,
+  list real execution-plan summaries, preserve plan identity on session
+  creation, project application-owned action availability, bound input to 4,000
+  characters and visible transcript output to 200 entries, and expose the
+  conversation as an accessible live `log`;
+- production clients continue to invoke only the existing controlled
+  conversation services and runtime adapter boundary. Tools, retrieval, memory,
+  multimodal input, streaming, cancel, and retry remain truthfully unsupported
+  unless the host advertises a completed path; and
+- the Asset Library read regression caused by unsafe new foundation declarations
+  is fixed: every foundation entry again passes the safety gate, functional
+  catalog conformance, and workspace Asset Library read-facade tests.
+
+Verification evidence includes controlled-template validation, create/build/
+approve end-to-end coverage, protected-content non-disclosure, nested desktop
+operation-envelope handling, execution-plan identity, 202-entry transcript
+bounding, desktop/thin host UI parity, foundation manifest/catalog safety, and
+the existing controlled-conversation regression suites.
+
 ## Increment 9: Data preview and review reference system
 
-- Status: planned
+- Status: in progress
 - Purpose: prove resource-backed assets, bounded content access, multiple preview
   types, filtering, and security can form a reusable review application.
 - Reference composition:
@@ -910,6 +1212,81 @@ Asset Kernel instances and bindings.
 - Exit evidence:
   - a user can compose, build, and run a secured data-review system whose preview
     behavior is assembled from reusable assets and authorized storage seams.
+
+### Increment 9 implementation plan
+
+1. Extend `system.foundation` only with the missing finite review declarations:
+   an artifact-read policy and explicit text, table, raster-image, PDF, and
+   unsupported preview assets. Reuse the existing resource-browser/detail,
+   metadata, filter, field-mask, audit, authentication, workflow, and complete
+   state assets; keep every new definition data-only and authority-free.
+2. Add the closed `reference.secured-data-review@1.0.0` System Builder template.
+   Materialize exact-version shell, browser, filter, detail, preview, policy,
+   masking, audit, and empty/unavailable/oversized/unauthorized/malformed state
+   instances into one canonical Asset Kernel graph, validate it atomically, and
+   build/approve it through the existing deterministic release pipeline.
+3. Add a `system-review` application boundary analogous to the release-bound
+   `system-data` runtime. Resolve policy only from one integrity-verified
+   manifest of an approved release; require authentication and allowlisted
+   roles; browse/read through existing artifact ports; mask configured metadata;
+   classify supported preview kinds; record bounded redacted allow/deny audit
+   events; and fail closed for missing, duplicated, malformed, stale, or
+   cross-workspace release evidence.
+4. Make preview quotas enforceable before byte materialization. Add an optional
+   maximum-byte ceiling to the host-neutral artifact retrieval request and
+   media-view boundary, require adapters to reject objects above the ceiling
+   before reading them, and verify the filesystem adapter stats before
+   `readFile`. Keep full downloads a separate explicit operation without
+   silently treating them as previews.
+5. Harden shared preview rendering. Classify from normalized media metadata plus
+   conservative signatures, never render HTML as markup, treat SVG and Office
+   formats as unsupported in the reference runtime, parse only bounded JSON/CSV
+   samples into native tables, neutralize spreadsheet-formula display risk,
+   sandbox and title PDF frames, revoke object URLs, and expose explicit
+   loading, empty, unavailable, oversized, unauthorized, malformed, and
+   unsupported states.
+6. Expose the release-bound review operations through authenticated API and IPC
+   transports, preload, desktop/thin clients, and one shared Systems Run & Test
+   presenter. The presenter selects an approved release, filters a bounded
+   artifact list, renders masked metadata and the shared preview, and shows safe
+   audit evidence. It must not reveal paths, provider payloads, credentials,
+   unmasked metadata, or raw parser errors.
+7. Add contract, release resolver, authorization/masking/audit, malformed and
+   oversized content, workspace/organization isolation, filesystem pre-read
+   quota, transport parity, presenter accessibility/keyboard/state, template,
+   and create-build-approve-run tests. Reuse a port conformance harness for the
+   artifact-object behavior; a managed cloud object-store selection remains an
+   Increment 10 deployment-shape decision rather than an invented provider in
+   this increment.
+8. Update storage, preview, System Builder, security, host, UI, context-pack, and
+   operations docs. Run focused tests while iterating, then both host
+   typechecks/builds plus docs, architecture, agent-support, and full applicable
+   repository gates.
+
+Rollback plan: the new template and runtime are additive. If release-policy or
+preview conformance fails, remove the template from the registry and leave the
+existing artifact browser/read paths unchanged; optional byte ceilings preserve
+unbounded download compatibility when omitted. No migration or destructive
+record rewrite is introduced.
+
+Research notes: OWASP recommends allowlisting necessary file types, checking
+signatures rather than trusting caller-supplied content type, enforcing size
+limits, keeping storage outside the web root, and serving content through an
+authorized handler. The WHATWG MIME Sniffing standard documents the security
+risk when contributed bytes are interpreted as a more privileged scriptable
+type than intended; this increment therefore uses conservative supported-type
+classification and `nosniff` behavior rather than extension-only trust. RFC
+9110 byte-range semantics demonstrate the portable partial-read model, but a
+range request is advisory and does not replace a server-side maximum; the
+application and adapter enforce their own ceiling. W3C iframe guidance requires
+an accessible frame title; PDF preview also uses a sandboxed, constrained frame.
+
+Research sources:
+
+- [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
+- [WHATWG MIME Sniffing Living Standard](https://mimesniff.spec.whatwg.org/)
+- [RFC 9110 HTTP Semantics - Range Requests](https://www.rfc-editor.org/rfc/rfc9110.html#name-range-requests)
+- [W3C WCAG Technique H64: iframe titles](https://www.w3.org/WAI/WCAG22/Techniques/html/H64)
 
 ## Increment 10: Multi-shape runtime and deployment handoff
 

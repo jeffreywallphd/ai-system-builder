@@ -51,6 +51,7 @@ export class ValidateSystemBuilderRevisionService {
 
     validateCompositionMembership(revision.composition.instanceRefs, instancesById, "instance", issues);
     validateCompositionMembership(revision.composition.bindingRefs ?? [], bindingsById, "binding", issues);
+    validateInstanceParents(revision.composition.compositionId, revision.instances, issues);
     validateBindingEndpoints(revision.bindings, instancesById, issues);
     validatePortCardinality(revision.bindings, instancesById, definitionsById, issues);
     validateDependencyCycles(revision.bindings, instancesById, issues);
@@ -102,6 +103,25 @@ export class ValidateSystemBuilderRevisionService {
     }
     return definitions;
   }
+}
+
+function validateInstanceParents(
+  compositionId: string,
+  instances: readonly AssetInstance[],
+  issues: AssetValidationIssue[],
+): void {
+  instances.forEach((instance, index) => {
+    const parent = instance.parentCompositionRef;
+    if (!parent || parent.kind !== "asset-composition" || String(parent.id) !== String(compositionId)) {
+      issues.push({
+        severity: "error",
+        category: "composition",
+        message: "Every system instance must belong to the saved system composition.",
+        assetRef: instanceReference(instance),
+        path: ["instances", String(index), "parentCompositionRef"],
+      });
+    }
+  });
 }
 
 function uniqueMap<T>(

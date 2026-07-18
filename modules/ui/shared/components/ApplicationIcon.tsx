@@ -4,8 +4,10 @@ export type ApplicationIconName =
   | "assets"
   | "arrow-right"
   | "browse"
+  | "archive"
   | "chevron"
   | "close"
+  | "copy"
   | "collapse"
   | "dataset"
   | "delete"
@@ -14,6 +16,7 @@ export type ApplicationIconName =
   | "info"
   | "image-generation"
   | "library"
+  | "link"
   | "menu"
   | "models"
   | "play"
@@ -67,6 +70,12 @@ function renderIconPaths(name: ApplicationIconName) {
           <path d="m15.5 15.5 2.5 2.5" />
         </>
       );
+    case "archive":
+      return <><path d="M4 7h16v13H4V7Z" /><path d="M3 4h18v3H3zM9 11h6" /></>;
+    case "copy":
+      return <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></>;
+    case "link":
+      return <><path d="m9 15-1.5 1.5a3.5 3.5 0 0 1-5-5L6 8a3.5 3.5 0 0 1 5 0" /><path d="m15 9 1.5-1.5a3.5 3.5 0 0 1 5 5L18 16a3.5 3.5 0 0 1-5 0M8 12h8" /></>;
     case "chevron":
       return <path d="m7 9 5 5 5-5" />;
     case "close":

@@ -1,4 +1,4 @@
-export type ThinClientPageKey = "home" | "artifacts" | "assets" | "user-library" | "image-generation" | "models" | "security" | "settings";
+export type ThinClientPageKey = "home" | "systems" | "artifacts" | "assets" | "user-library" | "image-generation" | "models" | "security" | "settings";
 
 export interface ThinClientPageDefinition {
   key: ThinClientPageKey;
@@ -9,6 +9,7 @@ export interface ThinClientPageDefinition {
 
 export const thinClientPageDefinitions: readonly ThinClientPageDefinition[] = [
   { key: "home", label: "Home", path: "/" },
+  { key: "systems", label: "Systems", path: "/systems", requiresWorkspace: true },
   { key: "artifacts", label: "Artifacts", path: "/artifacts", requiresWorkspace: true },
   { key: "assets", label: "Assets", path: "/assets", requiresWorkspace: true },
     { key: "user-library", label: "Reusable Library", path: "/user-library", requiresWorkspace: true },
@@ -23,6 +24,7 @@ export function thinClientPageRequiresWorkspace(pageKey: ThinClientPageKey): boo
 }
 
 export function resolveThinClientPage(pathname: string): ThinClientPageKey {
+  if (pathname === "/systems") return "systems";
   if (pathname === "/artifacts") return "artifacts";
   if (pathname === "/assets") return "assets";
   if (pathname === "/asset-authoring") return "assets";

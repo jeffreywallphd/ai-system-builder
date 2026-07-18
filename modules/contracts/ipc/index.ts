@@ -49,3 +49,6 @@ export * from './desktop-conversation-execution-v2-contract';
 export * from "./desktop-asset-implementation-contract";
 export * from "./desktop-asset-package-contract";
 export * from "./desktop-asset-studio-contract";
+export * from "./desktop-system-builder-contract";
+export * from "./desktop-system-build-contract";
+export * from "./desktop-system-data-contract";

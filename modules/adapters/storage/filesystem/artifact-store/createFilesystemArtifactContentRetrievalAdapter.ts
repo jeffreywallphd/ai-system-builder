@@ -5,7 +5,11 @@ import type {
   RetrieveArtifactViewerMediaByStorageKeyRequest,
 } from "../../../../application/ports/artifact-content";
 import type { ArtifactObjectStoragePort } from "../../../../application/ports/storage";
-import { createContractError, createFailureResult, createSuccessResult } from "../../../../contracts/shared";
+import {
+  createContractError,
+  createFailureResult,
+  createSuccessResult,
+} from "../../../../contracts/shared";
 import { normalizeStorageArtifactKey } from "../../../../contracts/storage";
 import { isWorkspaceId } from "../../../../contracts/workspace";
 
@@ -23,18 +27,30 @@ export function createFilesystemArtifactContentRetrievalAdapter(
       context: ApplicationRequestContext = {},
     ) {
       const storageKey = normalizeStorageArtifactKey(request.storageKey);
-      const catalogResult = await options.artifactCatalogRead.readArtifactCatalogRecord(
-        { workspaceId: isWorkspaceId(context.workspaceId) ? context.workspaceId : undefined, storageKey },
-        context,
-      );
+      const catalogResult =
+        await options.artifactCatalogRead.readArtifactCatalogRecord(
+          {
+            workspaceId: isWorkspaceId(context.workspaceId)
+              ? context.workspaceId
+              : undefined,
+            storageKey,
+          },
+          context,
+        );
 
       if (!catalogResult.ok) {
         return catalogResult;
       }
 
-      if (catalogResult.value.record.workspaceId !== context.workspaceId || catalogResult.value.record.storageKey !== storageKey) {
+      if (
+        catalogResult.value.record.workspaceId !== context.workspaceId ||
+        catalogResult.value.record.storageKey !== storageKey
+      ) {
         return createFailureResult(
-          createContractError("not-found", `Artifact not found for storage key \"${storageKey}\".`),
+          createContractError(
+            "not-found",
+            `Artifact not found for storage key \"${storageKey}\".`,
+          ),
           context,
         );
       }
@@ -42,22 +58,28 @@ export function createFilesystemArtifactContentRetrievalAdapter(
       const retrieveResult = await options.storage.retrieveArtifact(
         {
           key: storageKey,
+          maximumBytes: request.maximumBytes,
         },
         context,
       );
 
       if (!retrieveResult.ok) {
         return createFailureResult(
-          createContractError(retrieveResult.error.code, retrieveResult.error.message, {
-            details: retrieveResult.error.details,
-          }),
+          createContractError(
+            retrieveResult.error.code,
+            retrieveResult.error.message,
+            {
+              details: retrieveResult.error.details,
+            },
+          ),
           context,
         );
       }
 
-      const bytes = retrieveResult.value.content instanceof Uint8Array
-        ? retrieveResult.value.content
-        : new Uint8Array(retrieveResult.value.content as ArrayBufferLike);
+      const bytes =
+        retrieveResult.value.content instanceof Uint8Array
+          ? retrieveResult.value.content
+          : new Uint8Array(retrieveResult.value.content as ArrayBufferLike);
 
       return createSuccessResult(
         {

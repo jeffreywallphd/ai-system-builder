@@ -20,6 +20,11 @@ export interface ReadSystemBuilderSystemQuery {
   readonly systemId: SystemBuilderSystemId;
 }
 
+export interface ListSystemBuilderSystemsQuery {
+  readonly workspaceId: WorkspaceId;
+  readonly includeArchived?: boolean;
+}
+
 export interface RenameSystemBuilderSystemCommand extends SystemCommandContext {
   readonly systemId: SystemBuilderSystemId;
   readonly expectedRevision: number;
@@ -51,3 +56,7 @@ export interface ReadSystemBuilderRevisionQuery {
   readonly revisionId?: SystemBuilderRevisionId;
 }
 
+export interface ListSystemBuilderRevisionsQuery {
+  readonly workspaceId: WorkspaceId;
+  readonly systemId: SystemBuilderSystemId;
+}

@@ -47,6 +47,11 @@ import { createDesktopFeatureLifecycleRegistry, type DesktopFeatureDisposeReason
 import { createUnavailablePythonRuntimeStatus, resolvePythonRuntimeBaseUrl, type DesktopPythonRuntimeFeature } from "./desktopPythonRuntimeHelpers";
 import { createPythonConversationalRuntimeAdapterCatalog, createPythonConversationalRuntimeGuard, createPythonConversationalTextGenerationInvocationAdapter } from "../../../adapters/runtime/conversational-text-generation";
 import type { StructuredDocumentStore } from "../../../adapters/persistence/shared";
+import { composeSystemBuilder } from "../../shared/composition/composeSystemBuilder";
+import type { SystemBuildArtifactPort } from "../../../application/ports/system-build";
+import { createSha256SystemBuildHasher, createSystemBuildArtifactAdapter } from "../../../adapters/storage/system-build";
+import { composeSystemBuild } from "../../shared/composition/composeSystemBuild";
+import { composeSystemData } from "../../shared/composition/composeSystemData";
 export { createDesktopRuntimeReadinessService, type CreateDesktopRuntimeReadinessServiceOptions } from "./composeDesktopRuntimeReadiness";
 
 const HUGGING_FACE_TOKEN_SETTING_KEY = "huggingface.token" as const;
@@ -352,6 +357,36 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
         return async () => module.composeDesktopDatasetPreparationFeature({ artifacts: await getArtifactFeatures(), runtime: await getRuntimeTaskFeatures(), getArtifactRemoteFeatures, now: options.now });
       }});
       const structuredRepositoryOptions = { rootDir: registerOptions.storageRootDirectory, now: options.now, documents: organizationDocuments };
+      const systemBuilder = organizationDocuments ? composeSystemBuilder({
+        documents: organizationDocuments,
+        definitions: {
+          async readExactDefinition(reference) {
+            await getAssetFeatures();
+            return internalAssetRegistry?.assetKernel.repositories.definitionRepository.getDefinition(reference);
+          },
+        },
+        generateSystemId: () => `system.${randomUUID()}`,
+        now: options.now,
+      }) : undefined;
+      const systemBuildArtifacts: SystemBuildArtifactPort = {
+        async putImmutable(request) { return createSystemBuildArtifactAdapter((await getArtifactFeatures()).storage).putImmutable(request); },
+        async readVerified(workspaceId, descriptor) { return createSystemBuildArtifactAdapter((await getArtifactFeatures()).storage).readVerified(workspaceId, descriptor); },
+      };
+      const systemBuild = organizationDocuments && systemBuilder ? composeSystemBuild({
+        documents: organizationDocuments,
+        systemBuilder,
+        resolver: { async resolve(request) { const implementation = (await getAssetFeatures()).assetImplementation; if (!implementation) return { status: "blocked", definitionRef: request.definitionRef, selectedFacets: [], diagnostics: [{ severity: "error", code: "implementation.unavailable", message: "Asset implementation storage is unavailable." }] }; return implementation.useCases.resolve.execute(request); } },
+        artifacts: systemBuildArtifacts,
+        hasher: createSha256SystemBuildHasher(),
+        now: options.now,
+      }) : undefined;
+      const systemData = organizationDocuments && systemBuild ? composeSystemData({
+        documents: organizationDocuments,
+        builds: systemBuild.repository,
+        artifacts: systemBuildArtifacts,
+        generateAuditId: () => `system-data-audit.${randomUUID()}`,
+        now: options.now,
+      }) : undefined;
       const userLibraryAssetRepository = createLocalUserLibraryAssetRepositoryAdapter(structuredRepositoryOptions);
       const authoredAssetRepository = createLocalAuthoredAssetRepositoryAdapter(structuredRepositoryOptions);
       const assetDraftRepository = createLocalAssetDraftRepositoryAdapter(structuredRepositoryOptions);
@@ -552,6 +587,9 @@ export function composeDesktopHost(options: ComposeDesktopHostOptions = {}): Des
           read: { async execute(workspaceId, workflowId) { const feature = (await getAssetFeatures()).assetStudio; if (!feature) throw new Error("Asset Studio storage is unavailable."); return feature.useCases.read.execute(workspaceId, workflowId); } },
           list: { async execute(workspaceId) { const feature = (await getAssetFeatures()).assetStudio; if (!feature) throw new Error("Asset Studio storage is unavailable."); return feature.useCases.list.execute(workspaceId); } },
         },
+        ...(systemBuilder ? { systemBuilder: { ipcMain: registerOptions.ipcMain, ...systemBuilder.useCases } } : {}),
+        ...(systemBuild ? { systemBuild: { ipcMain: registerOptions.ipcMain, ...systemBuild.useCases } } : {}),
+        ...(systemData ? { systemData: { ipcMain: registerOptions.ipcMain, runtime: systemData.runtime } } : {}),
       });
       recordHostMemorySnapshot("desktop.host.ipc-registration.lazy-handlers.after");
       recordHostMemorySnapshot("desktop.host.ipc-registration.return");

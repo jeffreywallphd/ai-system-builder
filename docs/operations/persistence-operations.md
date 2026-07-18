@@ -148,6 +148,22 @@ export count and SHA-256 digest. It writes sanitized timing/checksum evidence
 under `artifacts/qualification/postgres-recovery`. Never point this command at a
 shared, staging, or production database: destruction is intentional.
 
+## Release-bound system-data recovery checks
+
+Approved-release records and safe audit evidence use the structured-document
+namespaces `system-data/records` and `system-data/audit`. They are covered by
+the same SQLite/PostgreSQL backup, export, organization partition, restore, and
+retention controls as other structured records; no separate file tree or
+database schema is introduced.
+
+After restore, select a non-production test release and verify: the release
+manifest passes integrity verification; an authorized create/read/update
+round-trip succeeds; a stale expected revision is rejected; a lower-privilege
+reader receives masked protected fields; an unauthorized write is denied; and
+the audit view contains the action/outcome and changed field names without field
+values. A database restore without the matching content-addressed build
+artifacts must leave the release runtime unavailable rather than infer a schema
+from mutable design state.
 ## Upgrade and rollback
 
 The application owns monotonic migrations and serializes startup migration work.

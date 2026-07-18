@@ -164,7 +164,7 @@ describe("desktop page section loading", () => {
 
   it("keeps Asset Library resource-backed views separate from initial definitions", async () => {
     const { container: c, api } = await mount(<AssetLibraryPage workspaceId="w1" workspaceName="Workspace" />);
-    expect(c.textContent).toContain("Asset Library");
+    expect(c.textContent).toContain("Assets");
     expect(api.listAssetDefinitions).toHaveBeenCalled();
     expect(api.listAssetResourceBackedViews).not.toHaveBeenCalled();
     const tab = Array.from(c.querySelectorAll("button")).find((button) => button.textContent === "Resource views");
@@ -186,6 +186,8 @@ describe("desktop page section loading", () => {
   it("keeps the Systems builder shell free of operational software reads", async () => {
     const { container: c, api } = await mount(<SystemBuilderPage workspaceId="w1" workspaceName="Workspace" />);
     expect(c.textContent).toContain("System Builder");
+    expect(c.textContent).toContain("Plans");
+    expect(c.textContent).toContain("Run & Test");
     expect(api.readFeatureLifecycleState).not.toHaveBeenCalled();
     expect(api.readPythonRuntimeStatus).not.toHaveBeenCalled();
     expect(api.readComfyUiInstallStatus).not.toHaveBeenCalled();

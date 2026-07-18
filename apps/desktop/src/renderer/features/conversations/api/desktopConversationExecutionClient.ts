@@ -5,8 +5,15 @@ type SessionValue = { conversationSessionId?: string; id?: string; approvalStatu
 type TranscriptValue = { entries?: unknown[]; messages?: unknown[]; turns?: unknown[] };
 const fail = (message: string, code = 'internal'): Result<never> => ({ ok: false, error: { code, message } });
 const asResult = <T,>(v: unknown): Result<T> => {
-  const r = v as { ok?: boolean; value?: T; error?: { message?: string; code?: string } };
-  return r?.ok === true ? { ok: true, value: r.value as T } : fail(r?.error?.message ?? 'Unable to complete request.', r?.error?.code ?? 'internal');
+  const r = v as { ok?: boolean; value?: unknown; error?: { message?: string; code?: string } };
+  if (r?.ok !== true) return fail(r?.error?.message ?? 'Unable to complete request.', r?.error?.code ?? 'internal');
+  const nested = r.value as { kind?: string; value?: T; failureKind?: string; diagnostics?: Array<{ message?: string; code?: string }> } | undefined;
+  if (nested?.kind === 'success') return { ok: true, value: nested.value as T };
+  if (nested?.kind === 'failure') {
+    const diagnostic = nested.diagnostics?.[0];
+    return fail(diagnostic?.message ?? 'Unable to complete request.', diagnostic?.code ?? nested.failureKind ?? 'internal');
+  }
+  return { ok: true, value: r.value as T };
 };
 
 type DesktopApi = {

@@ -106,6 +106,9 @@ import {
   DESKTOP_CONVERSATION_EXECUTION_V2_SUBMIT_TURN_REQUEST_CHANNEL,
   DESKTOP_CONVERSATION_EXECUTION_V2_CANCEL_TURN_REQUEST_CHANNEL,
   DESKTOP_CONVERSATION_EXECUTION_V2_RETRY_TURN_REQUEST_CHANNEL,
+  DESKTOP_SYSTEM_BUILDER_CHANNELS,
+  DESKTOP_SYSTEM_DATA_CHANNELS,
+  createIpcSuccessResponse,
 } from "../../../../../modules/contracts/ipc";
 import {
   DESKTOP_USER_LIBRARY_PROMOTE_REQUEST_CHANNEL,
@@ -132,6 +135,44 @@ import { createDesktopPreloadApi, type IpcRendererInvokePort } from "../exposedA
 
 describe("desktop preload exposedApi bridge", () => {
 
+
+  it("maps System Builder templates and release-bound data operations to dedicated IPC channels", async () => {
+    const responses = [
+      createIpcSuccessResponse(DESKTOP_SYSTEM_BUILDER_CHANNELS.listTemplates.response, []),
+      createIpcSuccessResponse(DESKTOP_SYSTEM_BUILDER_CHANNELS.createFromTemplate.response, {}),
+      createIpcSuccessResponse(DESKTOP_SYSTEM_DATA_CHANNELS.describe.response, {}),
+      createIpcSuccessResponse(DESKTOP_SYSTEM_DATA_CHANNELS.create.response, {}),
+      createIpcSuccessResponse(DESKTOP_SYSTEM_DATA_CHANNELS.read.response, {}),
+      createIpcSuccessResponse(DESKTOP_SYSTEM_DATA_CHANNELS.update.response, {}),
+      createIpcSuccessResponse(DESKTOP_SYSTEM_DATA_CHANNELS.list.response, {}),
+      createIpcSuccessResponse(DESKTOP_SYSTEM_DATA_CHANNELS.listAudit.response, []),
+    ];
+    const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockImplementation(async () => responses.shift());
+    const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });
+    const context = { requestId: "request-system-data", correlationId: "correlation-system-data" };
+    const binding = { workspaceId: "workspace.a", releaseId: "release.a", entityType: "service-request" };
+
+    await api.listSystemBuilderTemplates({}, context);
+    await api.createSystemBuilderFromTemplate({ workspaceId: "workspace.a", templateId: "reference.secured-data-entry@1.0.0", name: "Requests" }, context);
+    await api.describeSystemDataForm(binding, context);
+    await api.createSystemDataRecord({ ...binding, recordId: "record.a", values: { title: "First" } }, context);
+    await api.readSystemDataRecord({ ...binding, recordId: "record.a" }, context);
+    await api.updateSystemDataRecord({ ...binding, recordId: "record.a", expectedRevision: 1, values: { title: "Updated" } }, context);
+    await api.listSystemDataRecords({ ...binding, limit: 25 }, context);
+    await api.listSystemDataAudit({ ...binding, limit: 25 }, context);
+
+    expect(invoke.mock.calls.map((call) => call[0])).toEqual([
+      DESKTOP_SYSTEM_BUILDER_CHANNELS.listTemplates.request.value,
+      DESKTOP_SYSTEM_BUILDER_CHANNELS.createFromTemplate.request.value,
+      DESKTOP_SYSTEM_DATA_CHANNELS.describe.request.value,
+      DESKTOP_SYSTEM_DATA_CHANNELS.create.request.value,
+      DESKTOP_SYSTEM_DATA_CHANNELS.read.request.value,
+      DESKTOP_SYSTEM_DATA_CHANNELS.update.request.value,
+      DESKTOP_SYSTEM_DATA_CHANNELS.list.request.value,
+      DESKTOP_SYSTEM_DATA_CHANNELS.listAudit.request.value,
+    ]);
+    expect(invoke.mock.calls[1]?.[1]).toMatchObject({ payload: { workspaceId: "workspace.a", templateId: "reference.secured-data-entry@1.0.0", name: "Requests" }, requestId: context.requestId, correlationId: context.correlationId });
+  });
   it("maps conversation execution bridge calls to conversation IPC channels", async () => {
     const invoke = testDouble.fn<IpcRendererInvokePort["invoke"]>().mockResolvedValue({ ok: true, value: {} });
     const api = createDesktopPreloadApi({ ipcRenderer: { invoke } });

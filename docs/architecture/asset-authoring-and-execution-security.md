@@ -79,6 +79,21 @@ dependency/capability consent are required before an immutable source snapshot
 is created. No configured provider is a normal unavailable state, not a reason
 to fall back to an implicit provider or broader tools.
 
+## Approved-release data execution
+
+The secured data-entry reference runtime accepts only an integrity-verified
+manifest from an approved `SystemRelease`. It requires exactly one supported
+entity and exact authentication, authorization, masking, audit, CRUD-operation,
+workflow, and form declarations. Missing, duplicate, malformed, or cross-entity
+declarations deny execution.
+
+Field names and values are positively allowlisted at the application boundary.
+Transport principals are host-derived, system policy may only narrow platform
+policy, and protected fields are removed before response serialization. Record
+create/update and their append-only audit entry share one database transaction.
+Audit entries contain actor, release/entity/action/outcome, record identity, and
+changed field names only; they never contain field values, prompts, credentials,
+provider payloads, or raw errors.
 ## Fail-closed requirements
 
 - Missing sandbox runtime: authored/imported build or execution is unavailable.

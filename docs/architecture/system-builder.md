@@ -8,7 +8,11 @@
 
 System Builder is the workspace-scoped product area where users construct systems by composing assets and larger asset compositions. It is not an application-health dashboard and must not become a second asset, planning, runtime, or execution architecture.
 
-The repository currently establishes terminology, design-time contracts, navigation ownership, and data-model seams. ADR-0033 accepts revision-safe CRUD, composition editing, deterministic builds, and immutable releases as the target boundary; their support remains increment-gated until implementation evidence passes.
+The repository implements the revision-safe CRUD and typed composition-editor
+boundary accepted by ADR-0033 plus deterministic build attempts and immutable,
+content-addressed system releases. A validated design revision is still not a
+release, deployment, or running system: build and approval remain explicit
+downstream actions.
 
 ## Canonical concepts
 
@@ -30,14 +34,24 @@ SystemBuilderRecord {
   name
   description?
   status
+  revision
+  currentRevisionId?
   composition
   sourceCompositionPlanId?
   systemDefinitionRef?
   createdAt
   updatedAt
+  createdBy
+  updatedBy
   archivedAt?
 }
 ```
+
+`SystemBuilderRevision` is an immutable snapshot containing the composition,
+instances, bindings, safe validation issues, actor, and timestamp. Updating a
+record requires the caller's expected record revision. Saving a composition
+creates a new revision and advances the record atomically; an old revision is
+never overwritten.
 
 The composition field narrows the existing Asset Kernel `AssetComposition` to `system` or `system-of-subsystems`. It does not copy its instance, binding, rule, dependency, provenance, lifecycle, or validation vocabularies.
 
@@ -56,7 +70,33 @@ Design-time statuses are `draft`, `in-composition`, `blocked`, `ready-for-valida
 
 **Systems** is a top-level, workspace-required destination. It owns system lists, revision-safe creation/editing, validation, builds, releases, and system-level Run & Test through explicit contracts and use cases. Surfaces must remain truthful while each operation is increment-gated.
 
-General asset composition planning may remain available in Assets / Plans as an input-building workflow. System-specific assembly and system-record management belong in Systems. The two surfaces must share the same contracts rather than fork planning and composition data.
+General asset composition planning is presented in Systems / Plans as an
+input-building workflow. System-specific assembly, record management, and
+system-level Run & Test belong in Systems. Assets owns catalog, package import,
+authoring, customization, and single-asset Studio workflows.
+
+## Implemented composition boundary
+
+- `modules/application/ports/system-builder` owns the repository seam.
+- `modules/adapters/persistence/system-builder` uses structured document stores,
+  so local SQLite and managed PostgreSQL receive the same semantics.
+- `modules/application/use-cases/system-builder` owns revision-safe lifecycle
+  commands; adapters and UI do not invent system truth.
+- `ValidateSystemBuilderRevisionService` resolves exact definitions and composes
+  canonical Asset Kernel validators with system endpoint, cardinality, and
+  dependency-cycle checks.
+- `modules/adapters/transport/api-express/system-builder` and
+  `modules/adapters/transport/ipc-electron/system-builder` expose the same
+  operations. API reads require `asset:read`; mutations require `asset:write`.
+- `modules/ui/shared/system-builder` is the shared desktop/thin-client editor.
+  It uses native labeled controls and buttons as the complete keyboard path.
+- `modules/contracts/system-build`, `modules/application/use-cases/system-build`,
+  and the matching persistence/storage/transport adapters own deterministic
+  attempts and immutable releases without adding runtime state to system
+  records.
+- Systems / Build & Release freezes an exact revision and deployment profile,
+  exposes safe diagnostics and evidence, and requires an explicit integrity-
+  verified approval before a release exists.
 
 **Settings / Software status** owns:
 
@@ -67,15 +107,53 @@ General asset composition planning may remain available in Assets / Plans as an 
 
 Opening Systems must never trigger these operational reads. Opening Settings or Software status must not create, mutate, validate, or execute a composed system.
 
-## Current implementation gaps
+## Secured data-entry reference execution
 
-- system repository ports and persistence adapters;
-- create/read/list/update/archive use cases;
-- plan-to-system materialization and validation services;
-- API, IPC, preload, and client operations;
-- visual or structured system editing;
-- system publication/versioning and execution handoff;
-- thin-client System Builder parity;
+Increment 7 adds one closed, versioned reference template,
+`reference.secured-data-entry@1.0.0`. Template creation atomically persists the
+system record and its first immutable revision; it does not bypass Asset Kernel
+validation or create runtime state.
+
+The corresponding `system-data` application family runs only from one
+integrity-verified manifest belonging to an approved release. It fails closed
+when the release, manifest, authentication declaration, audit declaration,
+field mask, entity, operation, workflow, form, or narrowing role policy is
+missing, duplicated, malformed, or bound to another entity. The trusted
+application layer allowlists fields and values, enforces action policy, masks
+protected fields, bounds reads, and atomically commits optimistic record writes
+with append-only redacted audit entries.
+
+Desktop and thin-client Systems pages share the same native-control Run & Test
+presenter. API identity comes from authenticated request context, desktop IPC
+uses its explicit local trusted principal, and neither renderer can select or
+broaden the effective principal. This is a finite built-in release runtime, not
+authorization for arbitrary release code, deployment activation, or a second
+data/policy architecture.
+
+## Controlled chatbot reference system
+
+Increment 8 adds the closed `reference.controlled-chatbot@1.0.0` template. It
+atomically creates and validates a 31-instance Asset Kernel composition using
+exact-version shell, conversation, model/context, protected instruction,
+bounded generation, narrowing policy, audit, controlled inference, fallback,
+and complete-state assets. The template does not create a provider client,
+runtime session, execution plan, deployment, or activation.
+
+The existing deterministic build and approval families produce its immutable
+release. Systems Run & Test remains a distinct downstream workflow: desktop and
+thin client use the same shared presenter, list actual execution plans, and
+create an approval-gated conversation session through the existing controlled
+conversation clients. Protected instruction values remain behind application
+configuration/context boundaries and are absent from public build summaries,
+approval results, operational diagnostics, and session summaries. Tools,
+retrieval, memory, multimodal IO, streaming, cancel, and retry are not implied.
+
+## Remaining increment-gated gaps
+
+- deployment activation/rollback and approved-release execution handoff;
+- independent qualified rebuild and higher assurance claims;
 - collaboration, permissions, import/export, marketplace, and deployment synchronization.
 
-The target choices for these boundaries are accepted by ADR-0033, but public support must not be inferred from documents or baseline contracts. Each operation remains unavailable until its implementation and verification are present. See `docs/architecture/system-build-and-release.md`.
+Build/release support must not be inferred from design validation, and a release
+must not be treated as deployed or running. See
+`docs/architecture/system-build-and-release.md`.
