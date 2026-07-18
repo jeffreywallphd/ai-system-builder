@@ -11,6 +11,24 @@ This file is the repository entry point for coding agents. Keep it short; use th
 5. For architecture-sensitive work, consult `docs/adr/decision-readiness.md` before planning implementation.
 6. Inspect the affected code, its nearest README, and its tests before editing.
 
+## Repository Agent Skills
+
+- Discover portable repository skills from `skills/*/SKILL.md`. Read the
+  matching `SKILL.md` completely and follow its referenced workflow before
+  taking task actions.
+- Route by the skill description and user intent; the user does not need the
+  exact skill name. A request to use a skill if available for an implementation
+  roadmap, or to prepare, review, execute, continue, or resume roadmap
+  increments, must use
+  `skills/manage-implementation-roadmaps/SKILL.md`.
+- Treat a natural-language request such as "use a skill if available to create
+  an implementation roadmap" as sufficient invocation. The skill still
+  requires explicit user approval of high-level options and the completed
+  roadmap before implementation.
+- Keep repository skills portable across supported coding agents. Add or update
+  skill tests, routing documentation, and installation guidance in the same
+  change as a skill behavior change.
+
 ## Source Authority
 
 When guidance conflicts, use this order and make the conflict visible:
@@ -44,6 +62,22 @@ Run the narrowest relevant tests while iterating, then run the applicable reposi
 - `npm run build:thin-client` when thin-client build or wiring changes.
 
 Report commands run, failures, assumptions, and any verification you could not perform.
+
+## Contributor Helper Loops
+
+- Portable bounded loops live in `dev-tools/helpers/`; usage and configuration
+  are documented in `docs/diagnostics/contributor-helper-loops.md`.
+- User-invoked, cross-agent workflows live in `skills/`. Do not move generic
+  repository checks or patch transport into a skill; link a skill to bounded
+  helpers when their responsibilities complement each other.
+- Copy the example configuration into an ignored local directory, inspect
+  `--plan`, and run `dev-tools/helpers/run_repository_checks.py` to group
+  related gates.
+- Helpers do not bypass approvals. Do not add arbitrary command execution,
+  destructive cleanup, Git-history mutation, credentials, or local system paths.
+- When a secure action becomes repetitive, improve an existing bounded helper or
+  add a new one with configuration, negative security tests, and documentation
+  in the same change.
 
 ## Stop and Escalate
 

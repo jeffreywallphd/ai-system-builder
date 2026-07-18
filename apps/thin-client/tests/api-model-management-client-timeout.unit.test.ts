@@ -1,39 +1,102 @@
-import { afterEach, describe, expect, it, testDouble } from "../../../modules/testing/node-test";
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  testDouble,
+} from "../../../modules/testing/node-test";
 
 import {
   createApiModelManagementClient,
   MODEL_MANAGEMENT_DOWNLOAD_REQUEST_TIMEOUT_MS,
 } from "../src/features/model-management/api/apiModelManagementClient";
 
-const originalWindow = (globalThis as { window?: unknown }).window;
-const originalFetch = globalThis.fetch;
-const originalLocalStorage = (globalThis as { localStorage?: unknown }).localStorage;
+const originalWindowDescriptor = Object.getOwnPropertyDescriptor(
+  globalThis,
+  "window",
+);
+const originalFetchDescriptor = Object.getOwnPropertyDescriptor(
+  globalThis,
+  "fetch",
+);
+const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(
+  globalThis,
+  "localStorage",
+);
+
+const defineGlobal = (
+  property: "window" | "fetch" | "localStorage",
+  value: unknown,
+): void => {
+  Object.defineProperty(globalThis, property, {
+    configurable: true,
+    value,
+    writable: true,
+  });
+};
+
+const restoreGlobal = (
+  property: "window" | "fetch" | "localStorage",
+  descriptor?: PropertyDescriptor,
+): void => {
+  if (descriptor) {
+    Object.defineProperty(globalThis, property, descriptor);
+    return;
+  }
+  Reflect.deleteProperty(globalThis, property);
+};
 
 describe("api model management client request timeouts", () => {
   afterEach(() => {
-    (globalThis as { window?: unknown }).window = originalWindow;
-    globalThis.fetch = originalFetch;
-    (globalThis as { localStorage?: unknown }).localStorage = originalLocalStorage;
+    restoreGlobal("window", originalWindowDescriptor);
+    restoreGlobal("fetch", originalFetchDescriptor);
+    restoreGlobal("localStorage", originalLocalStorageDescriptor);
   });
 
   it("uses a long transport timeout for Hugging Face model downloads", async () => {
-    const setTimeoutSpy = testDouble.fn((handler: TimerHandler, timeout?: number) => {
-      return 1;
-    });
+    const setTimeoutSpy = testDouble.fn(
+      (handler: TimerHandler, timeout?: number) => {
+        return 1;
+      },
+    );
     const clearTimeoutSpy = testDouble.fn();
-    (globalThis as { window?: unknown }).window = {
+    defineGlobal("window", {
       setTimeout: setTimeoutSpy,
       clearTimeout: clearTimeoutSpy,
-    };
-    (globalThis as { localStorage?: unknown }).localStorage = { getItem: () => null };
-    globalThis.fetch = testDouble.fn(() => Promise.resolve({ headers: { get: () => "application/json" }, status: 200, json: async () => ({ ok: true, value: { model: { modelRecordId: "m1" }, download: { provider: "transformers", modelId: "stabilityai/stable-diffusion-xl-base-1.0", downloaded: true, fromCache: false, localPath: "/models/sdxl" } } }) } as unknown as Response)) as typeof fetch;
+    });
+    defineGlobal("localStorage", { getItem: () => null });
+    defineGlobal(
+      "fetch",
+      testDouble.fn(() =>
+        Promise.resolve({
+          headers: { get: () => "application/json" },
+          status: 200,
+          json: async () => ({
+            ok: true,
+            value: {
+              model: { modelRecordId: "m1" },
+              download: {
+                provider: "transformers",
+                modelId: "stabilityai/stable-diffusion-xl-base-1.0",
+                downloaded: true,
+                fromCache: false,
+                localPath: "/models/sdxl",
+              },
+            },
+          }),
+        } as unknown as Response),
+      ) as typeof fetch,
+    );
 
     const result = createApiModelManagementClient().downloadModel({
       provider: "huggingface",
       modelId: "stabilityai/stable-diffusion-xl-base-1.0",
     });
 
-    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), MODEL_MANAGEMENT_DOWNLOAD_REQUEST_TIMEOUT_MS);
+    expect(setTimeoutSpy).toHaveBeenCalledWith(
+      expect.any(Function),
+      MODEL_MANAGEMENT_DOWNLOAD_REQUEST_TIMEOUT_MS,
+    );
     const resolved = await result;
     expect(JSON.stringify(resolved)).not.toContain("/models/sdxl");
     expect("localPath" in resolved.model).toBe(false);
@@ -41,15 +104,26 @@ describe("api model management client request timeouts", () => {
   });
 
   it("keeps short request timeouts short for list operations", async () => {
-    const setTimeoutSpy = testDouble.fn((handler: TimerHandler, timeout?: number) => {
-      return 1;
-    });
-    (globalThis as { window?: unknown }).window = {
+    const setTimeoutSpy = testDouble.fn(
+      (handler: TimerHandler, timeout?: number) => {
+        return 1;
+      },
+    );
+    defineGlobal("window", {
       setTimeout: setTimeoutSpy,
       clearTimeout: testDouble.fn(),
-    };
-    (globalThis as { localStorage?: unknown }).localStorage = { getItem: () => null };
-    globalThis.fetch = testDouble.fn(() => Promise.resolve({ headers: { get: () => "application/json" }, status: 200, json: async () => ({ ok: true, value: { models: [] } }) } as unknown as Response)) as typeof fetch;
+    });
+    defineGlobal("localStorage", { getItem: () => null });
+    defineGlobal(
+      "fetch",
+      testDouble.fn(() =>
+        Promise.resolve({
+          headers: { get: () => "application/json" },
+          status: 200,
+          json: async () => ({ ok: true, value: { models: [] } }),
+        } as unknown as Response),
+      ) as typeof fetch,
+    );
 
     const result = createApiModelManagementClient().listModels();
 

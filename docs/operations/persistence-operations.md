@@ -36,6 +36,10 @@ maintenance command uses the pinned Electron runtime so it exercises the same
 `node:sqlite` implementation as the desktop package. Health, backup, and export
 require an existing database and do not silently select JSON.
 
+Repository CI keeps dependency installation script-free, then explicitly
+installs only the pinned Electron runtime before executing the production
+SQLite integration tests.
+
 ```text
 npm run persistence:sqlite -- health --data-root <desktop-user-data>
 npm run persistence:sqlite -- backup --data-root <desktop-user-data> --destination <backup.sqlite3>
@@ -147,6 +151,8 @@ runs application health and marker checks, and compares the canonical portable
 export count and SHA-256 digest. It writes sanitized timing/checksum evidence
 under `artifacts/qualification/postgres-recovery`. Never point this command at a
 shared, staging, or production database: destruction is intentional.
+CI verifies the required evidence files independently; artifact retention is
+best-effort and cannot replace that verification gate.
 
 ## Release-bound system-data recovery checks
 
@@ -164,6 +170,7 @@ the audit view contains the action/outcome and changed field names without field
 values. A database restore without the matching content-addressed build
 artifacts must leave the release runtime unavailable rather than infer a schema
 from mutable design state.
+
 ## Upgrade and rollback
 
 The application owns monotonic migrations and serializes startup migration work.

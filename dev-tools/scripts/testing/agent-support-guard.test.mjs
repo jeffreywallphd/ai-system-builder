@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -9,7 +10,30 @@ import {
   scenarioMatchesPack,
 } from "../agent-support/check-agent-support.mjs";
 
-const createFixtureRoot = async () => mkdtemp(path.join(tmpdir(), "agent-support-guard-"));
+const createFixtureRoot = async () =>
+  mkdtemp(path.join(tmpdir(), "agent-support-guard-"));
+const roadmapSkillRoot = path.resolve(
+  "skills",
+  "manage-implementation-roadmaps",
+);
+const python =
+  process.env.PYTHON ?? (process.platform === "win32" ? "python" : "python3");
+
+const filesUnder = async (directory) => {
+  const files = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    if (entry.name === "__pycache__" || entry.name.endsWith(".pyc")) {
+      continue;
+    }
+    const candidate = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await filesUnder(candidate)));
+    } else if (entry.isFile()) {
+      files.push(candidate);
+    }
+  }
+  return files;
+};
 const writeFixture = async (root, relativePath, contents = "fixture\n") => {
   const absolutePath = path.join(root, relativePath);
   await mkdir(path.dirname(absolutePath), { recursive: true });
@@ -54,7 +78,10 @@ const buildInputs = () => ({
 test("agent support matching uses task and affected-path signals", () => {
   const inputs = buildInputs();
   assert.equal(
-    scenarioMatchesPack(inputs.evaluationSuite.scenarios[0], inputs.catalog.packs[0]),
+    scenarioMatchesPack(
+      inputs.evaluationSuite.scenarios[0],
+      inputs.catalog.packs[0],
+    ),
     true,
   );
 });
@@ -65,7 +92,10 @@ test("agent support guard accepts a complete minimal catalog and scenario suite"
   await writeFixture(root, "docs/context/packs/testing.pack.md");
   await writeFixture(root, "docs/source.md");
 
-  assert.deepEqual(findAgentSupportFailures({ repoRoot: root, ...buildInputs() }), []);
+  assert.deepEqual(
+    findAgentSupportFailures({ repoRoot: root, ...buildInputs() }),
+    [],
+  );
 });
 
 test("agent support guard rejects unknown and over-budget pack expectations", async () => {
@@ -74,10 +104,92 @@ test("agent support guard rejects unknown and over-budget pack expectations", as
   await writeFixture(root, "docs/context/packs/testing.pack.md");
   await writeFixture(root, "docs/source.md");
   const inputs = buildInputs();
-  inputs.evaluationSuite.scenarios[0].expectedPacks = ["testing", "missing", "extra"];
+  inputs.evaluationSuite.scenarios[0].expectedPacks = [
+    "testing",
+    "missing",
+    "extra",
+  ];
 
   const failures = findAgentSupportFailures({ repoRoot: root, ...inputs });
 
-  assert.ok(failures.some((failure) => failure.includes("expectedPacks must contain")));
-  assert.ok(failures.some((failure) => failure.includes("unknown expected pack 'missing'")));
+  assert.ok(
+    failures.some((failure) => failure.includes("expectedPacks must contain")),
+  );
+  assert.ok(
+    failures.some((failure) =>
+      failure.includes("unknown expected pack 'missing'"),
+    ),
+  );
+});
+
+test("roadmap skill supports exact and natural-language routing", async () => {
+  const [skill, agents, docs] = await Promise.all([
+    readFile(path.join(roadmapSkillRoot, "SKILL.md"), "utf8"),
+    readFile("AGENTS.md", "utf8"),
+    readFile("docs/README.md", "utf8"),
+  ]);
+  assert.match(skill, /^name: manage-implementation-roadmaps$/m);
+  assert.match(skill, /requests a skill for roadmap work without naming one/);
+  assert.match(
+    skill,
+    /implement, continue, review, or resume roadmap increments/,
+  );
+  assert.match(skill, /explicit user approval/);
+  assert.match(skill, /clickable report link/);
+  for (const source of [agents, docs]) {
+    assert.match(source, /skills\/manage-implementation-roadmaps\/SKILL\.md/);
+    assert.match(
+      source,
+      /(?:without|does not need)\s+(?:the|an)\s+exact skill name/i,
+    );
+    assert.match(source, /implementation roadmap/i);
+  }
+});
+
+test("roadmap skill is portable and does not provide a command executor", async () => {
+  const forbiddenLocalFragments = [
+    ["C:", "\\Users\\"].join(""),
+    ["GitHub", "Projects"].join(""),
+    ["jef", "fr"].join(""),
+  ];
+  for (const file of await filesUnder(roadmapSkillRoot)) {
+    const source = await readFile(file, "utf8");
+    for (const fragment of forbiddenLocalFragments) {
+      assert.equal(
+        source.toLowerCase().includes(fragment.toLowerCase()),
+        false,
+        `${path.relative(roadmapSkillRoot, file)} contains ${fragment}`,
+      );
+    }
+  }
+  const engine = await readFile(
+    path.join(roadmapSkillRoot, "scripts", "roadmap.py"),
+    "utf8",
+  );
+  assert.doesNotMatch(engine, /\bsubprocess\b|\bos\.system\b|\bshell=True\b/);
+});
+
+test("roadmap state engine passes its Python regression suite", () => {
+  const result = spawnSync(
+    python,
+    [
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      path.join(roadmapSkillRoot, "tests"),
+      "-p",
+      "test_*.py",
+      "-v",
+    ],
+    {
+      cwd: path.resolve("."),
+      encoding: "utf8",
+    },
+  );
+  assert.equal(
+    result.status,
+    0,
+    `Python skill tests failed.\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+  );
 });

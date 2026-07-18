@@ -128,7 +128,7 @@ async function exportAndVerify(
   }
 }
 
-async function main(): Promise<void> {
+export async function runPostgresRecoveryDrill(): Promise<void> {
   const startedAt = new Date();
   const config = resolvePostgresRecoveryDrillConfig(process.env);
   await mkdir(config.evidenceDirectory, { recursive: true });
@@ -248,12 +248,3 @@ async function main(): Promise<void> {
     ]).catch(() => undefined);
   }
 }
-
-await main().catch((error: unknown) => {
-  const message =
-    error instanceof Error
-      ? error.message
-      : "PostgreSQL recovery drill failed.";
-  process.stderr.write(`${message}\n`);
-  process.exitCode = 1;
-});
