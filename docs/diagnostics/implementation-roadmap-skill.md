@@ -1,0 +1,136 @@
+> AI documentation reminder: when behavior in this area changes, update the
+> skill, tests, agent entry points, and installation guidance in the same
+> change.
+
+# Implementation roadmap skill
+
+The canonical cross-agent workflow is
+`skills/manage-implementation-roadmaps/SKILL.md`. It prepares, approves,
+executes, reviews, and resumes substantial implementation roadmaps as ordered
+increments. It also maintains repository-based progress so work can be reviewed
+or resumed without depending on one AI task's conversation state.
+
+## Automatic routing
+
+Agents must route to the skill by intent, not only by exact name. Use it when a
+user:
+
+- asks for an implementation roadmap;
+- asks to implement, continue, review, or resume roadmap increments;
+- asks to use a skill if one is available for roadmap work;
+- requests durable progress tracking for a substantial multi-increment change.
+
+For example, this is a complete invocation:
+
+> Please use a skill if available to create an implementation roadmap for this
+> feature. Please follow the guidance in AGENTS.md and docs/README.md.
+
+The user does not need to remember `manage-implementation-roadmaps`. The
+natural-language trigger does not waive the skill's approval checkpoints.
+
+## Approval and execution model
+
+The workflow requires:
+
+1. repository and primary-source discovery;
+2. two or three options for each high-level choice with one recommendation;
+3. explicit user approval of the selected high-level option;
+4. an ordered increment roadmap with acceptance criteria and rollback;
+5. explicit user approval of the completed roadmap;
+6. increment-specific research and a written plan before each increment;
+7. coherent work chunks with tests, documentation, feedback, and evidence;
+8. final verification that distinguishes local checks from
+   controlled-environment qualification.
+
+Use **increment**, not phase, in roadmap and status artifacts.
+
+## Durable tracking
+
+By default the skill creates:
+
+- `docs/<slug>-implementation-roadmap.md` for approved intent;
+- `docs/<slug>-implementation-report.md` for progress, evidence, feedback, and
+  the next checkpoint;
+- `.implementation-roadmaps/<slug>/state.json` as deterministic render state.
+
+The files are repository-relative and should be tracked unless repository policy
+requires a different location. The AI updates the report after a coherent chunk
+or natural checkpoint and gives the user a clickable link. It does not update
+the report after every individual file change.
+
+The Markdown files are generated from JSON state. Direct edits are detected as
+drift. The standard-library Python engine validates events, confines output
+paths to the repository, writes files atomically, and never executes a recorded
+command.
+
+## Skill and helper boundary
+
+- `skills/manage-implementation-roadmaps/` owns the user-invoked workflow,
+  state engine, references, examples, and skill tests.
+- `dev-tools/helpers/` owns generic contributor snapshots, repository check
+  orchestration, and patch transport.
+
+The skill can direct an agent to a bounded helper, but the helper must remain
+useful without the skill. Generic developer tools should not move into the skill
+solely because roadmap execution may call them.
+
+## Installation
+
+GitHub CLI 2.90 or later can discover `skills/*/SKILL.md` and install a
+repository skill for supported agents:
+
+```text
+gh skill preview <owner>/<repository> manage-implementation-roadmaps
+gh skill install <owner>/<repository> manage-implementation-roadmaps --agent codex --scope user
+gh skill install <owner>/<repository> manage-implementation-roadmaps --agent claude-code --scope user
+gh skill install <owner>/<repository> manage-implementation-roadmaps --agent github-copilot --scope user
+```
+
+For a trusted local checkout:
+
+```text
+gh skill install . manage-implementation-roadmaps --from-local --agent codex --scope project
+```
+
+Codex users may alternatively ask `$skill-installer` to install the published
+`skills/manage-implementation-roadmaps` GitHub directory. See the skill's
+`references/installation.md` for supported hosts, native locations, source
+links, and publishing checks.
+
+## Verification
+
+Run:
+
+```text
+python -m unittest discover -s skills/manage-implementation-roadmaps/tests -p "test_*.py" -v
+npm run docs:check
+npm run agent-support:check
+npm test
+```
+
+Use the creating host's skill validator and preview the repository package before
+publishing.
+
+## Maintenance and extension
+
+When roadmap work exposes a repeated failure mode, decide whether it belongs to
+the workflow, the bounded developer helpers, or product implementation:
+
+- update the skill for approval, research, planning, feedback, tracking, resume,
+  or evidence behavior;
+- update a helper for a portable, bounded repository operation;
+- update product code for application behavior.
+
+Skill changes require:
+
+- exact-name and natural-language trigger tests;
+- positive workflow and resume tests;
+- negative tests for path escape, malformed events, drift, and arbitrary command
+  injection;
+- no credentials, personal names, absolute local paths, or private task text;
+- synchronized `AGENTS.md`, `docs/README.md`, skill references, and
+  installation guidance.
+
+Review future repetitive interactions for new skills or bounded helpers, but do
+not combine unrelated authority or destructive behavior merely to reduce
+prompts.

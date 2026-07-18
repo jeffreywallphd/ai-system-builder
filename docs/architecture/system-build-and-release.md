@@ -1,7 +1,7 @@
 # System Build and Release
 
 - Status: current
-- Implementation: deterministic build attempts and immutable release approval are implemented; deployment activation and generalized release execution remain increment-gated
+- Implementation: deterministic builds, immutable release approval, and trusted-reference deployment handoff are implemented; imported/authored execution still requires an independently qualified sandbox adapter
 - Related decisions: ADR-0020, ADR-0021, ADR-0022, ADR-0023, ADR-0024, ADR-0029, ADR-0030, ADR-0033, ADR-0034
 - Verification: `docs/architecture/architecture-verification.md`
 
@@ -29,6 +29,7 @@ A build lock contains exact digests/versions for:
 - system revision and composition;
 - effective asset definitions;
 - selected implementation releases/facets;
+- selected implementation trust levels and runtime kinds;
 - foundation and imported package versions;
 - deployment profile and host/runtime API targets;
 - configuration and schema versions;
@@ -102,8 +103,13 @@ or interrupted output may be retained as quarantined evidence or garbage
 collected by operator retention policy; it is never a release until approval
 re-verifies every referenced artifact.
 
-Deployment records, activation/rollback, independent qualified rebuilds,
-generalized release execution, runtime quotas, and isolated managed builders are
-not implied by a successful build. Those remain owned by the runtime/deployment
-increment and must consume an approved `SystemRelease` rather than a mutable
-System Builder record.
+The separate `system-deployment` family now consumes an approved release,
+re-verifies every artifact at install, resolves the intersection of frozen
+facet compatibility, and records organization/workspace-scoped install,
+activation, readiness, rollback, revocation, run, and audit state. Desktop maps
+the three closed reference kinds to the trusted local profile; server maps
+campus/corporate and cloud shapes to their managed profiles. Thin client is a
+control surface only. Imported or authored UI/logic, independently qualified
+rebuilds, arbitrary provider execution, and a qualified container/WASI sandbox
+are not implied and remain unavailable until their explicit adapters and
+environment evidence exist.

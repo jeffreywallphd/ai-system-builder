@@ -26,6 +26,14 @@ replaceable runtime installations and caches.
   runtime storage, graceful termination, and distinct liveness/readiness probes.
   It is intentionally `Recreate` plus one replica until target-platform
   multi-replica tenancy, capacity, and recovery are qualified.
+- `kubernetes-runner.example.yaml` is a deliberately suspended managed-runner
+  specimen plus Restricted namespace, quota, limit, and default-deny network
+  resources. A host controller must create one immutable job per admitted run;
+  operators must not unsuspend the placeholder or interpret these controls as
+  qualification for imported or authored execution.
+- `kustomization.yaml` composes both reviewed Kubernetes templates for offline
+  `kubectl kustomize` parsing in CI. It is an inspection and rendering target,
+  not an automatic production deployment.
 - `config/environments/server/*.env.example` are shape-specific environment
   profiles. They intentionally omit secret values.
 
@@ -45,7 +53,19 @@ retention, RPO, RTO, high availability, or backup schedules. Operators must obta
 and apply the procedures in `docs/operations/persistence-operations.md` before a
 shape can be declared production-qualified.
 
+The runner template denies all ingress and egress. Add narrowly scoped egress
+policies only for origins admitted by the application policy, use opaque secret
+references rather than secret values in deployment records, retain the
+application deadline in addition to cluster quotas, and verify cancellation and
+probe behavior against the actual runner image. Kubernetes security context and
+RuntimeClass configuration are operator evidence; they do not independently
+qualify a sandbox against the executable-asset threat model.
+
 CI continuously exercises a destructive custom-format PostgreSQL logical backup
 and restore against a disposable service and retains sanitized evidence. Repeat
 that procedure against the target PostgreSQL toolchain, then separately qualify
 the platform's physical/PITR service and the matching artifact-store recovery.
+
+System-release install, activation, readiness, runner policy, rollback,
+revocation, and recovery procedures are in
+`docs/operations/system-deployment-operations.md`.

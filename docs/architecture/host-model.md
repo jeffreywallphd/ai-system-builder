@@ -142,7 +142,15 @@ Host is the execution authority. Desktop and server each own runtime execution w
 
 Desktop renderer should continue using preload/IPC regardless of local execution or future remote execution. Thin-client calls server APIs and never owns runtime execution.
 
+System deployment follows the same rule. Desktop composes the trusted
+`local-desktop` release adapter behind IPC. Server derives `campus-server` for
+campus/corporate shapes and `cloud-server` for cloud, then exposes authenticated
+deployment lifecycle and run-handoff use cases. The thin client is a command and
+safe-read surface only; request bodies cannot select principal, organization,
+host capabilities, runtime ABI, or sandbox qualification.
+
 Future execution placement should be per feature rather than all-or-nothing. Example future placement:
+
 - image generation: remote
 - artifact browsing: local
 - training: remote
@@ -156,7 +164,6 @@ Runtime roots must not be treated as artifact storage roots.
 
 See ADR-0013 for canonical cross-host runtime ownership and placement guidance.
 
-
 - Apps own framework bootstrap surfaces (for example `express()` instantiation and app-level middleware).
 - Host modules compose dependencies and register transport adapters against app-provided ports.
 - Transport adapter registration should be feature-sliced (for example `artifact-upload/...`) with only tiny top-level aggregators.
@@ -169,10 +176,9 @@ See ADR-0013 for canonical cross-host runtime ownership and placement guidance.
 
 If host code starts accumulating business logic, move that logic inward before it becomes entrenched.
 
-
 ### Private Asset Kernel composition
 
-`modules/hosts/shared/composition/composeLocalAssetKernel.ts` is the shared internal helper for local Asset Kernel composition. It initializes and validates the adapter-owned `<storageRootDirectory>/asset-kernel/` record store and returns repository ports plus existing application registry use cases for host-internal consumers. `modules/hosts/shared/composition/composeInternalAssetRegistry.ts` builds on that helper by composing the application `AssetRegistryReadFacade` as an internal host-owned service with an injected aggregate resource-backed view provider. It may also expose an internal-only system pack installer seam for explicit tests or future host-internal calls, but composition does not invoke that installer. Desktop `registerArtifactUploadIpc` and server `registerApi` now compose this internal registry from their storage roots and wire `composeResourceBackedViewProviders` from already-composed safe descriptor/read seams. Missing families remain unsupported/not wired with sanitized diagnostics. No startup seeding, new IPC channels, new API routes, preload methods, renderer UI, thin-client UI, resource-backed scans, provider/network calls, byte reads, or runtime behavior are added, and runtime roots remain separate from Asset Kernel persistence and provider reads.
+`modules/hosts/shared/composition/composeLocalAssetKernel.ts` is the shared internal helper for local Asset Kernel composition. It initializes and validates the host-selected Asset Kernel record store and returns repository ports plus existing application registry use cases for host-internal consumers. `modules/hosts/shared/composition/composeInternalAssetRegistry.ts` builds on that helper by composing the application `AssetRegistryReadFacade` as an internal host-owned service with an injected aggregate resource-backed view provider. These helpers expose the internal system-pack installer seam but do not invoke it. The owning desktop/server asset-feature startup composes the safe descriptor/read providers, explicitly invokes and awaits guarded installation of the product-owned global foundation, and fails feature composition closed when that baseline cannot be established. Managed hosts keep immutable definitions on the deployment-selected global store while organization-owned records stay on the request-context store. This lifecycle does not create or seed workspaces, expose installer mutations through public transports, scan resources, perform provider/network calls, read bytes, or place Asset Kernel records under runtime roots.
 
 Asset Registry read-surface baseline desktop composition passes only the internal registry read facade/read port into Electron IPC registration for definition list/read/version reads. It does not pass the full internal registry composition, repositories, mutation use cases, seed services, storage adapters, runtime adapters, or provider clients to asset IPC handlers. The desktop renderer Asset Library consumes only the preload-backed read client and shared UI read models; it does not import host composition, application services, persistence/storage adapters, transport handlers, runtime adapters, or provider clients.
 
@@ -192,7 +198,6 @@ Host-specific Asset Library UI actions use only the existing public API/preload 
 
 - Server API and desktop IPC/preload both expose shared publish, published-verify, source-verify, register-from-repo, and localize-from-repo use cases.
 - Thin-client and desktop renderer surfaces remain host-specific UI layers but call into the same shared application workflow path.
-
 
 ## Hugging Face token host configuration
 

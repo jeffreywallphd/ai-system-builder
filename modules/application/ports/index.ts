@@ -31,6 +31,7 @@ export * from "./system-builder";
 export * from "./system-build";
 export * from "./system-data";
 export * from "./system-review";
+export * from "./system-deployment";
 
 export * from "./effective-asset-projections";
 

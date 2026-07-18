@@ -32,7 +32,7 @@ export interface ComposeDesktopAssetFeatureOptions {
 
 export async function composeDesktopAssetFeature(
   options: ComposeDesktopAssetFeatureOptions,
-): Promise<any> {
+) {
   const modelRegistry = createLocalModelRegistryAdapter({
     filePath: `${options.storageRootDirectory}/model-registry/models.json`,
     rootDirectory: options.storageRootDirectory,

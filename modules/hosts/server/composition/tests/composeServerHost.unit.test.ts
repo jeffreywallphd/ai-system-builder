@@ -331,7 +331,11 @@ describe("composeServerHost", () => {
       : (existsSync(typeScriptPath) ? typeScriptPath : typeScriptPath.replace(/\.ts$/, ".js"));
     const source = readFileSync(sourcePath, "utf8");
 
-    expect(source).toContain("const huggingFaceArtifactRepoStorage = createHuggingFaceArtifactRepoStorageAdapter");
+    expect(source).toMatchObject(
+      expect.stringMatching(
+        /const\s+huggingFaceArtifactRepoStorage\s*=\s*createHuggingFaceArtifactRepoStorageAdapter/,
+      ),
+    );
     expect(source).toContain("adapter: huggingFaceArtifactRepoStorage");
     expect(source).toContain("repoBrowser: huggingFaceArtifactRepoStorage");
     expect(source).not.toContain("repoBrowser: artifactRepoStorage");
@@ -420,7 +424,11 @@ describe("composeServerHost", () => {
     const canonicalSourcePath = resolve("modules/hosts/server/composition/composeServerHost.ts");
     const source = readFileSync(canonicalSourcePath, "utf8");
     expect(source).toContain("const execFileWithTimeout = async");
-    expect(source).toContain("createGitRuntimeInstallerAdapter({ logging: loggingPort, execFile: execFileWithTimeout })");
+    expect(source).toMatchObject(
+      expect.stringMatching(
+        /createGitRuntimeInstallerAdapter\(\{[\s\S]*?logging:\s*loggingPort,[\s\S]*?execFile:\s*execFileWithTimeout,[\s\S]*?\}\)/,
+      ),
+    );
     expect(source).toContain("execFile: execFileWithTimeout");
   });
 

@@ -191,6 +191,17 @@ Test suites should be structured for predictable CI execution:
 - clear failure output that points to behavior regressions,
 - no reliance on local-only developer state.
 
+## Performance and accessibility qualification
+
+Keep deterministic budget-schema and result-validation tests in ordinary CI.
+Run timing probes only in named controlled environments with fixed workloads and
+retain sanitized p95 evidence; do not make variable developer hardware a unit
+test gate. Automated accessibility assertions protect semantics and regressions,
+but release qualification also requires documented keyboard, screen-reader,
+zoom/reflow, contrast, focus, and status-announcement review on each supported
+surface. See
+[Asset and System Support Qualification](../operations/asset-system-support-qualification.md).
+
 ## Anti-patterns to avoid
 
 - Coverage-only tests with no behavioral assertion value.

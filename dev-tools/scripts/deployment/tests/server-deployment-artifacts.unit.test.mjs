@@ -8,6 +8,8 @@ const paths = {
   dockerfile: "deployments/server/Dockerfile",
   compose: "deployments/server/compose.qualification.yaml",
   kubernetes: "deployments/server/kubernetes-deployment.example.yaml",
+  runner: "deployments/server/kubernetes-runner.example.yaml",
+  kustomization: "deployments/server/kustomization.yaml",
   workflow: ".github/workflows/ci.yml",
 };
 
@@ -38,9 +40,24 @@ test("deployment policy detects mutable images, privilege drift, identity drift,
     "type: Recreate",
     "type: RollingUpdate",
   );
+  changed.runner = changed.runner
+    .replace("suspend: true", "suspend: false")
+    .replace("- Egress", "# egress removed")
+    .replace(
+      "allowPrivilegeEscalation: false",
+      "allowPrivilegeEscalation: true",
+    );
+  changed.kustomization = changed.kustomization.replace(
+    "  - kubernetes-runner.example.yaml",
+    "",
+  );
   const violations = inspectServerDeploymentArtifacts(changed).join("\n");
   assert.match(violations, /digest-pinned/);
   assert.match(violations, /root filesystem is writable/);
   assert.match(violations, /overlapping replicas/);
   assert.match(violations, /managed OIDC/);
+  assert.match(violations, /safely suspended/);
+  assert.match(violations, /default-deny for network egress/);
+  assert.match(violations, /runner permits privilege escalation/);
+  assert.match(violations, /omits the managed runner template/);
 });

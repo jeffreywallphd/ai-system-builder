@@ -32,3 +32,22 @@
   message and transcript rendering, preserve the accessible live log, and show
   unsupported capabilities truthfully. It must not accept composition-plan ids,
   expose protected instruction/provider payloads, or call a provider directly.
+- The shared `SystemReviewRunTest` presenter consumes one approved release and
+  the narrow release-bound review client. Keep release selection, bounded native
+  name filtering, masked detail, shared artifact previews, safe audit evidence,
+  empty/loading/failure states, and object-URL cleanup identical in desktop and
+  thin client. It must not accept caller-selected principals, expose paths or
+  provider payloads, parse content in host surfaces, or turn unsupported types
+  into embedded active content.
+- The shared `SystemDeploymentWorkflow` consumes approved-release summaries and
+  the narrow deployment lifecycle client. Keep install, compatibility,
+  activation/readiness, rollback, revocation, bounded run history, and safe
+  audit states identical in desktop and thin client. The thin surface must say
+  that execution remains server-owned; renderers must never supply principal,
+  organization, host capabilities, runtime ABI, sandbox qualification, paths,
+  credentials, or raw runtime output.
+- Automated semantic tests for these shared asset/system presenters are
+  regression evidence, not a WCAG conformance claim. Each supported desktop and
+  thin-client profile still requires the keyboard, focus, zoom/reflow,
+  contrast, screen-reader, status, and error review in
+  `docs/operations/asset-system-support-qualification.md`.

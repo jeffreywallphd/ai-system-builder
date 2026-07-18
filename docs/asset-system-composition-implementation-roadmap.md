@@ -420,7 +420,9 @@ evidence conventions follow the Increment 0 primary-source research.
     effects;
   - quarantine, signature/provenance verification, digest/SBOM/dependency scan,
     manifest/schema validation, capability review, conflict preview, admission,
-    install, activation, update, disable, rollback, and removal workflows;
+    install, activation, update, disable, and rollback workflows; destructive
+    removal remains deferred because ADR-0031 requires retention checks across
+    active bindings, system releases, and audit policy;
   - explicit workspace import, user-library link/copy/promote, and
     organization-managed activation behavior aligned with existing provenance;
   - malicious archive, traversal, oversized content, duplicate identity,
@@ -504,7 +506,9 @@ Implementation evidence:
 
 ## Increment 3: Asset Studio and coding-model implementation workflow
 
-- Status: implemented and verified
+- Status: implemented and verified through reviewed immutable source snapshot;
+  sandboxed build, preview, and publication remain fail-closed pending a
+  qualified adapter
 - Purpose: replace metadata-only authoring with a guided studio that can produce
   complete definitions and tested implementation releases.
 - Deliverables:
@@ -582,10 +586,12 @@ Implementation evidence:
 
 No untrusted source is built or executed by this increment. Manual source is
 fully reviewable and snapshot-capable; coding-model assistance becomes
-available only when a host supplies the narrow port. Isolated build/test and
-release publication are owned by Increment 6, and sandboxed runtime execution
-by Increment 10, so the Studio displays those gates as blocking until those
-increments supply qualifying evidence.
+available only when a host supplies the narrow port. A qualified isolated asset
+implementation builder remains required before build, preview, or publication
+can be enabled. Increment 6 consumes already-published exact implementation
+releases for deterministic system builds; it does not substitute for that
+asset-implementation sandbox. Increment 10 preserves `sandbox-unavailable` for
+authored/imported execution, so the Studio displays these gates as blocking.
 
 - source/model/toolchain/prompt-template/test/approver provenance without
   storing protected prompts or provider payloads in general records;
@@ -605,6 +611,11 @@ increments supply qualifying evidence.
     immutable implementation release, and find it in Catalog;
   - the coding model cannot publish, activate, deploy, access secrets, or modify
     the product repository directly.
+
+Current boundary: the second exit criterion is verified. The first is verified
+through complete review and immutable source snapshot only; isolated build,
+preview, publication, and resulting Catalog implementation availability remain
+blocked until the sandbox qualification described above is supplied.
 
 ## Increment 4: Functional system-default asset foundation
 
@@ -1183,9 +1194,27 @@ operation-envelope handling, execution-plan identity, 202-entry transcript
 bounding, desktop/thin host UI parity, foundation manifest/catalog safety, and
 the existing controlled-conversation regression suites.
 
+### Increments 1-8 backward verification audit (2026-07-17)
+
+| Increment | Verified repository-owned outcome                                                                                                                                                                                                                             | Remaining or intentionally bounded condition                                                                                                 |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1         | Normalized implementation records, deterministic resolution, immutable structured persistence/artifacts, safe read transports, and cross-host trusted bindings pass focused contract, resolver, storage, transport, and composition tests.                    | The kernel exposes a replaceable builder port; it does not claim a qualified untrusted builder.                                              |
+| 2         | Bounded non-executing inspection plus quarantine, admission, install, activation, disable, rollback, trust, transport, and shared-UI paths pass focused malicious-input and lifecycle tests.                                                                  | Destructive removal, automatic updates, public marketplace discovery, and registry transport remain outside the accepted current lifecycle.  |
+| 3         | Manual/coding-model proposal validation, untrusted-context handling, timeout, stale approval, immutable proposal storage, exact human review, source snapshot, transport parity, and shared UI pass focused tests.                                            | Untrusted build, preview, and publication remain `sandbox-unavailable`; the roadmap status and exit wording above now state this explicitly. |
+| 4         | All 87 exact foundation entries retain one safe functional descriptor and compatible trusted binding; manifest, catalog, install, fail-closed policy, and accessible preview tests pass.                                                                      | New defaults still require closed-registry conformance and versioned pack evolution.                                                         |
+| 5         | Revision-safe CRUD, graph validation, structured persistence composition, API/IPC parity, shared system/template entry UI, and keyboard-complete controls pass focused tests.                                                                                 | Operational runs remain separate from design records by construction.                                                                        |
+| 6         | Deterministic materialization, bounded system size, evidence integrity, immutable approval/release, persistence, transport, and shared build UI pass focused tests.                                                                                           | Deployment activation is owned and verified by Increment 10, not by design/build records.                                                    |
+| 7         | The secured data-entry template creates, builds, approves, and runs with typed validation, policy, masking, optimistic persistence, and safe audit evidence across shared transports/UI.                                                                      | Live PostgreSQL conformance runs only when `TEST_POSTGRES_URL` is supplied; SQLite production integration is covered.                        |
+| 8         | The controlled chatbot creates/builds/approves through the general system pipeline and runs only through controlled conversational execution; plan identity, bounded transcript, safe client parity, and Asset Library foundation-read regression tests pass. | Tools, retrieval, memory, multimodal, streaming, cancellation, and retry remain truthfully unsupported.                                      |
+
+Focused audit batches passed 26 tests for Increments 1-3, 54 tests for
+Increments 4-6, and 42 tests for Increments 7-8. The repository-wide suite and
+production gates listed under Increment 11 provide the broader regression
+evidence.
+
 ## Increment 9: Data preview and review reference system
 
-- Status: in progress
+- Status: implemented and verified
 - Purpose: prove resource-backed assets, bounded content access, multiple preview
   types, filtering, and security can form a reusable review application.
 - Reference composition:
@@ -1288,9 +1317,45 @@ Research sources:
 - [RFC 9110 HTTP Semantics - Range Requests](https://www.rfc-editor.org/rfc/rfc9110.html#name-range-requests)
 - [W3C WCAG Technique H64: iframe titles](https://www.w3.org/WAI/WCAG22/Techniques/html/H64)
 
+Implementation evidence:
+
+- `system.foundation@1.0.0` now includes the finite artifact-read policy and
+  text, table, raster-image, PDF, and unsupported preview declarations, and the
+  closed `reference.secured-data-review@1.0.0` template composes them with the
+  existing browser, filter, detail, masking, audit, authentication, workflow,
+  and complete-state assets;
+- the release-bound `system-review` application family accepts only one
+  integrity-verified approved release manifest, derives a finite allowlist and
+  quotas from that manifest, returns opaque artifact references and masked
+  metadata, enforces authenticated role/workspace ownership, and records
+  bounded redacted allow/deny audit evidence;
+- preview retrieval carries an application-owned maximum-byte ceiling through
+  API/IPC and storage seams. The filesystem adapter checks file size before
+  reading, while shared classification rejects SVG/Office and malformed or
+  oversized input, bounds JSON/CSV tables, neutralizes displayed spreadsheet
+  formulas, and constrains titled sandboxed PDF frames;
+- API, Electron IPC, preload, desktop/thin clients, and the shared Systems Run
+  & Test presenter expose the same describe, browse, detail, preview, and audit
+  operations without accepting caller-selected principals or returning paths,
+  provider payloads, credentials, unmasked metadata, or raw parser errors; and
+- the desktop Asset Library startup regression is fixed. Host startup performs
+  a guarded system-owned foundation refresh, fails closed when it cannot
+  establish the foundation, removes the missing legacy implementation seed,
+  and treats compatible trusted built-in releases/bindings as idempotent. An
+  isolated copy of the previously failing desktop persistence data now installs
+  with zero failures and reads all 105 library entries.
+
+Verification evidence includes foundation/template validation, create/build/
+approve coverage, release-policy integrity denial, workspace and authorization
+isolation, masking and redacted audit, malformed/oversized preview denial,
+filesystem pre-read ceilings, API/IPC transport parity, shared presenter empty
+state/accessibility, 40 focused Increment 9 tests, filtered TypeScript
+diagnostics including the desktop template-id regression, successful server and
+thin-client production builds, and successful Electron desktop packaging.
+
 ## Increment 10: Multi-shape runtime and deployment handoff
 
-- Status: planned
+- Status: implemented and verified
 - Purpose: run the same logical system release safely across local, campus,
   corporate, and cloud deployment shapes.
 - Deployment behavior:
@@ -1327,9 +1392,129 @@ Research sources:
   - unsupported host capabilities fail before execution with actionable safe
     diagnostics.
 
+### Increment 10 implementation plan
+
+1. Introduce a separate `system-deployment` contract family for deployment
+   identity, target/profile, immutable release binding, compatibility evidence,
+   desired/observed lifecycle, health, bounded quotas, egress rules, opaque
+   secret references, run history, safe diagnostics, audit, and cancellation.
+   Do not add operational fields to System Builder records or mutate releases.
+2. Extend frozen system-build implementation evidence with trust/runtime facts
+   required at handoff. Resolve the selected host profile against the release's
+   exact deployment/host/runtime compatibility and required capabilities before
+   install; reject thin-client execution authority and incompatible or stale
+   release evidence before any runtime adapter call.
+3. Add workspace- and organization-scoped deployment/run repository ports plus
+   database-neutral structured adapters so SQLite and PostgreSQL share revision,
+   isolation, interruption, and rollback semantics. Deployment history is
+   append/update operational data; approved releases remain immutable.
+4. Add application-owned install, activate, health reconciliation, rollback,
+   revoke, list/read, start-run, cancel-run, and safe audit use cases. Activation
+   re-verifies release artifacts, records the previously active deployment for
+   rollback, waits for adapter readiness, and never exposes credentials, raw
+   paths, provider responses, or sandbox output.
+5. Define a capability broker and replaceable runtime/sandbox port. Enforce the
+   intersection of platform, organization, release, actor, egress, secret,
+   resource, and cancellation policy for every call. Map the three closed
+   reference-system kinds to product-compiled trusted runtimes on desktop and
+   managed server profiles. Imported/authored UI or logic must return a specific
+   safe `sandbox-unavailable` readiness result unless an independently qualified
+   adapter is injected; this increment will not silently select or advertise an
+   unqualified container/WASI engine.
+6. Expose deployment/readiness/run-history commands through authenticated API
+   and Electron IPC/preload, desktop/thin clients, and one shared Systems
+   Deploy & Run presenter. Thin client remains a control/read surface only and
+   cannot supply a local runtime, filesystem, secret, capability, or principal.
+7. Add operator templates and automated fitness checks for managed runners:
+   restricted non-root security context, read-only root, dropped capabilities,
+   no service-account token, default-deny network posture, explicit resource and
+   temporary-storage quotas, startup/readiness/liveness separation, graceful
+   cancellation, immutable images, tenant labels, and opaque secret injection.
+8. Verify compatibility and unsupported-shape decisions, same-release desktop/
+   managed handoff for all three references, cross-workspace/organization
+   denial, capability/egress/secret escalation denial, quota exhaustion,
+   interruption, readiness failure, cancellation, activation, rollback,
+   revocation, audit/telemetry redaction, transport parity, presenter states,
+   thin-client non-execution, host builds/smokes, and desktop packaging.
+9. Update build/release, host, security, tenancy, deployment, operations,
+   context-pack, UI, and roadmap documentation, then run focused tests and all
+   applicable repository gates.
+
+Rollback plan: the new deployment family and host composition are additive.
+Disable its API/IPC registration and shared presenter to return to direct
+reference-release Run & Test while preserving immutable release and deployment
+history. Activation failures retain the prior active deployment; rollback is an
+explicit new deployment transition, never a rewrite or deletion. An unavailable
+or unqualified sandbox remains a safe denial, so rollback never requires
+executing imported code.
+
+Research notes: Kubernetes Restricted Pod Security requires current hardening
+controls such as non-root execution, no privilege escalation, a constrained
+capability set, and seccomp; Kubernetes also notes that it has no generic API
+that proves a workload uses a sandboxed runtime. The repository therefore treats
+cluster configuration as operator evidence, not proof that an arbitrary asset
+is safe. NetworkPolicy permits default-deny ingress/egress but allows all traffic
+when no policy exists and requires an explicit DNS exception when resolution is
+needed. ResourceQuota and LimitRange provide namespace and per-workload limits;
+application quotas still remain mandatory because cluster quotas do not bound a
+single logical run across retries. Startup, readiness, and liveness probes have
+different failure semantics, so activation waits on readiness and does not use a
+dependency outage as a liveness failure. OCI defines the portable runtime
+configuration/lifecycle surface and Linux isolation mechanisms but does not by
+itself qualify one runtime against this threat model. Electron likewise requires
+process sandboxing, context isolation, narrow bridges, and sender validation for
+untrusted renderer content. OpenTelemetry semantic conventions provide common
+signal/resource naming, but deployment events stay bounded and redacted at the
+application boundary before reaching a sink.
+
+Research sources:
+
+- [Kubernetes Pod Security Standards](https://kubernetes.io/docs/concepts/security/pod-security-standards/)
+- [Kubernetes Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
+- [Kubernetes Resource Quotas](https://kubernetes.io/docs/concepts/policy/resource-quotas/)
+- [Kubernetes liveness, readiness, and startup probes](https://kubernetes.io/docs/concepts/workloads/pods/probes/)
+- [Kubernetes Pod lifecycle and graceful termination](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)
+- [OCI Runtime Specification](https://specs.opencontainers.org/runtime-spec/)
+- [Electron security guidance](https://www.electronjs.org/docs/latest/tutorial/security)
+- [OpenTelemetry semantic conventions](https://opentelemetry.io/docs/specs/semconv/)
+
+Implementation evidence:
+
+- the separate `system-deployment` contract/application/port/persistence family
+  stores organization/workspace-scoped deployments, runs, health, revisions,
+  compatibility, bounded policy, cancellation, and redacted audit without
+  mutating designs or releases;
+- release approval now freezes implementation trust facts and derives the
+  compatible profile intersection. Install re-verifies every release artifact
+  and the bounded manifest, then rejects incompatible profile, host/runtime,
+  capability, thin-client authority, unknown runtime, and unqualified sandbox
+  inputs before adapter execution;
+- desktop and server compose trusted mappings for the three closed reference
+  kinds on local, campus/corporate, and cloud profiles. Imported/authored
+  execution remains explicitly `sandbox-unavailable`, while activation,
+  readiness, interruption, rollback, revocation, bounded run handoff,
+  cancellation, and audit retain safe operational state;
+- authenticated API and Electron IPC derive organization/principal and host
+  authority, preload and desktop/thin clients expose parity, and the shared
+  Deploy & Run presenter shows compatibility, status, health, history, audit,
+  and truthful thin-client control-only behavior; and
+- the suspended managed-runner specimen and automated deployment fitness checks
+  require Restricted Pod Security, non-root/read-only/drop-all controls,
+  default-deny network, namespace and container quotas, bounded ephemeral
+  storage/deadline, distinct probes, cancellation grace, immutable images,
+  opaque tenant labels, and secret-reference injection without claiming sandbox
+  qualification.
+
+Verification evidence includes 9 focused deployment lifecycle/persistence/
+transport/presenter tests, cross-profile handoff for all three references,
+capability/secret/egress/concurrency/sandbox/cross-tenant negative tests,
+interrupted terminal-state checks, managed-runner drift tests, filtered
+TypeScript diagnostics, the deployment static gate, successful server and
+thin-client production builds, and successful Electron desktop packaging.
+
 ## Increment 11: Hardening and support qualification
 
-- Status: planned
+- Status: implemented; controlled support qualification remains incomplete
 - Purpose: establish release-quality security, compatibility, recovery,
   observability, performance, and operational evidence.
 - Deliverables:
@@ -1349,6 +1534,137 @@ Research sources:
     persistence, and capability drift;
   - support and deprecation policy, operator runbooks, user guidance, and example
     systems.
+
+### Increment 11 implementation plan
+
+1. Add one versioned, machine-readable support-qualification manifest plus a
+   human-readable support policy. The manifest will relate definition,
+   implementation, package, system, schema, host API, runtime ABI, deployment
+   profile, and application versions; record compatibility direction,
+   deprecation state, replacement, support window, and known unsupported
+   combinations; and preserve exact immutable locks. It will not infer
+   compatibility from a package version alone.
+2. Add an application-owned revocation-read seam to deployment composition.
+   Install, activation, health reconciliation, and run start will re-evaluate
+   every frozen implementation release in the approved system release. A newly
+   revoked implementation will fail closed, deactivate an active runtime where
+   possible, persist a revoked deployment state, and write a bounded audit
+   reason before any further start. Desktop and server will source this truth
+   from the existing implementation repository; thin client remains a control
+   surface.
+3. Document and test the vulnerable-package response path: correlate an
+   advisory to the locked package/SBOM identity, disable affected package
+   activation, revoke each affected immutable implementation release, reconcile
+   deployments, choose an unaffected approved release, and retain evidence. The
+   existing locked dependency audit and SPDX gate remains the repository
+   dependency control; this increment will not silently query a public registry,
+   auto-upgrade packages, or treat provenance as proof of safety.
+4. Publish exact upgrade, rollback, coordinated metadata/package backup,
+   portable export/import, restore, and disaster-recovery procedures. Add a
+   versioned qualification-evidence record that distinguishes `passed`,
+   `failed`, `not-run`, and `not-applicable`, records digests and sanitized
+   environment facts, and rejects a production-qualified result when required
+   environment or manual evidence is absent. RPO, RTO, retention, encryption,
+   regional failure scope, and approval remain organization-owned inputs.
+5. Define catalog, Studio editor, resolver, deterministic build, safe preview,
+   and trusted runtime performance budgets with representative workload sizes,
+   percentile, warm/cold state, host shape, and measurement method. Add a
+   repeatable Node qualification runner that emits sanitized timing evidence;
+   keep timing gates out of ordinary unit tests where host variance would create
+   flakes, while validating the budget schema and admission ceilings in CI.
+6. Consolidate the enforced package inspection, build diagnostics/manifest,
+   preview, deployment, output, concurrency, memory, duration, and temporary
+   storage ceilings into the qualification manifest. Add drift checks tying
+   those declarations to the owning source and negative tests proving oversized,
+   excessive, widened-capability, and concurrent requests remain rejected.
+7. Extend the canonical architecture gate with direct asset/system fitness
+   functions for executable payload fields in Asset Kernel metadata, renderer
+   imports of privileged layers, missing API security-policy registration,
+   missing organization/workspace scope in operational deployment persistence,
+   and trusted-reference capability widening. Add negative fixture tests for
+   every rule and update the architecture verification map.
+8. Add a security and accessibility qualification procedure. Automated evidence
+   will cover parser bombs/path collisions/digest confusion, authorization and
+   tenant denial, sandbox-unavailable behavior, secret/path redaction, IPC/API
+   parity, keyboard semantics, labels, live/busy/error states, and reference
+   presenters. Manual OWASP ASVS-informed security review and WCAG 2.2 AA
+   review remain explicit required evidence rather than an automated
+   conformance claim.
+9. Update operator/user guidance, context packs, examples, support/deprecation
+   policy, and the roadmap. Run focused revocation, compatibility, admission,
+   fitness, qualification-schema, performance-runner, security, accessibility,
+   transport, persistence, and host tests, followed by the full repository
+   gates and available builds/packages. Record unavailable controlled-platform
+   checks without converting them into passes.
+
+Rollback plan: the compatibility, quality, and evidence manifests and their
+fitness checks are additive and can be removed together if their schema must be
+replaced. Revocation enforcement is fail closed and uses the existing immutable
+implementation and deployment histories; rollback selects an unaffected prior
+release and never deletes a revocation. Removing a presenter or qualification
+runner does not widen runtime authority. A rollback must not disable the
+existing dependency audit, package admission limits, workspace/organization
+scope, capability narrowing, or sandbox-unavailable denial.
+
+Research notes: NIST SSDF treats vulnerability response and root-cause feedback
+as part of secure software development, while SPDX notes that SBOM vulnerability
+information becomes stale and consumers must re-evaluate it. CISA's Known
+Exploited Vulnerabilities catalog is therefore a prioritization input, not an
+automatic package verdict. OWASP ASVS supplies a review vocabulary for technical
+application controls, but a checklist is not a penetration test. WCAG 2.2 is the
+current W3C Recommendation and Level AA requires all Level A and AA success
+criteria; automated semantic tests cannot establish full conformance. Semantic
+Versioning requires a minor release when public API is deprecated and a major
+release for incompatible changes, while immutable system locks still preserve
+the exact admitted versions. Node's stable performance APIs support monotonic
+high-resolution measurements, but budgets must name workload and environment to
+be meaningful. Electron's security guidance continues to require sandboxing,
+context isolation, narrow bridges, sender validation, secure content, and a
+current framework. NIST contingency guidance and PostgreSQL backup guidance both
+support rehearsed, isolated recovery; neither chooses this product's RPO/RTO.
+
+Research sources:
+
+- [NIST Secure Software Development Framework 1.1](https://csrc.nist.gov/pubs/sp/800/218/final)
+- [OWASP Application Security Verification Standard 5.0](https://owasp.org/www-project-application-security-verification-standard/)
+- [W3C Web Content Accessibility Guidelines 2.2](https://www.w3.org/TR/WCAG22/)
+- [Semantic Versioning 2.0.0](https://semver.org/)
+- [SPDX 2.3 vulnerability and SBOM guidance](https://spdx.github.io/spdx-spec/v2.3/how-to-use/)
+- [CISA Known Exploited Vulnerabilities Catalog](https://www.cisa.gov/known-exploited-vulnerabilities-catalog)
+- [Node.js performance measurement APIs](https://nodejs.org/docs/latest-v24.x/api/perf_hooks.html)
+- [Electron security guidance](https://www.electronjs.org/docs/latest/tutorial/security)
+- [NIST contingency planning guidance](https://csrc.nist.gov/pubs/sp/800/34/r1/upd1/final)
+- [PostgreSQL SQL dump backup guidance](https://www.postgresql.org/docs/current/backup-dump.html)
+
+Implementation evidence:
+
+- `dev-tools/config/asset-system-qualification.json` now owns the exact
+  compatibility/deprecation matrix, six p95 workload budgets, five admission
+  control groups, and required evidence for all five deployment profiles;
+- the qualification assessor rejects missing/failed evidence and rejects a
+  performance pass without a complete validated p95 report. The Node runner
+  measures trusted probes with a monotonic clock and omits raw samples/results;
+- the canonical architecture gate now checks executable Asset Kernel metadata,
+  renderer-to-privileged imports, asset/system route-policy coverage,
+  organization/workspace deployment scope, closed trusted capabilities, and
+  manifest-to-source admission-limit drift, with negative fixtures;
+- package admission and system build now reject excessive declarations and
+  instances before privileged work, with regression coverage;
+- deployment install, activation, health, rollback selection, and run start now
+  re-read every frozen implementation revocation. Revocation storage failure
+  denies the transition, and a newly revoked active deployment is deactivated
+  where possible, persisted as revoked, and denied new starts;
+- the support runbook defines vulnerable-package response, immutable upgrade and
+  rollback, coordinated metadata/artifact recovery, performance evidence,
+  security review, WCAG 2.2 AA review, deprecation, and honest profile status.
+
+Implementation is complete for repository-owned controls. No profile is declared
+production-qualified by this increment alone. Cross-platform packages, live
+managed services, coordinated recovery, target load/sandbox limits, penetration
+review, manual accessibility review, and rehearsed revocation/recovery remain
+required controlled evidence and therefore remain `not-run`/`incomplete` until
+an owning organization supplies them.
+
 - Minimum verification:
   - full repository tests, architecture, docs, agent-support, security dependency,
     server/thin builds, and desktop packaging;

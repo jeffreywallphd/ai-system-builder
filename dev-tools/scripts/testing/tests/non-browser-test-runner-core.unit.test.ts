@@ -5,13 +5,17 @@ import {
   applyIgnoredFailureAdjustments,
   applyDiagnosticSummaryMetric,
   buildNonBrowserNodeTestRunOptions,
+  formatNonBrowserFailureSummary,
   isIgnorableRunnerSpawnFailure,
 } from "../non-browser-test-runner-core.mjs";
 
 describe("non-browser test runner core helpers", () => {
   it("builds node:test run options with repository runner defaults", () => {
     const files = ["C:/repo/test-a.mjs", "C:/repo/test-b.mjs"];
-    const runOptions = buildNonBrowserNodeTestRunOptions({ files, cwd: "C:/repo" });
+    const runOptions = buildNonBrowserNodeTestRunOptions({
+      files,
+      cwd: "C:/repo",
+    });
 
     assert.equal(runOptions.cwd, "C:/repo");
     assert.deepEqual(runOptions.files, files);
@@ -43,7 +47,10 @@ describe("non-browser test runner core helpers", () => {
     assert.equal(applyDiagnosticSummaryMetric(summary, "# cancelled 1"), true);
     assert.equal(applyDiagnosticSummaryMetric(summary, "# skipped 3"), true);
     assert.equal(applyDiagnosticSummaryMetric(summary, "# todo 4"), true);
-    assert.equal(applyDiagnosticSummaryMetric(summary, "# duration_ms 67.5"), true);
+    assert.equal(
+      applyDiagnosticSummaryMetric(summary, "# duration_ms 67.5"),
+      true,
+    );
     assert.equal(applyDiagnosticSummaryMetric(summary, "not a metric"), false);
 
     assert.equal(summary.counts.tests, 12);
@@ -72,7 +79,8 @@ describe("non-browser test runner core helpers", () => {
       isIgnorableRunnerSpawnFailure({
         event,
         sourceFile: "dev-tools/scripts/testing/run-non-browser-tests.mjs",
-        runnerRelativePath: "dev-tools/scripts/testing/run-non-browser-tests.mjs",
+        runnerRelativePath:
+          "dev-tools/scripts/testing/run-non-browser-tests.mjs",
       }),
       true,
     );
@@ -81,7 +89,8 @@ describe("non-browser test runner core helpers", () => {
       isIgnorableRunnerSpawnFailure({
         event,
         sourceFile: "modules/contracts/shared/operation-identity.unit.test.ts",
-        runnerRelativePath: "dev-tools/scripts/testing/run-non-browser-tests.mjs",
+        runnerRelativePath:
+          "dev-tools/scripts/testing/run-non-browser-tests.mjs",
       }),
       false,
     );
@@ -107,5 +116,41 @@ describe("non-browser test runner core helpers", () => {
 
     assert.equal(summary.counts.failed, 0);
     assert.equal(summary.counts.tests, 0);
+  });
+
+  it("formats startup and assertion failures for CI console diagnostics", () => {
+    const output = formatNonBrowserFailureSummary({
+      startupError: {
+        name: "Error",
+        message: "Discovery failed.",
+      },
+      failures: [
+        {
+          name: "preserves the contract",
+          file: "modules/example/tests/example.unit.test.ts",
+          line: 12,
+          column: 4,
+          details: {
+            error: {
+              name: "AssertionError",
+              message: "Expected values to be equal.",
+            },
+          },
+        },
+      ],
+    });
+
+    assert.match(output, /Non-browser test runner startup failed:/);
+    assert.match(output, /Error: Discovery failed\./);
+    assert.match(output, /Non-browser test failures \(1\):/);
+    assert.match(
+      output,
+      /preserves the contract \(modules\/example\/tests\/example\.unit\.test\.ts:12:4\)/,
+    );
+    assert.match(output, /AssertionError: Expected values to be equal\./);
+  });
+
+  it("emits no CI diagnostic summary for a passing report", () => {
+    assert.equal(formatNonBrowserFailureSummary({ failures: [] }), "");
   });
 });

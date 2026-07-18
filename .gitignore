@@ -49,6 +49,9 @@ apps/thin-client/.local/
 
 artifacts/
 
+# Local Codex helper tooling
+.local-codex/
+
 *.tsbuildinfo
 
 # Python runtime local artifacts

@@ -11,7 +11,7 @@ const releaseId = normalizeSystemReleaseId("release-review");
 const descriptor = {
   artifactId: normalizeSystemBuildArtifactId("artifact-review-manifest"),
   kind: "manifest",
-  digest: ("sha256:" + "b".repeat(64)) as const,
+  digest: ("sha256:" + "b".repeat(64)) as never,
   mediaType: "application/vnd.ai-system-builder.manifest+json",
   sizeBytes: 1,
 } as const;
@@ -83,7 +83,7 @@ describe("release-bound system-review definition resolver", () => {
   it("derives finite review policy only from one verified approved release manifest", async () => {
     const service = new ReleaseBoundSystemReviewDefinitionService(
       {
-        async readRelease(candidateWorkspace, candidateRelease) {
+        async readRelease(candidateWorkspace: typeof workspaceId, candidateRelease: typeof releaseId) {
           return candidateWorkspace === workspaceId &&
             candidateRelease === releaseId
             ? release()
@@ -94,7 +94,7 @@ describe("release-bound system-review definition resolver", () => {
         async readVerified() {
           return new TextEncoder().encode(JSON.stringify(manifest()));
         },
-      },
+      } as any,
     );
 
     const resolved = await service.resolve(workspaceId, releaseId);
@@ -151,7 +151,7 @@ describe("release-bound system-review definition resolver", () => {
           async readVerified() {
             return new TextEncoder().encode(JSON.stringify(candidate));
           },
-        },
+        } as any,
       );
       expect(await service.resolve(workspaceId, releaseId)).toBeUndefined();
     }
@@ -165,7 +165,7 @@ describe("release-bound system-review definition resolver", () => {
         async readVerified() {
           throw new Error("digest mismatch");
         },
-      },
+      } as any,
     );
     expect(
       await integrityFailure.resolve(workspaceId, releaseId),

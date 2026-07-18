@@ -305,6 +305,7 @@ export async function createServer(options: CreateServerOptions = {}): Promise<C
       storageRootDirectory: config.storageRootDirectory,
       runtimeRootDirectory: config.runtimeRootDirectory,
     });
+    await serverHost.waitForAssetFoundation();
 
     let persistenceClosed = false;
     startupSucceeded = true;

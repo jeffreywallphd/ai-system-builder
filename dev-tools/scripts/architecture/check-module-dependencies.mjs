@@ -4,6 +4,10 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import {
+  buildAssetSystemFitnessViolationMessage,
+  findAssetSystemFitnessViolations,
+} from "./check-asset-system-fitness.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = path.resolve(scriptDirectory, "../../..");
@@ -24,21 +28,38 @@ const isDirectory = (targetPath) => {
 
 const isSourceFile = (fileName) => /\.[cm]?tsx?$/i.test(fileName);
 
-export const readBoundaryConfiguration = (configurationPath = defaultConfigurationPath) => {
+export const readBoundaryConfiguration = (
+  configurationPath = defaultConfigurationPath,
+) => {
   const configuration = JSON.parse(readFileSync(configurationPath, "utf8"));
-  const names = new Set(configuration.boundaries?.map((boundary) => boundary.name));
+  const names = new Set(
+    configuration.boundaries?.map((boundary) => boundary.name),
+  );
 
-  if (configuration.schemaVersion !== 1 || !Array.isArray(configuration.boundaries)) {
-    throw new Error("Architecture boundary configuration must use schemaVersion 1 and define boundaries.");
+  if (
+    configuration.schemaVersion !== 1 ||
+    !Array.isArray(configuration.boundaries)
+  ) {
+    throw new Error(
+      "Architecture boundary configuration must use schemaVersion 1 and define boundaries.",
+    );
   }
 
   for (const boundary of configuration.boundaries) {
-    if (!boundary.name || !boundary.pathPrefix || !Array.isArray(boundary.forbiddenTargets)) {
-      throw new Error("Every architecture boundary needs a name, pathPrefix, and forbiddenTargets array.");
+    if (
+      !boundary.name ||
+      !boundary.pathPrefix ||
+      !Array.isArray(boundary.forbiddenTargets)
+    ) {
+      throw new Error(
+        "Every architecture boundary needs a name, pathPrefix, and forbiddenTargets array.",
+      );
     }
     for (const forbiddenTarget of boundary.forbiddenTargets) {
       if (!names.has(forbiddenTarget)) {
-        throw new Error(`Architecture boundary '${boundary.name}' references unknown target '${forbiddenTarget}'.`);
+        throw new Error(
+          `Architecture boundary '${boundary.name}' references unknown target '${forbiddenTarget}'.`,
+        );
       }
     }
   }
@@ -90,8 +111,10 @@ export const extractModuleSpecifiers = (sourceText, fileName = "source.ts") => {
     ) {
       addStringLiteral(node.moduleReference.expression);
     } else if (ts.isCallExpression(node) && node.arguments.length === 1) {
-      const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
-      const isRequire = ts.isIdentifier(node.expression) && node.expression.text === "require";
+      const isDynamicImport =
+        node.expression.kind === ts.SyntaxKind.ImportKeyword;
+      const isRequire =
+        ts.isIdentifier(node.expression) && node.expression.text === "require";
       if (isDynamicImport || isRequire) {
         addStringLiteral(node.arguments[0]);
       }
@@ -138,7 +161,9 @@ const walkSourceFiles = (repoRoot, sourceRoots, configuration) => {
   const visit = (absolutePath) => {
     for (const entry of readdirSync(absolutePath, { withFileTypes: true })) {
       const entryPath = path.join(absolutePath, entry.name);
-      const relativePath = normalizeToPosixPath(path.relative(repoRoot, entryPath));
+      const relativePath = normalizeToPosixPath(
+        path.relative(repoRoot, entryPath),
+      );
       if (entry.isDirectory()) {
         if (!isIgnoredSourcePath(`${relativePath}/`, configuration)) {
           visit(entryPath);
@@ -159,7 +184,9 @@ const walkSourceFiles = (repoRoot, sourceRoots, configuration) => {
       visit(absoluteRoot);
     }
   }
-  return files.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+  return files.sort((left, right) =>
+    left.relativePath.localeCompare(right.relativePath),
+  );
 };
 
 export const findModuleDependencyViolations = ({
@@ -169,20 +196,36 @@ export const findModuleDependencyViolations = ({
 } = {}) => {
   const violations = [];
 
-  for (const sourceFile of walkSourceFiles(repoRoot, sourceRoots, configuration)) {
-    const sourceBoundary = classifyBoundary(sourceFile.relativePath, configuration);
+  for (const sourceFile of walkSourceFiles(
+    repoRoot,
+    sourceRoots,
+    configuration,
+  )) {
+    const sourceBoundary = classifyBoundary(
+      sourceFile.relativePath,
+      configuration,
+    );
     if (!sourceBoundary || sourceBoundary.forbiddenTargets.length === 0) {
       continue;
     }
 
     const sourceText = readFileSync(sourceFile.absolutePath, "utf8");
-    for (const specifier of extractModuleSpecifiers(sourceText, sourceFile.relativePath)) {
-      const targetPath = resolveRepositorySpecifier(sourceFile.relativePath, specifier);
+    for (const specifier of extractModuleSpecifiers(
+      sourceText,
+      sourceFile.relativePath,
+    )) {
+      const targetPath = resolveRepositorySpecifier(
+        sourceFile.relativePath,
+        specifier,
+      );
       if (!targetPath) {
         continue;
       }
       const targetBoundary = classifyBoundary(targetPath, configuration);
-      if (!targetBoundary || !sourceBoundary.forbiddenTargets.includes(targetBoundary.name)) {
+      if (
+        !targetBoundary ||
+        !sourceBoundary.forbiddenTargets.includes(targetBoundary.name)
+      ) {
         continue;
       }
       const isTrackedException = (configuration.allowedViolations ?? []).some(
@@ -209,24 +252,41 @@ export const findModuleDependencyViolations = ({
   return violations;
 };
 
-export const buildModuleDependencyViolationMessage = (violations, documentationPath) => [
-  "Architecture dependency guard failed.",
-  `Rules: ${documentationPath}`,
-  "",
-  ...violations.flatMap((violation) => [
-    `- ${violation.source} (${violation.sourceBoundary}) imports '${violation.specifier}' (${violation.targetBoundary}).`,
-    `  ${violation.remediation}`,
-  ]),
-].join("\n");
+export const buildModuleDependencyViolationMessage = (
+  violations,
+  documentationPath,
+) =>
+  [
+    "Architecture dependency guard failed.",
+    `Rules: ${documentationPath}`,
+    "",
+    ...violations.flatMap((violation) => [
+      `- ${violation.source} (${violation.sourceBoundary}) imports '${violation.specifier}' (${violation.targetBoundary}).`,
+      `  ${violation.remediation}`,
+    ]),
+  ].join("\n");
 
-const isDirectExecution = process.argv[1] &&
+const isDirectExecution =
+  process.argv[1] &&
   fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
 if (isDirectExecution) {
   const configuration = readBoundaryConfiguration();
   const violations = findModuleDependencyViolations({ configuration });
+  const assetSystemViolations = findAssetSystemFitnessViolations();
   if (violations.length > 0) {
-    console.error(buildModuleDependencyViolationMessage(violations, configuration.documentation));
+    console.error(
+      buildModuleDependencyViolationMessage(
+        violations,
+        configuration.documentation,
+      ),
+    );
+    process.exitCode = 1;
+  }
+  if (assetSystemViolations.length > 0) {
+    console.error(
+      buildAssetSystemFitnessViolationMessage(assetSystemViolations),
+    );
     process.exitCode = 1;
   }
 }

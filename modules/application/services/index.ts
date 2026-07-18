@@ -2,6 +2,7 @@ export * from "./settings";
 export * from "./security";
 export * from "./asset";
 export * from "./system-builder";
+export * from "./system-deployment";
 export * from "./asset-packs";
 
 export * from "./runtime-readiness";
