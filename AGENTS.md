@@ -45,6 +45,19 @@ Run the narrowest relevant tests while iterating, then run the applicable reposi
 
 Report commands run, failures, assumptions, and any verification you could not perform.
 
+## Contributor Helper Loops
+
+- Portable bounded loops live in `dev-tools/helpers/`; usage and configuration
+  are documented in `docs/diagnostics/contributor-helper-loops.md`.
+- Copy the example configuration into an ignored local directory, inspect
+  `--plan`, and run `dev-tools/helpers/run_repository_checks.py` to group
+  related gates.
+- Helpers do not bypass approvals. Do not add arbitrary command execution,
+  destructive cleanup, Git-history mutation, credentials, or local system paths.
+- When a secure action becomes repetitive, improve an existing bounded helper or
+  add a new one with configuration, negative security tests, and documentation
+  in the same change.
+
 ## Stop and Escalate
 
 Pause for direction when the request requires a new product or architecture decision, destructive action, credentials, production mutation, or materially broader scope. Do not treat an ambiguous requirement as authorization for those actions.

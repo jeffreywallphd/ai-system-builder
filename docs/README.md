@@ -25,6 +25,8 @@ This directory separates canonical system guidance from downstream task context 
   - Security-oriented operational checks and manual verification guidance.
 - `docs/diagnostics/`
   - Focused diagnostic and regression-check procedures.
+  - `contributor-helper-loops.md` documents the configurable, bounded helper
+    loops under `dev-tools/helpers/`.
 - `docs/operations/`
   - Persistence operations, schema compatibility, recovery, rollout, and
     deployment qualification procedures.
