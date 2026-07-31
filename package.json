@@ -88,7 +88,7 @@
     "brace-expansion": "file:dev-tools/vendor/brace-expansion-compat",
     "css-loader": "^7.1.2",
     "electron": "41.10.2",
-    "jsdom": "^26.1.0",
+    "jsdom": "^30.0.0",
     "node-loader": "^2.1.0",
     "style-loader": "^4.0.0",
     "ts-loader": "^9.5.4",
